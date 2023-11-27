@@ -1,0 +1,75 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Artist {
+  id                Int                 @id @default(autoincrement())
+  name              String              @unique
+  bio               String?
+  websiteUrl        String?
+  twitterHandle     String?
+  instagramHandle   String?
+  collections       Collection[] // Many-to-many relation
+  artworks          Artwork[] // One-to-many relation
+  ArtistCollections ArtistCollections[]
+  ArtistArtworks    ArtistArtworks[]
+}
+
+model Collection {
+  id                Int                 @id @default(autoincrement())
+  slug              String              @unique
+  title             String
+  enabled           Boolean
+  description       String?
+  blockchain        String?
+  curatorNotes      String?
+  artists           Artist[] // Many-to-many relation
+  artworks          Artwork[] // One-to-many relation
+  ArtistCollections ArtistCollections[]
+}
+
+model Artwork {
+  id             Int              @id @default(autoincrement())
+  enabled        Boolean
+  title          String
+  description    String?
+  image          String?
+  dimensions     Json?
+  video          String?
+  liveUri        String?
+  attributes     Json?
+  tags           Json?
+  artistId       Int
+  artist         Artist           @relation(fields: [artistId], references: [id])
+  collectionId   Int
+  collection     Collection       @relation(fields: [collectionId], references: [id])
+  ArtistArtworks ArtistArtworks[]
+}
+
+model ArtistCollections {
+  artistId Int
+  artist   Artist @relation(fields: [artistId], references: [id])
+
+  collectionId Int
+  collection   Collection @relation(fields: [collectionId], references: [id])
+
+  @@id([artistId, collectionId])
+}
+
+model ArtistArtworks {
+  artistId Int
+  artist   Artist @relation(fields: [artistId], references: [id])
+
+  artworkId Int
+  artwork   Artwork @relation(fields: [artworkId], references: [id])
+
+  @@id([artistId, artworkId])
+}
