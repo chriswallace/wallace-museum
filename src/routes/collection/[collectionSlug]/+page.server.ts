@@ -55,7 +55,7 @@ export async function load({ params }) {
                 artwork.dimensions = { width: 300, height: 200 }; // default size in case of parsing error
             }
 
-            artwork.image = artwork.image + "?tr=w-2000,q-20,bl-6";
+            artwork.image = artwork.image + "?q-60";
             return artwork;
         });
 

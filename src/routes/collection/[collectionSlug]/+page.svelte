@@ -216,7 +216,8 @@
 	.artwork-item img,
 	.artwork-item video,
 	.artwork-item iframe {
-		@apply max-h-[85%] max-w-[55vw] mx-auto;
+		@apply max-h-[85%] max-w-[55vw] w-full h-full mx-auto;
+		object-fit: contain;
 	}
 
 	.artwork-item:first-child {

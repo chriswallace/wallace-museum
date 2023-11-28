@@ -109,10 +109,10 @@
 
 <style lang="scss">
 	header {
-		@apply text-lg w-[380px] md:z-20 bg-white border-r border-gray-200 max-h-[100vh] overflow-y-scroll;
+		@apply text-lg w-[380px] md:z-20 bg-white border-r text-gray-700 border-gray-200 max-h-[100vh] overflow-y-scroll;
 
 		@media (prefers-color-scheme: dark) {
-			@apply bg-black border-gray-800;
+			@apply bg-black border-gray-800 text-gray-200;
 		}
 	}
 
@@ -266,7 +266,7 @@
 
 		.slider {
 			@apply absolute cursor-pointer inset-0 duration-300 rounded-full border-2 border-double border-transparent bg-origin-border;
-			background-image: linear-gradient(black, black), linear-gradient(to right, #999, #999);
+			background-image: linear-gradient(white, white), linear-gradient(to right, #999, #999);
 			background-clip: content-box, border-box;
 
 			&:before {
@@ -280,35 +280,65 @@
 				transition: 0.125s;
 				border-radius: 50%;
 			}
+
+			@media (prefers-color-scheme: dark) {
+				background-image: linear-gradient(black, black), linear-gradient(to right, #666, #666);
+
+				&:before {
+					background-color: #666;
+				}
+			}
 		}
 	}
 
 	input:checked + .slider {
 		background-color: transparent;
-		background-image: linear-gradient(black, black),
+		background-image: linear-gradient(white, white),
 			linear-gradient(
 				to right,
 				rgb(166, 255, 71),
-				rgb(166, 255, 71),
+				rgb(126, 222, 24),
 				rgb(116, 194, 33),
 				rgb(4, 197, 97),
 				rgb(3, 179, 100),
 				rgb(69, 219, 147),
-				rgb(166, 255, 71),
-				rgb(254, 254, 97),
-				rgb(166, 255, 71),
+				rgb(126, 222, 24),
+				rgb(222, 222, 27),
+				rgb(126, 222, 24),
 				rgb(69, 219, 147),
 				rgb(3, 179, 100),
 				rgb(4, 197, 97),
 				rgb(116, 194, 33),
-				rgb(166, 255, 71),
+				rgb(126, 222, 24),
 				rgb(166, 255, 71)
 			);
 
 		&:before {
-			background-color: #fff;
+			background-color: rgb(3, 179, 100);
 
 			transform: translateX(25px); /* Move the button to the right */
+		}
+
+		@media (prefers-color-scheme: dark) {
+			background-image: linear-gradient(black, black),
+				linear-gradient(
+					to right,
+					rgb(166, 255, 71),
+					rgb(126, 222, 24),
+					rgb(116, 194, 33),
+					rgb(4, 197, 97),
+					rgb(3, 179, 100),
+					rgb(69, 219, 147),
+					rgb(126, 222, 24),
+					rgb(222, 222, 27),
+					rgb(126, 222, 24),
+					rgb(69, 219, 147),
+					rgb(3, 179, 100),
+					rgb(4, 197, 97),
+					rgb(116, 194, 33),
+					rgb(126, 222, 24),
+					rgb(166, 255, 71)
+				);
 		}
 	}
 
