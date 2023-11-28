@@ -29,7 +29,7 @@
 <header>
 	<nav aria-label="Global">
 		<a href="/" class="logo">
-			<span class="topline">Wallace</span><span>Collection</span>
+			<span class="topline">Wallace</span><span>Museum</span>
 		</a>
 
 		<CollectionDropdown currentSlug={$page.params.collectionSlug} />
@@ -124,7 +124,8 @@
 		@apply text-base text-gray-500 w-[160px] block pt-4 uppercase;
 		font-family: var(--serif-font-family);
 		font-size: 0.77rem;
-		letter-spacing: 0.4em;
+		letter-spacing: 1.5em;
+		text-indent: 2px;
 
 		span {
 			@apply block;
@@ -134,6 +135,7 @@
 			@apply text-gray-800 lowercase;
 			margin-bottom: 2px;
 			letter-spacing: 2px;
+			text-indent: 0;
 			font-size: 32px;
 			font-variation-settings:
 				'CUTT' 100,
