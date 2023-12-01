@@ -143,7 +143,7 @@
 		@apply text-white;
 
 		svg {
-			@apply w-48 mr-auto;
+			@apply w-[168px] mr-auto;
 		}
 
 		.w {
