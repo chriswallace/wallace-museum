@@ -20,7 +20,16 @@
 	</div>
 </div>
 
-<style type="scss" global>
+<div class="mobile-notice md:hidden">
+	<img src="/images/wallace-museum.png" alt="Wallace Museum" />
+	<p>
+		This experience was designed for modern graphics processing hardware and wide-format displays.
+		Please access it from a modern tablet, notebook, or PC for the optimal experience.<br /><br
+		/><span>- Chris Wallace</span>
+	</p>
+</div>
+
+<style lang="scss" global>
 	body {
 		@apply p-0 m-0;
 		font-family: Helvetica, Arial, sans-serif;
@@ -34,9 +43,8 @@
 			color: rgb(68, 240, 114);
 		}
 	}
-
 	.page-grid {
-		@apply flex h-screen min-w-[800px];
+		@apply h-screen min-w-[800px] hidden md:flex;
 	}
 
 	.page-grid .left-column {
@@ -49,5 +57,37 @@
 
 	.page-grid .main-column {
 		@apply flex-grow overflow-x-auto w-full;
+	}
+
+	.mobile-notice {
+		@apply flex flex-col bg-gray-200 w-screen text-black justify-center items-center h-screen font-display text-2xl p-6 sm:p-12 mx-auto;
+
+		font-variation-settings:
+			'wght' 500,
+			'wdth' 80,
+			'CUTT' 80;
+
+		img {
+			@apply max-w-[220px] mb-12 mr-auto;
+		}
+
+		p {
+			@apply mr-12;
+		}
+
+		span {
+			@apply uppercase text-xl ml-4;
+			font-variation-settings:
+				'wght' 400,
+				'wdth' 40,
+				'CUTT' 80;
+		}
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.mobile-notice {
+			background-color: black;
+			color: white;
+		}
 	}
 </style>
