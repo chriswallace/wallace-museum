@@ -45,10 +45,12 @@
 
 	function resetScrollPosition() {
 		if (container && data.artworks && data.artworks.length > 0) {
-			const firstArtworkElement = artworkRefs[0];
-			setTimeout(() => {
-				firstArtworkElement.click();
-			}, 200);
+			if (artworkRefs[0]) {
+				const firstArtworkElement = artworkRefs[0];
+				setTimeout(() => {
+					firstArtworkElement.click();
+				}, 200);
+			}
 		}
 	}
 
@@ -176,6 +178,15 @@
 </div>
 
 <style lang="scss">
+	.fade-out {
+		opacity: 0;
+		transition: opacity 0.3s ease-out;
+	}
+	.fade-in {
+		opacity: 1;
+		transition: opacity 0.3s ease-in;
+	}
+
 	.artwork-container {
 		@apply h-screen flex overflow-x-auto justify-items-center items-center;
 		scroll-snap-type: x mandatory;
@@ -183,7 +194,7 @@
 	}
 
 	.artwork-item {
-		@apply h-screen mx-4 flex justify-items-center items-center relative;
+		@apply h-screen mx-4 flex justify-items-center items-center;
 		flex: 0 0 auto; /* Adjust this as needed, depending on your layout */
 		scroll-snap-align: center; /* Align the start edge of the element with the container's snapport */
 

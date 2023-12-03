@@ -9,6 +9,7 @@
 	let isToggleActive = false;
 
 	$: artworkDetails = $selectedArtwork;
+	$: artworkSuffix = $page.data.artworks && $page.data.artworks.length > 1 ? 's' : '';
 
 	function toggleMaximize() {
 		if (artworkDetails) {
@@ -35,6 +36,7 @@
 				viewBox="0 0 296 88"
 				fill="none"
 				xmlns="http://www.w3.org/2000/svg"
+				class:highlighted={$isLiveCodeVisible}
 			>
 				<rect width="87.0952" height="87.0952" rx="7.72619" />
 				<path
@@ -63,6 +65,10 @@
 	</nav>
 
 	<div class="details-container">
+		<div class="collection-details">
+			<span>{$page.data.artworks.length} artwork{artworkSuffix}</span> in this collection.
+		</div>
+
 		{#if artworkDetails && artworkDetails.ArtistArtworks}
 			<div class="artist-details">
 				{#each artworkDetails.ArtistArtworks as artist}
@@ -128,7 +134,7 @@
 
 <style lang="scss">
 	header {
-		@apply text-lg w-[380px] md:z-20 bg-white border-r text-gray-700 border-gray-200 max-h-[100vh] overflow-y-scroll;
+		@apply text-lg w-[380px] z-20 bg-white border-r text-gray-700 border-gray-200 max-h-screen overflow-y-scroll;
 
 		@media (prefers-color-scheme: dark) {
 			@apply bg-black border-gray-800 text-gray-200;
@@ -161,11 +167,19 @@
 	}
 
 	a {
-		@apply block no-underline font-bold uppercase text-sm md:text-base;
+		@apply block no-underline font-bold uppercase text-base;
 	}
 
 	.details-container {
 		@apply mt-4 px-6 pb-8;
+	}
+
+	.collection-details {
+		@apply text-sm mb-4 border border-gray-200 rounded-sm p-4;
+
+		span {
+			@apply font-bold;
+		}
 	}
 
 	.artwork-title {
@@ -270,6 +284,10 @@
 			@apply text-gray-300;
 		}
 
+		.collection-details {
+			@apply border-gray-700;
+		}
+
 		.maximize {
 			background-image: url('/images/expand-dark-mode.svg');
 		}
@@ -345,7 +363,6 @@
 
 		&:before {
 			background-color: rgb(3, 179, 100);
-
 			transform: translateX(25px); /* Move the button to the right */
 		}
 

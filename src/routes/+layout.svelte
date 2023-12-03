@@ -4,6 +4,7 @@
 </script>
 
 <svelte:head>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<link rel="stylesheet" href="https://use.typekit.net/dpg0jya.css" />
 </svelte:head>
 
@@ -35,18 +36,18 @@
 	}
 
 	.page-grid {
-		@apply sm:flex sm:h-screen;
+		@apply flex h-screen min-w-[800px];
 	}
 
 	.page-grid .left-column {
-		@apply sm:w-[380px] sm:h-full;
+		@apply w-[380px] h-full;
 	}
 
 	.page-grid .left-column header {
-		@apply sm:h-full;
+		@apply h-full;
 	}
 
 	.page-grid .main-column {
-		@apply sm:flex-grow overflow-x-auto w-full;
+		@apply flex-grow overflow-x-auto w-full;
 	}
 </style>

@@ -92,7 +92,7 @@
   }
 
   h1 {
-    @apply max-w-2xl lg:max-w-5xl text-3xl lg:text-5xl lg:mb-20;
+    @apply max-w-5xl text-5xl mb-20;
     font-variation-settings: 'wght' 400, 'wdth' 75, 'CUTT' 100;
   }
 
@@ -136,7 +136,7 @@
   }
 
   .content{
-    @apply max-w-[calc(100%-2rem)] md:max-w-[calc(100%-4rem)] mx-auto;
+    @apply max-w-[calc(100%-4rem)] mx-auto;
   }
 
   section {
@@ -144,11 +144,11 @@
   }
 
   .subtitle {
-    @apply text-xl mb-4 md:mb-6 lg:text-2xl font-medium;
+    @apply mb-6 text-2xl font-medium;
   }
 
   .content .prose {
-    @apply max-w-full mb-12 lg:text-lg text-stone-800 leading-loose;
+    @apply max-w-full mb-12 text-lg text-stone-800 leading-loose;
   }
 
   .large {
