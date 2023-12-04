@@ -1,22 +1,18 @@
-# create-svelte
+# Wallace Museum
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/master/packages/create-svelte).
+The official repository for the Wallace Museum website, powered by Sveltekit.
 
-## Creating a project
+## Requirements
 
-If you're seeing this, you've probably already done this step. Congrats!
+To run this app, you will need to connect it up with a database. I use a PostgreSQL database, but you can use any database supported by Prisma. The connection string should be stored in a `.env` file in the root of the project. The `.env` file should look like this (replace with your own database connection string):
 
-```bash
-# create a new project in the current directory
-npm create svelte@latest
-
-# create a new project in my-app
-npm create svelte@latest my-app
+```env
+DATABASE_URL=postgres://user:password@host:port/database
 ```
 
-## Developing
+## Cloning this project
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+To set this project up locally, clone the repository and install the dependencies with `npm install` (or `pnpm install` or `yarn`), then start a development server:
 
 ```bash
 npm run dev
@@ -35,4 +31,4 @@ npm run build
 
 You can preview the production build with `npm run preview`.
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment. I use Vercel, so I use the Vercel adapter.
