@@ -5,6 +5,7 @@
 	import { get } from 'svelte/store';
 	import { closeFullscreen } from '$lib/artworkActions';
 	import { onMount } from 'svelte';
+	import { fade } from 'svelte/transition';
 
 	export let data;
 
@@ -18,9 +19,6 @@
 	});
 
 	onMount(() => {
-		data.artworks.forEach((artwork, index) => {
-			setSrcSetAndSizes(artwork, artworkRefs[index]);
-		});
 		window.addEventListener('keydown', handleKeyDown);
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
@@ -43,6 +41,12 @@
 
 	$: $page.path, resetScrollPosition();
 
+	$: loadedClasses = {};
+
+	$: Object.keys(loadingStates).forEach((id) => {
+		loadedClasses[id] = loadingStates[id] ? '' : 'loaded';
+	});
+
 	function resetScrollPosition() {
 		if (container && data.artworks && data.artworks.length > 0) {
 			if (artworkRefs[0]) {
@@ -52,6 +56,14 @@
 				}, 200);
 			}
 		}
+	}
+
+	function handleMediaLoad(artworkId) {
+		console.log(`Media loaded for artwork ID: ${artworkId}`);
+
+		loadingStates[artworkId] = false;
+		loadingStates = { ...loadingStates }; // Reassign the object to trigger reactivity
+		setSrcSetAndSizes(artworkRefs[artworkId], artworkId);
 	}
 
 	function openDetail(artwork, index) {
@@ -130,63 +142,60 @@
 		{#each data.artworks as artwork, index}
 			<div
 				data-artwork-id={artwork.id}
+				in:fade={{ duration: 300 }}
+				out:fade={{ duration: 300 }}
 				bind:this={artworkRefs[index]}
-				class:highlighted={$selectedArtwork && $selectedArtwork.id === artwork.id}
-				class:hidden={$selectedArtwork && $selectedArtwork.id !== artwork.id}
-				class:maximized={$isMaximized}
-				class="artwork-item"
 				on:click={() => openDetail(artwork, index)}
+				class:highlighted={$selectedArtwork && $selectedArtwork.id === artwork.id}
+				class:maximized={$isMaximized}
+				class="artwork-item {loadedClasses[artwork.id]}"
 				tabindex="0"
 				aria-role="button"
 			>
 				<button class="close icon-button" on:click={closeFullscreen}>Close</button>
-				{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.liveUri && $isLiveCodeVisible}
-					<iframe
-						src={artwork.liveUri}
-						class="live-code"
-						style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
-						height={artwork.dimensions.height}
-						width={artwork.dimensions.width}
-						onload={() => (loadingStates[artwork.id] = false)}
-					></iframe>
-				{:else if artwork.video && artwork.video.length > 0}
-					<video autoplay muted>
-						<source
-							src={artwork.video}
-							type="video/mp4"
+				<div
+					class="media-container"
+					style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions
+						.height}; height: {artwork.dimensions.height}; width={artwork.dimensions.width}"
+				>
+					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.liveUri && $isLiveCodeVisible}
+						<iframe
+							src={artwork.liveUri}
+							class="live-code"
 							style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 							height={artwork.dimensions.height}
 							width={artwork.dimensions.width}
-							on:loadeddata={() => (loadingStates[artwork.id] = false)}
+							on:load={() => handleMediaLoad(artwork.id)}
+						></iframe>
+					{:else if artwork.video && artwork.video.length > 0}
+						<video autoplay muted on:loadeddata={() => handleMediaLoad(artwork.id)}>
+							<source
+								src={artwork.video}
+								type="video/mp4"
+								style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
+								height={artwork.dimensions.height}
+								width={artwork.dimensions.width}
+							/>
+							Your browser does not support the video tag.
+						</video>
+					{:else}
+						<img
+							bind:this={artworkRefs[artwork.id]}
+							src={artwork.image}
+							alt={artwork.title}
+							srcset={artwork.srcset}
+							sizes={artwork.sizes}
+							style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
+							on:load={() => handleMediaLoad(artwork.id)}
 						/>
-						Your browser does not support the video tag.
-					</video>
-				{:else}
-					<img
-						bind:this={artworkRefs[artwork.id]}
-						src={artwork.image}
-						alt={artwork.title}
-						srcset={artwork.srcset}
-						sizes={artwork.sizes}
-						style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
-						on:load={() => (loadingStates[artwork.id] = false)}
-					/>
-				{/if}
+					{/if}
+				</div>
 			</div>
 		{/each}
 	</div>
 </div>
 
 <style lang="scss">
-	.fade-out {
-		opacity: 0;
-		transition: opacity 0.3s ease-out;
-	}
-	.fade-in {
-		opacity: 1;
-		transition: opacity 0.3s ease-in;
-	}
-
 	.artwork-container {
 		@apply h-screen flex overflow-x-auto justify-items-center items-center;
 		scroll-snap-type: x mandatory;
@@ -198,17 +207,64 @@
 		flex: 0 0 auto; /* Adjust this as needed, depending on your layout */
 		scroll-snap-align: center; /* Align the start edge of the element with the container's snapport */
 
-		img,
-		video {
-			transition: opacity 0.125s ease-in-out;
+		.media-container:before {
+			content: '';
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			z-index: 20;
+			height: 5px;
+			width: 5px;
+			color: #fff;
+			box-shadow:
+				-10px -10px 0 5px,
+				-10px -10px 0 5px,
+				-10px -10px 0 5px,
+				-10px -10px 0 5px;
+			animation: loader-38 6s infinite;
 		}
-	}
 
-	.loading-animation {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
+		.media-container {
+			@apply relative;
+		}
+
+		> div {
+			height: 100%;
+			width: 100%;
+			position: relative;
+		}
+
+		img,
+		video,
+		iframe {
+			opacity: 0;
+			transition: opacity 0.125s linear;
+		}
+
+		.media-container:before {
+			transition: opacity 0.125s linear;
+		}
+
+		&.loaded {
+			.media-container:before {
+				content: none;
+			}
+
+			img,
+			video,
+			iframe {
+				opacity: 0.6;
+			}
+		}
+
+		&.loaded.highlighted {
+			img,
+			video,
+			iframe {
+				opacity: 1;
+			}
+		}
 	}
 
 	:global {
@@ -224,11 +280,16 @@
 		}
 	}
 
-	.artwork-item img,
-	.artwork-item video,
-	.artwork-item iframe {
-		@apply max-h-[65%] max-w-[55vw] w-full h-full mx-auto;
-		object-fit: contain;
+	.artwork-item div {
+		@apply flex max-h-[85vh] max-w-[calc(100vw-560px)] lg:max-w-[calc(100vw-640px)] mx-auto z-10;
+	}
+
+	.artwork-item {
+		img,
+		video,
+		iframe {
+			@apply w-full h-full object-contain;
+		}
 	}
 
 	.artwork-item:first-child {
@@ -271,6 +332,100 @@
 	@media (prefers-color-scheme: dark) {
 		.close {
 			background-image: url('/images/close-dark-mode.svg');
+		}
+	}
+
+	@keyframes loader-38 {
+		0% {
+			box-shadow:
+				-10px -10px 0 5px,
+				-10px -10px 0 5px,
+				-10px -10px 0 5px,
+				-10px -10px 0 5px;
+		}
+		8.33% {
+			box-shadow:
+				-10px -10px 0 5px,
+				10px -10px 0 5px,
+				10px -10px 0 5px,
+				10px -10px 0 5px;
+		}
+		16.66% {
+			box-shadow:
+				-10px -10px 0 5px,
+				10px -10px 0 5px,
+				10px 10px 0 5px,
+				10px 10px 0 5px;
+		}
+		24.99% {
+			box-shadow:
+				-10px -10px 0 5px,
+				10px -10px 0 5px,
+				10px 10px 0 5px,
+				-10px 10px 0 5px;
+		}
+		33.32% {
+			box-shadow:
+				-10px -10px 0 5px,
+				10px -10px 0 5px,
+				10px 10px 0 5px,
+				-10px -10px 0 5px;
+		}
+		41.65% {
+			box-shadow:
+				10px -10px 0 5px,
+				10px -10px 0 5px,
+				10px 10px 0 5px,
+				10px -10px 0 5px;
+		}
+		49.98% {
+			box-shadow:
+				10px 10px 0 5px,
+				10px 10px 0 5px,
+				10px 10px 0 5px,
+				10px 10px 0 5px;
+		}
+		58.31% {
+			box-shadow:
+				-10px 10px 0 5px,
+				-10px 10px 0 5px,
+				10px 10px 0 5px,
+				-10px 10px 0 5px;
+		}
+		66.64% {
+			box-shadow:
+				-10px -10px 0 5px,
+				-10px -10px 0 5px,
+				10px 10px 0 5px,
+				-10px 10px 0 5px;
+		}
+		74.97% {
+			box-shadow:
+				-10px -10px 0 5px,
+				10px -10px 0 5px,
+				10px 10px 0 5px,
+				-10px 10px 0 5px;
+		}
+		83.3% {
+			box-shadow:
+				-10px -10px 0 5px,
+				10px 10px 0 5px,
+				10px 10px 0 5px,
+				-10px 10px 0 5px;
+		}
+		91.63% {
+			box-shadow:
+				-10px -10px 0 5px,
+				-10px 10px 0 5px,
+				-10px 10px 0 5px,
+				-10px 10px 0 5px;
+		}
+		100% {
+			box-shadow:
+				-10px -10px 0 5px,
+				-10px -10px 0 5px,
+				-10px -10px 0 5px,
+				-10px -10px 0 5px;
 		}
 	}
 </style>

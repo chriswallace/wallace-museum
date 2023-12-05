@@ -48,13 +48,14 @@ export async function load({ params }) {
         if (!collection) throw error(404, 'Collection not found. Please go back or try again later.');
 
         collection.artworks = collection.artworks.map(artwork => {
-            try {
-                artwork.dimensions = JSON.parse(artwork.dimensions);
-            } catch (e) {
-                console.error('Error parsing dimensions JSON for artwork:', artwork.id, e);
-                artwork.dimensions = { width: 300, height: 200 }; // default size in case of parsing error
+            if (typeof artwork.dimensions === 'string') {
+                try {
+                    artwork.dimensions = JSON.parse(artwork.dimensions);
+                } catch (e) {
+                    console.error('Error parsing dimensions JSON for artwork:', artwork.id, e);
+                    artwork.dimensions = { width: 300, height: 200 }; // default size in case of parsing error
+                }
             }
-
             artwork.image = artwork.image + "?q-60";
             return artwork;
         });
