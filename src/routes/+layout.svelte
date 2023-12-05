@@ -20,7 +20,7 @@
 	</div>
 </div>
 
-<div class="mobile-notice md:hidden">
+<div class="mobile-notice">
 	<img src="/images/wallace-museum.png" alt="Wallace Museum" />
 	<p>
 		This experience was designed for modern graphics processing hardware and wide-format displays.
@@ -60,7 +60,7 @@
 	}
 
 	.mobile-notice {
-		@apply flex flex-col bg-gray-200 w-screen text-black justify-center items-center h-screen font-display text-2xl p-6 sm:p-12 mx-auto;
+		@apply md:hidden flex flex-col bg-gray-200 w-screen text-black justify-center items-center h-screen font-display text-2xl p-6 sm:p-12 mx-auto;
 
 		font-variation-settings:
 			'wght' 500,
