@@ -272,6 +272,7 @@
 			margin-left: 0 !important;
 		}
 
+		body > .artwork-item.highlighted div,
 		body > .artwork-item.highlighted img,
 		body > .artwork-item.highlighted video,
 		body > .artwork-item.highlighted iframe {
