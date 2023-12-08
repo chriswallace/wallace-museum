@@ -114,17 +114,10 @@
 							${base_url}${img_name}?tr=w-${size_2x},q-70 2x,
 							${base_url}${img_name}?tr=w-${size_3x},q-70 3x`;
 
-			// This should reflect your actual layout rules in your CSS
-			const sizesStr = `(max-width: 400px) ${size_1x}px,
-						(max-width: 800px) ${size_2x}px,
-						(max-width: 1200px) ${size_3x}px,
-						${size_4x}px`;
-
 			const updatedArtwork = {
 				...artwork,
 				src: newSrc,
-				srcset: srcsetStr,
-				sizes: sizesStr
+				srcset: srcsetStr
 			};
 
 			const index = data.artworks.findIndex((a) => a.id === artwork.id);
@@ -149,22 +142,19 @@
 				class:highlighted={$selectedArtwork && $selectedArtwork.id === artwork.id}
 				class:maximized={$isMaximized}
 				class="artwork-item {loadedClasses[artwork.id]}"
+				style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 				tabindex="0"
 				aria-role="button"
 			>
 				<button class="close icon-button" on:click={closeFullscreen}>Close</button>
 				<div
 					class="media-container"
-					style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions
-						.height}; height: {artwork.dimensions.height}; width={artwork.dimensions.width}"
+					style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 				>
 					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.liveUri && $isLiveCodeVisible}
 						<iframe
 							src={artwork.liveUri}
 							class="live-code"
-							style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
-							height={artwork.dimensions.height}
-							width={artwork.dimensions.width}
 							on:load={() => handleMediaLoad(artwork.id)}
 						></iframe>
 					{:else if artwork.video && artwork.video.length > 0}
@@ -172,7 +162,6 @@
 							<source
 								src={artwork.video}
 								type="video/mp4"
-								style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 								height={artwork.dimensions.height}
 								width={artwork.dimensions.width}
 							/>
@@ -185,7 +174,6 @@
 							alt={artwork.title}
 							srcset={artwork.srcset}
 							sizes={artwork.sizes}
-							style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 							on:load={() => handleMediaLoad(artwork.id)}
 						/>
 					{/if}
@@ -203,11 +191,26 @@
 	}
 
 	.artwork-item {
-		@apply h-screen mx-4 flex justify-items-center items-center;
+		@apply h-screen mx-4 flex justify-items-center items-center max-h-[85vh] max-w-[calc(100vw-560px)] lg:max-w-[calc(100vw-640px)] z-10 relative;
 		flex: 0 0 auto; /* Adjust this as needed, depending on your layout */
 		scroll-snap-align: center; /* Align the start edge of the element with the container's snapport */
+		transition:
+			transform 0.3s ease,
+			opacity 0.3s ease;
 
-		.media-container:before {
+		&:first-child {
+			@apply ml-[25%];
+		}
+
+		&:last-child {
+			@apply mr-[25%];
+		}
+
+		&:first-child:last-child {
+			@apply mx-auto;
+		}
+
+		&:before {
 			content: '';
 			position: absolute;
 			top: 50%;
@@ -223,31 +226,22 @@
 				-10px -10px 0 5px,
 				-10px -10px 0 5px;
 			animation: loader-38 6s infinite;
+			transition: opacity 0.125s linear;
 		}
 
 		.media-container {
-			@apply relative;
-		}
-
-		> div {
-			height: 100%;
-			width: 100%;
-			position: relative;
+			@apply mx-auto w-full relative;
 		}
 
 		img,
 		video,
 		iframe {
-			opacity: 0;
-			transition: opacity 0.125s linear;
-		}
-
-		.media-container:before {
+			@apply h-full w-full opacity-0;
 			transition: opacity 0.125s linear;
 		}
 
 		&.loaded {
-			.media-container:before {
+			&:before {
 				content: none;
 			}
 
@@ -265,50 +259,6 @@
 				opacity: 1;
 			}
 		}
-	}
-
-	:global {
-		body > .artwork-item.highlighted {
-			margin-left: 0 !important;
-		}
-
-		body > .artwork-item.highlighted div,
-		body > .artwork-item.highlighted img,
-		body > .artwork-item.highlighted video,
-		body > .artwork-item.highlighted iframe {
-			max-height: 92vh !important;
-			max-width: 92vw !important;
-		}
-	}
-
-	.artwork-item div {
-		@apply flex max-h-[85vh] max-w-[calc(100vw-560px)] lg:max-w-[calc(100vw-640px)] mx-auto z-10;
-	}
-
-	.artwork-item {
-		img,
-		video,
-		iframe {
-			@apply w-full h-full object-contain;
-		}
-	}
-
-	.artwork-item:first-child {
-		@apply ml-[25%];
-	}
-
-	.artwork-item:last-child {
-		@apply mr-[25%];
-	}
-
-	.artwork-item:first-child:last-child {
-		@apply ml-0 mr-0 w-full;
-	}
-
-	.artwork-item {
-		transition:
-			transform 0.3s ease,
-			opacity 0.3s ease;
 	}
 
 	.close {
@@ -333,100 +283,6 @@
 	@media (prefers-color-scheme: dark) {
 		.close {
 			background-image: url('/images/close-dark-mode.svg');
-		}
-	}
-
-	@keyframes loader-38 {
-		0% {
-			box-shadow:
-				-10px -10px 0 5px,
-				-10px -10px 0 5px,
-				-10px -10px 0 5px,
-				-10px -10px 0 5px;
-		}
-		8.33% {
-			box-shadow:
-				-10px -10px 0 5px,
-				10px -10px 0 5px,
-				10px -10px 0 5px,
-				10px -10px 0 5px;
-		}
-		16.66% {
-			box-shadow:
-				-10px -10px 0 5px,
-				10px -10px 0 5px,
-				10px 10px 0 5px,
-				10px 10px 0 5px;
-		}
-		24.99% {
-			box-shadow:
-				-10px -10px 0 5px,
-				10px -10px 0 5px,
-				10px 10px 0 5px,
-				-10px 10px 0 5px;
-		}
-		33.32% {
-			box-shadow:
-				-10px -10px 0 5px,
-				10px -10px 0 5px,
-				10px 10px 0 5px,
-				-10px -10px 0 5px;
-		}
-		41.65% {
-			box-shadow:
-				10px -10px 0 5px,
-				10px -10px 0 5px,
-				10px 10px 0 5px,
-				10px -10px 0 5px;
-		}
-		49.98% {
-			box-shadow:
-				10px 10px 0 5px,
-				10px 10px 0 5px,
-				10px 10px 0 5px,
-				10px 10px 0 5px;
-		}
-		58.31% {
-			box-shadow:
-				-10px 10px 0 5px,
-				-10px 10px 0 5px,
-				10px 10px 0 5px,
-				-10px 10px 0 5px;
-		}
-		66.64% {
-			box-shadow:
-				-10px -10px 0 5px,
-				-10px -10px 0 5px,
-				10px 10px 0 5px,
-				-10px 10px 0 5px;
-		}
-		74.97% {
-			box-shadow:
-				-10px -10px 0 5px,
-				10px -10px 0 5px,
-				10px 10px 0 5px,
-				-10px 10px 0 5px;
-		}
-		83.3% {
-			box-shadow:
-				-10px -10px 0 5px,
-				10px 10px 0 5px,
-				10px 10px 0 5px,
-				-10px 10px 0 5px;
-		}
-		91.63% {
-			box-shadow:
-				-10px -10px 0 5px,
-				-10px 10px 0 5px,
-				-10px 10px 0 5px,
-				-10px 10px 0 5px;
-		}
-		100% {
-			box-shadow:
-				-10px -10px 0 5px,
-				-10px -10px 0 5px,
-				-10px -10px 0 5px,
-				-10px -10px 0 5px;
 		}
 	}
 </style>
