@@ -240,6 +240,20 @@
 			transition: opacity 0.125s linear;
 		}
 
+		&.maximized {
+			@apply flex flex-col justify-center items-center bg-white;
+
+			.media-container {
+				@apply max-h-[85vh] max-w-[85vw] h-full w-auto;
+			}
+
+			img,
+			video,
+			iframe {
+				@apply max-h-full max-w-full object-contain;
+			}
+		}
+
 		&.loaded {
 			&:before {
 				content: none;
@@ -262,7 +276,7 @@
 	}
 
 	.close {
-		@apply absolute hidden overflow-hidden;
+		@apply absolute hidden overflow-hidden bg-white;
 		background-image: url('/images/close.svg');
 		position: absolute;
 		top: 16px;
@@ -274,6 +288,7 @@
 		font-size: 1.5rem;
 		z-index: 1010;
 		text-indent: 100%;
+		border-radius: 9px;
 	}
 
 	.maximized .close {
@@ -281,7 +296,12 @@
 	}
 
 	@media (prefers-color-scheme: dark) {
+		.maximized {
+			@apply bg-black;
+		}
+
 		.close {
+			@apply bg-white;
 			background-image: url('/images/close-dark-mode.svg');
 		}
 	}
