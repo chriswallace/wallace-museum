@@ -219,7 +219,7 @@
 			z-index: 20;
 			height: 5px;
 			width: 5px;
-			color: #fff;
+			color: #000;
 			box-shadow:
 				-10px -10px 0 5px,
 				-10px -10px 0 5px,
@@ -296,6 +296,9 @@
 	}
 
 	@media (prefers-color-scheme: dark) {
+		.artwork-item:before {
+			color: #fff;
+		}
 		.maximized {
 			@apply bg-black;
 		}
