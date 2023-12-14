@@ -21,6 +21,12 @@ export async function load({ params }) {
                         video: true, // Scalar field
                         liveUri: true, // Scalar field
                         dimensions: true, // Scalar field
+                        contractAddr: true,
+                        contractAlias: true,
+                        totalSupply: true,
+                        symbol: true,
+                        tokenID: true,
+                        mintDate: true,
                         tags: true, // Scalar field
                         attributes: true, // Scalar field
                         ArtistArtworks: {  // Include the join table relation

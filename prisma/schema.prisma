@@ -46,6 +46,12 @@ model Artwork {
   video          String?
   liveUri        String?
   attributes     Json?
+  contractAddr   String?
+  contractAlias  String?
+  totalSupply    String?
+  symbol         String?
+  tokenID        Int?
+  mintDate       DateTime?
   tags           Json?
   artistId       Int
   artist         Artist           @relation(fields: [artistId], references: [id])

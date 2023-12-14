@@ -165,7 +165,7 @@
   }
 
   dl{
-    @apply text-sm grid grid-cols-2;
+    @apply text-sm grid grid-cols-5;
   }
 
   dt,dd{
@@ -173,7 +173,11 @@
   }
 
   dt{
-    @apply font-bold;
+    @apply font-bold col-span-2 pr-2;
+  }
+
+  dd{
+    @apply col-span-3;
   }
 }
 

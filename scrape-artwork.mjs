@@ -412,7 +412,7 @@ async function logData(data) {
 }
 
 async function processAllFiles() {
-    const dir = 'static/collection';
+    const dir = 'static/collection2';
     const files = await fs.readdir(dir);
 
     for (const file of files) {

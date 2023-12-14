@@ -17,6 +17,13 @@
 		}
 	}
 
+	function getAddressURI(contractAddr, tokenID) {
+		// if contract address starts with KT1 or KT2, it's a Tezos contract
+		if (contractAddr.startsWith('KT1') || contractAddr.startsWith('KT2')) {
+			return `https://tzkt.io/${contractAddr}/tokens/${tokenID}`;
+		}
+	}
+
 	function toggleLiveCode() {
 		isLiveCodeVisible.set(!get(isLiveCodeVisible));
 		isToggleActive = $isLiveCodeVisible ? true : false; // Update the toggle state
@@ -24,6 +31,16 @@
 
 	function convertToHTML(text) {
 		return text.replace(/(?:\r\n|\r|\n)/g, '<br>');
+	}
+
+	function formatDate(date) {
+		return new Date(artworkDetails.mintDate).toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: 'numeric'
+		});
 	}
 </script>
 
@@ -87,11 +104,10 @@
 			<div class="artwork-details">
 				<h1 class="artwork-title">
 					{artworkDetails.title}
-
-					<a href="#" class="maximize icon-button" on:click|preventDefault={toggleMaximize}>
-						Fullscreen
-					</a>
 				</h1>
+				<a href="#" class="maximize icon-button with-text" on:click|preventDefault={toggleMaximize}>
+					View Full Screen
+				</a>
 				<div class="artist-details"></div>
 				<p>{@html convertToHTML(artworkDetails.description)}</p>
 
@@ -104,6 +120,44 @@
 						{/each}
 					</dl>
 				{/if}
+
+				<div class="artwork-details">
+					<h3 class="mt-8 mb-4">Additional info</h3>
+					<dl>
+						{#if artworkDetails.mintDate}
+							<dt class="mint-date">Minted</dt>
+							<dd>{formatDate(artworkDetails.mintDate)}</dd>
+						{/if}
+						{#if artworkDetails.tokenID}
+							<dt>Token ID</dt>
+							<dd>{artworkDetails.tokenID}</dd>
+						{/if}
+						{#if artworkDetails.totalSupply}
+							<dt>Token Supply</dt>
+							<dd>
+								{#if artworkDetails.totalSupply == 1}1 of 1{:else}{artworkDetails.totalSupply}{/if}
+							</dd>
+						{/if}
+						{#if artworkDetails.contractAddr && artworkDetails.tokenID}
+							<dt>Contract</dt>
+							<dd>
+								<a
+									target="_blank"
+									href={getAddressURI(artworkDetails.contractAddr, artworkDetails.tokenID)}
+									>{artworkDetails.contractAlias}</a
+								>
+							</dd>
+						{/if}
+						{#if artworkDetails.symbol}
+							<dt>Symbol</dt>
+							<dd>{artworkDetails.symbol}</dd>
+						{/if}
+						{#if artworkDetails.dimensions && artworkDetails.dimensions.width && artworkDetails.dimensions.height}
+							<dt>Dimensions</dt>
+							<dd>{artworkDetails.dimensions.width}x{artworkDetails.dimensions.height}px</dd>
+						{/if}
+					</dl>
+				</div>
 
 				{#if artworkDetails && artworkDetails.tags && artworkDetails.tags.length > 0}
 					<h3 class="mt-8 mb-4">Tags</h3>
@@ -167,7 +221,7 @@
 	}
 
 	a {
-		@apply block no-underline font-bold uppercase text-base;
+		@apply no-underline font-bold uppercase text-base;
 	}
 
 	.details-container {
@@ -186,7 +240,8 @@
 		@apply text-2xl pb-0 mb-0 font-semibold;
 	}
 
-	.artist-name {
+	.artist-name,
+	.artist-name a {
 		display: inline;
 	}
 
@@ -201,14 +256,10 @@
 		content: '';
 	}
 
-	.artist-name a {
-		display: inline;
-	}
-
 	.artist-details,
 	.artwork-details {
 		h1 {
-			@apply text-3xl mb-4 font-semibold leading-normal;
+			@apply text-3xl mb-2 font-semibold leading-normal;
 		}
 
 		.artist-name {
@@ -244,10 +295,19 @@
 		line-height: 500px;
 	}
 
-	.icon-button:first-of-type {
-		@apply ml-2;
-	}
+	.icon-button.with-text {
+		@apply w-auto mb-2;
+		text-indent: 30px;
+		line-height: 22px;
+		background-position: left center;
+		color: inherit;
+		font-size: 13px;
+		font-weight: semibold;
 
+		&:hover {
+			@apply decoration-2 underline;
+		}
+	}
 	.maximize {
 		background-image: url('/images/expand.svg');
 	}

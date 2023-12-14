@@ -167,7 +167,7 @@
 							/>
 							Your browser does not support the video tag.
 						</video>
-					{:else}
+					{:else if artwork.image}
 						<img
 							bind:this={artworkRefs[artwork.id]}
 							src={artwork.image}
@@ -299,12 +299,12 @@
 		.artwork-item:before {
 			color: #fff;
 		}
-		.maximized {
+		.artwork-item.maximized {
 			@apply bg-black;
 		}
 
 		.close {
-			@apply bg-white;
+			@apply bg-black;
 			background-image: url('/images/close-dark-mode.svg');
 		}
 	}
