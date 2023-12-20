@@ -36,7 +36,7 @@
 	});
 
 	$: if (data.artworks) {
-		openDetail(data.artworks[0], 0);
+		openDetail(data.artworks[0]);
 	}
 
 	$: $page.path, resetScrollPosition();
@@ -66,17 +66,19 @@
 		setSrcSetAndSizes(artworkRefs[artworkId], artworkId);
 	}
 
-	function openDetail(artwork, index) {
+	function openDetail(artwork) {
 		selectedArtwork.setSelected(artwork);
-		centerArtwork(index);
+		if (artwork) centerArtwork(artwork.id);
 	}
 
-	function centerArtwork(index) {
-		const artworkElement = artworkRefs[index];
-		if (artworkElement && container) {
-			const scrollX =
-				artworkElement.offsetLeft - container.offsetWidth / 2 + artworkElement.offsetWidth / 2;
-			container.scrollTo({ left: scrollX, behavior: 'smooth' });
+	function centerArtwork(artworkId) {
+		if (container) {
+			const artworkElement = container.querySelector(`[data-artwork-id="${artworkId}"]`);
+			if (artworkElement && container) {
+				const scrollX =
+					artworkElement.offsetLeft - container.offsetWidth / 2 + artworkElement.offsetWidth / 2;
+				container.scrollTo({ left: scrollX, behavior: 'smooth' });
+			}
 		}
 	}
 
@@ -138,7 +140,7 @@
 				in:fade={{ duration: 300 }}
 				out:fade={{ duration: 300 }}
 				bind:this={artworkRefs[index]}
-				on:click={() => openDetail(artwork, index)}
+				on:click={() => openDetail(artwork)}
 				class:highlighted={$selectedArtwork && $selectedArtwork.id === artwork.id}
 				class:maximized={$isMaximized}
 				class="artwork-item {loadedClasses[artwork.id]}"
