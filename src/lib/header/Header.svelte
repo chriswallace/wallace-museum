@@ -21,6 +21,8 @@
 		// if contract address starts with KT1 or KT2, it's a Tezos contract
 		if (contractAddr.startsWith('KT1') || contractAddr.startsWith('KT2')) {
 			return `https://tzkt.io/${contractAddr}/tokens/${tokenID}`;
+		} else if (contractAddr.startsWith('0x')) {
+			return `https://etherscan.io/token/${contractAddr}?a=${tokenID}`;
 		}
 	}
 
