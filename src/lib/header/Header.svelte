@@ -11,12 +11,6 @@
 	$: artworkDetails = $selectedArtwork;
 	$: artworkSuffix = $page.data.artworks && $page.data.artworks.length > 1 ? 's' : '';
 
-	function toggleMaximize() {
-		if (artworkDetails) {
-			handleMaximize(artworkDetails); // Ensure artworkRefs and data are accessible here
-		}
-	}
-
 	function getAddressURI(contractAddr, tokenID) {
 		// if contract address starts with KT1 or KT2, it's a Tezos contract
 		if (contractAddr.startsWith('KT1') || contractAddr.startsWith('KT2')) {
@@ -107,9 +101,6 @@
 				<h1 class="artwork-title">
 					{artworkDetails.title}
 				</h1>
-				<a href="#" class="maximize icon-button with-text" on:click|preventDefault={toggleMaximize}>
-					View Full Screen
-				</a>
 				<div class="artist-details"></div>
 				<p>{@html convertToHTML(artworkDetails.description)}</p>
 
@@ -286,34 +277,6 @@
 		}
 	}
 
-	.icon-button {
-		@apply inline-block p-0 align-baseline;
-		width: 22px;
-		height: 22px;
-		background-size: 22px;
-		background-position: center center;
-		background-repeat: no-repeat;
-		overflow: hidden;
-		line-height: 500px;
-	}
-
-	.icon-button.with-text {
-		@apply w-auto mb-2;
-		text-indent: 30px;
-		line-height: 22px;
-		background-position: left center;
-		color: inherit;
-		font-size: 13px;
-		font-weight: semibold;
-
-		&:hover {
-			@apply decoration-2 underline;
-		}
-	}
-	.maximize {
-		background-image: url('/images/expand.svg');
-	}
-
 	@media (prefers-color-scheme: dark) {
 		.logo {
 			@apply text-white;
@@ -348,10 +311,6 @@
 
 		.collection-details {
 			@apply border-gray-700;
-		}
-
-		.maximize {
-			background-image: url('/images/expand-dark-mode.svg');
 		}
 
 		.view-live-code {

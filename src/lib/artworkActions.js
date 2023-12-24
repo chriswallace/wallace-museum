@@ -1,17 +1,12 @@
 import { get } from 'svelte/store';
-import { isMaximized, isLiveCodeVisible } from '$lib/stores';
+import { isMaximized } from '$lib/stores';
 
 let clonedArtwork = null;
 
-export function handleMaximize(artworkDetails) {
+export function handleMaximize(artworkId) {
     const isCurrentlyMaximized = get(isMaximized);
 
-    if (!isCurrentlyMaximized && artworkDetails) {
-        // Assuming artworkDetails has an id property
-        let artworkId = artworkDetails.id;
-
-        // Find the artwork element in the DOM
-        // This assumes your artwork elements have a data attribute like 'data-artwork-id'
+    if (!isCurrentlyMaximized) {
         let artworkElement = document.querySelector(`[data-artwork-id='${artworkId}']`);
 
         if (artworkElement) {

@@ -3,7 +3,7 @@
 	import { selectedArtwork, isMaximized, isLiveCodeVisible } from '$lib/stores';
 	import { afterNavigate, beforeNavigate } from '$app/navigation';
 	import { get } from 'svelte/store';
-	import { closeFullscreen } from '$lib/artworkActions';
+	import { closeFullscreen, handleMaximize } from '$lib/artworkActions';
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 
@@ -43,9 +43,17 @@
 
 	$: loadedClasses = {};
 
+	$: artworkDetails = $selectedArtwork;
+
 	$: Object.keys(loadingStates).forEach((id) => {
 		loadedClasses[id] = loadingStates[id] ? '' : 'loaded';
 	});
+
+	function toggleMaximize(artworkId) {
+		if (artworkId) {
+			handleMaximize(artworkId);
+		}
+	}
 
 	function resetScrollPosition() {
 		if (container && data.artworks && data.artworks.length > 0) {
@@ -179,6 +187,16 @@
 							on:load={() => handleMediaLoad(artwork.id)}
 						/>
 					{/if}
+
+					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && !$isMaximized}
+						<a
+							href="#"
+							class="maximize icon-button"
+							on:click|preventDefault={() => toggleMaximize(artwork.id)}
+						>
+							View Full Screen
+						</a>
+					{/if}
 				</div>
 			</div>
 		{/each}
@@ -295,6 +313,14 @@
 
 	.maximized .close {
 		@apply block;
+	}
+
+	.maximize {
+		@apply left-[50%] transform translate-x-[-50%] absolute -bottom-10;
+
+		.maximized & {
+			@apply hidden;
+		}
 	}
 
 	@media (prefers-color-scheme: dark) {
