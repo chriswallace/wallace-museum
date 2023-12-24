@@ -79,7 +79,7 @@
 
 	<div class="details-container">
 		<div class="collection-details">
-			<span>{$page.data.artworks.length} artwork{artworkSuffix}</span> in this collection.
+			<span>{$page.data.artworks?.length ?? 0} artwork{artworkSuffix}</span> in this collection.
 		</div>
 
 		{#if artworkDetails && artworkDetails.ArtistArtworks}

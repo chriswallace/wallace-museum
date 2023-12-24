@@ -50,7 +50,7 @@ model Artwork {
   contractAlias  String?
   totalSupply    String?
   symbol         String?
-  tokenID        BigInt?
+  tokenID        String?
   mintDate       DateTime?
   tags           Json?
   artistId       Int

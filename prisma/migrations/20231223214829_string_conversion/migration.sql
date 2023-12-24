@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Artwork" ALTER COLUMN "tokenID" SET DATA TYPE TEXT;
