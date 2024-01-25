@@ -30,7 +30,7 @@ module.exports = {
             },
             fontFamily: {
                 display: ['var(--serif-font-family)', 'serif'],
-                sans: ['var(--serif-font-family)', 'sans-serif'],
+                sans: ['var(--font-family)', 'sans-serif'],
                 body: ['var(--serif-font-family)', 'sans-serif']
             }
         }
