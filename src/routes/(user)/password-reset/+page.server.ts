@@ -41,7 +41,7 @@ const login: Action = async ({ cookies, request }) => {
 
     cookies.set('session', authenticatedUser.userAuthToken, {
         // send cookie for admin pages
-        path: '/admin',
+        path: '/',
         // server side only cookie so you can't use `document.cookie`
         httpOnly: true,
         // only requests from same site can send cookies

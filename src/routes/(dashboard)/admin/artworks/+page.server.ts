@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ request, locals }) => {
     let user = null;
     if (sessionId) {
         const session = await prisma.session.findUnique({
-            where: { sessionId },
+            where: { sessionId: sessionId },
             include: { user: true }
         });
 
@@ -20,6 +20,7 @@ export const load: PageServerLoad = async ({ request, locals }) => {
         if (session && new Date(session.expiresAt) > new Date()) {
             user = session.user;
         }
+
     }
 
     if (!user) {

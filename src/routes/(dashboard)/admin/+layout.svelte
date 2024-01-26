@@ -29,11 +29,9 @@
 				<a href="/admin/import">Import NFTs</a>
 			</div>
 
-			{#if $page.data.user}
-				<form action="/logout" method="POST">
-					<button type="submit">Log out</button>
-				</form>
-			{/if}
+			<form action="/logout" method="POST">
+				<button type="submit">Log out</button>
+			</form>
 		</nav>
 	</div>
 	<div class="ui-content">
@@ -88,6 +86,10 @@
 			font-variation-settings: initial;
 		}
 
+		.back-btn {
+			@apply inline-block px-2 py-1 mb-6 uppercase text-sm border border-transparent rounded-sm text-gray-500 hover:text-primary hover:border-primary font-semibold no-underline transition duration-300 ease-in-out;
+		}
+
 		.pagination {
 			@apply text-center py-16;
 
@@ -124,14 +126,14 @@
 
 		th {
 			@apply font-bold text-gray-600 uppercase text-sm py-4 border-b-2 border-gray-300;
+
+			&.sortable {
+				@apply cursor-pointer text-blue-600 hover:text-blue-800;
+			}
 		}
 
 		td div {
-			@apply w-full max-w-[220px] truncate;
-		}
-
-		.actions {
-			@apply max-w-[10px];
+			@apply text-left w-full max-w-[220px] truncate;
 		}
 
 		tr td {
@@ -146,8 +148,16 @@
 			@apply bg-white;
 		}
 
+		.actions {
+			@apply max-w-[10px];
+		}
+
 		.edit {
 			@apply text-primary border-2 border-primary hover:bg-primary hover:text-white hover:no-underline rounded-sm text-sm uppercase no-underline font-bold px-3 py-2 m-0 mx-1;
+		}
+
+		.search {
+			@apply w-full float-right text-lg px-4 py-3 mb-8 rounded-sm border border-gray-300;
 		}
 
 		.artwork {

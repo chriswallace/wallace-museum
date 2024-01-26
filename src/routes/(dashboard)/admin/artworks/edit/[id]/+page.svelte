@@ -49,9 +49,9 @@
 		}
 	}
 
-	// Implement updateArtwork and deleteArtwork functions as before
-
 	function updateArtwork() {}
+
+	function deleteArtwork() {}
 
 	onMount(() => {
 		if (browser) {
@@ -60,61 +60,65 @@
 	});
 </script>
 
-{#if isLoading}
-	<p>Loading...</p>
-{:else if error}
-	<p class="error">{error}</p>
-{:else}
-	<h1>Edit artwork</h1>
-	<div class="edit-form">
-		<div class="artwork">
-			<img src="{artwork.image}?tr=w-740,q-70" alt="" />
-		</div>
-		<div>
-			<form on:submit|preventDefault={updateArtwork}>
-				<!-- Artwork Fields -->
-				<div>
-					<label for="title">Title</label>
-					<input type="text" id="title" bind:value={artwork.title} />
-				</div>
-				<div>
-					<label for="description">Description</label>
-					<textarea id="description" bind:value={artwork.description}></textarea>
-				</div>
-				<div>
-					<label for="artist">Artist</label>
-					<select id="artist" bind:value={artwork.artistId}>
-						<option value="">Select Artist</option>
-						{#each artists as artist}
-							<option value={artist.id}>{artist.name}</option>
-						{/each}
-					</select>
-				</div>
-				<div>
-					<label for="collection">Collection</label>
-					<select id="collection" bind:value={artwork.collectionId}>
-						<option value="">Select Collection</option>
-						{#each collections as collection}
-							<option value={collection.id}>{collection.title}</option>
-						{/each}
-					</select>
-				</div>
-				<!-- Add other fields as necessary -->
+<title>Edit artwork</title>
 
-				<button type="submit">Save details</button>
-			</form>
-			<button class="delete" on:click={deleteArtwork}>Delete Artwork</button>
+<div class="container">
+	{#if isLoading}
+		<p>Loading...</p>
+	{:else if error}
+		<p class="error">{error}</p>
+	{:else}
+		<a class="back-btn" href="/admin/artworks">&lt; Back</a>
+		<h1>Edit artwork</h1>
+		<div class="edit-form">
+			<div class="artwork">
+				<img src="{artwork.image}?tr=w-740,q-70" alt="" />
+			</div>
+			<div>
+				<form on:submit|preventDefault={updateArtwork}>
+					<!-- Artwork Fields -->
+					<div>
+						<label for="title">Title</label>
+						<input type="text" id="title" bind:value={artwork.title} />
+					</div>
+					<div>
+						<label for="description">Description</label>
+						<textarea id="description" bind:value={artwork.description}></textarea>
+					</div>
+					<div>
+						<label for="artist">Artist</label>
+						<select id="artist" bind:value={artwork.artistId}>
+							<option value="">Select Artist</option>
+							{#each artists as artist}
+								<option value={artist.id}>{artist.name}</option>
+							{/each}
+						</select>
+					</div>
+					<div>
+						<label for="collection">Collection</label>
+						<select id="collection" bind:value={artwork.collectionId}>
+							<option value="">Select Collection</option>
+							{#each collections as collection}
+								<option value={collection.id}>{collection.title}</option>
+							{/each}
+						</select>
+					</div>
+					<!-- Add other fields as necessary -->
+
+					<button type="submit">Save details</button>
+				</form>
+				<button class="delete" on:click={deleteArtwork}>Delete Artwork</button>
+			</div>
 		</div>
-	</div>
-{/if}
+	{/if}
+</div>
 
 <style>
 	h1 {
 		@apply mb-12;
 	}
 
-	h1,
-	.edit-form {
+	.container {
 		@apply max-w-7xl mx-auto;
 	}
 

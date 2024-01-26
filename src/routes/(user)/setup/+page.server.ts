@@ -4,7 +4,11 @@ import bcrypt from 'bcryptjs'
 import prisma from '$lib/prisma'
 
 export const load: PageServerLoad = async () => {
+    const anyUser = await prisma.user.findFirst()
 
+    if (anyUser) {
+        throw redirect(303, '/login')
+    }
 }
 
 const register: Action = async ({ request }) => {

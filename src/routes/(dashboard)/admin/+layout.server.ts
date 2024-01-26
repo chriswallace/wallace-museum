@@ -4,7 +4,6 @@ import prisma from '$lib/prisma';
 import { redirect } from '@sveltejs/kit';
 
 export const load: LayoutServerLoad = async ({ request, locals }) => {
-    console.log("Running layout server load");
 
     const cookies = request.headers.get('cookie') || '';
     const sessionCookie = cookies.split(';').find(c => c.trim().startsWith('session='));

@@ -194,34 +194,30 @@
   transform: translateY(0);
 }
 
-	.icon-button {
-		@apply inline-block p-0 align-baseline;
-		width: 22px;
-		height: 22px;
-		background-size: 22px;
-		background-position: center center;
-		background-repeat: no-repeat;
-		overflow: hidden;
-		line-height: 500px;
-	}
+.icon-button {
+  @apply inline-block p-0 align-baseline;
+  width: 22px;
+  height: 22px;
+  background-size: 22px;
+  background-position: center center;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  line-height: 500px;
+}
 
-	.icon-button.with-text {
-		@apply w-auto mb-2;
-		text-indent: 30px;
-		line-height: 22px;
-		background-position: left center;
-		color: inherit;
-		font-size: 13px;
-		font-weight: semibold;
+.icon-button.with-text {
+  @apply w-auto mb-2;
+  text-indent: 30px;
+  line-height: 22px;
+  background-position: left center;
+  color: inherit;
+  font-size: 13px;
+  font-weight: semibold;
+}
 
-		&:hover {
-			@apply decoration-2 underline;
-		}
-	}
-
-	.maximize {
-		background-image: url('/images/expand.svg');
-	}
+.maximize {
+  background-image: url('/images/expand.svg');
+}
 
 @keyframes fadeIn {
   from {
