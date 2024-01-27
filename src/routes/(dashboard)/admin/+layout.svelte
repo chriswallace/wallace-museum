@@ -2,19 +2,17 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
+	import { SvelteToast } from '@zerodevx/svelte-toast';
 
 	let currentPage;
 
 	if (browser) {
-		// Subscribe to $page store to force rerunning the load function
 		page.subscribe(($page) => {
 			currentPage = $page.url.pathname;
 		});
 	}
 
-	onMount(() => {
-		// Logic that depends on currentPage, if necessary
-	});
+	onMount(() => {});
 </script>
 
 <div class="ui-frame">
@@ -23,10 +21,16 @@
 			<a class="medici" href="/">Medici.</a>
 
 			<div class="primary-nav">
-				<a href="/admin">Dashboard</a>
-				<a href="/admin/collections">Collections</a>
-				<a href="/admin/artworks">Artworks</a>
-				<a href="/admin/import">Import NFTs</a>
+				<a href="/admin" class={currentPage === '/admin' ? 'selected' : ''}>Dashboard</a>
+				<a href="/admin/collections" class={currentPage === '/admin/collections' ? 'selected' : ''}
+					>Collections</a
+				>
+				<a href="/admin/artworks" class={currentPage === '/admin/artworks' ? 'selected' : ''}
+					>Artworks</a
+				>
+				<a href="/admin/import" class={currentPage === '/admin/import' ? 'selected' : ''}
+					>Import NFTs</a
+				>
 			</div>
 
 			<form action="/logout" method="POST">
@@ -38,6 +42,8 @@
 		<slot />
 	</div>
 </div>
+
+<SvelteToast />
 
 <style lang="scss">
 	.ui-frame {
@@ -61,8 +67,12 @@
 
 		a,
 		button {
-			@apply text-gray-800 no-underline font-normal px-2 py-3 m-0 mx-1;
+			@apply text-gray-800 font-normal px-2 py-3 m-0 mx-1 transition duration-300 ease-in-out decoration-2 underline-offset-8 underline decoration-transparent;
 			font-variation-settings: initial;
+		}
+
+		.selected {
+			@apply decoration-primary;
 		}
 	}
 
@@ -84,6 +94,10 @@
 		label {
 			@apply font-sans;
 			font-variation-settings: initial;
+		}
+
+		h1 button {
+			@apply align-middle text-sm border border-gray-400 text-gray-600 ml-4 mt-0 px-2 py-1 rounded-sm hover:bg-primary hover:border-primary hover:text-white;
 		}
 
 		.back-btn {
@@ -162,6 +176,14 @@
 
 		.artwork {
 			@apply w-24;
+		}
+
+		.file-uploader {
+			@apply grid grid-cols-1 items-center justify-center bg-gray-200 border-2 border-dashed border-gray-300 rounded-sm p-8 aspect-square;
+
+			input {
+				@apply w-auto align-middle mx-auto border border-gray-500 border-dashed;
+			}
 		}
 	}
 </style>

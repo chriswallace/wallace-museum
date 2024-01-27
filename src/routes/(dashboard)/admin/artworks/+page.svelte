@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { toast } from '@zerodevx/svelte-toast';
 
 	let artworks = [];
 	let page = 1;
@@ -33,7 +34,9 @@
 		});
 		if (response.ok) {
 			artwork.enabled = !artwork.enabled;
+			toast.push(`Artwork ${artwork.enabled ? 'enabled' : 'disabled'} successfully`);
 		} else {
+			toast.push(`Artwork ${artwork.enabled ? 'enable' : 'disable'} failed`);
 			console.error('Failed to toggle artwork enabled state');
 		}
 	}
@@ -71,11 +74,15 @@
 		// This will scroll the window to the top of the page
 		window.scrollTo(0, 0);
 	}
+
+	function addNew() {
+		goto(`/admin/artworks/new`);
+	}
 </script>
 
 <title>Artworks</title>
 
-<h1>Artworks</h1>
+<h1>Artworks <button on:click={() => addNew()}>+ Add new</button></h1>
 
 <p>
 	This is a list of artworks currently stored in your Compendium. Here, you may edit, enable, or

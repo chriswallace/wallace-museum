@@ -36,18 +36,6 @@ export async function PUT({ params, request }) {
                 enabled: data.enabled,
                 title: data.title,
                 description: data.description,
-                image: data.image,
-                dimensions: data.dimensions,
-                video: data.video,
-                liveUri: data.liveUri,
-                attributes: data.attributes,
-                contractAddr: data.contractAddr,
-                contractAlias: data.contractAlias,
-                totalSupply: data.totalSupply,
-                symbol: data.symbol,
-                tokenID: data.tokenID,
-                mintDate: data.mintDate ? new Date(data.mintDate) : null,
-                tags: data.tags,
                 artistId: data.artistId,
                 collectionId: data.collectionId
             }
@@ -76,6 +64,7 @@ export async function DELETE({ params }) {
 
         return new Response(null, { status: 204 });
     } catch (error) {
+        console.log(error);
         return new Response(JSON.stringify({ error: 'Error deleting artwork' }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }

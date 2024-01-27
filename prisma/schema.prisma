@@ -75,7 +75,7 @@ model ArtistArtworks {
   artist   Artist @relation(fields: [artistId], references: [id])
 
   artworkId Int
-  artwork   Artwork @relation(fields: [artworkId], references: [id])
+  artwork   Artwork @relation(fields: [artworkId], references: [id], onDelete: Cascade)
 
   @@id([artistId, artworkId])
 }
