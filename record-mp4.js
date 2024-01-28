@@ -2,12 +2,13 @@ const puppeteer = require('puppeteer');
 const { PuppeteerScreenRecorder } = require('puppeteer-screen-recorder');
 const fs = require('fs');
 const imagekit = require('imagekit');
+const { env } = require('$env/dynamic/private');
 
 // Initialize ImageKit
 const imagekitInstance = new imagekit({
-    publicKey: "public_L3fJkv2yTfeiUv4DH5HtKrmlOAk=",
-    privateKey: "private_i5P3md55uud+u6D6LLqgooJE1hs=",
-    urlEndpoint: "https://ik.imagekit.io/UltraDAO/"
+    publicKey: env.IMAGEKIT_PUBLIC_KEY,
+    privateKey: env.IMAGEKIT_PRIVATE_KEY,
+    urlEndpoint: env.URL_ENDPOINT
 });
 
 async function captureAndUpload(url, fileName) {

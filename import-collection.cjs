@@ -8,8 +8,9 @@ const sharp = require('sharp');
 const path = require('path');
 const axios = require('axios');
 const gifResize = require('@gumlet/gif-resize'); // Library for resizing GIFs
+const { env } = require('$env/dynamic/private');
 
-const openseaApiKey = "c5ebf6f438ff4c239b34d6fc48dbae95"; // Replace with your OpenSea API key
+const openseaApiKey = env.OPENSEA_API_KEY; // Replace with your OpenSea API key
 
 //sdk.auth(openseaApiKey);
 //sdk.server('https://api.opensea.io');
@@ -21,9 +22,9 @@ const RETRY_DELAY = 2000;  // 2 seconds
 
 // Initialize ImageKit
 const imagekit = new imageKit({
-    publicKey: "public_L3fJkv2yTfeiUv4DH5HtKrmlOAk=",
-    privateKey: "private_i5P3md55uud+u6D6LLqgooJE1hs=",
-    urlEndpoint: "https://ik.imagekit.io/UltraDAO/"
+    publicKey: env.IMAGEKIT_PUBLIC_KEY,
+    privateKey: env.IMAGEKIT_PRIVATE_KEY,
+    urlEndpoint: env.URL_ENDPOINT
 });
 
 async function fetchMedia(uri) {

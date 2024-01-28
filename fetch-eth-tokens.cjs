@@ -3,10 +3,11 @@ const axios = require('axios');
 const sdk = require('api')('@opensea/v2.0#kke226lqeabeu1');
 const { Network, Alchemy } = require('alchemy-sdk');
 const BigNumber = require('bignumber.js');
+const { env } = require('$env/dynamic/private');
 
 const walletAddress = "0x8367A713bc14212Ab1bB8c55A778e43e50B8b927"; // Ethereum wallet address
-const openseaApiKey = "c5ebf6f438ff4c239b34d6fc48dbae95"; // Replace with your OpenSea API key
-const alchemyApiKey = "cF9tNLE7hq66wwGAyJ9O4iqeMfPH4t62"; // Replace with your Alchemy API key
+const openseaApiKey = env.OPENSEA_API_KEY; // Replace with your OpenSea API key
+const alchemyApiKey = env.ALCHEMY_API_KEY; // Replace with your Alchemy API key
 
 const settings = {
   apiKey: alchemyApiKey,
