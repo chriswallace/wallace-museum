@@ -29,7 +29,6 @@ model Collection {
   title             String
   enabled           Boolean
   description       String?
-  blockchain        String?
   curatorNotes      String?
   artists           Artist[] // Many-to-many relation
   artworks          Artwork[] // One-to-many relation
@@ -46,6 +45,8 @@ model Artwork {
   video          String?
   liveUri        String?
   attributes     Json?
+  curatorNotes   String?
+  blockchain     String?
   contractAddr   String?
   contractAlias  String?
   totalSupply    String?

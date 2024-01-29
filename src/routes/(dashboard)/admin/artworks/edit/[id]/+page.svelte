@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { toast } from '@zerodevx/svelte-toast';
+	import { showToast } from '$lib/toastHelper';
 
 	let artworkId;
 
@@ -13,14 +13,17 @@
 		title: '',
 		description: '',
 		image: '',
+		video: '',
 		artistId: '',
 		collectionId: '',
 		liveUri: '',
 		attributes: '',
+		curatorNotes: '',
 		contractAddr: '',
 		contractAlias: '',
 		totalSupply: '',
 		symbol: '',
+		blockchain: '',
 		tokenID: '',
 		mintDate: ''
 	};
@@ -34,7 +37,7 @@
 			const [artworkRes, artistsRes, collectionsRes] = await Promise.all([
 				fetch(`/api/admin/artworks/${artworkId}`),
 				fetch('/api/admin/artists'), // Assuming you have an endpoint to fetch artists
-				fetch('/api/admin/collections') // Assuming you have an endpoint to fetch collections
+				fetch('/api/admin/collections/all') // Assuming you have an endpoint to fetch collections
 			]);
 
 			if (artworkRes.ok) {
@@ -67,10 +70,10 @@
 		});
 
 		if (response.ok) {
-			toast.push('Artwork updated successfully!', { theme: 'success' });
+			showToast('Artwork saved.', 'success');
 		} else {
-			error = 'Failed to update artwork';
 			toast.push(error, { theme: 'error' });
+			showToast('Failed to update artwork.', 'error');
 		}
 	}
 
@@ -80,12 +83,15 @@
 		});
 
 		if (response.ok) {
-			toast.push('Artwork deleted successfully!', { theme: 'success' });
+			showToast('Artwork deleted.', 'success');
 			goto('/admin/artworks');
 		} else {
-			error = 'Failed to delete artwork';
-			toast.push(error, { theme: 'error' });
+			showToast('Failed to update artwork.', 'error');
 		}
+	}
+
+	function hasVideo() {
+		return artwork.video && artwork.video.length > 0;
 	}
 
 	onMount(() => {
@@ -107,7 +113,11 @@
 		<h1>Edit artwork</h1>
 		<div class="edit-form">
 			<div class="artwork">
-				<img src="{artwork.image}?tr=w-740,q-70" alt="" />
+				{#if hasVideo()}
+					<video src={artwork.video} autoplay controls playsinline muted loop></video>
+				{:else}
+					<img src="{artwork.image}?tr=w-740,q-70" alt={artwork.title} />
+				{/if}
 			</div>
 			<div>
 				<form on:submit|preventDefault={updateArtwork}>
@@ -119,6 +129,10 @@
 					<div>
 						<label for="description">Description</label>
 						<textarea id="description" bind:value={artwork.description}></textarea>
+					</div>
+					<div>
+						<label for="curator-notes">Curator notes</label>
+						<textarea id="curator-notes" bind:value={artwork.curatorNotes}></textarea>
 					</div>
 					<div>
 						<label for="artist">Artist</label>
@@ -139,13 +153,17 @@
 						</select>
 					</div>
 
-					<button type="submit">Save details</button>
+					<button type="submit" class="cta">Save details</button>
 				</form>
-				<button class="delete" on:click={deleteArtwork}>Delete Artwork</button>
+				<button class="delete cta" on:click={deleteArtwork}>Delete Artwork</button>
 			</div>
 
 			<div>
 				<div class="additional-meta">
+					<div class="non-editable">
+						<label>Blockchain</label>
+						<p>{artwork.blockchain}</p>
+					</div>
 					<div class="non-editable">
 						<label>Contract Address</label>
 						<p>{artwork.contractAddr}</p>
@@ -191,48 +209,5 @@
 
 	.artwork {
 		@apply w-full;
-	}
-
-	label,
-	input,
-	select,
-	textarea {
-		@apply block mb-4 w-full p-3;
-	}
-
-	label {
-		@apply px-0 mb-0 font-semibold;
-	}
-
-	textarea {
-		@apply h-32;
-	}
-
-	button {
-		@apply inline-block w-[100%] mt-2 px-4 py-3 bg-primary rounded-sm text-white font-semibold;
-
-		&.delete {
-			@apply bg-red-500;
-		}
-	}
-
-	.error {
-		color: red;
-	}
-
-	.additional-meta {
-		@apply py-4 px-8 bg-gray-200 border rounded-md text-sm;
-	}
-
-	.non-editable {
-		@apply my-3;
-
-		label {
-			@apply m-0 p-0 font-bold;
-		}
-
-		p {
-			@apply m-0;
-		}
 	}
 </style>

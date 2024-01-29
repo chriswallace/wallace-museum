@@ -1,13 +1,14 @@
 <script>
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
-	import { toast } from '@zerodevx/svelte-toast';
+	import { showToast } from '$lib/toastHelper';
+	import { goto } from '$app/navigation';
 
 	let artwork = {
 		title: '',
 		description: '',
 		image: '',
-		// ... include other fields as necessary ...
+		curatorNotes: '',
 		artistId: '',
 		collectionId: ''
 	};
@@ -32,12 +33,52 @@
 			}
 		} catch (e) {
 			error = e.message;
-		} finally {
-			isLoading = false;
 		}
 	}
 
-	function addArtwork() {}
+	async function addArtwork() {
+		const formData = new FormData();
+		const fileInput = document.querySelector('input[type="file"]');
+		if (fileInput.files[0]) {
+			formData.append('image', fileInput.files[0]);
+		}
+
+		formData.append('title', artwork.title);
+		formData.append('description', artwork.description);
+		formData.append('curatorNotes', artwork.curatorNotes);
+
+		// Append artist and collection IDs or new names
+		if (addingNewArtist) {
+			formData.append('newArtistName', newArtistName);
+		} else {
+			formData.append('artistId', artwork.artistId);
+		}
+		if (addingNewCollection) {
+			formData.append('newCollectionTitle', newCollectionTitle);
+		} else {
+			formData.append('collectionId', artwork.collectionId);
+		}
+
+		const response = await fetch('/api/admin/artworks/create', {
+			method: 'POST',
+			body: formData
+		});
+
+		if (response.ok) {
+			const responseData = await response.json();
+			showToast('Artwork added successfully', 'success');
+			goto(`/admin/artworks/edit/${responseData.id}`);
+		} else {
+			const { error } = await response.json();
+			showToast(error, 'error');
+		}
+	}
+
+	let addingNewArtist = false;
+	let newArtistName = '';
+
+	let addingNewCollection = false;
+	let newCollectionTitle = '';
 
 	onMount(() => {
 		if (browser) {
@@ -58,6 +99,7 @@
 			<div class="artwork">
 				<div class="file-uploader">
 					<input type="file" name="image" />
+					<label for="image">Upload media (JPG, PNG, GIF, MP4 under 25MB)</label>
 				</div>
 			</div>
 			<div>
@@ -71,25 +113,58 @@
 						<label for="description">Description</label>
 						<textarea id="description" bind:value={artwork.description}></textarea>
 					</div>
-					<div>
+					<fieldset>
 						<label for="artist">Artist</label>
-						<select id="artist" bind:value={artwork.artistId}>
-							<option value="">Select Artist</option>
-							{#each artists as artist}
-								<option value={artist.id}>{artist.name}</option>
-							{/each}
-						</select>
-					</div>
-					<div>
+						{#if addingNewArtist}
+							<input
+								type="text"
+								name="newArtistName"
+								bind:value={newArtistName}
+								placeholder="Artist Name"
+							/>
+						{:else}
+							<div class="flex gap-4">
+								<div style="flex: 1;">
+									<select id="artistId" name="artistId" bind:value={artwork.artistId}>
+										<option value="">Select Artist</option>
+										{#each artists as artist}
+											<option value={artist.id}>{artist.name}</option>
+										{/each}
+									</select>
+								</div>
+								<div style="flex: none;">
+									<button class="link" on:click={() => (addingNewArtist = true)}>Add New</button>
+								</div>
+							</div>
+						{/if}
+					</fieldset>
+					<fieldset>
 						<label for="collection">Collection</label>
-						<select id="collection" bind:value={artwork.collectionId}>
-							<option value="">Select Collection</option>
-							{#each collections as collection}
-								<option value={collection.id}>{collection.title}</option>
-							{/each}
-						</select>
-					</div>
-					<!-- Add other fields as necessary -->
+						{#if addingNewCollection}
+							<input
+								type="text"
+								name="newCollectionTitle"
+								bind:value={newCollectionTitle}
+								placeholder="Collection Title"
+							/>
+						{:else}
+							<div class="flex gap-4">
+								<div style="flex: 1;">
+									<select id="collection" name="collectionId" bind:value={artwork.collectionId}>
+										<option value="">Select Collection</option>
+										{#each collections as collection}
+											<option value={collection.id}>{collection.title}</option>
+										{/each}
+									</select>
+								</div>
+								<div style="flex: none;">
+									<button class="link" on:click={() => (addingNewCollection = true)}>
+										Add New
+									</button>
+								</div>
+							</div>
+						{/if}
+					</fieldset>
 
 					<button type="submit">Save</button>
 				</form>
@@ -135,6 +210,18 @@
 
 		&.delete {
 			@apply bg-red-500;
+		}
+
+		&.link {
+			@apply mt-0 inline-block bg-secondary align-middle;
+		}
+	}
+
+	fieldset {
+		@apply border border-gray-300 p-4 my-8 rounded-md text-sm;
+
+		select {
+			@apply mb-0;
 		}
 	}
 

@@ -179,10 +179,57 @@
 		}
 
 		.file-uploader {
-			@apply grid grid-cols-1 items-center justify-center bg-gray-200 border-2 border-dashed border-gray-300 rounded-sm p-8 aspect-square;
+			@apply grid grid-cols-1 content-center justify-center bg-gray-200 border-2 border-dashed border-gray-300 rounded-sm p-6 aspect-square;
 
 			input {
 				@apply w-auto align-middle mx-auto border border-gray-500 border-dashed;
+			}
+
+			label {
+				@apply text-center text-gray-500 italic text-sm;
+			}
+		}
+
+		label,
+		input,
+		select,
+		textarea {
+			@apply block mb-4 w-full p-3;
+		}
+
+		label {
+			@apply px-0 mb-0 font-semibold;
+		}
+
+		textarea {
+			@apply h-32;
+		}
+
+		.cta {
+			@apply inline-block w-[100%] mt-2 px-4 py-3 bg-primary rounded-sm text-white font-semibold;
+
+			&.delete {
+				@apply bg-red-500;
+			}
+		}
+
+		.error {
+			color: red;
+		}
+
+		.additional-meta {
+			@apply py-4 px-8 bg-gray-200 border rounded-md text-sm;
+		}
+
+		.non-editable {
+			@apply my-3;
+
+			label {
+				@apply m-0 p-0 font-bold;
+			}
+
+			p {
+				@apply m-0;
 			}
 		}
 	}

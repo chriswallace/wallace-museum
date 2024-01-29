@@ -43,6 +43,11 @@
 
   --input-color-background: #f0f0f0;
   --input-color-text: #000;
+
+  --toastContainerTop: auto;
+  --toastContainerRight: 2rem;
+  --toastContainerBottom: 2rem;
+  --toastContainerLeft: auto;
 }
 
 @media (prefers-color-scheme: dark) {
