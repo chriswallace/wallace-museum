@@ -79,3 +79,28 @@ model ArtistArtworks {
 
   @@id([artistId, artworkId])
 }
+
+model User {
+  id            String @id @default(uuid())
+  username      String @unique
+  email         String @unique
+  passwordHash  String
+  userAuthToken String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions       Session[]
+
+}
+
+model Session {
+  id             Int       @id @default(autoincrement())
+  sessionId      String    @unique
+  userId         String
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime
+  user           User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
