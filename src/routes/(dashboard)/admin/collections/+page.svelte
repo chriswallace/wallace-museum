@@ -57,28 +57,34 @@
 	individual collections.
 </p>
 
-<input
-	type="text"
-	placeholder="Search by Collection Title"
-	class="search"
-	on:input={handleSearchInput}
-/>
+{#if collections.length === 0}
+	<div class="empty">
+		<p>No collections found.</p>
+	</div>
+{:else}
+	<input
+		type="text"
+		placeholder="Search by Collection Title"
+		class="search"
+		on:input={handleSearchInput}
+	/>
 
-<div class="collection-grid">
-	{#each collections as collection}
-		<div class="card" on:click={() => editCollection(collection.id)}>
-			<div class="cover-image-wrap">
-				<img
-					src="{collection.coverImage}?tr=w-500,h-500,q-70,dpr-auto"
-					alt={collection.title}
-					class="cover-image"
-				/>
+	<div class="collection-grid">
+		{#each collections as collection}
+			<div class="card" on:click={() => editCollection(collection.id)}>
+				<div class="cover-image-wrap">
+					<img
+						src="{collection.coverImage}?tr=w-500,h-500,q-70,dpr-auto"
+						alt={collection.title}
+						class="cover-image"
+					/>
+				</div>
+				<div class="title">{collection.title}</div>
+				<!-- Include toggle button for enable/disable if needed -->
 			</div>
-			<div class="title">{collection.title}</div>
-			<!-- Include toggle button for enable/disable if needed -->
-		</div>
-	{/each}
-</div>
+		{/each}
+	</div>
+{/if}
 
 {#if totalPages > 1}
 	<nav class="pagination">

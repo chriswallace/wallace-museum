@@ -30,7 +30,7 @@
 		}
 
 		h1 {
-			@apply font-sans text-xl lg:text-2xl font-normal;
+			@apply font-sans text-xl lg:text-2xl font-semibold;
 			font-variation-settings: initial;
 		}
 
@@ -45,7 +45,7 @@
 		input[type='text'],
 		input[type='email'],
 		input[type='password'] {
-			@apply mb-6 p-4 block w-full border border-gray-300 rounded-md shadow-sm text-base text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500;
+			@apply mb-6 p-4 box-border block w-full border border-gray-300 rounded-md shadow-sm text-base text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500;
 		}
 
 		input[type='submit'],

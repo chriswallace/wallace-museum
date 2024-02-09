@@ -232,5 +232,13 @@
 				@apply m-0;
 			}
 		}
+
+		.empty {
+			@apply text-center pt-12 border-t-2 border-gray-200;
+
+			p {
+				@apply text-center mx-auto;
+			}
+		}
 	}
 </style>

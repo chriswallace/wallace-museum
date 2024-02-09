@@ -89,65 +89,71 @@
 	disable individual artworks.
 </p>
 
-<input
-	type="text"
-	placeholder="Search by Title, Artist, or Collection"
-	class="search"
-	on:input={handleSearchInput}
-/>
+{#if artworks.length === 0}
+	<div class="empty">
+		<p>No artworks found.</p>
+	</div>
+{:else}
+	<input
+		type="text"
+		placeholder="Search by Title, Artist, or Collection"
+		class="search"
+		on:input={handleSearchInput}
+	/>
 
-<table>
-	<thead>
-		<tr>
-			<th class="enable sortable" on:click={() => changeSorting('enabled')}>
-				Enabled
-				{sortColumn === 'enabled' && sortOrder === 'asc' ? ' ↑' : ''}
-				{sortColumn === 'enabled' && sortOrder === 'desc' ? ' ↓' : ''}
-			</th>
-			<th class="artwork"></th>
-			<th class="title sortable" on:click={() => changeSorting('title')}>
-				Title
-				{sortColumn === 'title' && sortOrder === 'asc' ? ' ↑' : ''}
-				{sortColumn === 'title' && sortOrder === 'desc' ? ' ↓' : ''}
-			</th>
-			<th class="artist sortable" on:click={() => changeSorting('artist')}>
-				Artist
-				{sortColumn === 'artist' && sortOrder === 'asc' ? ' ↑' : ''}
-				{sortColumn === 'artist' && sortOrder === 'desc' ? ' ↓' : ''}
-			</th>
-			<th class="collection sortable" on:click={() => changeSorting('collection')}>
-				Collection(s)
-				{sortColumn === 'collection' && sortOrder === 'asc' ? ' ↑' : ''}
-				{sortColumn === 'collection' && sortOrder === 'desc' ? ' ↓' : ''}
-			</th>
-			<th class="actions">Actions</th>
-		</tr>
-	</thead>
-	<tbody>
-		{#each artworks as artwork}
+	<table>
+		<thead>
 			<tr>
-				<td>
-					<input
-						type="checkbox"
-						checked={artwork.enabled}
-						on:click={() => toggleArtworkEnabled(artwork)}
-					/>
-				</td>
-				<td>
-					<button on:click={() => editArtwork(artwork.id)}>
-						<img src="{artwork.image}?tr=h-120,w-120,q-70" alt="" />
-					</button>
-				</td>
-				<td><div>{artwork.title}</div></td>
-				<td><div>{artwork.artist.name}</div></td>
-				<td><div>{artwork.collection.title}</div></td>
-				<td class="text-center"
-					><button class="edit" on:click={() => editArtwork(artwork.id)}>Edit</button></td
-				>
+				<th class="enable sortable" on:click={() => changeSorting('enabled')}>
+					Enabled
+					{sortColumn === 'enabled' && sortOrder === 'asc' ? ' ↑' : ''}
+					{sortColumn === 'enabled' && sortOrder === 'desc' ? ' ↓' : ''}
+				</th>
+				<th class="artwork"></th>
+				<th class="title sortable" on:click={() => changeSorting('title')}>
+					Title
+					{sortColumn === 'title' && sortOrder === 'asc' ? ' ↑' : ''}
+					{sortColumn === 'title' && sortOrder === 'desc' ? ' ↓' : ''}
+				</th>
+				<th class="artist sortable" on:click={() => changeSorting('artist')}>
+					Artist
+					{sortColumn === 'artist' && sortOrder === 'asc' ? ' ↑' : ''}
+					{sortColumn === 'artist' && sortOrder === 'desc' ? ' ↓' : ''}
+				</th>
+				<th class="collection sortable" on:click={() => changeSorting('collection')}>
+					Collection(s)
+					{sortColumn === 'collection' && sortOrder === 'asc' ? ' ↑' : ''}
+					{sortColumn === 'collection' && sortOrder === 'desc' ? ' ↓' : ''}
+				</th>
+				<th class="actions">Actions</th>
 			</tr>
-		{/each}
-	</tbody>
-</table>
+		</thead>
+		<tbody>
+			{#each artworks as artwork}
+				<tr>
+					<td>
+						<input
+							type="checkbox"
+							checked={artwork.enabled}
+							on:click={() => toggleArtworkEnabled(artwork)}
+						/>
+					</td>
+					<td>
+						<button on:click={() => editArtwork(artwork.id)}>
+							<img src="{artwork.image}?tr=h-120,w-120,q-70" alt="" />
+						</button>
+					</td>
+					<td><div>{artwork.title}</div></td>
+					<td><div>{artwork.artist.name}</div></td>
+					<td><div>{artwork.collection.title}</div></td>
+					<td class="text-center"
+						><button class="edit" on:click={() => editArtwork(artwork.id)}>Edit</button></td
+					>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+{/if}
 
 {#if totalPages > 1}
 	<nav class="pagination">
