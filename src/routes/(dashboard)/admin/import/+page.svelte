@@ -1,22 +1,27 @@
 <script>
-  import { onMount } from 'svelte';
   let nfts = [];
   let selectedNfts = new Set();
-  let walletAddress = '0x8Dfd856Af8B868bDC73b4EddBf34511310402C03'; // Define or pass the wallet address here
+  let walletAddressInput = ''; // Use this to bind to the input field
+  let loadState = 'idle';
 
-  onMount(async () => {
+  // Function to fetch NFTs for the entered wallet address
+  async function fetchNfts() {
     try {
-      const response = await fetch(`/api/admin/import/eth/${walletAddress}`);
+      loadState = 'loading';
+      const response = await fetch(`/api/admin/import/eth/${walletAddressInput}`);
       if (response.ok) {
         const data = await response.json();
         nfts = data.assets || [];
+        loadState = 'success';
       } else {
         console.error('Failed to fetch NFTs');
+        loadState = 'error';
       }
     } catch (error) {
       console.error('Error fetching NFTs:', error);
+      loadState = 'error';
     }
-  });
+  }
 
   // Function to handle NFT selection
   function toggleSelection(nftId) {
@@ -29,14 +34,11 @@
 
   // Function to import selected NFTs
   async function importSelectedNfts() {
-    // Here you would typically send the selected NFT IDs to your backend
-    // to be processed and added to your database. This is a placeholder for that functionality.
     const selectedIdsArray = Array.from(selectedNfts);
     console.log('Importing NFTs:', selectedIdsArray);
 
-    // Example POST request to your backend API endpoint for importing NFTs
     try {
-      const response = await fetch('/api/importNfts', {
+      const response = await fetch('/api/admin/importNfts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -45,12 +47,9 @@
       });
 
       if (response.ok) {
-        // Handle successful import
         console.log('NFTs imported successfully');
-        // Reset selection
         selectedNfts.clear();
       } else {
-        // Handle errors
         console.error('Failed to import NFTs');
       }
     } catch (error) {
@@ -59,11 +58,30 @@
   }
 </script>
 
+<div>
+  <input type="text" bind:value={walletAddressInput} placeholder="Enter Ethereum Address" />
+  <button on:click={fetchNfts} disabled={loadState === 'loading'}>
+    {#if loadState === 'loading'}
+      <i>Loading...</i> <!-- You can replace this with an actual animation or spinner -->
+    {:else}
+      Fetch NFTs
+    {/if}
+  </button>
+</div>
+
+{#if nfts.length > 0}
+  <p>{nfts.length} NFTs available for import</p>
+{:else if loadState === 'success'}
+  <p>No NFTs found</p>
+{:else if loadState === 'error'}
+  <p>Failed to fetch NFTs</p>
+{/if}
+
 <div class="nft-gallery">
   {#each nfts as nft}
     <div class="nft-card">
       <img src="{nft.imageUrl}" alt="{nft.name}" />
-      <p>{nft.name}</p>
+      <h3>{nft.name}</h3>
       <button on:click={() => toggleSelection(nft.id)}>{selectedNfts.has(nft.id) ? 'Deselect' : 'Select'}</button>
     </div>
   {/each}
@@ -88,5 +106,22 @@
   .nft-card img {
     width: 100%;
     border-radius: 4px;
+  }
+  .nft-card h3 {
+    font-size: 15px;
+    font-weight: bold;
+    margin: 8px 0;
+  }
+  button{
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 12px 24px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
   }
 </style>
