@@ -1,15 +1,94 @@
 <script>
-	import { writable } from 'svelte/store';
-	import Modal from '$lib/Modal.svelte';
-	import { intersectionObserver } from '$lib/intersectionObserver';
+    import { writable } from 'svelte/store';
+    import Modal from '$lib/Modal.svelte';
+    import EditableCollectionTable from '$lib/EditableCollectionTable.svelte';
+    import EditableArtistTable from '$lib/EditableArtistTable.svelte';
+    import { intersectionObserver } from '$lib/intersectionObserver';
 
-	let walletAddress = writable('');
-	let nftType = writable('collected');
-	let nfts = writable([]);
-	let isLoading = writable(false);
-	let isModalOpen = writable(false);
-	let selectedNfts = writable(new Set());
-	let selectAllChecked = writable(false);
+    let walletAddress = writable('');
+    let nftType = writable('collected');
+    let nfts = writable([]);
+    let isLoading = writable(false);
+    let isModalOpen = writable(false);
+    let selectedNfts = writable(new Set());
+    let selectAllChecked = writable(false);
+    let reviewData = writable({ collections: [], artists: [] });
+
+    async function openReviewModal() {
+        const selectedIndices = Array.from($selectedNfts);
+        const collectionSlugs = selectedIndices.map(index => $nfts[index].collection);
+
+        isLoading.set(true);
+
+        try {
+            const response = await fetch('/api/admin/nft-data/ethereum', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ collections: collectionSlugs }),
+            });
+
+			console.log(collectionSlugs);
+
+            if (!response.ok) throw new Error('Failed to fetch collection and artist data');
+            const { data } = await response.json();
+
+			console.log(data);
+
+            // Assuming the API returns the data in the format you've shown
+            let collections = [];
+            let artists = [];
+            data.forEach(item => {
+                if (!collections.some(c => c.collection === item.collection.collection)) {
+                    collections.push(item.collection);
+                }
+                if (!artists.some(a => a.address === item.artist.address)) {
+                    artists.push(item.artist);
+                }
+            });
+
+            reviewData.set({ collections, artists });
+			console.log($reviewData.artists);
+            isModalOpen.set(true);
+        } catch (error) {
+            console.error('Error opening review modal:', error);
+        } finally {
+            isLoading.set(false);
+        }
+    }
+
+    async function finalizeImport() {
+        // Extract the updated collection and artist data
+        const { collections, artists } = $reviewData;
+        const updatedNfts = $selectedNfts.map(index => {
+            const nft = $nfts[index];
+            // Find the updated collection and artist based on a matching property, e.g., collection slug or artist address
+            const updatedCollection = collections.find(c => c.collection === nft.collectionSlug);
+            const updatedArtist = artists.find(a => a.address === nft.artist.address);
+
+            return { ...nft, collection: updatedCollection, artist: updatedArtist };
+        });
+
+        try {
+            const response = await fetch('/api/admin/import/eth/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nfts: updatedNfts }),
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('Import success:', result);
+                selectedNfts.set(new Set());
+                isModalOpen.set(false);
+            } else {
+                console.error('Failed to import NFTs');
+            }
+        } catch (error) {
+            console.error('Error finalizing import:', error);
+        }
+    }
 
 	const loadingImageUrl = '/images/loading.png';
 
@@ -78,19 +157,21 @@
 	}
 
 	async function importArtworks() {
-		const selectedIndices = $selectedNfts; // Get the current state of selected NFTs indices
-		const selectedNftData = Array.from(selectedIndices).map((index) => $nfts[index]); // Map indices to NFT data
+		openReviewModal();
+	}
 
-		const response = await fetch('/api/admin/import/eth/', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({ nfts: selectedNftData }) // Ensure this matches your server-side expectation
+	function handleCollectionSave(editedCollection, index) {
+		reviewData.update(($reviewData) => {
+			$reviewData.collections[index] = editedCollection;
+			return $reviewData;
 		});
+	}
 
-		const result = await response.json();
-		console.log(result);
+	function handleArtistSave(editedArtist, index) {
+		reviewData.update(($reviewData) => {
+			$reviewData.artists[index] = editedArtist;
+			return $reviewData;
+		});
 	}
 </script>
 
@@ -161,7 +242,13 @@
 
 	{#if $isModalOpen}
 		<Modal onClose={() => isModalOpen.set(false)}>
-			<!-- Modal content for adding existing artworks -->
+			<h2>Review and Edit Collections</h2>
+			<EditableCollectionTable items={$reviewData.collections} onSave={handleCollectionSave} />
+
+			<h2>Review and Edit Artists</h2>
+			<EditableArtistTable items={$reviewData.artists} onSave={handleArtistSave} />
+
+			<button on:click={finalizeImport}>Finalize Import</button>
 		</Modal>
 	{/if}
 </div>

@@ -18,6 +18,7 @@
 	let collection = {
 		title: '',
 		description: '',
+		curatorNotes: '',
 		slug: '',
 		enabled: false,
 		artworks: []
