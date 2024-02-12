@@ -87,7 +87,9 @@
 	});
 </script>
 
-<title>Add new artwork</title>
+<svelte:head>
+	<title>Add new artwork</title>
+</svelte:head>
 
 <div class="container">
 	{#if error}
@@ -133,7 +135,9 @@
 									</select>
 								</div>
 								<div style="flex: none;">
-									<button class="link" on:click={() => (addingNewArtist = true)}>Add New</button>
+									<button class="button link" on:click={() => (addingNewArtist = true)}>
+										Add New
+									</button>
 								</div>
 							</div>
 						{/if}
@@ -158,7 +162,7 @@
 									</select>
 								</div>
 								<div style="flex: none;">
-									<button class="link" on:click={() => (addingNewCollection = true)}>
+									<button class="button link" on:click={() => (addingNewCollection = true)}>
 										Add New
 									</button>
 								</div>
@@ -166,7 +170,7 @@
 						{/if}
 					</fieldset>
 
-					<button type="submit">Save</button>
+					<button type="button submit">Save</button>
 				</form>
 			</div>
 		</div>
@@ -203,18 +207,6 @@
 
 	textarea {
 		@apply h-32;
-	}
-
-	button {
-		@apply inline-block w-[100%] mt-2 px-4 py-3 bg-primary rounded-sm text-white font-semibold;
-
-		&.delete {
-			@apply bg-red-500;
-		}
-
-		&.link {
-			@apply mt-0 inline-block bg-secondary align-middle;
-		}
 	}
 
 	fieldset {

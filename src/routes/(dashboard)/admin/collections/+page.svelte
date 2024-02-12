@@ -48,11 +48,13 @@
 	}
 </script>
 
-<title>Collections</title>
+<svelte:head>
+	<title>Collections</title>
+</svelte:head>
 
-<h1>Collections <button on:click={addNew}>+ Add new</button></h1>
+<h1>Collections <button class="ghost" on:click={addNew}>+ Add new</button></h1>
 
-<p>
+<p class="subheading">
 	This is a list of collections currently stored in your system. Here, you can edit or view
 	individual collections.
 </p>
@@ -95,12 +97,6 @@
 {/if}
 
 <style>
-	h1 {
-		@apply mb-8;
-	}
-	p {
-		@apply max-w-3xl mb-16 text-gray-500 text-lg;
-	}
 	.collection-grid {
 		@apply w-full grid grid-cols-3 gap-4;
 	}

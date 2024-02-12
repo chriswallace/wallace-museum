@@ -1,5 +1,5 @@
 import prisma from '$lib/prisma';
-import { uploadToImageKit } from '$lib/imageKitUploader.js';
+import { uploadToImageKit } from '$lib/mediaHelpers';
 import slugify from 'slugify';
 
 export async function POST({ request }) {

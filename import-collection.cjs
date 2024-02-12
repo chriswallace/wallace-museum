@@ -261,7 +261,7 @@ async function importArtworks(filePath, collectionSlugs = []) {
                         title: artwork.name,
                         enabled: true,
                         description: collectionData.description,
-                        blockchain: "Ethereum"
+                        blockchain: "ethereum"
                     },
                 });
 

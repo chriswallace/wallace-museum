@@ -101,7 +101,9 @@
 	});
 </script>
 
-<title>Edit artwork</title>
+<svelte:head>
+	<title>Edit artwork</title>
+</svelte:head>
 
 <div class="container">
 	{#if isLoading}
@@ -153,9 +155,9 @@
 						</select>
 					</div>
 
-					<button type="submit" class="cta">Save details</button>
+					<button type="submit" class="primary w-full mt-4">Save details</button>
 				</form>
-				<button class="delete cta" on:click={deleteArtwork}>Delete Artwork</button>
+				<button class="delete w-full" on:click={deleteArtwork}>Delete Artwork</button>
 			</div>
 
 			<div>

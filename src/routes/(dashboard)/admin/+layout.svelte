@@ -205,14 +205,6 @@
 			@apply h-32;
 		}
 
-		.cta {
-			@apply inline-block w-[100%] mt-2 px-4 py-3 bg-primary rounded-sm text-white font-semibold;
-
-			&.delete {
-				@apply bg-red-500;
-			}
-		}
-
 		.error {
 			color: red;
 		}

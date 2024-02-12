@@ -114,7 +114,9 @@
 	}
 </script>
 
-<title>Edit {collection.title}</title>
+<svelte:head>
+	<title>Edit {collection.title}</title>
+</svelte:head>
 
 {#if isModalOpen}
 	<Modal onClose={() => (isModalOpen = false)}>
@@ -172,8 +174,9 @@
 					{/each}
 					<div class="fieldset add-artwork">
 						<div class="add-artwork-buttons">
-							<button class="cta" on:click={navigateToAddArtwork}>Add new</button>
-							<button class="cta" on:click={openAddExistingArtworkModal}>Add existing</button>
+							<button class="button cta" on:click={navigateToAddArtwork}>Add new</button>
+							<button class="button cta" on:click={openAddExistingArtworkModal}>Add existing</button
+							>
 						</div>
 					</div>
 				</div>
@@ -198,8 +201,8 @@
 						<label for="enabled">Enabled</label>
 					</div>
 					<div class="button-split">
-						<button class="cta" type="submit">Save Collection</button>
-						<button class="cta delete" type="submit">Delete Collection</button>
+						<button class="button primary" type="submit">Save Collection</button>
+						<button class="button delete" type="submit">Delete Collection</button>
 					</div>
 				</form>
 			</div>
@@ -234,6 +237,10 @@
 
 	.button-split {
 		@apply flex gap-4;
+
+		button {
+			@apply w-full;
+		}
 	}
 
 	.add-artwork {

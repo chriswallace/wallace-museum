@@ -80,11 +80,13 @@
 	}
 </script>
 
-<title>Artworks</title>
+<svelte:head>
+	<title>Artworks</title>
+</svelte:head>
 
-<h1>Artworks <button on:click={() => addNew()}>+ Add new</button></h1>
+<h1>Artworks <button class="ghost" on:click={() => addNew()}>+ Add new</button></h1>
 
-<p>
+<p class="subheading">
 	This is a list of artworks currently stored in your Compendium. Here, you may edit, enable, or
 	disable individual artworks.
 </p>
@@ -139,7 +141,7 @@
 						/>
 					</td>
 					<td>
-						<button on:click={() => editArtwork(artwork.id)}>
+						<button class="image" on:click={() => editArtwork(artwork.id)}>
 							<img src="{artwork.image}?tr=h-120,w-120,q-70" alt="" />
 						</button>
 					</td>
@@ -147,7 +149,7 @@
 					<td><div>{artwork.artist.name}</div></td>
 					<td><div>{artwork.collection.title}</div></td>
 					<td class="text-center"
-						><button class="edit" on:click={() => editArtwork(artwork.id)}>Edit</button></td
+						><button class="edit button" on:click={() => editArtwork(artwork.id)}>Edit</button></td
 					>
 				</tr>
 			{/each}
@@ -166,13 +168,6 @@
 {/if}
 
 <style lang="scss">
-	h1 {
-		@apply mb-8;
-	}
-	p {
-		@apply max-w-3xl mb-16 text-gray-500 text-lg;
-	}
-
 	.enable {
 		@apply w-32;
 	}
