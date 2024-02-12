@@ -1,21 +1,23 @@
 // src/routes/api/password-reset-request.js
 import prisma from '$lib/prisma';
-import { sendPasswordResetEmail } from '$lib/emailService'; // Implement this
 
 export async function post(request) {
-    const { email } = JSON.parse(request.body);
+	const { email } = JSON.parse(request.body);
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-        // Optionally, don't reveal if the email is registered for security
-        return { status: 200, body: { message: 'If your email is registered, you will receive a password reset link.' } };
-    }
+	const user = await prisma.user.findUnique({ where: { email } });
+	if (!user) {
+		// Optionally, don't reveal if the email is registered for security
+		return {
+			status: 200,
+			body: { message: 'If your email is registered, you will receive a password reset link.' }
+		};
+	}
 
-    const token = crypto.randomUUID(); // Generate a unique token
-    // Store the token in the database with an expiration time
-    // ...
+	const token = crypto.randomUUID(); // Generate a unique token
+	// Store the token in the database with an expiration time
+	// ...
 
-    await sendPasswordResetEmail(email, token); // Send the email
+	//await sendPasswordResetEmail(email, token); // Send the email
 
-    return { status: 200, body: { message: 'Password reset email sent.' } };
+	return { status: 200, body: { message: 'Password reset email sent.' } };
 }
