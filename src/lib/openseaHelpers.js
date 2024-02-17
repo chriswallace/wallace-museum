@@ -99,3 +99,17 @@ export async function fetchNFTsByAddress(walletAddress, allNfts = [], cursor = n
 		return allNfts;
 	}
 }
+
+/**
+ * @param {string | URL | Request} url
+ */
+export async function fetchMetadata(url) {
+	try {
+		const response = await fetch(url);
+		if (!response.ok) throw new Error(`Failed to fetch metadata from ${url}`);
+		return await response.json();
+	} catch (error) {
+		console.error(`Error fetching metadata:`, error);
+		return null;
+	}
+}

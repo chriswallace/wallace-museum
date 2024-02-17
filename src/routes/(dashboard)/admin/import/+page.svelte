@@ -1,94 +1,140 @@
 <script>
-    import { writable } from 'svelte/store';
-    import Modal from '$lib/Modal.svelte';
-    import EditableCollectionTable from '$lib/EditableCollectionTable.svelte';
-    import EditableArtistTable from '$lib/EditableArtistTable.svelte';
-    import { intersectionObserver } from '$lib/intersectionObserver';
+	import {
+		nfts,
+		isLoading,
+		walletAddress,
+		nftType,
+		selectedNfts,
+		updatedNfts,
+		reviewData,
+		isModalOpen,
+		selectAllChecked
+	} from '$lib/stores';
+	import { intersectionObserver } from '$lib/intersectionObserver';
+	import EditableCollectionTable from '$lib/EditableCollectionTable.svelte';
+	import EditableArtistTable from '$lib/EditableArtistTable.svelte';
+	import FinalImportStep from '$lib/FinalImportStep.svelte';
 
-    let walletAddress = writable('');
-    let nftType = writable('collected');
-    let nfts = writable([]);
-    let isLoading = writable(false);
-    let isModalOpen = writable(false);
-    let selectedNfts = writable(new Set());
-    let selectAllChecked = writable(false);
-    let reviewData = writable({ collections: [], artists: [] });
+	let currentStep = 1;
+	const totalSteps = 3;
 
-    async function openReviewModal() {
-        const selectedIndices = Array.from($selectedNfts);
-        const collectionSlugs = selectedIndices.map(index => $nfts[index].collection);
+	function closeModal() {
+		isModalOpen.set(false);
+		currentStep = 1;
+	}
 
-        isLoading.set(true);
+	function nextStep() {
+		if (currentStep === 2) {
+			finalReviewSync();
+		}
+		if (currentStep < totalSteps) {
+			currentStep += 1;
+		}
+	}
 
-        try {
-            const response = await fetch('/api/admin/nft-data/ethereum', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ collections: collectionSlugs }),
-            });
+	function finalReviewSync() {
+		const selectedIndicesArray = Array.from($selectedNfts);
+		const update = selectedIndicesArray.map((index) => {
+			const nft = $nfts[index];
 
-			console.log(collectionSlugs);
+			const updatedCollection = $reviewData.collections.find(
+				(c) => c.collection === nft.collection
+			);
 
-            if (!response.ok) throw new Error('Failed to fetch collection and artist data');
-            const { data } = await response.json();
+			const updatedArtist = $reviewData.artists.find((a) => a.address === nft.artist);
 
-			console.log(data);
+			return {
+				...nft,
+				collection: updatedCollection ?? {},
+				artist: updatedArtist ?? {}
+			};
+		});
 
-            // Assuming the API returns the data in the format you've shown
-            let collections = [];
-            let artists = [];
-            data.forEach(item => {
-                if (!collections.some(c => c.collection === item.collection.collection)) {
-                    collections.push(item.collection);
-                }
-                if (!artists.some(a => a.address === item.artist.address)) {
-                    artists.push(item.artist);
-                }
-            });
+		updatedNfts.set(update);
+	}
 
-            reviewData.set({ collections, artists });
-			console.log($reviewData.artists);
-            isModalOpen.set(true);
-        } catch (error) {
-            console.error('Error opening review modal:', error);
-        } finally {
-            isLoading.set(false);
-        }
-    }
+	async function openReviewModal() {
+		const selectedIndices = Array.from($selectedNfts);
 
-    async function finalizeImport() {
-        // Extract the updated collection and artist data
-        const { collections, artists } = $reviewData;
-        const updatedNfts = $selectedNfts.map(index => {
-            const nft = $nfts[index];
-            // Find the updated collection and artist based on a matching property, e.g., collection slug or artist address
-            const updatedCollection = collections.find(c => c.collection === nft.collectionSlug);
-            const updatedArtist = artists.find(a => a.address === nft.artist.address);
+		isLoading.set(true);
+		isModalOpen.set(true);
 
-            return { ...nft, collection: updatedCollection, artist: updatedArtist };
-        });
+		try {
+			// Assuming collectionSlugs need to be collected differently based on your correction
+			const collectionSlugs = selectedIndices.map((index) => $nfts[index].collection);
 
-        try {
-            const response = await fetch('/api/admin/import/eth/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nfts: updatedNfts }),
-            });
+			const response = await fetch('/api/admin/nft-data/ethereum', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ collections: collectionSlugs })
+			});
 
-            if (response.ok) {
-                const result = await response.json();
-                console.log('Import success:', result);
-                selectedNfts.set(new Set());
-                isModalOpen.set(false);
-            } else {
-                console.error('Failed to import NFTs');
-            }
-        } catch (error) {
-            console.error('Error finalizing import:', error);
-        }
-    }
+			if (!response.ok) throw new Error('Failed to fetch collection and artist data');
+			const { data } = await response.json();
+
+			let collections = [];
+			let artists = [];
+
+			// Update NFTs with artist address directly during data processing
+			selectedIndices.forEach((index) => {
+				const nft = $nfts[index];
+				const item = data.find((item) => item.collection.collection === nft.collection);
+
+				if (item) {
+					// Ensure the collection is added if not already included
+					if (!collections.some((c) => c.collection === item.collection.collection)) {
+						collections.push(item.collection);
+					}
+
+					// Ensure the artist is added if not already included
+					if (!artists.some((a) => a.address === item.artist.address)) {
+						artists.push(item.artist);
+					}
+
+					// Here's the crucial part: updating the NFT with the artist's address
+					nft.artist = item.artist.address; // Assign artist's Ethereum address to the NFT
+				}
+			});
+
+			// After processing, update the reviewData store
+			reviewData.set({ collections, artists });
+
+			// Update the nfts store with the modified NFTs, ensuring artist addresses are included
+			nfts.set($nfts);
+
+			isModalOpen.set(true);
+		} catch (error) {
+			console.error('Error opening review modal:', error);
+		} finally {
+			isLoading.set(false);
+		}
+	}
+
+	async function completeImport() {
+		const updatedNftsArray = $updatedNfts; // Access the store's value
+
+		try {
+			//console.log(updatedNftsArray);
+			const response = await fetch('/api/admin/import/eth/', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ nfts: updatedNftsArray }) // Use the array
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				console.log('Import success:', result);
+				selectedNfts.set(new Set());
+				isModalOpen.set(false);
+			} else {
+				const result = await response.json();
+				console.error(result.message);
+				isModalOpen.set(false);
+			}
+		} catch (error) {
+			console.error('Error finalizing import:', error);
+		}
+	}
 
 	const loadingImageUrl = '/images/loading.png';
 
@@ -156,10 +202,6 @@
 		}
 	}
 
-	async function importArtworks() {
-		openReviewModal();
-	}
-
 	function handleCollectionSave(editedCollection, index) {
 		reviewData.update(($reviewData) => {
 			$reviewData.collections[index] = editedCollection;
@@ -200,60 +242,81 @@
 	</div>
 
 	<div class="relative">
-		{#if $nfts.length > 0}
+		{#if $isLoading}
+			<img class="loading" src="/images/loading.png" alt="Loading" />
+		{:else if $nfts.length > 0}
 			<div class="selection-header">
-				<div class="pr-3 mr-3 h-full whitespace-nowrap border-r border-gray-400">
-					{$nfts.length} NFTs found
+				<div class="number-found">
+					<div>
+						{$nfts.length} NFTs found
+					</div>
+					<label>
+						<input
+							class="inline w-auto"
+							type="checkbox"
+							bind:checked={$selectAllChecked}
+							on:click={toggleSelectAll}
+						/>
+						Select all
+					</label>
 				</div>
-
-				<label>
-					<input
-						class="inline w-auto"
-						type="checkbox"
-						bind:checked={$selectAllChecked}
-						on:click={toggleSelectAll}
-					/>
-					Select all
-				</label>
-				<button class="cta button" on:click={importArtworks} disabled={$selectedNfts.size === 0}>
+				<button
+					class="primary button"
+					on:click={openReviewModal}
+					disabled={$selectedNfts.size === 0}
+				>
 					Import {$selectedNfts.size} Selected
 				</button>
 			</div>
 
 			<div class="nft-gallery">
-				{#if $isLoading}
-					<p>Loading NFTs...</p>
-				{:else}
-					{#each $nfts as { image_url, name }, index}
-						<div
-							class="nft-card {$selectedNfts.has(index) ? 'selected' : ''}"
-							on:click={() => toggleSelection(index)}
-						>
-							<img use:handleLazyLoad={{ src: image_url }} alt={name} class="nft-image" />
-							<div class="inner-container">
-								<h3>{name}</h3>
-							</div>
+				{#each $nfts as { image_url, name }, index}
+					<div
+						class="nft-card {$selectedNfts.has(index) ? 'selected' : ''}"
+						on:click={() => toggleSelection(index)}
+					>
+						<img use:handleLazyLoad={{ src: image_url }} alt={name} class="nft-image" />
+						<div class="inner-container">
+							<h3>{name}</h3>
 						</div>
-					{/each}
-				{/if}
+					</div>
+				{/each}
 			</div>
 		{/if}
 	</div>
 
 	{#if $isModalOpen}
-		<Modal onClose={() => isModalOpen.set(false)}>
-			<h2>Review and Edit Collections</h2>
-			<EditableCollectionTable items={$reviewData.collections} onSave={handleCollectionSave} />
-
-			<h2>Review and Edit Artists</h2>
-			<EditableArtistTable items={$reviewData.artists} onSave={handleArtistSave} />
-
-			<button on:click={finalizeImport}>Finalize Import</button>
-		</Modal>
+		{#if currentStep === 1}
+			<EditableCollectionTable
+				title="Review/edit {$reviewData.collections.length} collections to be imported"
+				items={$reviewData.collections}
+				onSave={handleCollectionSave}
+				onNext={nextStep}
+				onClose={closeModal}
+			/>
+		{:else if currentStep === 2}
+			<EditableArtistTable
+				title="Review/edit {$reviewData.artists.length} artists to be imported"
+				items={$reviewData.artists}
+				onSave={handleArtistSave}
+				onNext={nextStep}
+				onClose={closeModal}
+			/>
+		{:else if currentStep === 3}
+			<FinalImportStep
+				title="Review and finalize import"
+				nfts={$updatedNfts}
+				onCompleteImport={completeImport}
+				onClose={closeModal}
+			/>
+		{/if}
 	{/if}
 </div>
 
 <style lang="scss">
+	.loading {
+		@apply mx-auto w-[40px] h-[40px] my-16;
+	}
 	.nft-gallery {
 		@apply grid gap-4 grid-cols-6 p-6 border-l border-r border-b border-gray-200 bg-white rounded-b-sm;
 	}
@@ -296,8 +359,14 @@
 	.selection-header {
 		@apply flex sticky top-0 bg-white py-2 items-center justify-between z-20 px-4 mb-0 rounded-t-md border border-gray-200;
 
+		.number-found {
+			div {
+				@apply inline pr-3 mr-3 h-full whitespace-nowrap border-r border-gray-400;
+			}
+		}
+
 		label {
-			@apply font-normal;
+			@apply font-normal inline;
 		}
 
 		input[type='checkbox'] {
@@ -311,5 +380,21 @@
 
 	.search {
 		@apply mb-0;
+	}
+
+	.nft-review-table {
+		thead {
+			@apply z-20;
+		}
+		th:first-child,
+		td:first-child {
+			@apply w-[32px];
+		}
+
+		td:nth-child(2n),
+		td:nth-child(3n),
+		td:nth-child(4n) {
+			@apply w-[35%];
+		}
 	}
 </style>

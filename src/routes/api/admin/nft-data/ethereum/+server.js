@@ -9,8 +9,6 @@ export const POST = async ({ request }) => {
 		// Deduplicate contract addresses to minimize API calls
 		const collectionSlugs = [...new Set(collections)];
 
-		console.log('Fetching NFT data for:', collections);
-
 		// Fetch collection and artist data for each unique address
 		const dataPromises = collectionSlugs.map(async (collectionSlug) => {
 			const collection = await fetchCollection(collectionSlug); // Assuming the collection slug or address is provided
@@ -23,8 +21,6 @@ export const POST = async ({ request }) => {
 		});
 
 		const data = await Promise.all(dataPromises);
-
-		//console.log('Fetched NFT data:', data);
 
 		// Map back to the original array if needed or return as is
 		return json({ success: true, data });

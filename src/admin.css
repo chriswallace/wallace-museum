@@ -127,7 +127,7 @@
   }
 
   .delete {
-    @apply bg-red-500;
+    @apply bg-red-500 border-red-500;
   }
 
   .link {

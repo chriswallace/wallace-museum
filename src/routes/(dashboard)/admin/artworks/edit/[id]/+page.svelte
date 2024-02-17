@@ -32,6 +32,19 @@
 	let error = '';
 	let isLoading = true;
 
+	// Function to format the date
+	function formatDate(dateString) {
+		const options = {
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit',
+			second: '2-digit'
+		};
+		return new Date(dateString).toLocaleDateString('en-US', options);
+	}
+
 	async function fetchArtwork() {
 		try {
 			const [artworkRes, artistsRes, collectionsRes] = await Promise.all([
@@ -163,32 +176,32 @@
 			<div>
 				<div class="additional-meta">
 					<div class="non-editable">
-						<label>Blockchain</label>
-						<p>{artwork.blockchain}</p>
-					</div>
-					<div class="non-editable">
-						<label>Contract Address</label>
-						<p>{artwork.contractAddr}</p>
-					</div>
-					<div class="non-editable">
-						<label>Contract Alias</label>
-						<p>{artwork.contractAlias}</p>
-					</div>
-					<div class="non-editable">
-						<label>Token ID</label>
+						<h3>Token ID</h3>
 						<p>{artwork.tokenID}</p>
 					</div>
 					<div class="non-editable">
-						<label>Mint Date</label>
-						<p>{artwork.mintDate}</p>
+						<h3>Blockchain</h3>
+						<p>{artwork.blockchain}</p>
 					</div>
 					<div class="non-editable">
-						<label>Total Supply</label>
+						<h3>Token Standard</h3>
+						<p>{artwork.tokenStandard}</p>
+					</div>
+					<div class="non-editable">
+						<h3>Contract</h3>
+						<p>
+							<a href="https://etherscan.io/address/{artwork.contractAddr}"
+								>{artwork.contractAlias}</a
+							>
+						</p>
+					</div>
+					<div class="non-editable">
+						<h3>Mint Date</h3>
+						<p>{formatDate(artwork.mintDate)}</p>
+					</div>
+					<div class="non-editable">
+						<h3>Total Supply</h3>
 						<p>{artwork.totalSupply}</p>
-					</div>
-					<div class="non-editable">
-						<label>Symbol</label>
-						<p>{artwork.symbol}</p>
 					</div>
 				</div>
 			</div>
@@ -196,7 +209,7 @@
 	{/if}
 </div>
 
-<style>
+<style lang="scss">
 	h1 {
 		@apply mb-12;
 	}
@@ -211,5 +224,21 @@
 
 	.artwork {
 		@apply w-full;
+	}
+
+	.additional-meta {
+		@apply text-gray-600 text-base border border-gray-300 p-6 pt-4 pb-0 bg-gray-100;
+
+		.non-editable {
+			@apply mb-8;
+		}
+
+		h3 {
+			@apply mb-1 text-sm tracking-wide font-normal uppercase;
+		}
+
+		a {
+			@apply text-gray-600;
+		}
 	}
 </style>

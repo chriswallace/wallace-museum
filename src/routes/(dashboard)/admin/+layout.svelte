@@ -130,7 +130,7 @@
 		}
 
 		thead {
-			@apply sticky top-0 bg-gray-100;
+			@apply bg-gray-100;
 		}
 
 		th,
@@ -146,10 +146,6 @@
 			}
 		}
 
-		td div {
-			@apply text-left w-full max-w-[220px] truncate;
-		}
-
 		tr td {
 			@apply transition duration-200 ease-in-out;
 		}
@@ -158,8 +154,8 @@
 			@apply block hover:underline;
 		}
 
-		tr:hover td {
-			@apply bg-white;
+		.image {
+			@apply p-0 w-12 h-12 m-0;
 		}
 
 		.actions {
@@ -168,6 +164,62 @@
 
 		.edit {
 			@apply text-primary border-2 border-primary hover:bg-primary hover:text-white hover:no-underline rounded-sm text-sm uppercase no-underline font-bold px-3 py-2 m-0 mx-1;
+		}
+
+		.flex-table {
+			width: 100%;
+			border-collapse: collapse; /* Clean up table borders */
+
+			thead {
+				/* Ensures the header is not scrollable */
+				display: table;
+				width: 100%;
+				table-layout: fixed;
+			}
+
+			tbody {
+				display: block;
+				max-height: 400px; /* Adjust based on your needs */
+				overflow-y: auto;
+				width: 100%;
+			}
+
+			tr {
+				width: 100%;
+				display: table;
+			}
+
+			th,
+			td {
+				border: 1px solid #ddd;
+				text-align: left;
+				padding: 3px 8px; /* Adjust padding for visual appeal */
+			}
+
+			th:first-child,
+			td:first-child {
+				width: 35%;
+			}
+
+			th:nth-child(2),
+			td:nth-child(2) {
+				width: 40%;
+			}
+
+			th:last-child,
+			td:last-child {
+				width: 25%;
+			}
+
+			th {
+				position: sticky;
+				top: 0; /* Keeps the header on top */
+				background-color: #f9f9f9; /* Gives a different color to distinguish the header */
+			}
+
+			button {
+				display: inline-block;
+			}
 		}
 
 		.search {
