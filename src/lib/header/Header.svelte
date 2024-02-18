@@ -2,8 +2,8 @@
 	import CollectionDropdown from '$lib/CollectionDropdown.svelte';
 	import { page } from '$app/stores';
 	import { selectedArtwork, isLiveCodeVisible } from '$lib/stores';
-	import { handleMaximize } from '$lib/artworkActions';
 	import { get } from 'svelte/store';
+	import { onMount } from 'svelte';
 
 	let artworkDetails = null;
 	let isToggleActive = false;
@@ -38,6 +38,12 @@
 			minute: 'numeric'
 		});
 	}
+
+	onMount(() => {
+		if (artworkDetails && artworkDetails.attributes) {
+			console.log(artworkDetails.attributes);
+		}
+	});
 </script>
 
 <header>
@@ -111,6 +117,10 @@
 						{#if artworkDetails.tokenID}
 							<dt>Token ID</dt>
 							<dd>{artworkDetails.tokenID}</dd>
+						{/if}
+						{#if artworkDetails.tokenStandard}
+							<dt>Token Standard</dt>
+							<dd>{artworkDetails.tokenStandard}</dd>
 						{/if}
 						{#if artworkDetails.totalSupply}
 							<dt>Token Supply</dt>

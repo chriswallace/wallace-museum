@@ -3,16 +3,53 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
+	import { importProgress, nftImportQueue } from '$lib/stores';
+	import { showToast } from '$lib/toastHelper';
+	import { get } from 'svelte/store';
+	import { startImportProcess } from '$lib/importHandler';
 
 	let currentPage;
 
-	if (browser) {
-		page.subscribe(($page) => {
-			currentPage = $page.url.pathname;
-		});
+	page.subscribe(($page) => {
+		currentPage = $page.url.pathname;
+	});
+
+	function checkAndResumeImport() {
+		const progress = get(importProgress);
+		const queue = get(nftImportQueue);
+
+		if (progress.total > 0 && progress.current < progress.total && queue.length > 0) {
+			const resume = confirm('An import process was found. Would you like to resume?');
+			if (resume) {
+				startImportProcess();
+			}
+		}
 	}
 
-	onMount(() => {});
+	onMount(() => {
+		if (browser) {
+			const persistedQueue = localStorage.getItem('nftImportQueue');
+			if (persistedQueue) {
+				nftImportQueue.set(JSON.parse(persistedQueue));
+			}
+			checkAndResumeImport();
+
+			importProgress.subscribe(($importProgress) => {
+				console.log($importProgress);
+				if ($importProgress.total > 0) {
+					const progressPercent = Math.round(
+						($importProgress.current / $importProgress.total) * 100
+					);
+					showToast(`${$importProgress.message} (${progressPercent}%)`, 'info');
+				}
+			});
+
+			// Updated to automatically save queue to local storage
+			nftImportQueue.subscribe(($nftImportQueue) => {
+				localStorage.setItem('nftImportQueue', JSON.stringify($nftImportQueue));
+			});
+		}
+	});
 </script>
 
 <div class="ui-frame">

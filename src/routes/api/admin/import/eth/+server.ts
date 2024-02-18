@@ -30,6 +30,8 @@ export const POST = async ({ request }) => {
 
 			const normalizedMetadata = await normalizeMetadata(nft);
 
+			console.log(normalizedMetadata.attributes);
+
 			if (normalizedMetadata.image) {
 				if (!normalizedMetadata.image) {
 					console.error("Image URI is undefined or empty.");
@@ -71,7 +73,6 @@ export const POST = async ({ request }) => {
 				}
 			});
 
-			// Use connectOrCreate to avoid unique constraint violation
 			await prisma.artistArtworks.upsert({
 				where: {
 					artistId_artworkId: {

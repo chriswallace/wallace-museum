@@ -8,12 +8,19 @@
 		updatedNfts,
 		reviewData,
 		isModalOpen,
-		selectAllChecked
+		selectAllChecked,
+		nftImportQueue,
+		importProgress
 	} from '$lib/stores';
+
+	import { showToast } from '$lib/toastHelper';
 	import { intersectionObserver } from '$lib/intersectionObserver';
 	import EditableCollectionTable from '$lib/EditableCollectionTable.svelte';
 	import EditableArtistTable from '$lib/EditableArtistTable.svelte';
 	import FinalImportStep from '$lib/FinalImportStep.svelte';
+	import { startImportProcess } from '$lib/importHandler';
+	import { get } from 'svelte/store';
+	import { browser } from '$app/environment';
 
 	let currentStep = 1;
 	const totalSteps = 3;
@@ -102,37 +109,13 @@
 			// Update the nfts store with the modified NFTs, ensuring artist addresses are included
 			nfts.set($nfts);
 
+			console.log($nfts);
+
 			isModalOpen.set(true);
 		} catch (error) {
 			console.error('Error opening review modal:', error);
 		} finally {
 			isLoading.set(false);
-		}
-	}
-
-	async function completeImport() {
-		const updatedNftsArray = $updatedNfts; // Access the store's value
-
-		try {
-			//console.log(updatedNftsArray);
-			const response = await fetch('/api/admin/import/eth/', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ nfts: updatedNftsArray }) // Use the array
-			});
-
-			if (response.ok) {
-				const result = await response.json();
-				console.log('Import success:', result);
-				selectedNfts.set(new Set());
-				isModalOpen.set(false);
-			} else {
-				const result = await response.json();
-				console.error(result.message);
-				isModalOpen.set(false);
-			}
-		} catch (error) {
-			console.error('Error finalizing import:', error);
 		}
 	}
 
@@ -179,7 +162,28 @@
 		}
 	}
 
+	async function finalizeImport() {
+		const updatedNftsArray = $updatedNfts; // Access the store's value
+
+		nftImportQueue.set(updatedNftsArray);
+		if (browser) localStorage.setItem('nftImportQueue', JSON.stringify(updatedNftsArray));
+
+		const importProgressInit = {
+			current: 0,
+			total: updatedNftsArray.length,
+			message: 'Starting import...'
+		};
+
+		importProgress.set(importProgressInit);
+		if (browser) localStorage.setItem('importProgress', JSON.stringify(importProgressInit));
+
+		// Start the import process
+		await startImportProcess();
+		closeModal(); // Close the modal if you have one open for import confirmation
+	}
+
 	async function fetchNfts() {
+		``;
 		isLoading.set(true);
 		selectAllChecked.set(false);
 		selectedNfts.set(new Set());
@@ -306,7 +310,7 @@
 			<FinalImportStep
 				title="Review and finalize import"
 				nfts={$updatedNfts}
-				onCompleteImport={completeImport}
+				onCompleteImport={finalizeImport}
 				onClose={closeModal}
 			/>
 		{/if}

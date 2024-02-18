@@ -82,7 +82,7 @@ async function fetchMedia(uri) {
 }
 
 async function uploadToImageKit(media, fileBasename) {
-    const folderName = 'wallace_collection';
+    const folderName = 'compendium';
 
     const requestBody = {
         file: media,
@@ -205,18 +205,31 @@ const getCollectionDataFromOpenSea = async (collectionSlug) => {
 };
 
 function normalizeAttributes(features) {
+    const normalizeValue = (value) => {
+        // Check if the value is an object and not null, and recursively handle nested objects
+        if (typeof value === 'object' && value !== null) {
+            // Handle nested objects by creating an array of key-value pairs
+            return Object.entries(value).reduce((acc, [key, val]) => {
+                acc[key] = normalizeValue(val); // Recursively normalize nested values
+                return acc;
+            }, {});
+        } else {
+            return value; // Directly use the value if it's not an object
+        }
+    };
+
     if (typeof features !== 'object' || features === null) {
-        // If features is not an object or is null, return an empty array
-        return [];
+        return []; // Return an empty array if features is not an object or is null
     }
 
-    return Object.entries(features).map(([trait_type, value]) => {
-        return { trait_type, value: String(value) }; // Convert value to string as your target format seems to represent all values as strings
-    });
+    // Map over entries in the features object to create an array of objects with key-value pairs
+    return Object.entries(features).map(([key, value]) => ({
+        [key]: normalizeValue(value), // Normalize each value, handling nested objects as needed
+    }));
 }
 
 async function normalizeMetadata(artwork) {
-    // Simplified to handle only metadata normalization
+
     const standardMetadata = {
         name: artwork.metadata.name || '',
         tokenID: artwork.metadata.tokenID || artwork.metadata.tokenId || '',
@@ -228,7 +241,7 @@ async function normalizeMetadata(artwork) {
         live_uri: artwork.metadata.generator_url || artwork.metadata.animation_url,
         tags: artwork.metadata.tags || [],
         website: artwork.metadata.website || '',
-        attributes: artwork.metadata.attributes || normalizeAttributes(artwork.metadata.features) || [],
+        attributes: normalizeAttributes(artwork.metadata.features || artwork.metadata.attributes) || [],
     };
 
     return standardMetadata;
@@ -273,8 +286,6 @@ async function importArtworks(filePath, collectionSlugs = []) {
                     strict: true,
                     locale: 'en'
                 });
-
-                let artworkImage;
 
                 const normalizedMetadata = await normalizeMetadata(artwork);
 

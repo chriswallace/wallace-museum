@@ -16,6 +16,7 @@ export async function uploadToImageKit(fileStream, fileName) {
 	try {
 		const response = await imagekit.upload({
 			file: fileStream,
+			folder: 'compendium',
 			fileName: fileName
 		});
 
@@ -35,7 +36,8 @@ export async function uploadToImageKit(fileStream, fileName) {
 }
 
 export async function normalizeMetadata(artwork) {
-	// Simplified to handle only metadata normalization
+	//console.log(artwork.metadata.attributes);
+
 	const standardMetadata = {
 		name: artwork.metadata.name || '',
 		tokenID: artwork.metadata.tokenID || artwork.metadata.tokenId || artwork.identifier || '',
@@ -77,50 +79,44 @@ function convertIpfsUriToHttpUrl(ipfsUri) {
 
 export async function fetchMedia(uri) {
 	try {
-		let buffer;
-		let fileName = '';
-
-		// Convert IPFS URI to HTTP URL if necessary
 		const httpUrl = convertIpfsUriToHttpUrl(uri);
-
-		// Fetch the media content
 		const response = await axios.get(httpUrl, { responseType: 'arraybuffer' });
-		buffer = Buffer.from(response.data);
+		const buffer = Buffer.from(response.data);
 
-		// Determine the file type
+		// Correct usage of fileTypeFromBuffer
 		const fileTypeResult = await fileTypeFromBuffer(buffer);
-		if (!fileTypeResult) {
-			throw new Error('Could not determine file type.');
-		}
 
-		// Check if the URI is for a supported image or video file
-		if (!fileTypeResult.mime.startsWith('image/') && !fileTypeResult.mime.startsWith('video/')) {
-			console.error(`Unsupported media type: ${fileTypeResult.mime}`);
+		if (!fileTypeResult) {
+			console.error('Could not determine file type.');
 			return null;
 		}
 
-		// Extract the file name from the URI
-		fileName = path.basename(uri, path.extname(uri)) + '.' + fileTypeResult.ext;
+		const mimeType = fileTypeResult.mime;
 
-		// Initialize dimensions for images
-		let dimensions = { width: null, height: null };
+		// Only process supported image and video files
+		if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) {
+			console.error(`Unsupported media type: ${mimeType}`);
+			return null;
+		}
 
-		// Obtain dimensions if it's an image
-		if (fileTypeResult.mime.startsWith('image/')) {
+		// Extract the file name
+		const fileName = path.basename(new URL(httpUrl).pathname) + '.' + fileTypeResult.ext;
+
+		// Determine dimensions for images
+		let dimensions = null;
+		if (mimeType.startsWith('image/')) {
 			const metadata = await sharp(buffer).metadata();
 			dimensions = { width: metadata.width, height: metadata.height };
 		}
 
-		// Return the media information
 		return {
-			buffer: buffer,
-			extension: fileTypeResult.ext,
-			fileName: fileName,
-			dimensions: fileTypeResult.mime.startsWith('image/') ? dimensions : undefined,
-			mimeType: fileTypeResult.mime // Including MIME type in the returned object for further checks
+			buffer,
+			mimeType,
+			fileName,
+			dimensions, // Include dimensions only for images
 		};
 	} catch (error) {
-		console.error('Error fetching media:', error.message, `URI: ${uri}`);
+		console.error(`Error fetching media from ${uri}:`, error);
 		return null;
 	}
 }
@@ -132,22 +128,24 @@ export async function handleMediaUpload(mediaUri) {
 	const mediaData = await fetchMedia(mediaUri);
 	if (!mediaData) return null;
 
+	// Only proceed if the media is an image or a video
+	if (!mediaData.mimeType.startsWith('image/') && !mediaData.mimeType.startsWith('video/')) {
+		console.error(`Unsupported media type: ${mediaData.mimeType}`);
+		return null;
+	}
+
 	let fileStreamToUpload = mediaData.buffer;
 
-	if (mediaData.extension === 'mp4') {
-		const videoSizeMB = Buffer.byteLength(mediaData.buffer) / (1024 * 1024);
-		if (videoSizeMB > 300) {
-			console.error('Video file exceeds the 300MB limit.');
-			return null;
-		}
-	} else {
-		// Resize image
-		fileStreamToUpload = await resizeImage(mediaData.buffer, mediaData.dimensions.width, mediaData.dimensions.height);
-	}
+	// Resize image if necessary, though this example doesn't directly include resizing logic
+	// Consider adding conditional resizing here based on your requirements
 
 	const uploadResult = await uploadToImageKit(fileStreamToUpload, mediaData.fileName);
 
-	return { url: uploadResult?.url, fileType: mediaData.mimeType, dimensions: mediaData.dimensions };
+	return {
+		url: uploadResult?.url,
+		fileType: mediaData.mimeType,
+		dimensions: mediaData.dimensions
+	};
 }
 
 export async function resizeImage(buffer, targetWidth = 2000, targetHeight = 2000) {

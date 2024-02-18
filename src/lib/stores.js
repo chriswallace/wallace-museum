@@ -11,6 +11,28 @@ function createSelectedArtworkStore() {
     };
 }
 
+function createPersistentStore(key, startValue) {
+    const { subscribe, set, update } = writable(startValue);
+
+    return {
+        subscribe,
+        set: (value) => {
+            localStorage.setItem(key, JSON.stringify(value));
+            set(value);
+        },
+        update,
+        useLocalStorage: () => {
+            const json = localStorage.getItem(key);
+            if (json) {
+                set(JSON.parse(json));
+            }
+        }
+    };
+}
+
+export const nftImportQueue = createPersistentStore('nftImportQueue', []);
+export const importProgress = createPersistentStore('importProgress', { current: 0, total: 0, message: '' });
+
 export const walletAddress = writable('');
 export const nftType = writable('collected');
 export const nfts = writable([]);

@@ -102,7 +102,7 @@
 		let newSrc;
 
 		const renderedWidth = artworkRef.clientWidth;
-		const base_url = 'https://ik.imagekit.io/UltraDAO/wallace_collection/';
+		const base_url = 'https://ik.imagekit.io/UltraDAO/compendium/';
 		const img_name = artwork.image.split('/').pop().split('?')[0];
 
 		if (artwork.dimensions.width && artwork.dimensions.width <= renderedWidth) {

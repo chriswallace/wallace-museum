@@ -22,6 +22,8 @@ export const POST = async ({ request }) => {
 
 		const data = await Promise.all(dataPromises);
 
+		//console.log('Fetched data:', data);
+
 		// Map back to the original array if needed or return as is
 		return json({ success: true, data });
 	} catch (error) {

@@ -55,8 +55,6 @@ export async function POST({ request }) {
             newArtworkData.image = imageOrVideoUrl;
         }
 
-        console.log('newArtworkData', newArtworkData);
-
         const newArtwork = await prisma.artwork.create({
             data: newArtworkData
         });
