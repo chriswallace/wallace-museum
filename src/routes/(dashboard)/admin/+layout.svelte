@@ -35,7 +35,7 @@
 			checkAndResumeImport();
 
 			importProgress.subscribe(($importProgress) => {
-				console.log($importProgress);
+				//console.log($importProgress);
 				if ($importProgress.total > 0) {
 					const progressPercent = Math.round(
 						($importProgress.current / $importProgress.total) * 100

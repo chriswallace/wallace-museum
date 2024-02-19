@@ -36,7 +36,7 @@ export const POST = async ({ request }) => {
 				if (!normalizedMetadata.image) {
 					console.error("Image URI is undefined or empty.");
 				} else {
-					const imageUploadResult = await handleMediaUpload(normalizedMetadata.image);
+					const imageUploadResult = await handleMediaUpload(normalizedMetadata.image, nft);
 					normalizedMetadata.image = imageUploadResult ? imageUploadResult.url : '';
 					nft.dimensions = imageUploadResult ? imageUploadResult.dimensions : '';
 				}
@@ -46,7 +46,7 @@ export const POST = async ({ request }) => {
 				if (!normalizedMetadata.video) {
 					console.error("Video URI is undefined or empty.");
 				} else {
-					const videoUploadResult = await handleMediaUpload(normalizedMetadata.video);
+					const videoUploadResult = await handleMediaUpload(normalizedMetadata.video, nft);
 					normalizedMetadata.video = videoUploadResult ? videoUploadResult.url : '';
 				}
 			}

@@ -5,6 +5,7 @@ import path from 'path';
 import { env } from '$env/dynamic/private';
 import imageKit from 'imagekit';
 import { fileTypeFromBuffer } from 'file-type';
+import crypto from 'crypto';
 
 const imagekit = new imageKit({
 	publicKey: env.IMAGEKIT_PUBLIC_KEY,
@@ -12,33 +13,92 @@ const imagekit = new imageKit({
 	urlEndpoint: env.IMAGEKIT_URL_ENDPOINT
 });
 
-export async function uploadToImageKit(fileStream, fileName) {
+function createHashForArtworkName(name) {
+	// Create a SHA-256 hash from the artwork name
+	return crypto.createHash('sha256').update(name).digest('hex');
+}
+
+function extensionFromMimeType(mimeType) {
+	switch (mimeType) {
+		case 'image/jpeg':
+			return '.jpg';
+		case 'image/png':
+			return '.png';
+		case 'video/mp4':
+			return '.mp4';
+		default:
+			console.error(`Unsupported MIME type for extension: ${mimeType}`);
+			return '';
+	}
+}
+
+function generateFileName(artwork, mimeType) {
+	let baseName;
+	if (artwork.contractAddr && artwork.tokenID) {
+		baseName = `artwork-${artwork.contractAddr}-${artwork.tokenID}`;
+	} else {
+		baseName = artwork.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+	}
+
+	const extension = extensionFromMimeType(mimeType);
+	return `${baseName}${extension}`;
+}
+
+function generateTags(artwork) {
+	let tags = [];
+	if (artwork.contractAddr && artwork.tokenID) {
+		tags.push(`contractAddr:${artwork.contractAddr}`, `tokenID:${artwork.tokenID}`);
+	} else {
+		// Create a hash or a unique identifier for artworks without contractAddr and tokenID
+		const hash = createHashForArtworkName(artwork.name);
+		tags.push(`nameHash:${hash}`);
+	}
+	return tags.join(',');
+}
+
+export async function uploadToImageKit(fileStream, artwork, mimeType) {
+	const tags = generateTags(artwork);
+
+	// Search for existing files using the generated tags
 	try {
+		const searchResponse = await imagekit.listFiles({
+			tags: tags
+		});
+
+		// Check if there's an existing file with the same unique tags
+		if (searchResponse.length > 0) {
+			//console.log(`File already exists, skipping upload: ${searchResponse[0].url}`);
+			return { url: searchResponse[0].url, fileType: searchResponse[0].fileType };
+		}
+	} catch (error) {
+		console.error(`Error searching for existing file in ImageKit: ${error.message}`);
+		return null;
+	}
+
+	// No existing file found, proceed with upload
+	try {
+		const fileName = generateFileName(artwork, mimeType); // Generate a base file name
 		const response = await imagekit.upload({
 			file: fileStream,
+			fileName, // This name will get a unique suffix by ImageKit
 			folder: 'compendium',
-			fileName: fileName
+			tags: tags // Apply tags for later identification
 		});
 
 		if (response && response.url) {
-			// Return an object with both URL and fileType
-			return {
-				url: response.url,
-				fileType: response.fileType || 'image' // Default to 'image' if fileType is not provided
-			};
+			return { url: response.url, fileType: mimeType };
 		} else {
-			throw new Error('Invalid response from ImageKit');
+			throw new Error('ImageKit upload failed with no response');
 		}
 	} catch (error) {
-		console.error('Error uploading to ImageKit:', error);
+		console.error(`Error uploading to ImageKit: ${error.message}`);
 		return null;
 	}
 }
 
 export async function normalizeMetadata(artwork) {
-	//console.log(artwork.metadata.attributes);
 
-	const standardMetadata = {
+	const normalizedMetadata = {
 		name: artwork.metadata.name || '',
 		tokenID: artwork.metadata.tokenID || artwork.metadata.tokenId || artwork.identifier || '',
 		description: artwork.metadata.description || '',
@@ -46,13 +106,21 @@ export async function normalizeMetadata(artwork) {
 		platform: artwork.metadata.platform || '',
 		image: artwork.metadata.displayUri || artwork.metadata.image || '',
 		video: artwork.metadata.video || artwork.metadata.animation_url || '',
-		live_uri: artwork.metadata.generator_url || artwork.metadata.animation_url || '',
+		live_uri: '',
 		tags: artwork.metadata.tags || [],
 		website: artwork.metadata.website || '',
 		attributes: artwork.metadata.attributes || normalizeAttributes(artwork.metadata.features) || []
 	};
 
-	return standardMetadata;
+	const live_uri = artwork.metadata.generator_url || artwork.metadata.animation_url;
+	if (live_uri) {
+		// Only call convertIpfsUriToHttpUrl if live_uri is not undefined
+		normalizedMetadata.live_uri = convertIpfsUriToHttpUrl(live_uri);
+	}
+
+	console.log(normalizedMetadata); // Debugging
+
+	return normalizedMetadata;
 }
 
 function normalizeAttributes(features) {
@@ -83,30 +151,31 @@ export async function fetchMedia(uri) {
 		const response = await axios.get(httpUrl, { responseType: 'arraybuffer' });
 		const buffer = Buffer.from(response.data);
 
-		// Correct usage of fileTypeFromBuffer
 		const fileTypeResult = await fileTypeFromBuffer(buffer);
-
 		if (!fileTypeResult) {
 			console.error('Could not determine file type.');
 			return null;
 		}
 
 		const mimeType = fileTypeResult.mime;
+		//console.log(`MIME Type: ${mimeType}`); // Debugging
 
-		// Only process supported image and video files
 		if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) {
 			console.error(`Unsupported media type: ${mimeType}`);
 			return null;
 		}
 
-		// Extract the file name
 		const fileName = path.basename(new URL(httpUrl).pathname) + '.' + fileTypeResult.ext;
-
-		// Determine dimensions for images
 		let dimensions = null;
+
 		if (mimeType.startsWith('image/')) {
-			const metadata = await sharp(buffer).metadata();
-			dimensions = { width: metadata.width, height: metadata.height };
+			try {
+				const metadata = await sharp(buffer).metadata();
+				dimensions = { width: metadata.width, height: metadata.height };
+				console.log(`Image Dimensions: ${JSON.stringify(dimensions)}`); // Debugging
+			} catch (sharpError) {
+				console.error('Error processing image with sharp:', sharpError);
+			}
 		}
 
 		return {
@@ -124,28 +193,24 @@ export async function fetchMedia(uri) {
 /**
  * @param {any} mediaUri
  */
-export async function handleMediaUpload(mediaUri) {
+export async function handleMediaUpload(mediaUri, artwork) {
 	const mediaData = await fetchMedia(mediaUri);
 	if (!mediaData) return null;
 
-	// Only proceed if the media is an image or a video
+	// Ensure we only proceed with supported types
 	if (!mediaData.mimeType.startsWith('image/') && !mediaData.mimeType.startsWith('video/')) {
 		console.error(`Unsupported media type: ${mediaData.mimeType}`);
 		return null;
 	}
 
-	let fileStreamToUpload = mediaData.buffer;
+	const uploadResult = await uploadToImageKit(mediaData.buffer, artwork, mediaData.mimeType);
 
-	// Resize image if necessary, though this example doesn't directly include resizing logic
-	// Consider adding conditional resizing here based on your requirements
-
-	const uploadResult = await uploadToImageKit(fileStreamToUpload, mediaData.fileName);
-
-	return {
-		url: uploadResult?.url,
+	// Return upload result or null if unsuccessful
+	return uploadResult ? {
+		url: uploadResult.url,
 		fileType: mediaData.mimeType,
 		dimensions: mediaData.dimensions
-	};
+	} : null;
 }
 
 export async function resizeImage(buffer, targetWidth = 2000, targetHeight = 2000) {

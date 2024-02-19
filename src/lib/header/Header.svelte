@@ -41,7 +41,7 @@
 
 	onMount(() => {
 		if (artworkDetails && artworkDetails.attributes) {
-			console.log(artworkDetails.attributes);
+			//console.log(artworkDetails.attributes);
 		}
 	});
 </script>

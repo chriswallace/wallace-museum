@@ -109,7 +109,7 @@
 			// Update the nfts store with the modified NFTs, ensuring artist addresses are included
 			nfts.set($nfts);
 
-			console.log($nfts);
+			//console.log($nfts);
 
 			isModalOpen.set(true);
 		} catch (error) {

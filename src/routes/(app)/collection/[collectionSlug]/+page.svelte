@@ -67,7 +67,7 @@
 	}
 
 	function handleMediaLoad(artworkId) {
-		console.log(`Media loaded for artwork ID: ${artworkId}`);
+		//console.log(`Media loaded for artwork ID: ${artworkId}`);
 
 		loadingStates[artworkId] = false;
 		loadingStates = { ...loadingStates }; // Reassign the object to trigger reactivity
