@@ -44,7 +44,7 @@ export async function normalizeMetadata(artwork) {
 		description: artwork.metadata.description || '',
 		artist: artwork.metadata.artist || '',
 		platform: artwork.metadata.platform || '',
-		image: artwork.metadata.image || '',
+		image: artwork.metadata.displayUri || artwork.metadata.image || '',
 		video: artwork.metadata.video || artwork.metadata.animation_url || '',
 		live_uri: artwork.metadata.generator_url || artwork.metadata.animation_url || '',
 		tags: artwork.metadata.tags || [],
@@ -113,7 +113,7 @@ export async function fetchMedia(uri) {
 			buffer,
 			mimeType,
 			fileName,
-			dimensions, // Include dimensions only for images
+			dimensions // Include dimensions only for images
 		};
 	} catch (error) {
 		console.error(`Error fetching media from ${uri}:`, error);
@@ -159,7 +159,8 @@ export async function resizeImage(buffer, targetWidth = 2000, targetHeight = 200
 		let resizedBuffer = buffer;
 		let attempt = 0;
 
-		while (sizeMB > 25 && attempt < 10) { // Limit attempts to prevent infinite loops
+		while (sizeMB > 25 && attempt < 10) {
+			// Limit attempts to prevent infinite loops
 			// Dynamically adjust dimensions to decrease size with each attempt
 			let scaleFactor = attempt === 0 ? 1 : 0.9 ** attempt; // Reduce dimensions progressively
 			let newWidth = Math.floor(targetWidth * scaleFactor);
@@ -186,7 +187,7 @@ export async function resizeImage(buffer, targetWidth = 2000, targetHeight = 200
 
 		// After resizing attempts, check if the file size is below the desired threshold
 		if (sizeMB > 25) {
-			console.warn("Unable to reduce file size below 25MB after several attempts.");
+			console.warn('Unable to reduce file size below 25MB after several attempts.');
 			// At this point, further action could be needed, depending on requirements.
 		}
 
