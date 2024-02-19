@@ -168,7 +168,7 @@
 							on:load={() => handleMediaLoad(artwork.id)}
 						></iframe>
 					{:else if artwork.video && artwork.video.length > 0}
-						<video autoplay muted on:loadeddata={() => handleMediaLoad(artwork.id)}>
+						<video autoplay loop muted on:loadeddata={() => handleMediaLoad(artwork.id)}>
 							<source
 								src={artwork.video}
 								type="video/mp4"
