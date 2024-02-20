@@ -128,10 +128,6 @@
 								>
 							</dd>
 						{/if}
-						{#if artworkDetails.symbol}
-							<dt>Symbol</dt>
-							<dd>{artworkDetails.symbol}</dd>
-						{/if}
 						{#if artworkDetails.dimensions && artworkDetails.dimensions.width && artworkDetails.dimensions.height}
 							<dt>Dimensions</dt>
 							<dd>{artworkDetails.dimensions.width}x{artworkDetails.dimensions.height}px</dd>
