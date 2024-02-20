@@ -45,10 +45,12 @@ model Artwork {
   video          String?
   liveUri        String?
   attributes     Json?
+  curatorNotes   String?
+  blockchain     String?
   contractAddr   String?
   contractAlias  String?
-  totalSupply    String?
-  symbol         String?
+  totalSupply    Int?
+  tokenStandard  String?
   tokenID        String?
   mintDate       DateTime?
   tags           Json?
@@ -57,6 +59,8 @@ model Artwork {
   collectionId   Int
   collection     Collection       @relation(fields: [collectionId], references: [id])
   ArtistArtworks ArtistArtworks[]
+
+  @@unique([tokenID, contractAddr], name: "tokenID_contractAddr")
 }
 
 model ArtistCollections {
@@ -74,7 +78,7 @@ model ArtistArtworks {
   artist   Artist @relation(fields: [artistId], references: [id])
 
   artworkId Int
-  artwork   Artwork @relation(fields: [artworkId], references: [id])
+  artwork   Artwork @relation(fields: [artworkId], references: [id], onDelete: Cascade)
 
   @@id([artistId, artworkId])
 }
