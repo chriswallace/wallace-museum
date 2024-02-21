@@ -24,7 +24,6 @@ export const load: PageServerLoad = async ({ request, locals }) => {
     }
 
     if (!user) {
-        console.log("redirecting");
         throw redirect(302, '/login');
     }
 

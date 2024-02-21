@@ -8,15 +8,8 @@ import { fileTypeFromBuffer } from 'file-type';
 import slugify from 'slugify';
 import sharp from 'sharp';
 import gifResize from '@gumlet/gif-resize';  // Import a library for resizing GIFs
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '$lib/prisma';
 import { env } from '$env/dynamic/private';
-
-const prisma = new PrismaClient();
-
-const sleep = (milliseconds) => new Promise(resolve => setTimeout(resolve, milliseconds));
-
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000;  // 2 seconds
 
 const imagekit = new imageKit({
     publicKey: env.IMAGEKIT_PUBLIC_KEY,
@@ -143,23 +136,16 @@ async function uploadToImageKit(media, fileBasename) {
 
     console.log("Uploading media to ImageKit: ", requestBody.folder + "/" + requestBody.fileName);
 
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const response = await imagekit.upload(requestBody);
-            if (response && response.url) {
-                return response.url;
-            } else {
-                throw new Error('Invalid response from ImageKit');
-            }
-        } catch (error) {
-            if (attempt < MAX_RETRIES) {
-                console.log(`Retrying in ${RETRY_DELAY} milliseconds...`);
-                await sleep(RETRY_DELAY);
-            } else {
-                console.error('Max retries reached. Upload failed.');
-                return null;
-            }
+    try {
+        const response = await imagekit.upload(requestBody);
+        if (response && response.url) {
+            return response.url;
+        } else {
+            throw new Error('Invalid response from ImageKit');
         }
+    } catch (error) {
+        console.error('Upload failed.');
+        return null;
     }
 }
 

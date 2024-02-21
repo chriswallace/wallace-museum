@@ -20,8 +20,6 @@ export const POST = async ({ request }) => {
 				fetchedMetadata = await fetchMetadata(nft.metadata_url);
 				if (fetchedMetadata) {
 					nft.metadata = fetchedMetadata;
-				} else {
-					console.error(`Failed to fetch metadata for NFT at index ${currentIndex}.`);
 				}
 			}
 
@@ -30,24 +28,25 @@ export const POST = async ({ request }) => {
 
 			const normalizedMetadata = await normalizeMetadata(nft);
 
-			console.log(normalizedMetadata.attributes);
-
 			if (normalizedMetadata.image) {
-				if (!normalizedMetadata.image) {
-					console.error("Image URI is undefined or empty.");
-				} else {
-					const imageUploadResult = await handleMediaUpload(normalizedMetadata.image, nft);
-					normalizedMetadata.image = imageUploadResult ? imageUploadResult.url : '';
-					nft.dimensions = imageUploadResult ? imageUploadResult.dimensions : '';
-				}
+				const imageUploadResult = await handleMediaUpload(normalizedMetadata.image, nft);
+				console.log('imageUploadResult:', imageUploadResult);
+				normalizedMetadata.image = imageUploadResult ? imageUploadResult.url : '';
+				// Ensure dimensions are defined before using them
+				nft.dimensions = imageUploadResult && imageUploadResult.dimensions ? imageUploadResult.dimensions : { width: undefined, height: undefined };
+			} else {
+				console.error("Image URI is undefined or empty.");
+				return;
 			}
 
+			// Adjusted video processing with checking for undefined dimensions
 			if (normalizedMetadata.video) {
-				if (!normalizedMetadata.video) {
-					console.error("Video URI is undefined or empty.");
+				const videoUploadResult = await handleMediaUpload(normalizedMetadata.video, nft);
+				if (videoUploadResult && videoUploadResult.url) {
+					normalizedMetadata.video = videoUploadResult.url;
 				} else {
-					const videoUploadResult = await handleMediaUpload(normalizedMetadata.video, nft);
-					normalizedMetadata.video = videoUploadResult ? videoUploadResult.url : '';
+					console.error(`Video upload failed or returned no URL for: ${normalizedMetadata.video}`);
+					normalizedMetadata.video = ''; // Clear or handle as needed
 				}
 			}
 
@@ -87,6 +86,8 @@ export const POST = async ({ request }) => {
 				},
 			});
 
+			if (artwork.id)
+				console.log(`Imported artwork ${currentIndex + 1} of ${nfts.length}.`);
 		});
 
 		await Promise.all(importPromises);

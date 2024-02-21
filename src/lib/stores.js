@@ -31,7 +31,7 @@ function createPersistentStore(key, startValue) {
 }
 
 export const nftImportQueue = createPersistentStore('nftImportQueue', []);
-export const importProgress = createPersistentStore('importProgress', { current: 0, total: 0, message: '' });
+export const importProgress = createPersistentStore('importProgress', []);
 
 export const walletAddress = writable('');
 export const nftType = writable('collected');

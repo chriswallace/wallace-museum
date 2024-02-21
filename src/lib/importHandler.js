@@ -1,53 +1,52 @@
 import { nftImportQueue, importProgress } from '$lib/stores';
-import { showToast } from '$lib/toastHelper';
+import { toast } from '@zerodevx/svelte-toast';
 import { get } from 'svelte/store';
-import { browser } from '$app/environment';
+import ImportStatus from '$lib/ImportStatus.svelte';
+
+export function showImportToast() {
+    toast.push('Importing', {
+        component: { src: ImportStatus }, initial: 0, dismissable: false, theme: {
+            '--toastBackground': '#fff', '--toastColor': '#444'
+        }
+    });
+}
+
+export function hideImportToast() {
+    setInterval(() => {
+        toast.pop();
+    }, 2000);
+}
 
 export async function startImportProcess() {
-    if (browser) {
-        // Ensure stores are initialized from localStorage
-        nftImportQueue.useLocalStorage();
-        importProgress.useLocalStorage();
+    let nftsToImport = get(nftImportQueue);
 
-        let { current, total } = get(importProgress);
-        let nftsToImport = get(nftImportQueue);
+    showImportToast();
 
-        // If there's nothing to import or the import is already complete, return
-        if (nftsToImport.length === 0 || current >= total) {
-            showToast('No NFTs to import or import already completed.', 'info');
-            return;
-        }
+    for (let i = 0; i < nftsToImport.length; i++) {
+        const nft = nftsToImport[i];
+        // Immediately update the store to reflect the NFT is being imported
+        importProgress.update(progress => progress.map(item =>
+            item.id === nft.id ? { ...item, status: 'loading' } : item
+        ));
 
-        // Update total in case the queue has changed since the last attempt
-        total = nftsToImport.length;
-
-        for (let i = current; i < nftsToImport.length; i++) {
-            const nft = nftsToImport[i];
-            try {
-                // Your logic to import an NFT, ensure this function is properly defined
-                await importNft(nft);
-
-                importProgress.update(n => ({ ...n, current: i + 1, message: `Importing ${i + 1} of ${nftsToImport.length}` }));
-                showToast(`Imported ${nft.name}`, 'success');
-            } catch (error) {
-                showToast(`Failed to import ${nft.name}: ${error.message}`, 'error');
-                // Optionally, break the loop if you want to stop at the first error
-                break;
-            }
-        }
-
-        if (get(importProgress).current >= total) {
-            showToast('Import completed successfully.', 'success');
-            // Reset the queue and progress
-            nftImportQueue.set([]);
-            importProgress.set({ current: 0, total: 0, message: '' });
+        try {
+            await importNft(nft); // Your import logic here
+            // Update the store to reflect the NFT import is complete
+            importProgress.update(progress => progress.map(item =>
+                item.id === nft.id ? { ...item, status: 'complete' } : item
+            ));
+        } catch (error) {
+            // Update the store to reflect an error occurred during the import
+            importProgress.update(progress => progress.map(item =>
+                item.id === nft.id ? { ...item, status: 'error' } : item
+            ));
         }
     }
+
+    hideImportToast();
 }
 
 async function importNft(nft) {
-
-    //console.log("importNft", nft);
 
     try {
         const response = await fetch('/api/admin/import/eth/', {

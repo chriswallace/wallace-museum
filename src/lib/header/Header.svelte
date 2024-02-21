@@ -41,7 +41,6 @@
 
 	onMount(() => {
 		if (artworkDetails && artworkDetails.attributes) {
-			//console.log(artworkDetails.attributes);
 		}
 	});
 </script>
@@ -89,7 +88,7 @@
 			</div>
 		{/if}
 
-		{#if artworkDetails}
+		{#if artworkDetails && artworkDetails.description}
 			<div class="artwork-details">
 				<h1 class="artwork-title">
 					{artworkDetails.title}

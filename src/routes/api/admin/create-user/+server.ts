@@ -16,8 +16,6 @@ export const POST: RequestHandler = async ({ request }) => {
             data: { email, username, passwordHash },
         });
 
-        console.log(user);
-
         return new Response(JSON.stringify({ message: 'Admin user created' }), {
             status: 200,
             headers: {

@@ -64,7 +64,6 @@ export async function DELETE({ params }) {
 
         return new Response(null, { status: 204 });
     } catch (error) {
-        console.log(error);
         return new Response(JSON.stringify({ error: 'Error deleting artwork' }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }

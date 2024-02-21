@@ -13,13 +13,11 @@
 		importProgress
 	} from '$lib/stores';
 
-	import { showToast } from '$lib/toastHelper';
 	import { intersectionObserver } from '$lib/intersectionObserver';
 	import EditableCollectionTable from '$lib/EditableCollectionTable.svelte';
 	import EditableArtistTable from '$lib/EditableArtistTable.svelte';
 	import FinalImportStep from '$lib/FinalImportStep.svelte';
 	import { startImportProcess } from '$lib/importHandler';
-	import { get } from 'svelte/store';
 	import { browser } from '$app/environment';
 
 	let currentStep = 1;
@@ -109,8 +107,6 @@
 			// Update the nfts store with the modified NFTs, ensuring artist addresses are included
 			nfts.set($nfts);
 
-			//console.log($nfts);
-
 			isModalOpen.set(true);
 		} catch (error) {
 			console.error('Error opening review modal:', error);
@@ -168,22 +164,22 @@
 		nftImportQueue.set(updatedNftsArray);
 		if (browser) localStorage.setItem('nftImportQueue', JSON.stringify(updatedNftsArray));
 
-		const importProgressInit = {
-			current: 0,
-			total: updatedNftsArray.length,
-			message: 'Starting import...'
-		};
+		const importProgressInit = $nftImportQueue.map((nft) => ({
+			id: nft.id,
+			name: nft.name,
+			status: 'pending'
+		}));
 
 		importProgress.set(importProgressInit);
 		if (browser) localStorage.setItem('importProgress', JSON.stringify(importProgressInit));
 
+		closeModal();
+
 		// Start the import process
 		await startImportProcess();
-		closeModal(); // Close the modal if you have one open for import confirmation
 	}
 
 	async function fetchNfts() {
-		``;
 		isLoading.set(true);
 		selectAllChecked.set(false);
 		selectedNfts.set(new Set());
