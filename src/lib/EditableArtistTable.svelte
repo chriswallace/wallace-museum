@@ -24,7 +24,7 @@
 	}
 </script>
 
-<Modal {title} {onClose}>
+<Modal {title} {onClose} width="96%">
 	<table>
 		<thead>
 			<tr>

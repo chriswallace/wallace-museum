@@ -56,8 +56,8 @@ model Artwork {
   tags           Json?
   artistId       Int
   artist         Artist           @relation(fields: [artistId], references: [id])
-  collectionId   Int
-  collection     Collection       @relation(fields: [collectionId], references: [id])
+  collectionId   Int?
+  collection     Collection?       @relation(fields: [collectionId], references: [id])
   ArtistArtworks ArtistArtworks[]
 
   @@unique([tokenID, contractAddr], name: "tokenID_contractAddr")

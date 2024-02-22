@@ -5,9 +5,10 @@
 	import { showToast } from '$lib/toastHelper';
 	import Modal from '$lib/Modal.svelte';
 	import { goto } from '$app/navigation';
+	import { closeModal, openModal } from '$lib/modal';
+	import { isModalOpen } from '$lib/stores';
 
 	let collectionId;
-	let isModalOpen = false;
 	let searchQuery = '';
 	let searchResults = [];
 	let isLoading = true;
@@ -23,6 +24,31 @@
 		enabled: false,
 		artworks: []
 	};
+
+	    // Assuming Modal is already imported and set up for dynamic content
+    let confirmationModalOpen = false;
+    let confirmationPromiseResolve;
+
+	function confirmAction(message) {
+        return new Promise(resolve => {
+            confirmationModalOpen = true;
+            $: if (confirmationModalOpen === false) {
+                resolve(confirmationPromiseResolve);
+            }
+            // This function will be called with true or false when the user responds
+            confirmationPromiseResolve = resolve;
+        });
+    }
+
+    async function confirmRemoval(artworkToRemove) {
+        const confirmed = await confirmAction('Are you sure you want to remove this artwork from the collection?');
+        if (confirmed) {
+            removeArtworkFromCollection(artworkToRemove);
+        } else {
+			confirmationModalOpen = false;
+			return;
+		}
+    }
 
 	async function fetchCollection() {
 		try {
@@ -58,7 +84,7 @@
 	}
 
 	function openAddExistingArtworkModal() {
-		isModalOpen = true;
+		openModal();
 		searchResults = [];
 	}
 
@@ -91,17 +117,17 @@
 		const response = await fetch(
 			`/api/admin/artworks/search?query=${encodeURIComponent(searchQuery)}`
 		);
+		console.log(response);
 		if (response.ok) {
 			const data = await response.json();
-			searchResults = data.artworks;
+			searchResults = data;
 		} else {
 			showToast('Failed to search artworks', 'error');
 		}
 	}
 
 	function addSelectedArtwork(artwork) {
-		// Add logic to update collection with selected artwork
-		isModalOpen = false;
+		closeModal();
 	}
 
 	onMount(() => {
@@ -119,17 +145,33 @@
 	<title>Edit {collection.title}</title>
 </svelte:head>
 
-{#if isModalOpen}
-	<Modal onClose={() => (isModalOpen = false)}>
-		<h2>Add Existing Artwork</h2>
-		<input type="text" placeholder="Search artwork" bind:value={searchQuery} />
-		<button on:click={searchExistingArtworks}>Search</button>
-		{#each searchResults as artwork}
-			<div on:click={() => addSelectedArtwork(artwork)}>
-				<img src={artwork.image} alt={artwork.title} />
-				<p>{artwork.title}</p>
+{#if confirmationModalOpen}
+    <Modal title="Confirm Action" width="500px" onClose={closeModal}>
+		<div class="w-[440px]">
+			<p>Are you sure you want to remove this?</p>
+			<div class="modal-actions">
+				<button class="delete button cta" on:click={() => { confirmationModalOpen = false; confirmationPromiseResolve(true); }}>Confirm</button>
+				<button class="button cta" on:click={() => { confirmationModalOpen = false; confirmationPromiseResolve(false); }}>Cancel</button>
 			</div>
-		{/each}
+		</div>
+    </Modal>
+{/if}
+{#if isModalOpen}
+	<Modal title="Add existing" width="75%" onClose={closeModal}>
+		<div class="w-full">
+			<div class="flex">
+				<input type="text" class="flex-grow mb-0 border border-gray-400 border-r-0" placeholder="Search artwork" bind:value={searchQuery} />
+				<button class="primary cta mt-0" on:click={searchExistingArtworks}>Search</button>
+			</div>
+			<div class="grid grid-cols-3 gap-4 w-full max-h-[60vh] mt-8">
+				{#each searchResults as artwork}
+					<div on:click={() => addSelectedArtwork(artwork)}>
+						<img src={artwork.image} alt={artwork.title} />
+						<p>{artwork.title}</p>
+					</div>
+				{/each}
+			</div>
+		</div>
 	</Modal>
 {/if}
 
@@ -156,7 +198,7 @@
 						<div>
 							<img src="{artwork.image}?tr=w-400,h-400,q-70,cm-pad_resize,bg-e9e9e9" alt="" />
 							<h3>{artwork.title}</h3>
-							<button class="remove" on:click={() => removeArtworkFromCollection(artwork)}>
+							<button class="remove" on:click={() => confirmRemoval(artwork)}>
 								<svg
 									fill="none"
 									height="15"

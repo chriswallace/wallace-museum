@@ -7,7 +7,7 @@
 	export let onCompleteImport;
 </script>
 
-<Modal {title} {onClose}>
+<Modal {title} {onClose} width="96%">
 	<table class="nft-review-table">
 		<thead>
 			<tr>

@@ -2,6 +2,7 @@
 	import { isLoading } from '$lib/stores';
 	export let title;
 	export let onClose; // Ensure this function is passed as a prop
+	export let width = "500px"; // Default width
 
 	function handleBackdropClick(event) {
 		// Prevent modal content click from closing the modal
@@ -12,8 +13,7 @@
 </script>
 
 <div class="modal" on:click={handleBackdropClick}>
-	<div class="modal-container">
-		<button class="close-button" on:click={onClose}>✖</button>
+	<div class="modal-container" style="width: {width};">
 		{#if $isLoading}
 			<div class="loading">
 				<img src="/images/loading.png" alt="Loading" />
@@ -21,6 +21,7 @@
 		{:else}
 			<div class="modal-header">
 				<h2>{title}</h2>
+				<button class="close-button" on:click={onClose}>✖</button>
 			</div>
 			<div class="modal-content">
 				<slot />
@@ -43,11 +44,7 @@
 		z-index: 100;
 	}
 	.modal-container {
-		@apply absolute;
-		top: 2vh;
-		bottom: 2vh;
-		left: 2vh;
-		right: 2vh;
+		@apply rounded-lg;
 	}
 	.loading {
 		display: flex;
@@ -67,6 +64,7 @@
 		justify-content: space-between;
 		align-items: end;
 		background: #fff;
+		position: relative;
 
 		h2 {
 			font-size: 24px;
@@ -83,12 +81,16 @@
 	.close-button {
 		margin-top: 0;
 		position: absolute;
-		top: 10px;
-		right: 10px;
+		top: 0;
+		right: 0;
 		border: none;
 		background: none;
 		cursor: pointer;
-		font-size: 25px;
+		font-size: 20px;
+		height: 48px;
+		width: 48px;
+		line-height: 0;
 		z-index: 100;
+		background:white;
 	}
 </style>

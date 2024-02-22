@@ -147,7 +147,13 @@
 					</td>
 					<td><div>{artwork.title}</div></td>
 					<td><div>{artwork.artist.name}</div></td>
-					<td><div>{artwork.collection.title}</div></td>
+					<td><div>
+						{#if artwork.collection}
+							<a href="/admin/collections/{artwork.collection.id}" on:click|preventDefault={() => goto(`/admin/collections/${artwork.collection.id}`)}>{artwork.collection.title}</a>
+						{:else}
+							None
+						{/if}
+					</div></td>
 					<td class="text-center"
 						><button class="edit button" on:click={() => editArtwork(artwork.id)}>Edit</button></td
 					>

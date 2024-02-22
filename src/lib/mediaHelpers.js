@@ -86,7 +86,11 @@ export async function uploadToImageKit(fileStream, artwork, mimeType) {
 
 		// Check if there's an existing file with the same unique tags
 		if (searchResponse.length > 0) {
-			return { url: searchResponse[0].url, fileType: searchResponse[0].fileType, dimensions: { height: searchResponse[0].height, width: searchResponse[0].width } };
+			return {
+				url: searchResponse[0].url,
+				fileType: searchResponse[0].fileType,
+				dimensions: { height: searchResponse[0].height, width: searchResponse[0].width }
+			};
 		}
 	} catch (error) {
 		console.error(`Error searching for existing file in ImageKit: ${error.message}`);
@@ -129,10 +133,13 @@ export async function normalizeMetadata(nft) {
 		platform: artwork.platform || metadata.platform || '',
 		image: artwork.image_url || metadata.displayUri || metadata.image || '',
 		video: artwork.animation_url || metadata.video || metadata.animation_url || '',
-		live_uri: artwork.live_uri || metadata.generator_url ? convertIpfsUriToHttpUrl(metadata.generator_url || artwork.generator_url) : '',
+		live_uri:
+			artwork.live_uri || metadata.generator_url
+				? convertIpfsUriToHttpUrl(metadata.generator_url || artwork.generator_url)
+				: '',
 		tags: metadata.tags || [],
 		website: artwork.website || metadata.website || '',
-		attributes: artwork.traits || metadata.attributes || metadata.features || {},
+		attributes: artwork.traits || metadata.attributes || metadata.features || {}
 	};
 
 	return standardMetadata;
@@ -158,7 +165,7 @@ export async function fetchWithRetry(url, retries = 3, delay = 1000) {
 			});
 		} catch (error) {
 			if (i < retries - 1) {
-				await new Promise(resolve => setTimeout(resolve, delay));
+				await new Promise((resolve) => setTimeout(resolve, delay));
 				continue;
 			} else {
 				throw error;
@@ -238,24 +245,31 @@ export async function handleMediaUpload(mediaUri, artwork) {
 	// Check for dimensions before resizing and uploading
 	let dimensions = mediaData.dimensions;
 	if (!dimensions || dimensions.width === 0 || dimensions.height === 0) {
-		console.warn("Dimensions are missing or invalid, resizing might not correctly adjust dimensions.");
+		console.warn(
+			'Dimensions are missing or invalid, resizing might not correctly adjust dimensions.'
+		);
 		dimensions = { width: undefined, height: undefined }; // Use undefined or a default value
 	}
 
-	const resizeResult = await resizeImage(mediaData.buffer, dimensions.width || 2000, dimensions.height || 2000); // Default/fallback dimensions if missing
+	const resizeResult = await resizeImage(
+		mediaData.buffer,
+		dimensions.width || 2000,
+		dimensions.height || 2000
+	); // Default/fallback dimensions if missing
 	const resizedBuffer = resizeResult.buffer;
 	const resizedDimensions = resizeResult.dimensions || dimensions; // Use original or resized dimensions
 
 	const uploadResult = await uploadToImageKit(resizedBuffer, artwork, mediaData.mimeType);
 
 	// Return upload result or null if unsuccessful
-	return uploadResult ? {
-		url: uploadResult.url,
-		fileType: mediaData.mimeType,
-		dimensions: resizedDimensions // Use the resized or fallback dimensions
-	} : null;
+	return uploadResult
+		? {
+				url: uploadResult.url,
+				fileType: mediaData.mimeType,
+				dimensions: resizedDimensions // Use the resized or fallback dimensions
+			}
+		: null;
 }
-
 
 export async function resizeImage(buffer, targetWidth = 2000, targetHeight = 2000) {
 	try {
