@@ -140,14 +140,11 @@ export async function normalizeMetadata(nft) {
 	return standardMetadata;
 }
 
-function normalizeAttributes(features) {
-	if (typeof features !== 'object' || features === null) {
-		return [];
-	}
-
-	return Object.entries(features).map(([trait_type, value]) => {
-		return { trait_type, value: String(value) };
-	});
+export function getCoverImages(artworks, defaultImage, maxImages = 4) {
+    // Create an array of image URLs or default images if the artwork doesn't exist
+    return Array.from({ length: maxImages }, (_, index) =>
+        artworks[index]?.image || defaultImage
+    );
 }
 
 export async function fetchWithRetry(url, retries = 3, delay = 1000) {

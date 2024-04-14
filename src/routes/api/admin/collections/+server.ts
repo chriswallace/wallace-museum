@@ -1,4 +1,5 @@
 import prisma from '$lib/prisma';
+import { getCoverImages } from '$lib/mediaHelpers';
 
 export async function GET({ url }) {
     try {
@@ -29,16 +30,18 @@ export async function GET({ url }) {
             orderBy: [orderBy],
             include: {
                 artworks: {
-                    take: 1, // Only take the first artwork
+                    take: 4, // Only take the first four artworks
                     select: { image: true } // Only select the image field
                 }
             }
         });
 
-        // Adding coverImage property to each collection
+        // Adding coverImages to each collection
+        const defaultImage = '/images/medici-image.png'; // Default image URL
+
         const modifiedCollections = collections.map(collection => ({
             ...collection,
-            coverImage: collection.artworks[0]?.image || '/images/medici-image.png' // Replace with a default image URL if needed
+            coverImages: getCoverImages(collection.artworks, defaultImage)
         }));
 
         return new Response(JSON.stringify({

@@ -75,11 +75,13 @@
 		{#each collections as collection}
 			<div class="card" on:click={() => editCollection(collection.id)}>
 				<div class="cover-image-wrap">
-					<img
-						src="{collection.coverImage}?tr=w-500,h-500,q-70,dpr-auto"
-						alt={collection.title}
-						class="cover-image"
-					/>
+					<div class="cover-image-grid">
+						{#each collection.coverImages as image}
+						<img
+							src="{image}?tr=w-250,h-250,q-70,dpr-auto"
+						/>
+						{/each}
+					</div>
 				</div>
 				<div class="title">{collection.title}</div>
 			</div>
@@ -106,12 +108,14 @@
 			transform: scale(1.2);
 		}
 	}
-	.cover-image-wrap {
-		@apply w-full aspect-square overflow-hidden;
+	.cover-image-wrap{
+		 @apply overflow-hidden;
 	}
-	.cover-image {
-		@apply w-full object-cover aspect-square transition duration-200 ease-in-out;
-		transform: scale(1.15);
+	.cover-image-grid {
+		@apply w-full aspect-square grid grid-cols-2 transition duration-200 ease-in-out hover:scale-105;
+	}
+	.cover-image{
+		@apply w-full h-full object-cover;
 	}
 	.title {
 		@apply text-lg font-semibold p-4;
