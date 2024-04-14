@@ -6,7 +6,7 @@ export async function GET({ params }) {
 	const collection = await prisma.collection.findUnique({
 		where: { id: parseInt(collectionId, 10) },
 		include: {
-			artworks: true // Include associated artworks
+			artworks: true
 		}
 	});
 
@@ -37,7 +37,6 @@ export async function PUT({ params, request }) {
 				curatorNotes: data.curatorNotes,
 				slug: data.slug,
 				enabled: data.enabled
-				// Any other fields to update
 			}
 		});
 

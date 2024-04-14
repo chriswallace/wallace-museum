@@ -233,7 +233,7 @@
 			</div>
 			<div class="search-grid">
 				{#each searchResults as artwork}
-					<div
+					<button
 						class="card"
 						class:active={selectedArtworks.has(artwork.id)}
 						on:click={() => toggleArtworkSelection(artwork.id)}
@@ -246,7 +246,7 @@
 						{#if selectedArtworks.has(artwork.id)}
 							<div class="selected-indicator">Selected</div>
 						{/if}
-					</div>
+					</button>
 				{/each}
 			</div>
 			<div class="well">
@@ -295,8 +295,8 @@
 										d="M6.79289 7.49998L4.14645 4.85353L4.85355 4.14642L7.5 6.79287L10.1464 4.14642L10.8536 4.85353L8.20711 7.49998L10.8536 10.1464L10.1464 10.8535L7.5 8.20708L4.85355 10.8535L4.14645 10.1464L6.79289 7.49998Z"
 										fill="black"
 										fill-rule="evenodd"
-									/></svg
-								>
+									/>
+								</svg>
 							</button>
 						</div>
 					{/each}

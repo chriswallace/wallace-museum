@@ -88,13 +88,13 @@
 			</div>
 		{/if}
 
-		{#if artworkDetails && artworkDetails.description}
+		{#if artworkDetails && artworkDetails.title}
 			<div class="artwork-details">
 				<h1 class="artwork-title">
 					{artworkDetails.title}
 				</h1>
-				<div class="artist-details"></div>
-				<p>{@html convertToHTML(artworkDetails.description)}</p>
+
+				<p class="artwork-description">{@html convertToHTML(artworkDetails.description)}</p>
 
 				{#if artworkDetails && artworkDetails.attributes && artworkDetails.attributes.length > 0}
 					<h3 class="mt-8 mb-4">Attributes</h3>
@@ -230,10 +230,6 @@
 		}
 	}
 
-	.artwork-title {
-		@apply text-2xl pb-0 mb-0 font-semibold;
-	}
-
 	.artist-name,
 	.artist-name a {
 		display: inline;
@@ -250,24 +246,16 @@
 		content: '';
 	}
 
-	.artist-details,
-	.artwork-details {
-		h1 {
-			@apply text-3xl mb-2 font-semibold leading-normal;
-		}
-
-		.artist-name {
-			@apply font-sans;
-		}
-
-		p {
-			@apply text-sm mb-4;
-		}
+	.artist-name{
+		@apply text-sm font-normal;
 	}
 
-	.artist-details {
-		@apply mb-2;
-		letter-spacing: 0;
+	.artwork-title {
+		@apply text-2xl mb-4 font-bold leading-normal;
+	}
+
+	.artwork-description{
+		@apply text-sm leading-relaxed max-w-full overflow-x-hidden;
 	}
 
 	.tags {
@@ -286,10 +274,6 @@
 
 			path {
 				fill: #fafafa;
-			}
-
-			rect {
-				fill: white;
 			}
 
 			.w {
@@ -316,9 +300,6 @@
 			@apply border-gray-700;
 		}
 
-		.view-live-code {
-			background-image: url('/images/code-dark-mode.svg');
-		}
 	}
 
 	.live-code {

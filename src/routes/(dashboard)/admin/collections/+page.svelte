@@ -73,18 +73,19 @@
 
 	<div class="collection-grid">
 		{#each collections as collection}
-			<div class="card" on:click={() => editCollection(collection.id)}>
+			<button class="card" on:click={() => editCollection(collection.id)}>
 				<div class="cover-image-wrap">
 					<div class="cover-image-grid">
 						{#each collection.coverImages as image}
 						<img
 							src="{image}?tr=w-250,h-250,q-70,dpr-auto"
+							alt=""
 						/>
 						{/each}
 					</div>
 				</div>
 				<div class="title">{collection.title}</div>
-			</div>
+			</button>
 		{/each}
 	</div>
 {/if}
@@ -102,20 +103,13 @@
 		@apply w-full grid grid-cols-3 gap-4;
 	}
 	.card {
-		@apply cursor-pointer bg-white rounded-md shadow-md overflow-hidden;
-
-		&:hover .cover-image {
-			transform: scale(1.2);
-		}
+		@apply cursor-pointer bg-white rounded-md shadow-md overflow-hidden p-0;
 	}
 	.cover-image-wrap{
 		 @apply overflow-hidden;
 	}
 	.cover-image-grid {
 		@apply w-full aspect-square grid grid-cols-2 transition duration-200 ease-in-out hover:scale-105;
-	}
-	.cover-image{
-		@apply w-full h-full object-cover;
 	}
 	.title {
 		@apply text-lg font-semibold p-4;
