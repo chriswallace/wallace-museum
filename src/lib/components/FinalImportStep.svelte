@@ -37,8 +37,9 @@
 				</td>
 			</tr>
 		</tfoot>
-	</table></Modal
->
+	</table>
+
+	</Modal>
 
 <style lang="scss">
 	table {
@@ -108,23 +109,5 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-	}
-
-	.input {
-		@apply truncate;
-	}
-
-	input[type='text'],
-	textarea {
-		border: 1px solid gray;
-		padding: 4px;
-	}
-
-	textarea {
-		@apply h-[6em] mb-0 block;
-
-		&:disabled {
-			@apply bg-gray-100 border-transparent;
-		}
 	}
 </style>

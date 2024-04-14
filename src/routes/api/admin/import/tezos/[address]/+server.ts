@@ -15,7 +15,6 @@ export const GET: RequestHandler = async ({ params, url }) => {
 			nfts = await fetchCreatedNFTsByAddress(address);
 		} else {
 			nfts = await fetchOwnedNFTsByAddress(address);
-			console.log(nfts.data.holder[0].held_tokens);
 		}
 
 		nfts = nfts.data.holder[0].held_tokens.map(({ token }) => ({

@@ -16,29 +16,28 @@
 </div>
 
 <style lang="scss">
-	:global {
-		html {
-			font-size: 16px;
-		}
-
-		body {
-			margin: 0;
-			padding: 0;
-			font-family:
-				system-ui,
-				-apple-system,
-				BlinkMacSystemFont,
-				'Segoe UI',
-				Roboto,
-				Oxygen,
-				Ubuntu,
-				Cantarell,
-				'Open Sans',
-				'Helvetica Neue',
-				sans-serif;
-			background-color: #eee;
-		}
+	html {
+		font-size: 16px;
 	}
+
+	body {
+		margin: 0;
+		padding: 0;
+		font-family:
+			system-ui,
+			-apple-system,
+			BlinkMacSystemFont,
+			'Segoe UI',
+			Roboto,
+			Oxygen,
+			Ubuntu,
+			Cantarell,
+			'Open Sans',
+			'Helvetica Neue',
+			sans-serif;
+		background-color: #eee;
+	}
+	
 	.error {
 		display: flex;
 		justify-content: center;
