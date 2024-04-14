@@ -11,7 +11,7 @@ export const POST = async ({ request }) => {
 
 		// Fetch collection and artist data for each unique address
 		const dataPromises = collectionSlugs.map(async (collectionSlug) => {
-			const collection = await fetchCollection(collectionSlug); // Assuming the collection slug or address is provided
+			const collection = await fetchCollection(collectionSlug);
 			let artist = {};
 			if (collection && collection.owner) {
 				artist = await fetchArtist(collection.owner);
@@ -21,6 +21,7 @@ export const POST = async ({ request }) => {
 		});
 
 		const data = await Promise.all(dataPromises);
+
 
 		// Map back to the original array if needed or return as is
 		return json({ success: true, data });

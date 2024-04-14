@@ -53,13 +53,12 @@ export async function PUT({ params, request }) {
 	}
 }
 
-// DELETE: Delete Collection
 export async function DELETE({ params }) {
-	const { id } = params;
+	const { collectionId } = params;
 
 	try {
 		await prisma.collection.delete({
-			where: { id: parseInt(id, 10) }
+			where: { id: parseInt(collectionId, 10) }
 		});
 
 		return new Response(null, { status: 204 });

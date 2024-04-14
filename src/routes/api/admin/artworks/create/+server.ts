@@ -19,7 +19,8 @@ export async function POST({ request }) {
         let isVideo = false;
 
         if (file) {
-            const uploadResponse = await uploadToImageKit(file.stream(), file.name);
+            const buffer = await (file as Blob).arrayBuffer();
+            const uploadResponse = await uploadToImageKit(buffer, file.name);
             imageOrVideoUrl = uploadResponse.url;
             isVideo = uploadResponse.fileType === 'non-image';
         }

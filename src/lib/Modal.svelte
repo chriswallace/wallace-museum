@@ -2,7 +2,7 @@
 	import { isLoading } from '$lib/stores';
 	export let title;
 	export let onClose; // Ensure this function is passed as a prop
-	export let width = "500px"; // Default width
+	export let width = '500px'; // Default width
 
 	function handleBackdropClick(event) {
 		// Prevent modal content click from closing the modal
@@ -73,7 +73,7 @@
 	}
 	.modal-content {
 		background: white;
-		padding: 2vh 2rem 4vh;
+		padding: 0 2rem 4vh;
 		max-height: 100vh;
 		overflow-y: auto;
 		display: flex;
@@ -91,6 +91,6 @@
 		width: 48px;
 		line-height: 0;
 		z-index: 100;
-		background:white;
+		background: white;
 	}
 </style>

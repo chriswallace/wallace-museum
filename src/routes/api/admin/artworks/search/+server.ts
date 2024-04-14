@@ -19,8 +19,6 @@ export async function GET({ url }) {
 			}
 		});
 
-		console.log(artworks);
-
 		return new Response(JSON.stringify(artworks), {
 			status: 200,
 			headers: { 'Content-Type': 'application/json' }

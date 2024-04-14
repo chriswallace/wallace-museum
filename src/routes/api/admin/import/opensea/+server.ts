@@ -30,7 +30,6 @@ export const POST = async ({ request }) => {
 
 			if (normalizedMetadata.image) {
 				const imageUploadResult = await handleMediaUpload(normalizedMetadata.image, nft);
-				console.log('imageUploadResult:', imageUploadResult);
 				normalizedMetadata.image = imageUploadResult ? imageUploadResult.url : '';
 				// Ensure dimensions are defined before using them
 				nft.dimensions = imageUploadResult && imageUploadResult.dimensions ? imageUploadResult.dimensions : { width: undefined, height: undefined };
@@ -86,8 +85,6 @@ export const POST = async ({ request }) => {
 				},
 			});
 
-			if (artwork.id)
-				console.log(`Imported artwork ${currentIndex + 1} of ${nfts.length}.`);
 		});
 
 		await Promise.all(importPromises);

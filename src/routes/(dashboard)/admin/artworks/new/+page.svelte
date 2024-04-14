@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { showToast } from '$lib/toastHelper';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores'; // Import the page store
 
 	let artwork = {
 		title: '',
@@ -30,6 +31,7 @@
 
 			if (collectionsRes.ok) {
 				collections = await collectionsRes.json();
+				collections = collections.collections;
 			}
 		} catch (e) {
 			error = e.message;
@@ -82,7 +84,11 @@
 
 	onMount(() => {
 		if (browser) {
-			fetchArtwork();
+			fetchArtwork().then(() => {
+				if (collections.length > 0) {
+					artwork.collectionId = Number($page.url.searchParams.get('cID'));
+				}
+			});
 		}
 	});
 </script>
@@ -135,7 +141,7 @@
 									</select>
 								</div>
 								<div style="flex: none;">
-									<button class="button link" on:click={() => (addingNewArtist = true)}>
+									<button class="cta button primary" on:click={() => (addingNewArtist = true)}>
 										Add New
 									</button>
 								</div>
@@ -162,7 +168,7 @@
 									</select>
 								</div>
 								<div style="flex: none;">
-									<button class="button link" on:click={() => (addingNewCollection = true)}>
+									<button class="cta button primary" on:click={() => (addingNewCollection = true)}>
 										Add New
 									</button>
 								</div>
@@ -170,7 +176,7 @@
 						{/if}
 					</fieldset>
 
-					<button type="button submit">Save</button>
+					<button class="cta button primary w-full" type="submit">Save</button>
 				</form>
 			</div>
 		</div>

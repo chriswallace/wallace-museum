@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { fixIpfsUrl } from '$lib/mediaHelpers';
 
 export async function fetchAccount(walletAddress) {
 	const url = `https://api.opensea.io/api/v2/accounts/${walletAddress}`;
@@ -20,6 +21,10 @@ export async function fetchCollection(slug) {
 		throw new Error(`HTTP error! status: ${response.status}`);
 	}
 	const data = await response.json();
+
+	if (data.contracts[0] && data.contracts[0].blockchain) {
+		data.blockchain = data.contracts[0].blockchain;
+	}
 	return data || [];
 }
 
@@ -86,10 +91,8 @@ export async function fetchNFTsByAddress(walletAddress, allNfts = [], cursor = n
 
 	const data = await response.json();
 
-	for (const nft of data.nfts) {
-		if (nft.image_url && nft.image_url.startsWith('https://ipfs.io')) {
-			nft.image_url = nft.image_url.replace('https://ipfs.io', 'https://cloudflare-ipfs.com');
-		}
+	for (let nft of data.nfts) {
+		nft = await fixIpfsUrl(nft);
 		allNfts.push(nft);
 	}
 

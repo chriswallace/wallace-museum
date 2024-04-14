@@ -1,12 +1,12 @@
 <script>
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
+	import { isModalOpen } from '$lib/stores';
 	import { browser } from '$app/environment';
 	import { showToast } from '$lib/toastHelper';
 	import Modal from '$lib/Modal.svelte';
 	import { goto } from '$app/navigation';
 	import { closeModal, openModal } from '$lib/modal';
-	import { isModalOpen } from '$lib/stores';
 
 	let collectionId;
 	let searchQuery = '';
@@ -25,30 +25,36 @@
 		artworks: []
 	};
 
-	    // Assuming Modal is already imported and set up for dynamic content
-    let confirmationModalOpen = false;
-    let confirmationPromiseResolve;
+	let selectedArtworks = new Set();
+
+	$: selectedArtworksArray = Array.from(selectedArtworks); // Reactive conversion to array for reactivity and iteration
+
+	// Assuming Modal is already imported and set up for dynamic content
+	let confirmationModalOpen = false;
+	let confirmationPromiseResolve;
 
 	function confirmAction(message) {
-        return new Promise(resolve => {
-            confirmationModalOpen = true;
-            $: if (confirmationModalOpen === false) {
-                resolve(confirmationPromiseResolve);
-            }
-            // This function will be called with true or false when the user responds
-            confirmationPromiseResolve = resolve;
-        });
-    }
+		return new Promise((resolve) => {
+			confirmationModalOpen = true;
+			$: if (confirmationModalOpen === false) {
+				resolve(confirmationPromiseResolve);
+			}
+			// This function will be called with true or false when the user responds
+			confirmationPromiseResolve = resolve;
+		});
+	}
 
-    async function confirmRemoval(artworkToRemove) {
-        const confirmed = await confirmAction('Are you sure you want to remove this artwork from the collection?');
-        if (confirmed) {
-            removeArtworkFromCollection(artworkToRemove);
-        } else {
+	async function confirmRemoval(artworkToRemove) {
+		const confirmed = await confirmAction(
+			'Are you sure you want to remove this artwork from the collection?'
+		);
+		if (confirmed) {
+			removeArtworkFromCollection(artworkToRemove);
+		} else {
 			confirmationModalOpen = false;
 			return;
 		}
-    }
+	}
 
 	async function fetchCollection() {
 		try {
@@ -80,7 +86,7 @@
 	}
 
 	function navigateToAddArtwork() {
-		goto(`/admin/artworks/add?collectionId=${collectionId}`);
+		goto(`/admin/artworks/new?cID=${collectionId}`);
 	}
 
 	function openAddExistingArtworkModal() {
@@ -117,7 +123,6 @@
 		const response = await fetch(
 			`/api/admin/artworks/search?query=${encodeURIComponent(searchQuery)}`
 		);
-		console.log(response);
 		if (response.ok) {
 			const data = await response.json();
 			searchResults = data;
@@ -126,8 +131,53 @@
 		}
 	}
 
-	function addSelectedArtwork(artwork) {
-		closeModal();
+	function toggleArtworkSelection(artworkId) {
+		if (selectedArtworks.has(artworkId)) {
+			selectedArtworks.delete(artworkId);
+		} else {
+			selectedArtworks.add(artworkId);
+		}
+		selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
+	}
+
+	async function addSelectedArtworksToCollection() {
+		if (selectedArtworks.size === 0) {
+			showToast('No artworks selected', 'error');
+			return;
+		}
+
+		const response = await fetch(`/api/admin/collections/${collectionId}/artworks/add`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ collectionId: collectionId, artworkIds: Array.from(selectedArtworks) }) // Convert Set to Array
+		});
+
+		if (response.ok) {
+			showToast('Artworks added to collection', 'success');
+			selectedArtworks.clear(); // Clear selection after successful addition
+			closeModal();
+			fetchCollection();
+		} else {
+			showToast('Failed to add artworks to collection', 'error');
+		}
+	}
+
+	async function deleteCollection() {
+		const confirmed = await confirmAction('Are you sure you want to delete this collection?');
+		if (confirmed) {
+			const deleteUrl = `/api/admin/collections/${collectionId}/`;
+			console.log(deleteUrl);
+			const response = await fetch(deleteUrl, {
+				method: 'DELETE'
+			});
+
+			if (response.ok) {
+				showToast('Collection deleted', 'success');
+				goto('/admin/collections');
+			} else {
+				showToast('Failed to delete collection', 'error');
+			}
+		}
 	}
 
 	onMount(() => {
@@ -146,30 +196,65 @@
 </svelte:head>
 
 {#if confirmationModalOpen}
-    <Modal title="Confirm Action" width="500px" onClose={closeModal}>
+	<Modal title="Confirm Action" width="500px" onClose={closeModal}>
 		<div class="w-[440px]">
-			<p>Are you sure you want to remove this?</p>
+			<p class="mb-4">Are you sure you want to remove this artwork?</p>
 			<div class="modal-actions">
-				<button class="delete button cta" on:click={() => { confirmationModalOpen = false; confirmationPromiseResolve(true); }}>Confirm</button>
-				<button class="button cta" on:click={() => { confirmationModalOpen = false; confirmationPromiseResolve(false); }}>Cancel</button>
+				<button
+					class="delete button cta"
+					on:click={() => {
+						confirmationModalOpen = false;
+						confirmationPromiseResolve(true);
+					}}>Yes, remove it</button
+				>
+				<button
+					class="button cta"
+					on:click={() => {
+						confirmationModalOpen = false;
+						confirmationPromiseResolve(false);
+					}}>No, keep it</button
+				>
 			</div>
 		</div>
-    </Modal>
+	</Modal>
 {/if}
-{#if isModalOpen}
-	<Modal title="Add existing" width="75%" onClose={closeModal}>
+{#if $isModalOpen}
+	<Modal title="Add existing artwork" width="75%" onClose={closeModal}>
 		<div class="w-full">
 			<div class="flex">
-				<input type="text" class="flex-grow mb-0 border border-gray-400 border-r-0" placeholder="Search artwork" bind:value={searchQuery} />
+				<input
+					type="text"
+					class="flex-grow mb-0 border border-gray-400 border-r-0"
+					placeholder="Search artwork"
+					bind:value={searchQuery}
+					on:keypress={(e) => e.key === 'Enter' && searchExistingArtworks()}
+				/>
 				<button class="primary cta mt-0" on:click={searchExistingArtworks}>Search</button>
 			</div>
-			<div class="grid grid-cols-3 gap-4 w-full max-h-[60vh] mt-8">
+			<div class="search-grid">
 				{#each searchResults as artwork}
-					<div on:click={() => addSelectedArtwork(artwork)}>
-						<img src={artwork.image} alt={artwork.title} />
+					<div
+						class="card"
+						class:active={selectedArtworks.has(artwork.id)}
+						on:click={() => toggleArtworkSelection(artwork.id)}
+					>
+						<img
+							src="{artwork.image}?tr=w-400,h-400,q-70,cm-pad_resize,bg-e9e9e9"
+							alt={artwork.title}
+						/>
 						<p>{artwork.title}</p>
+						{#if selectedArtworks.has(artwork.id)}
+							<div class="selected-indicator">Selected</div>
+						{/if}
 					</div>
 				{/each}
+			</div>
+			<div class="well">
+				{#if selectedArtworks.size > 0}
+					<button class="primary button" on:click={addSelectedArtworksToCollection}>
+						Add Selected Artworks
+					</button>
+				{/if}
 			</div>
 		</div>
 	</Modal>
@@ -217,8 +302,11 @@
 					{/each}
 					<div class="fieldset add-artwork">
 						<div class="add-artwork-buttons">
-							<button class="button cta" on:click={navigateToAddArtwork}>Add new</button>
-							<button class="button cta" on:click={openAddExistingArtworkModal}>Add existing</button
+							<button class="button primary w-full mb-4" on:click={navigateToAddArtwork}
+								>Add new</button
+							>
+							<button class="button secondary w-full" on:click={openAddExistingArtworkModal}
+								>Add existing</button
 							>
 						</div>
 					</div>
@@ -244,8 +332,8 @@
 						<label for="enabled">Enabled</label>
 					</div>
 					<div class="button-split">
-						<button class="button primary" type="submit">Save Collection</button>
-						<button class="button delete" type="submit">Delete Collection</button>
+						<button class="button primary" type="submit">Save</button>
+						<button class="button delete" type="button" on:click={deleteCollection}>Delete</button>
 					</div>
 				</form>
 			</div>
@@ -292,6 +380,38 @@
 		h3 {
 			@apply mb-6;
 		}
+	}
+
+	.search-grid {
+		@apply grid grid-cols-3 gap-4 w-full max-h-[55vh] overflow-y-scroll mt-8;
+
+		.card {
+			@apply rounded-[14px];
+
+			img {
+				@apply rounded-t-md;
+			}
+		}
+
+		p {
+			@apply py-3;
+		}
+
+		.active {
+			@apply border-2 border-blue-500 relative;
+
+			p {
+				@apply p-3;
+			}
+		}
+	}
+
+	.well {
+		@apply mt-8 text-right;
+	}
+
+	.selected-indicator {
+		@apply bg-blue-500 rounded-tr-md text-xs uppercase font-bold absolute top-0 right-0 text-white px-3 py-2;
 	}
 
 	.delete {

@@ -19,8 +19,8 @@ function safeLocalStorage() {
 	// Mock localStorage for server-side compatibility
 	return {
 		getItem: () => null,
-		setItem: () => {},
-		removeItem: () => {}
+		setItem: () => { },
+		removeItem: () => { }
 	};
 }
 

@@ -120,7 +120,7 @@
 	}
 
 	button {
-		@apply mt-2 px-4 py-3;
+		@apply px-4 py-3;
 	}
 
 	.button {

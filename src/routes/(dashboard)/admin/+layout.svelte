@@ -61,7 +61,7 @@
 
 		a,
 		button {
-			@apply text-gray-800 font-normal px-2 py-3 m-0 mx-1 transition duration-300 ease-in-out decoration-2 underline-offset-8 underline decoration-transparent;
+			@apply text-gray-800 font-normal px-2 py-3 transition duration-300 ease-in-out decoration-2 underline-offset-8 underline decoration-transparent;
 			font-variation-settings: initial;
 		}
 
@@ -91,7 +91,7 @@
 		}
 
 		h1 button {
-			@apply align-middle text-sm border border-gray-400 text-gray-600 ml-4 mt-0 px-2 py-1 rounded-sm hover:bg-primary hover:border-primary hover:text-white;
+			@apply align-middle text-sm border border-gray-400 text-gray-600 ml-4 px-2 py-1 rounded-sm hover:bg-primary hover:border-primary hover:text-white;
 		}
 
 		.back-btn {

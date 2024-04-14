@@ -82,7 +82,6 @@
 					/>
 				</div>
 				<div class="title">{collection.title}</div>
-				<!-- Include toggle button for enable/disable if needed -->
 			</div>
 		{/each}
 	</div>

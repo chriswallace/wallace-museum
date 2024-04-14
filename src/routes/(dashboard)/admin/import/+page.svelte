@@ -7,12 +7,18 @@
 		selectedNfts,
 		updatedNfts,
 		reviewData,
-		isModalOpen,
 		selectAllChecked,
-		currentStep
+		currentStep,
+		isModalOpen
 	} from '$lib/stores';
 
-	import { finalizeImport, nextStep, openReviewModal, handleCollectionSave, handleArtistSave } from '$lib/importHandler';
+	import {
+		finalizeImport,
+		nextStep,
+		openReviewModal,
+		handleCollectionSave,
+		handleArtistSave
+	} from '$lib/importHandler';
 	import { intersectionObserver } from '$lib/intersectionObserver';
 	import EditableCollectionTable from '$lib/EditableCollectionTable.svelte';
 	import EditableArtistTable from '$lib/EditableArtistTable.svelte';
@@ -20,7 +26,9 @@
 	import { closeModal } from '$lib/modal';
 	import { get } from 'svelte/store';
 
-	const loadingImageUrl = '/images/loading.png';
+	const loadingImageUrl = '/images/medici-image.png';
+
+	$: $isModalOpen;
 
 	function handleLazyLoad(node, { src }) {
 		node.src = loadingImageUrl;
@@ -64,27 +72,33 @@
 	}
 
 	async function fetchNfts() {
-	isLoading.set(true);
-	selectAllChecked.set(false);
-	selectedNfts.set(new Set());
-	const wallet = $walletAddress;
-	if (wallet.length > 0) {
-		const type = $nftType;
-		try {
-			const response = await fetch(`/api/admin/import/eth/${wallet}/?type=${type}`);
-			if (response.ok) {
-				const data = await response.json();
-				nfts.set(data.nfts);
-			} else {
-				console.error('Failed to fetch NFTs');
+		isLoading.set(true);
+		selectAllChecked.set(false);
+		selectedNfts.set(new Set());
+		const wallet = $walletAddress;
+		let blockchain = 'opensea';
+
+		if (wallet.length > 0) {
+			const type = $nftType;
+			if (wallet.startsWith('tz')) {
+				blockchain = 'tezos';
 			}
-		} catch (error) {
-			console.error('Error fetching NFTs:', error);
-		} finally {
-			isLoading.set(false);
+			let apiEndpoint = `/api/admin/import/${blockchain}/${wallet}/?type=${type}`;
+			try {
+				const response = await fetch(apiEndpoint);
+				if (response.ok) {
+					const data = await response.json();
+					nfts.set(data.nfts);
+				} else {
+					console.error('Failed to fetch NFTs');
+				}
+			} catch (error) {
+				console.error('Error fetching NFTs:', error);
+			} finally {
+				isLoading.set(false);
+			}
 		}
 	}
-}
 </script>
 
 <svelte:head>

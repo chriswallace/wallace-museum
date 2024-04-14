@@ -38,7 +38,7 @@ export async function GET({ url }) {
         // Adding coverImage property to each collection
         const modifiedCollections = collections.map(collection => ({
             ...collection,
-            coverImage: collection.artworks[0]?.image || '/images/loading.png' // Replace with a default image URL if needed
+            coverImage: collection.artworks[0]?.image || '/images/medici-image.png' // Replace with a default image URL if needed
         }));
 
         return new Response(JSON.stringify({
