@@ -1,4 +1,4 @@
-<!-- src/lib/ImportStatus.svelte -->
+<!-- src/lib/components/ImportStatus.svelte -->
 <script>
 	import { importProgress } from '$lib/stores';
 </script>

@@ -1,5 +1,5 @@
 <script>
-	import CollectionDropdown from '$lib/CollectionDropdown.svelte';
+	import CollectionDropdown from '$lib/components/CollectionDropdown.svelte';
 	import { page } from '$app/stores';
 	import { selectedArtwork, isLiveCodeVisible } from '$lib/stores';
 	import { get } from 'svelte/store';

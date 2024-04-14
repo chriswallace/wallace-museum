@@ -7,6 +7,8 @@
 	page.subscribe(($page) => {
 		currentPage = $page.url.pathname;
 	});
+	
+	import '../../../admin.css';
 </script>
 
 <div class="ui-frame">

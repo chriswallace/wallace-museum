@@ -16,7 +16,6 @@ export const load: PageServerLoad = async ({ request, locals }) => {
             include: { user: true }
         });
 
-        // Check if the session is valid and not expired
         if (session && new Date(session.expiresAt) > new Date()) {
             user = session.user;
         }

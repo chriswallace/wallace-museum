@@ -11,7 +11,7 @@ import {
 } from '$lib/stores';
 import { toast } from '@zerodevx/svelte-toast';
 import { get } from 'svelte/store';
-import ImportStatus from '$lib/ImportStatus.svelte';
+import ImportStatus from '$lib/components/ImportStatus.svelte';
 import { tick } from 'svelte';
 import { browser } from '$app/environment';
 import { openModal, closeModal } from '$lib/modal';

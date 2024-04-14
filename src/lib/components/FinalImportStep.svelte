@@ -1,5 +1,5 @@
 <script>
-	import Modal from '$lib/Modal.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 
 	export let title;
 	export let nfts = [];

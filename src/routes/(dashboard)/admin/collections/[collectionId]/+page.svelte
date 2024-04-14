@@ -4,7 +4,7 @@
 	import { isModalOpen } from '$lib/stores';
 	import { browser } from '$app/environment';
 	import { showToast } from '$lib/toastHelper';
-	import Modal from '$lib/Modal.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 	import { goto } from '$app/navigation';
 	import { closeModal, openModal } from '$lib/modal';
 

@@ -20,9 +20,9 @@
 		handleArtistSave
 	} from '$lib/importHandler';
 	import { intersectionObserver } from '$lib/intersectionObserver';
-	import EditableCollectionTable from '$lib/EditableCollectionTable.svelte';
-	import EditableArtistTable from '$lib/EditableArtistTable.svelte';
-	import FinalImportStep from '$lib/FinalImportStep.svelte';
+	import EditableCollectionTable from '$lib/components/EditableCollectionTable.svelte';
+	import EditableArtistTable from '$lib/components/EditableArtistTable.svelte';
+	import FinalImportStep from '$lib/components/FinalImportStep.svelte';
 	import { closeModal } from '$lib/modal';
 	import { get } from 'svelte/store';
 

@@ -1,5 +1,5 @@
 <script>
-	import Modal from './Modal.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 
 	export let items = []; // items to display and edit, e.g., collections or artists
 	export let onSave; // optional callback function to handle saving changes
@@ -28,8 +28,9 @@
 	<table>
 		<thead>
 			<tr>
+				<th>Address</th>
 				<th>Name</th>
-				<th>Description</th>
+				<th>Bio</th>
 				<th>Actions</th>
 			</tr>
 		</thead>
@@ -37,17 +38,20 @@
 			{#each items as item, index}
 				<tr>
 					<td>
+						<div class="address">{item.address}</div>
+					</td>
+					<td>
 						{#if editableIndex === index}
-							<textarea bind:value={item.name}></textarea>
+							<textarea bind:value={item.username}></textarea>
 						{:else}
-							{item.name}
+							<div class="name">{item.username}</div>
 						{/if}
 					</td>
 					<td>
 						{#if editableIndex === index}
-							<textarea bind:value={item.description}></textarea>
+							<textarea bind:value={item.bio}></textarea>
 						{:else}
-							{item.description}
+							{item.bio}
 						{/if}
 					</td>
 					<td>
@@ -76,47 +80,51 @@
 		width: 100%;
 		border-collapse: collapse;
 		color: #777;
+		table-layout: fixed; /* Apply fixed layout to the whole table */
 	}
-	thead {
-		background: #c7cacd;
-		border-radius: 6px 6px 0 0;
-		display: table;
-		width: 100%;
-		height: 4vh;
-		table-layout: fixed;
 
-		th {
-			border-bottom: 0;
-		}
+	thead,
+	tbody,
+	tfoot {
+		display: table; /* Ensure thead and tfoot are also treated as table for alignment */
+		width: 100%; /* Ensure full width */
 	}
+
 	tbody {
 		display: block;
 		max-height: 64vh;
 		overflow-y: scroll;
-		width: 100%;
-
-		tr:nth-child(even) {
-			background-color: #f2f2f2;
-		}
 	}
+
 	th,
 	td {
 		padding: 8px;
 		text-align: left;
-		border-bottom: 0;
 		font-size: 14px;
-		word-break: break-all;
+		border-bottom: 1px solid #ddd; /* Added for visual consistency */
+	}
 
-		&:first-child {
-			@apply w-[15%];
-			font-weight: bold;
-		}
-		&:nth-child(2) {
-			@apply w-[65%];
-		}
+	/* Specific column widths */
+	th:first-child,
+	td:first-child {
+		width: 25%;
+	}
+	th:nth-child(2),
+	td:nth-child(2) {
+		width: 20%;
+	}
+	th:nth-child(3),
+	td:nth-child(3) {
+		width: 30%;
+	}
+	th:nth-child(4),
+	td:nth-child(4) {
+		width: 25%;
+		text-align: center;
+	}
 
-		&:nth-child(3) {
-			@apply w-[20%];
+	td {
+		&:nth-child(4n) {
 			text-align: center;
 
 			button {
@@ -124,16 +132,7 @@
 			}
 		}
 	}
-	th:nth-child(3) {
-		@apply text-center;
-	}
-	td {
-		&:nth-child(3n) {
-			button {
-				@apply mx-auto;
-			}
-		}
-	}
+
 	tfoot td {
 		border-bottom: 0;
 		text-align: right;
@@ -143,11 +142,16 @@
 			margin-left: auto;
 		}
 	}
+
+	.address,
+	.name {
+		@apply break-all;
+	}
+
 	input[type='text'],
 	textarea {
 		border: 1px solid gray;
-		border-radius: 6px;
-		padding: 6px 10px;
+		padding: 4px;
 	}
 
 	textarea {
