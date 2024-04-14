@@ -1,16 +1,6 @@
-import { invalid } from '@sveltejs/kit';
-
-export const customResponse = (status: number, success: boolean, message: string, data?: any) => {
-    if (success) {
-        return {
-            success: success,
-            message: message,
-            info: data
-        };
-    }
-    return invalid(status, {
-        success: success,
-        message: message,
-        info: data
-    });
-};
+export function getCoverImages(artworks, defaultImage, maxImages = 4) {
+    // Create an array of image URLs or default images if the artwork doesn't exist
+    return Array.from({ length: maxImages }, (_, index) =>
+        artworks[index]?.image || defaultImage
+    );
+}

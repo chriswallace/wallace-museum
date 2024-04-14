@@ -1,5 +1,5 @@
 import prisma from '$lib/prisma';
-import { getCoverImages } from '$lib/mediaHelpers';
+import { getCoverImages } from '$lib/utils';
 
 export async function GET({ url }) {
     try {

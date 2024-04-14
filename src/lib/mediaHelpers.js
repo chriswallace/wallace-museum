@@ -140,13 +140,6 @@ export async function normalizeMetadata(nft) {
 	return standardMetadata;
 }
 
-export function getCoverImages(artworks, defaultImage, maxImages = 4) {
-    // Create an array of image URLs or default images if the artwork doesn't exist
-    return Array.from({ length: maxImages }, (_, index) =>
-        artworks[index]?.image || defaultImage
-    );
-}
-
 export async function fetchWithRetry(url, retries = 3, delay = 1000) {
 	for (let i = 0; i < retries; i++) {
 		try {
