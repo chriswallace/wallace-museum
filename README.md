@@ -2,7 +2,7 @@
 
 The official repository for the Medici web application.
 
-## Requirements
+## App Requirements
 
 To run this app, you will need to connect it up with a database. I use a PostgreSQL database, but you can use any database supported by Prisma. The connection string should be stored in a `.env` file in the root of the project. The `.env` file should look like this (replace with your own database connection string):
 
