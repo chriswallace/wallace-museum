@@ -13,6 +13,7 @@
 		"package": "svelte-kit package",
 		"prepare": "svelte-kit sync",
 		"start": "node build/index.js",
+		"postinstall": "npx prisma generate && npx prisma migrate deploy",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
