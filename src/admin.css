@@ -104,7 +104,7 @@
 	}
 
 	.subheading {
-		@apply max-w-3xl mb-16 text-gray-500 text-lg;
+		@apply max-w-3xl mb-6 text-gray-500 text-lg;
 	}
 
 	.medici {
@@ -123,12 +123,16 @@
 		@apply px-4 py-3;
 	}
 
-	.button {
+	.primary {
 		@apply rounded-sm bg-primary whitespace-nowrap text-white font-semibold;
 	}
 
-	.delete {
-		@apply bg-red-500 border-red-500;
+	.primary:hover {
+		background-color: var(--button-color-background-primary-dark);
+	}
+
+	.destructive {
+		@apply rounded-sm bg-red-500 border-red-500 whitespace-nowrap text-white font-semibold;
 	}
 
 	.link {
@@ -137,14 +141,6 @@
 
 	.cta {
 		@apply bg-gray-600;
-	}
-
-	.primary {
-		@apply bg-primary text-white;
-	}
-
-	.primary:hover {
-		background-color: var(--button-color-background-primary-dark);
 	}
 
 	.ghost {

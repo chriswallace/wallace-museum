@@ -76,7 +76,7 @@
 	}
 
 	.ui-content {
-		@apply w-full max-w-[1600px] col-span-1 md:col-span-3 p-12 mx-auto;
+		@apply w-full max-w-[1600px] col-span-1 md:col-span-3 p-6 mx-auto;
 	}
 
 	:global {

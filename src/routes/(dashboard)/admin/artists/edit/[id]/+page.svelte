@@ -81,9 +81,4 @@
     .error {
         color: red;
     }
-
-    .back-btn {
-        display: block;
-        margin-bottom: 20px;
-    }
 </style>

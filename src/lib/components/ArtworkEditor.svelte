@@ -63,6 +63,8 @@
       {/each}
     </select>
   </div>
-  <button type="submit">Save details</button>
+  <div class="flex justify-between">
+    <button class="destructive" on:click={deleteArtwork} type="button">Delete Artwork</button>
+    <button class="primary" type="submit">Save details</button>
+  </div>
 </form>
-<button on:click={deleteArtwork}>Delete Artwork</button>

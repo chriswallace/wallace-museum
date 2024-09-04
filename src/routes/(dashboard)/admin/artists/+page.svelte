@@ -69,11 +69,6 @@
 </svelte:head>
 
 <h1>Artists <button class="ghost" on:click={addNew}>+ Add new</button></h1>
-
-<p class="subheading">
-	This is a list of artists currently stored in your Compendium. Here, you may edit individual artists.
-</p>
-
 {#if artists.length === 0}
 	<div class="empty">
 		<p>No artists found.</p>

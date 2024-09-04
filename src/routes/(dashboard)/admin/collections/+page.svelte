@@ -54,11 +54,6 @@
 
 <h1>Collections <button class="ghost" on:click={addNew}>+ Add new</button></h1>
 
-<p class="subheading">
-	This is a list of collections currently stored in your system. Here, you can edit or view
-	individual collections.
-</p>
-
 {#if collections.length === 0}
 	<div class="empty">
 		<p>No collections found.</p>

@@ -275,7 +275,10 @@
 	{#if isLoading}
 		<p>Loading...</p>
 	{:else}
-		<a class="back-btn" href="/admin/collections">&lt; Back to Collections</a>
+        <div>
+            <a class="back-btn" href="/admin/collections">&lt; Back to Collections</a>
+        </div>
+	
 		<h1>Edit {collection.title}</h1>
 
 		<div class="tabs">
@@ -355,9 +358,9 @@
 						<input type="checkbox" id="enabled" bind:checked={collection.enabled} />
 						<label for="enabled">Enabled</label>
 					</div>
-					<div class="button-split">
-						<button class="button primary" type="submit">Save</button>
-						<button class="button delete" type="button" on:click={deleteCollection}>Delete</button>
+					<div class="flex justify-between">
+						<button class="destructive" type="button" on:click={deleteCollection}>Delete</button>
+						<button class="primary" type="submit">Save</button>
 					</div>
 				</form>
 			</div>

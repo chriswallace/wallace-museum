@@ -86,11 +86,6 @@
 
 <h1>Artworks <button class="ghost" on:click={() => addNew()}>+ Add new</button></h1>
 
-<p class="subheading">
-	This is a list of artworks currently stored in your Compendium. Here, you may edit, enable, or
-	disable individual artworks.
-</p>
-
 {#if artworks.length === 0}
 	<div class="empty">
 		<p>No artworks found.</p>

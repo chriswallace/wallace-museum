@@ -101,7 +101,9 @@
 	{#if error}
 		<p class="error">{error}</p>
 	{:else}
-		<a class="back-btn" href="/admin/artworks">&lt; Back</a>
+        <div>
+            <a class="back-btn" href="/admin/collections">&lt; Back to Collections</a>
+        </div>
 		<h1>Add new artwork</h1>
 		<div class="edit-form">
 			<div class="artwork">
@@ -176,7 +178,7 @@
 						{/if}
 					</fieldset>
 
-					<button class="cta button primary w-full" type="submit">Save</button>
+					<button class="cta button primary w-full" type="submit">Add artwork</button>
 				</form>
 			</div>
 		</div>

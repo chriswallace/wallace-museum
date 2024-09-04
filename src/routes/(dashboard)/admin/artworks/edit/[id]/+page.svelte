@@ -82,15 +82,13 @@
     {:else}
         <a class="back-btn" href="/admin/artworks">&lt; Back</a>
         <h1>Edit artwork</h1>
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-2 gap-4">
             <div>
                 <ArtworkDisplay {artwork}/>
+                <ArtworkMeta {artwork}/>
             </div>
             <div>
                 <ArtworkEditor {artwork} {artists} {collections}/>
-            </div>
-            <div>
-                <ArtworkMeta {artwork}/>
             </div>
         </div>
     {/if}
@@ -108,10 +106,5 @@
 
     .error {
         color: red;
-    }
-
-    .back-btn {
-        display: block;
-        margin-bottom: 20px;
     }
 </style>

@@ -40,7 +40,7 @@ export let artwork;
 }
 
 .additional-meta {
-    @apply text-gray-600 text-base border border-gray-300 p-6 pt-4 pb-0 bg-gray-100;
+    @apply grid grid-cols-2 mt-4 text-gray-600 text-base bg-gray-100 border-gray-300;
 
     h3 {
         @apply mb-1 text-sm tracking-wide font-normal uppercase;

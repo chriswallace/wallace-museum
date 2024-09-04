@@ -60,10 +60,11 @@
     <label for="instagramHandle">Instagram Handle</label>
     <input type="text" id="instagramHandle" bind:value={artist.instagramHandle} />
   </div>
-  <button class="primary" type="submit">Save details</button>
+  <div class="flex justify-between">
+    <button class="destructive" on:click={deleteArtist} type="button">Delete Artist</button>
+    <button class="primary" type="submit">Save details</button>
+  </div>
 </form>
-
-<button class="destructive" on:click={deleteArtist}>Delete Artist</button>
 
 <style>
   .avatar {
@@ -89,20 +90,5 @@
     padding: 0.5rem;
     border: 1px solid #ccc;
     border-radius: 4px;
-  }
-
-  button {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    margin-top: 1rem;
-    border: none;
-    background-color: #007bff;
-    color: white;
-    cursor: pointer;
-    border-radius: 4px;
-  }
-
-  button:hover {
-    background-color: #0056b3;
   }
 </style>

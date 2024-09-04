@@ -3,7 +3,6 @@
     import { page } from '$app/stores';
     import { browser } from '$app/environment';
     import ArtistEditor from '$lib/components/ArtistEditor.svelte';
-    import ArtistMeta from '$lib/components/ArtistMeta.svelte';
 
     let artistId;
     
@@ -69,9 +68,6 @@
             <div>
                 <ArtistEditor {artist} {collections}/>
             </div>
-            <div>
-                <ArtistMeta {artist}/>
-            </div>
         </div>
     {/if}
 </div>
@@ -88,10 +84,5 @@
 
     .error {
         color: red;
-    }
-
-    .back-btn {
-        display: block;
-        margin-bottom: 20px;
     }
 </style>
