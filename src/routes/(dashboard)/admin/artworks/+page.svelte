@@ -142,7 +142,7 @@
 					</td>
 					<td>
 						<button class="image" on:click={() => editArtwork(artwork.id)}>
-							<img src="{artwork.image}?tr=h-120,w-120,q-70" alt="" />
+							<img src="{artwork.image_url}?tr=h-120,w-120,q-70" alt="" />
 						</button>
 					</td>
 					<td><div>{artwork.title}</div></td>

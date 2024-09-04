@@ -25,6 +25,7 @@
 	import FinalImportStep from '$lib/components/FinalImportStep.svelte';
 	import { closeModal } from '$lib/modal';
 	import { get } from 'svelte/store';
+	import { isImage, isVideo } from '$lib/utils';
 
 	const loadingImageUrl = '/images/medici-image.png';
 
@@ -42,7 +43,6 @@
 		};
 
 		const onLeave = () => {
-			node.src = loadingImageUrl;
 		};
 
 		intersectionObserver(node, { onEnter, onLeave });
@@ -71,7 +71,10 @@
 		}
 	}
 
-	async function fetchNfts() {
+	let offset = 0;
+	const limit = 100;
+
+	async function fetchNfts(loadMore = false) {
 		isLoading.set(true);
 		selectAllChecked.set(false);
 		selectedNfts.set(new Set());
@@ -83,12 +86,22 @@
 			if (wallet.startsWith('tz')) {
 				blockchain = 'tezos';
 			}
-			let apiEndpoint = `/api/admin/import/${blockchain}/${wallet}/?type=${type}`;
+			let apiEndpoint = `/api/admin/import/${blockchain}/${wallet}/?type=${type}&limit=${limit}&offset=${offset}`;
+
 			try {
 				const response = await fetch(apiEndpoint);
 				if (response.ok) {
 					const data = await response.json();
-					nfts.set(data.nfts);
+
+					// If loading more, append to existing items
+					if (loadMore) {
+						nfts.update(current => [...current, ...data.nfts]);
+					} else {
+						nfts.set(data.nfts);
+					}
+
+					// Update the offset for the next load
+					offset += limit;
 				} else {
 					console.error('Failed to fetch NFTs');
 				}
@@ -154,17 +167,38 @@
 			</div>
 
 			<div class="nft-gallery">
-				{#each $nfts as { image_url, name }, index}
-					<div
+				{#each $nfts as { animation_url, image_url, name, mime }, index}
+					<button
 						class="nft-card {$selectedNfts.has(index) ? 'selected' : ''}"
 						on:click={() => toggleSelection(index)}
 					>
-						<img use:handleLazyLoad={{ src: image_url }} alt={name} class="nft-image" />
+						{#if image_url && image_url.endsWith('.mp4')}
+							<video autoplay playsinline muted loop>
+								<source src={image_url} type="video/mp4" />
+							</video>
+						{:else if animation_url && animation_url.endsWith('mp4')}
+							<video autoplay playsinline muted loop>
+								<source src={animation_url} type="video/mp4" />
+							</video>
+						{:else if image_url}
+							<img use:handleLazyLoad={{ src: image_url }} alt={name} class="nft-image" />
+						{:else if animation_url}
+							<img use:handleLazyLoad={{ src: animation_url }} alt={name} class="nft-image" />
+						{:else }
+							<div class="nft-image bg-gray-200 aspect-square flex items-center text-center justify-center">No Image</div>
+						{/if}
 						<div class="inner-container">
 							<h3>{name}</h3>
 						</div>
-					</div>
+					</button>
 				{/each}
+			</div>
+
+			<!-- Load More Button -->
+			<div class="load-more-container">
+				<button class="secondary button" on:click={() => fetchNfts(true)}>
+					Load More
+				</button>
 			</div>
 		{/if}
 	</div>
@@ -205,8 +239,16 @@
 		@apply grid gap-4 grid-cols-6 p-6 border-l border-r border-b border-gray-200 bg-white rounded-b-sm;
 	}
 
+	.load-more-container {
+		@apply text-center mt-4;
+
+		.button {
+			@apply py-2 px-4 bg-blue-500 text-white rounded-md;
+		}
+	}
+
 	.nft-card {
-		@apply relative outline outline-gray-200 outline-2 outline-offset-0 rounded-sm cursor-pointer transition-all relative;
+		@apply relative outline outline-gray-200 outline-2 outline-offset-0 rounded-sm cursor-pointer transition-all relative p-0;
 
 		&:after {
 			@apply absolute top-4 right-4 w-[24px] h-[24px] z-10 bg-white rounded-full text-center text-sm;
@@ -231,12 +273,13 @@
 			@apply p-3 pt-2;
 		}
 
-		img {
+		img,
+		video {
 			@apply w-full rounded-t-sm mb-1 aspect-square object-contain text-center bg-gray-200;
 		}
 
 		h3 {
-			@apply text-[15px] font-normal my-0 leading-normal;
+			@apply text-[15px] truncate max-w-full font-normal my-0 leading-normal;
 		}
 	}
 
@@ -264,21 +307,5 @@
 
 	.search {
 		@apply mb-0;
-	}
-
-	.nft-review-table {
-		thead {
-			@apply z-20;
-		}
-		th:first-child,
-		td:first-child {
-			@apply w-[32px];
-		}
-
-		td:nth-child(2n),
-		td:nth-child(3n),
-		td:nth-child(4n) {
-			@apply w-[35%];
-		}
 	}
 </style>

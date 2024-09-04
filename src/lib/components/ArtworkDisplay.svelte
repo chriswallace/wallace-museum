@@ -2,15 +2,15 @@
   export let artwork;
   
   function hasVideo() {
-    return artwork.video && artwork.video.length > 0;
+    return artwork.animation_url && artwork.mime.startsWith('video');
   }
 </script>
 
 <div class="artwork">
   {#if hasVideo()}
-    <video src={artwork.video} autoplay controls playsinline muted loop></video>
+    <video src={artwork.animation_url} autoplay controls playsinline muted loop></video>
   {:else}
-    <img src="{artwork.image}?tr=w-740,q-70" alt={artwork.title} />
+    <img src="{artwork.image_url}?tr=w-740,q-70" alt={artwork.title} />
   {/if}
 </div>
 

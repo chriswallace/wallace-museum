@@ -92,7 +92,8 @@ export async function fetchNFTsByAddress(walletAddress, allNfts = [], cursor = n
 	const data = await response.json();
 
 	for (let nft of data.nfts) {
-		nft = await fixIpfsUrl(nft);
+		if(nft.image)
+			nft.image_url = fixIpfsUrl(nft.image);
 		allNfts.push(nft);
 	}
 

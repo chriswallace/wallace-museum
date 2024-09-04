@@ -15,6 +15,7 @@ model Artist {
   name              String              @unique
   bio               String?
   websiteUrl        String?
+  avatarUrl         String?
   twitterHandle     String?
   instagramHandle   String?
   collections       Collection[] // Many-to-many relation
@@ -40,13 +41,13 @@ model Artwork {
   enabled        Boolean
   title          String
   description    String?
-  image          String?
+  image_url      String?
+  animation_url  String?
   dimensions     Json?
-  video          String?
-  liveUri        String?
   attributes     Json?
   curatorNotes   String?
   blockchain     String?
+  mime           String?
   contractAddr   String?
   contractAlias  String?
   totalSupply    Int?

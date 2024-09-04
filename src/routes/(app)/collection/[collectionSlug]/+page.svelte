@@ -6,6 +6,7 @@
 	import { closeFullscreen, handleMaximize } from '$lib/artworkActions';
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
+	import { isVideo } from '$lib/utils';
 
 	export let data;
 
@@ -101,7 +102,7 @@
 
 		const renderedWidth = artworkRef.clientWidth;
 		const base_url = 'https://ik.imagekit.io/UltraDAO/compendium/';
-		const img_name = artwork.image.split('/').pop().split('?')[0];
+		const img_name = artwork.image_url.split('/').pop().split('?')[0];
 
 		if (artwork.dimensions.width && artwork.dimensions.width <= renderedWidth) {
 			newSrc = `${base_url}${img_name}?tr=q-70`;
@@ -159,26 +160,26 @@
 					class="media-container"
 					style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 				>
-					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.liveUri && $isLiveCodeVisible}
+					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.mime.startsWith('application') && artwork.animation_url && $isLiveCodeVisible}
 						<iframe
-							src={artwork.liveUri}
+							src={artwork.animation_url}
 							class="live-code"
 							on:load={() => handleMediaLoad(artwork.id)}
 						></iframe>
-					{:else if artwork.video && artwork.video.length > 0}
+					{:else if artwork.mime.startsWith('video') && artwork.animation_url && artwork.animation_url.length > 0}
 						<video autoplay loop muted on:loadeddata={() => handleMediaLoad(artwork.id)}>
 							<source
-								src={artwork.video}
+								src={artwork.animation_url}
 								type="video/mp4"
 								height={artwork.dimensions.height}
 								width={artwork.dimensions.width}
 							/>
 							Your browser does not support the video tag.
 						</video>
-					{:else if artwork.image}
+					{:else if artwork.image_url}
 						<img
 							bind:this={artworkRefs[artwork.id]}
-							src={artwork.image}
+							src={artwork.image_url}
 							alt={artwork.title}
 							srcset={artwork.srcset}
 							sizes={artwork.sizes}

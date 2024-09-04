@@ -1,6 +1,11 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { fetchAccount, fetchCollections, fetchNFTsByAddress, fetchNFTsFromCollections } from '$lib/openseaHelpers';
+import {
+	fetchAccount,
+	fetchCollections,
+	fetchNFTsByAddress,
+	fetchNFTsFromCollections
+} from '$lib/openseaHelpers';
 
 export const GET: RequestHandler = async ({ params, url }) => {
 	const { address } = params;

@@ -5,12 +5,14 @@ export async function processArtist(artistInfo) {
         where: { name: artistInfo.username || artistInfo.address },
         update: {
             bio: artistInfo.bio,
+            avatarUrl: artistInfo.avatarUrl,
             websiteUrl: artistInfo.website,
             twitterHandle: artistInfo.social_media_accounts.twitter,
             instagramHandle: artistInfo.social_media_accounts.instagram,
         },
         create: {
             name: artistInfo.username || artistInfo.address,
+            avatarUrl: artistInfo.avatarUrl,
             bio: artistInfo.bio,
             websiteUrl: artistInfo.website,
             twitterHandle: artistInfo.social_media_accounts.twitter,
@@ -21,7 +23,7 @@ export async function processArtist(artistInfo) {
 
 export async function processCollection(collectionInfo) {
     return await prisma.collection.upsert({
-        where: { slug: collectionInfo.collection },
+        where: { slug: collectionInfo.contract },
         update: {
             title: collectionInfo.name,
             description: collectionInfo.description,
@@ -29,7 +31,7 @@ export async function processCollection(collectionInfo) {
             curatorNotes: collectionInfo.curatorNotes,
         },
         create: {
-            slug: collectionInfo.collection,
+            slug: collectionInfo.contract,
             title: collectionInfo.name,
             description: collectionInfo.description,
             enabled: true,
@@ -40,30 +42,29 @@ export async function processCollection(collectionInfo) {
 
 export async function saveArtwork(nft, artistId, collectionId) {
 
-    const imageUrl = nft.metadata?.image; // Use optional chaining to safely access .image
-    const videoUrl = nft.metadata?.video; // Same for video
+    //console.log("Saving artwork", nft);
 
     return await prisma.artwork.upsert({
         where: {
             tokenID_contractAddr: {
-                tokenID: nft.identifier,
-                contractAddr: nft.contract
+                tokenID: nft.tokenID,
+                contractAddr: nft.collection.contract
             }
         },
         update: {
             title: nft.name,
             description: nft.description,
-            image: imageUrl,
-            video: videoUrl,
-            liveUri: nft.metadata?.live_uri,
+            image_url: nft.metadata.image_url,
+            animation_url: nft.metadata.animation_url,
             attributes: nft.metadata.attributes,
             blockchain: nft.collection.blockchain,
             dimensions: JSON.stringify(nft.dimensions),
-            contractAddr: nft.contract,
+            contractAddr: nft.collection.contract,
             contractAlias: nft.collection.name,
+            mime: nft.mime,
             totalSupply: nft.collection.total_supply,
             tokenStandard: nft.token_standard,
-            tokenID: nft.identifier,
+            tokenID: nft.tokenID,
             mintDate: new Date(nft.updated_at),
             artistId: artistId,
             collectionId: collectionId,
@@ -71,17 +72,17 @@ export async function saveArtwork(nft, artistId, collectionId) {
         create: {
             title: nft.name,
             description: nft.description,
-            image: imageUrl,
-            video: videoUrl,
-            liveUri: nft.metadata?.live_uri,
+            image_url: nft.metadata.image_url,
+            animation_url: nft.metadata.animation_url,
             attributes: nft.metadata.attributes,
             blockchain: nft.collection.blockchain,
             dimensions: JSON.stringify(nft.dimensions),
-            contractAddr: nft.contract,
+            contractAddr: nft.collection.contract,
             contractAlias: nft.collection.name,
+            mime: nft.mime,
             totalSupply: nft.collection.total_supply,
             tokenStandard: nft.token_standard,
-            tokenID: nft.identifier,
+            tokenID: nft.tokenID,
             mintDate: new Date(nft.updated_at),
             enabled: true,
             artist: {

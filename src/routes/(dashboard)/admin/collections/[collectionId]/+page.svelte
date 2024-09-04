@@ -36,9 +36,6 @@
 	function confirmAction(message) {
 		return new Promise((resolve) => {
 			confirmationModalOpen = true;
-			$: if (confirmationModalOpen === false) {
-				resolve(confirmationPromiseResolve);
-			}
 			// This function will be called with true or false when the user responds
 			confirmationPromiseResolve = resolve;
 		});
@@ -166,7 +163,6 @@
 		const confirmed = await confirmAction('Are you sure you want to delete this collection?');
 		if (confirmed) {
 			const deleteUrl = `/api/admin/collections/${collectionId}/`;
-			console.log(deleteUrl);
 			const response = await fetch(deleteUrl, {
 				method: 'DELETE'
 			});
@@ -238,10 +234,25 @@
 						class:active={selectedArtworks.has(artwork.id)}
 						on:click={() => toggleArtworkSelection(artwork.id)}
 					>
+						{#if artwork.image_url?.endsWith(".mp4")}
+							<video
+								alt={artwork.title}
+								width="204"
+								height="204"
+								nocontrols
+								loop
+								muted
+								playsinline
+								autoplay
+							>
+							<source src="{artwork.image_url}" type="video/mp4" />
+						</video>
+						{:else}
 						<img
-							src="{artwork.image}?tr=w-400,h-400,q-70,cm-pad_resize,bg-e9e9e9"
+							src="{artwork.image_url}?tr=w-400,h-400,q-70,cm-pad_resize,bg-e9e9e9"
 							alt={artwork.title}
 						/>
+						{/if}
 						<p>{artwork.title}</p>
 						{#if selectedArtworks.has(artwork.id)}
 							<div class="selected-indicator">Selected</div>
@@ -281,7 +292,20 @@
 				<div class="artwork-grid">
 					{#each collection.artworks as artwork}
 						<div>
-							<img src="{artwork.image}?tr=w-400,h-400,q-70,cm-pad_resize,bg-e9e9e9" alt="" />
+							{#if artwork.mime?.startsWith('video') || artwork.image_url?.endsWith(".mp4")}
+								<video
+									alt={artwork.title}
+									nocontrols
+									loop
+									muted
+									playsinline
+									autoplay
+								>
+								<source src="{artwork.image_url}" type="video/mp4" />
+							</video>
+							{:else}
+								<img src="{artwork.image_url}?tr=w-400,h-400,q-70,cm-pad_resize,bg-e9e9e9" alt="" />
+							{/if}
 							<h3>{artwork.title}</h3>
 							<button class="remove" on:click={() => confirmRemoval(artwork)}>
 								<svg
@@ -346,16 +370,8 @@
 		@apply max-w-7xl mx-auto;
 	}
 
-	h2 {
-		@apply mb-8;
-	}
-
 	h3 {
 		@apply text-lg font-semibold mb-3;
-	}
-
-	.collection-edit-grid {
-		@apply grid grid-cols-2 gap-8;
 	}
 
 	input[type='checkbox'] {
@@ -376,25 +392,22 @@
 
 	.add-artwork {
 		@apply grid grid-cols-1 content-center text-center border-2 border-dashed border-gray-300 rounded-sm p-8 aspect-square;
-
-		h3 {
-			@apply mb-6;
-		}
 	}
 
 	.search-grid {
-		@apply grid grid-cols-3 gap-4 w-full max-h-[55vh] overflow-y-scroll mt-8;
+		@apply grid grid-cols-4 gap-4 w-full max-h-[60vh] overflow-y-scroll mt-8 items-start justify-start;
 
 		.card {
-			@apply rounded-[14px];
+			@apply p-0 rounded-[8px];
 
-			img {
-				@apply rounded-t-md;
+			img,
+			video {
+				@apply w-full aspect-square object-cover rounded-t-[8px];
 			}
 		}
 
 		p {
-			@apply py-3;
+			@apply py-3 truncate;
 		}
 
 		.active {
@@ -411,7 +424,7 @@
 	}
 
 	.selected-indicator {
-		@apply bg-blue-500 rounded-tr-md text-xs uppercase font-bold absolute top-0 right-0 text-white px-3 py-2;
+		@apply bg-blue-500 rounded-tr-[6px] rounded-bl-[6px] text-xs uppercase font-bold absolute top-0 right-0 text-white px-3 py-2;
 	}
 
 	.delete {

@@ -15,7 +15,6 @@ import ImportStatus from '$lib/components/ImportStatus.svelte';
 import { tick } from 'svelte';
 import { browser } from '$app/environment';
 import { openModal, closeModal } from '$lib/modal';
-import { all } from 'axios';
 
 const totalSteps = 3;
 
@@ -100,10 +99,13 @@ export async function openReviewModal() {
 
     try {
 
-        if (wallet.startsWith('0x'))
+        if (wallet.startsWith('0x')){
+            console.log("Eth wallet detected", wallet);
             await setEthReviewData();
-        else if (wallet.startsWith('tz'))
+        } else if (wallet.startsWith('tz')){
+            console.log("Tezos wallet detected", wallet);
             await setTezReviewData();
+        }
 
         if (get(reviewData).collections.length > 0)
             openModal();
@@ -141,6 +143,8 @@ export async function setTezReviewData() {
 
         // Set the updatedNfts store with the new array of NFTs
         nfts.set(allNfts);
+
+        // console.log(get(nfts));
 
     } catch (error) {
         console.error('Error setting review data:', error);
@@ -262,7 +266,13 @@ export async function finalizeImport() {
 
 async function importNft(nft) {
     try {
-        const response = await fetch(`/api/admin/import/opensea/`, {
+        let source = 'opensea';
+
+        if(get(walletAddress).startsWith('tz')){
+            source = 'tezos';
+        }
+
+        const response = await fetch(`/api/admin/import/${source}/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nfts: Array(nft) })
@@ -280,19 +290,17 @@ async function importNft(nft) {
 }
 
 export function handleCollectionSave(editedCollection, index) {
-    const reviewDataArray = get(reviewData);
-
-    reviewDataArray.update((array) => {
-        array.collections[index] = editedCollection;
-        return array;
+    reviewData.update((data) => {
+        const updatedCollections = [...data.collections];
+        updatedCollections[index] = editedCollection;
+        return { ...data, collections: updatedCollections };
     });
 }
 
 export function handleArtistSave(editedArtist, index) {
-    const reviewDataArray = get(reviewData);
-
-    reviewData.update((array) => {
-        array.artists[index] = editedArtist;
-        return array;
+    reviewData.update((data) => {
+        const updatedArtists = [...data.artists];
+        updatedArtists[index] = editedArtist;
+        return { ...data, artists: updatedArtists };
     });
 }

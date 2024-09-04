@@ -24,6 +24,9 @@
 				<a href="/admin/artworks" class={currentPage === '/admin/artworks' ? 'selected' : ''}
 					>Artworks</a
 				>
+				<a href="/admin/artists" class={currentPage === '/admin/artists' ? 'selected' : ''}
+					>Artists</a
+				>
 				<a href="/admin/import" class={currentPage === '/admin/import' ? 'selected' : ''}
 					>Import NFTs</a
 				>

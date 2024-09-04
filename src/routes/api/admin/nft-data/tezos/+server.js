@@ -13,8 +13,12 @@ export const POST = async ({ request }) => {
 
 			// Access the first item in the fa array
 			collection = response.data.fa.length > 0 ? response.data.fa[0] : null;
+			let artist = {};
+			if (collection && collection.owner) {
+				artist = await fetchArtist(collection.owner);
+			}
 
-			return { collection };
+			return { collection, artist };
 		});
 
 		const data = await Promise.all(dataPromises);

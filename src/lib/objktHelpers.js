@@ -20,10 +20,12 @@ export async function fetchAccount(walletAddress) {
     {
         holder(where: {address: {_eq: "${walletAddress}"}}) {
             address
-            tokens {
-                id
-                title
-                artifactUri
+            held_tokens {
+                token {
+                    token_id
+                    artifact_uri
+                    name
+                }
             }
         }
     }`;
@@ -56,36 +58,63 @@ export async function fetchArtist(address) {
             twitter
         }
     }`;
-    return graphqlFetch(query);
+
+    // Fetch the data from your GraphQL endpoint
+    const response = await graphqlFetch(query);
+
+    // Assuming the response is structured as { data: { holder: [ { ...fields } ] } }
+    const holderData = response.data.holder[0];
+
+    // Transform the data to match the OpenSea structure
+    const transformedData = {
+        address: holderData.address,
+        username: holderData.alias,
+        profile_image_url: holderData.logo,
+        website: holderData.website,
+        social_media_accounts: [
+            ...(holderData.twitter ? [{ platform: "twitter", username: holderData.twitter }] : []),
+            ...(holderData.instagram ? [{ platform: "instagram", username: holderData.instagram }] : [])
+        ],
+        bio: holderData.description
+    };
+
+    return transformedData;
 }
 
-export async function fetchOwnedNFTsByAddress(walletAddress) {
+export async function fetchOwnedNFTsByAddress(walletAddress, limit = 100, offset = 0) {
     const query = `
     {
         holder(where: {address: {_eq: "${walletAddress}"}}) {
-            held_tokens {
+            held_tokens(limit: ${limit}, offset: ${offset}) {
                 token{
                     token_id
                     name
                     artifact_uri
                     display_uri
                     description
+                    mime
+                    supply
+                    symbol
                     metadata
                     fa {
-                        name,
-                        description,
-                        contract,
+                        name
+                        metadata
+                        description
+                        website
+                        twitter
+                        short_name
+                        contract
                         path
                     }
                     creators{
                         creator_address
                         holder {
-                            alias,
-                            address,
-                            logo,
-                            description,
-                            website,
-                            instagram,
+                            alias
+                            address
+                            logo
+                            description
+                            website
+                            instagram
                             twitter
                         }
                     }
@@ -97,11 +126,11 @@ export async function fetchOwnedNFTsByAddress(walletAddress) {
     return graphqlFetch(query);
 }
 
-export async function fetchCreatedNFTsByAddress(walletAddress) {
+export async function fetchCreatedNFTsByAddress(walletAddress, limit = 100, offset = 0) {
     const query = `
     {
         holder(where: {address: {_eq: "${walletAddress}"}}) {
-            created_tokens {
+            created_tokens(limit: ${limit}, offset: ${offset}) {
                 token{
                     token_id
                     name

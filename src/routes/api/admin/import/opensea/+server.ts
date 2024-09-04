@@ -1,8 +1,9 @@
 import prisma from '$lib/prisma.js';
 import { json } from '@sveltejs/kit';
-import { normalizeMetadata, handleMediaUpload } from '$lib/mediaHelpers';
+import { normalizeOpenSeaMetadata, handleMediaUpload } from '$lib/mediaHelpers';
 import { fetchMetadata } from '$lib/openseaHelpers.js';
 import { processArtist, processCollection, saveArtwork } from '$lib/adminOperations.js';
+import { isVideo, isImage } from '$lib/utils';
 
 export const POST = async ({ request }) => {
 	try {
@@ -13,7 +14,6 @@ export const POST = async ({ request }) => {
 		}
 
 		const importPromises = nfts.map(async (nft, currentIndex) => {
-
 			let fetchedMetadata = null;
 
 			if (nft.metadata_url) {
@@ -26,48 +26,55 @@ export const POST = async ({ request }) => {
 			const artist = await processArtist(nft.artist);
 			const collection = await processCollection(nft.collection);
 
-			const normalizedMetadata = await normalizeMetadata(nft);
+			console.log('Processing NFT:', nft);
 
-			if (normalizedMetadata.image) {
-				const imageUploadResult = await handleMediaUpload(normalizedMetadata.image, nft);
-				normalizedMetadata.image = imageUploadResult ? imageUploadResult.url : '';
-				// Ensure dimensions are defined before using them
-				nft.dimensions = imageUploadResult && imageUploadResult.dimensions ? imageUploadResult.dimensions : { width: undefined, height: undefined };
+			const normalizedMetadata = await normalizeOpenSeaMetadata(nft);
+
+			console.log('Normalized metadata:', normalizedMetadata);
+
+			if (normalizedMetadata.image_url && (await isImage(normalizedMetadata.image_url))) {
+				const imageUploadResult = await handleMediaUpload(normalizedMetadata.image_url, nft);
+				normalizedMetadata.image_url = imageUploadResult ? imageUploadResult.url.split('?')[0] : '';
+				nft.dimensions =
+					imageUploadResult && imageUploadResult.dimensions
+						? imageUploadResult.dimensions
+						: { width: undefined, height: undefined };
 			} else {
-				console.error("Image URI is undefined or empty.");
-				return;
+				console.error('Image URI is undefined or empty.');
+				return json({ error: 'Image URI is missing or invalid.' }, { status: 400 });
 			}
 
-			// Adjusted video processing with checking for undefined dimensions
-			if (normalizedMetadata.video) {
-				const videoUploadResult = await handleMediaUpload(normalizedMetadata.video, nft);
+			if (normalizedMetadata.animation_url && (await isVideo(normalizedMetadata.animation_url))) {
+				const videoUploadResult = await handleMediaUpload(normalizedMetadata.animation_url, nft);
 				if (videoUploadResult && videoUploadResult.url) {
-					normalizedMetadata.video = videoUploadResult.url;
+					normalizedMetadata.animation_url = videoUploadResult.url;
 				} else {
-					console.error(`Video upload failed or returned no URL for: ${normalizedMetadata.video}`);
-					normalizedMetadata.video = ''; // Clear or handle as needed
+					console.error(
+						`Video upload failed or returned no URL for: ${normalizedMetadata.animation_url}`
+					);
+					normalizedMetadata.animation_url = ''; // Clear or handle as needed
 				}
 			}
 
 			nft.metadata = normalizedMetadata;
+			nft.metadata.tokenID = nft.metadata.identifier;
+			nft.tokenID = nft.metadata.identifier;
 
-			const artwork = await saveArtwork(
-				nft,
-				artist.id,
-				collection.id,
-			);
+			//console.log(nft);
+
+			const artwork = await saveArtwork(nft, artist.id, collection.id);
 
 			await prisma.artistCollections.upsert({
 				where: {
 					artistId_collectionId: {
 						artistId: artist.id,
-						collectionId: collection.id,
+						collectionId: collection.id
 					}
 				},
 				update: {},
 				create: {
 					artistId: artist.id,
-					collectionId: collection.id,
+					collectionId: collection.id
 				}
 			});
 
@@ -75,16 +82,15 @@ export const POST = async ({ request }) => {
 				where: {
 					artistId_artworkId: {
 						artistId: artist.id,
-						artworkId: artwork.id,
-					},
+						artworkId: artwork.id
+					}
 				},
 				update: {},
 				create: {
 					artistId: artist.id,
-					artworkId: artwork.id,
-				},
+					artworkId: artwork.id
+				}
 			});
-
 		});
 
 		await Promise.all(importPromises);

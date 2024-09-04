@@ -1,12 +1,15 @@
-// src/lib/mediaHelpers.js
 import axios from 'axios';
-import axiosRetry from 'axios-retry';
 import sharp from 'sharp';
 import path from 'path';
-import { env } from '$env/dynamic/private';
-import imageKit from 'imagekit';
-import { fileTypeFromBuffer } from 'file-type';
+import { promises as fs } from 'fs';
 import crypto from 'crypto';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegPath from 'ffmpeg-static';
+import ffprobePath from '@ffprobe-installer/ffprobe';
+import { fileTypeFromBuffer } from 'file-type';
+import imageKit from 'imagekit';
+
+import { env } from '$env/dynamic/private';
 
 const imagekit = new imageKit({
 	publicKey: env.IMAGEKIT_PUBLIC_KEY,
@@ -14,15 +17,9 @@ const imagekit = new imageKit({
 	urlEndpoint: env.IMAGEKIT_URL_ENDPOINT
 });
 
-axiosRetry(axios, {
-	retries: 3,
-	retryDelay: (retryCount) => {
-		return retryCount * 1000;
-	},
-	retryCondition: (error) => {
-		return axiosRetry.isNetworkOrIdempotentRequestError(error) || error.response.status >= 500;
-	}
-});
+// Set the paths to the static binaries
+ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfprobePath(ffprobePath.path);
 
 function createHashForString(string) {
 	if (!string) {
@@ -74,14 +71,22 @@ function generateTags(fileName, contractAddr, tokenID) {
 	return tags.join(',');
 }
 
-export async function uploadToImageKit(fileStream, file, mimeType) {
+function removeQueryString(url) {
+	try {
+		const parsedUrl = new URL(url);
+		parsedUrl.search = ''; // Remove the query string
+		return parsedUrl.toString();
+	} catch (error) {
+		console.error('Invalid URL:', url);
+		return url; // Return the original URL if parsing fails
+	}
+}
 
+export async function uploadToImageKit(fileStream, file, mimeType) {
 	const tags = generateTags(fileStream);
 
 	try {
-		const searchResponse = await imagekit.listFiles({
-			tags: tags
-		});
+		const searchResponse = await imagekit.listFiles({ tags });
 
 		if (searchResponse.length > 0) {
 			return {
@@ -101,11 +106,11 @@ export async function uploadToImageKit(fileStream, file, mimeType) {
 			file: fileStream,
 			fileName,
 			folder: 'compendium',
-			tags: tags
+			tags
 		});
 
 		if (response && response.url) {
-			return { url: response.url, fileType: mimeType };
+			return { url: response.url.split('?')[0], fileType: mimeType };
 		} else {
 			throw new Error('ImageKit upload failed with no response');
 		}
@@ -115,29 +120,57 @@ export async function uploadToImageKit(fileStream, file, mimeType) {
 	}
 }
 
-export async function normalizeMetadata(nft) {
-	const artwork = nft.nft || nft;
+export async function normalizeOpenSeaMetadata(nft) {
+	const metadata = nft.metadata || {};
 
-	const metadata = artwork.metadata || {};
-
-	const standardMetadata = {
-		name: artwork.name || metadata.name || '',
-		tokenID: artwork.identifier || metadata.tokenID || metadata.tokenId || '',
-		description: artwork.description || metadata.description || '',
-		artist: artwork.creator || metadata.artist || '', // Assuming 'creator' field exists at top level for OpenSea data
-		platform: artwork.platform || metadata.platform || '',
-		image: artwork.image_url || metadata.displayUri || metadata.image || '',
-		video: artwork.animation_url || metadata.video || metadata.animation_url || '',
-		live_uri:
-			artwork.live_uri || metadata.generator_url
-				? convertIpfsUriToHttpUrl(metadata.generator_url || artwork.generator_url)
-				: '',
-		tags: metadata.tags || [],
-		website: artwork.website || metadata.website || '',
-		attributes: artwork.traits || metadata.attributes || metadata.features || {}
+	return {
+		name: metadata.name || nft.name,
+		tokenID: metadata.tokenID || metadata.tokenId || nft.tokenID || nft.tokenId || nft.identifier,
+		description: metadata.description || nft.description,
+		artist: nft.creator || 'Unknown Artist',
+		blockchain: 'Ethereum',
+		image_url: metadata.image || nft.image_url || nft.display_image_url,
+		animation_url: metadata.animation_url || nft.animation_url || nft.display_animation_url,
+		tags: nft.tags || [],
+		website: nft.website || metadata.external_url || '',
+		attributes: metadata.attributes || nft.traits || []
 	};
+}
 
-	return standardMetadata;
+export async function normalizeTezosMetadata(nft) {
+	const metadata = nft.metadata || {};
+	const creator = nft.creators && nft.creators.length > 0 ? nft.creators[0] : {};
+
+	return {
+		name: metadata.name || nft.name || 'Unknown Name',
+		tokenID: nft.tokenId || nft.tokenID || metadata.tokenId || metadata.tokenID || 'Unknown Token ID',
+		description: metadata.description || nft.description || 'No Description Available',
+		artist: {
+			address: creator.creator_address || '',
+			username: creator.holder?.alias || '',
+			bio: creator.holder?.description || '',
+			avatarUrl: creator.holder?.logo || '',
+			website: creator.holder?.website || '',
+			social_media_accounts: {
+				twitter: creator.holder?.twitter || '',
+				instagram: creator.holder?.instagram || ''
+			},
+		},
+		platform: 'Tezos',
+		mime: nft.mime || '',
+		image_url: nft.image_url,
+		animation_url: nft.animation_url,
+		tags: metadata.tags || [],
+		website: metadata.website || '',
+		attributes: metadata.attributes || [],
+		symbol: nft.symbol || '',
+		supply: nft.supply || 1,
+		collection: {
+			name: nft.fa?.name || '',
+			address: nft.fa?.contract || '',
+			blockchain: 'Tezos',
+		}
+	};
 }
 
 export async function fetchWithRetry(url, retries = 3, delay = 1000) {
@@ -158,19 +191,11 @@ export async function fetchWithRetry(url, retries = 3, delay = 1000) {
 	}
 }
 
-export async function fixIpfsUrl(nft) {
-	if (nft.image_url) {
-		nft.image_url = convertIpfsUriToHttpUrl(nft.image_url)
-		nft.image_url = convertIpfsUrlToCloudflareUrl(nft.image_url);
+export function fixIpfsUrl(url) {
+	if (url) {
+		url = convertIpfsUriToHttpUrl(url);
 	}
-	return nft;
-}
-
-function convertIpfsUrlToCloudflareUrl(ipfsUri) {
-	if (ipfsUri.startsWith('https://ipfs.io')) {
-		return ipfsUri.replace('https://ipfs.io', 'https://cloudflare-ipfs.com');
-	}
-	return ipfsUri;
+	return url;
 }
 
 function convertIpfsUriToHttpUrl(ipfsUri) {
@@ -180,14 +205,15 @@ function convertIpfsUriToHttpUrl(ipfsUri) {
 	const ipfsPrefix = 'ipfs://';
 	if (ipfsUri.startsWith(ipfsPrefix)) {
 		const ipfsHash = ipfsUri.slice(ipfsPrefix.length);
-		return `https://cloudflare-ipfs.com/ipfs/${ipfsHash}`;
+		return `https://ipfs.io/ipfs/${ipfsHash}`;
 	}
 	return ipfsUri;
 }
 
 export async function fetchMedia(uri) {
 	try {
-		const httpUrl = convertIpfsUriToHttpUrl(uri);
+		const sanitizedUri = removeQueryString(uri);
+		const httpUrl = convertIpfsUriToHttpUrl(sanitizedUri);
 		const response = await axios.get(httpUrl, { responseType: 'arraybuffer' });
 		const buffer = Buffer.from(response.data);
 
@@ -199,6 +225,7 @@ export async function fetchMedia(uri) {
 
 		const mimeType = fileTypeResult.mime;
 
+		// Only proceed if the mime type is a supported image or video format
 		if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) {
 			console.error(`Unsupported media type: ${mimeType}`);
 			return null;
@@ -214,6 +241,8 @@ export async function fetchMedia(uri) {
 			} catch (sharpError) {
 				console.error('Error processing image with sharp:', sharpError);
 			}
+		} else if (mimeType.startsWith('video/')) {
+			dimensions = await getVideoDimensions(buffer);
 		}
 
 		return {
@@ -223,19 +252,36 @@ export async function fetchMedia(uri) {
 			dimensions
 		};
 	} catch (error) {
+		console.error('Error fetching media:', error);
 		return null;
 	}
 }
 
-/**
- * @param {any} mediaUri
- */
+async function getVideoDimensions(buffer) {
+	const tmpFile = path.join('/tmp', `tmp_video_${Date.now()}.mp4`);
+	await fs.writeFile(tmpFile, buffer);
+
+	return new Promise((resolve, reject) => {
+		ffmpeg.ffprobe(tmpFile, (err, metadata) => {
+			fs.unlink(tmpFile); // Clean up the temp file
+			if (err) {
+				reject(`Error processing video with ffmpeg: ${err.message}`);
+			} else {
+				const stream = metadata.streams.find(s => s.width && s.height);
+				if (stream) {
+					resolve({ width: stream.width, height: stream.height });
+				} else {
+					resolve(null);
+				}
+			}
+		});
+	});
+}
+
 export async function handleMediaUpload(mediaUri, artwork) {
 	const mediaData = await fetchMedia(mediaUri);
-	if (!mediaData) return null;
-
-	if (!mediaData.mimeType.startsWith('image/') && !mediaData.mimeType.startsWith('video/')) {
-		console.error(`Unsupported media type: ${mediaData.mimeType}`);
+	if (!mediaData) {
+		console.error(`Unsupported or unprocessable media at URI: ${mediaUri}`);
 		return null;
 	}
 
@@ -247,60 +293,87 @@ export async function handleMediaUpload(mediaUri, artwork) {
 		dimensions = { width: undefined, height: undefined };
 	}
 
-	const resizeResult = await resizeImage(
-		mediaData.buffer,
-		dimensions.width || 2000,
-		dimensions.height || 2000
-	);
+	try {
+		const resizeResult = await resizeMedia(mediaData.buffer, mediaData.mimeType, dimensions);
 
-	const resizedBuffer = resizeResult.buffer;
-	const resizedDimensions = resizeResult.dimensions || dimensions;
+		const resizedBuffer = resizeResult.buffer;
+		const resizedDimensions = resizeResult.dimensions || dimensions;
 
-	const uploadResult = await uploadToImageKit(resizedBuffer, artwork, mediaData.mimeType);
+		const uploadResult = await uploadToImageKit(resizedBuffer, artwork, mediaData.mimeType);
 
-	return uploadResult
-		? {
-			url: uploadResult.url,
-			fileType: mediaData.mimeType,
-			dimensions: resizedDimensions
-		}
-		: null;
+		return uploadResult
+			? {
+				url: uploadResult.url.split('?')[0],
+				fileType: mediaData.mimeType,
+				dimensions: resizedDimensions
+			}
+			: null;
+	} catch (error) {
+		console.error(`Failed to handle media upload for URI: ${mediaUri}`, error);
+		return null;
+	}
 }
 
-export async function resizeImage(buffer, targetWidth = 2000, targetHeight = 2000) {
+export async function resizeMedia(buffer, mimeType, dimensions, maxSizeMB = 25) {
 	try {
 		let sizeMB = Buffer.byteLength(buffer) / (1024 * 1024);
 		let attempt = 0;
 		let resizedBuffer = buffer;
 
-		while (sizeMB > 25 && attempt < 10) {
-			let scaleFactor = attempt === 0 ? 1 : Math.pow(0.9, attempt);
-			let newWidth = Math.floor(targetWidth * scaleFactor);
-			let newHeight = Math.floor(targetHeight * scaleFactor);
+		if (mimeType.startsWith('image/')) {
+			while (sizeMB > maxSizeMB && attempt < 10) {
+				let scaleFactor = attempt === 0 ? 1 : Math.pow(0.9, attempt);
+				let newWidth = Math.floor(dimensions.width * scaleFactor);
+				let newHeight = Math.floor(dimensions.height * scaleFactor);
 
-			let image = sharp(resizedBuffer).resize(newWidth, newHeight, {
-				fit: 'inside',
-				withoutEnlargement: true
-			});
+				let image = sharp(resizedBuffer).resize(newWidth, newHeight, {
+					fit: 'inside',
+					withoutEnlargement: true
+				});
 
-			resizedBuffer = await image.toBuffer();
+				resizedBuffer = await image.toBuffer();
+				sizeMB = Buffer.byteLength(resizedBuffer) / (1024 * 1024);
+				attempt++;
+			}
+		} else if (mimeType.startsWith('video/')) {
+			while (sizeMB > maxSizeMB && attempt < 10) {
+				let scaleFactor = attempt === 0 ? 1 : Math.pow(0.9, attempt);
+				let newWidth = Math.floor(dimensions.width * scaleFactor);
+				let newHeight = Math.floor(dimensions.height * scaleFactor);
 
-			// Extract metadata from the resized image
-			let metadata = await sharp(resizedBuffer).metadata();
-			dimensions.width = newWidth;
-			dimensions.height = newHeight;
+				resizedBuffer = await new Promise((resolve, reject) => {
+					const tmpFile = path.join('/tmp', `tmp_video_${Date.now()}.mp4`);
+					const outputTmpFile = path.join('/tmp', `tmp_video_resized_${Date.now()}.mp4`);
 
-			sizeMB = Buffer.byteLength(resizedBuffer) / (1024 * 1024);
-			attempt++;
+					fs.writeFile(tmpFile, resizedBuffer);
+
+					ffmpeg(tmpFile)
+						.size(`${newWidth}x${newHeight}`)
+						.outputOptions('-preset', 'fast')
+						.outputOptions('-crf', '28') // Adjust the quality here as needed
+						.on('end', () => {
+							const resized = fs.readFile(outputTmpFile);
+							fs.unlink(tmpFile);
+							fs.unlink(outputTmpFile);
+							resolve(resized);
+						})
+						.on('error', (err) => {
+							reject(`Error resizing video with ffmpeg: ${err.message}`);
+						})
+						.save(outputTmpFile);
+				});
+				sizeMB = Buffer.byteLength(resizedBuffer) / (1024 * 1024);
+				attempt++;
+			}
 		}
 
-		if (sizeMB > 25) {
+		if (sizeMB > maxSizeMB) {
 			console.warn('Unable to reduce file size below 25MB after several attempts.');
 		}
 
-		return { buffer: resizedBuffer, dimensions: { width: targetWidth, height: targetHeight } };
+		return { buffer: resizedBuffer, dimensions: { width: dimensions.width, height: dimensions.height } };
 	} catch (error) {
-		console.error('Error resizing image:', error);
+		console.error('Error resizing media:', error);
 		throw error;
 	}
 }

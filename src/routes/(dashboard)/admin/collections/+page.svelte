@@ -77,10 +77,23 @@
 				<div class="cover-image-wrap">
 					<div class="cover-image-grid">
 						{#each collection.coverImages as image}
-						<img
-							src="{image}?tr=w-250,h-250,q-70,dpr-auto"
-							alt=""
-						/>
+						{#if image.endsWith(".mp4")}
+							<video
+								src="{image}"
+								autoplay
+								loop
+								muted
+								playsinline
+								class="object-cover"
+								width="250"
+								height="250"
+							/>
+						{:else}
+							<img
+								src="{image}?tr=w-250,h-250,q-70,dpr-auto"
+								alt=""
+							/>
+						{/if}
 						{/each}
 					</div>
 				</div>

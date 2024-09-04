@@ -37,7 +37,7 @@
 		@apply w-3/4 grow text-sm;
 	}
 	.title span {
-		@apply truncate w-full block;
+		@apply truncate max-w-[14em] block;
 	}
 	.loading {
 		width: 24px;

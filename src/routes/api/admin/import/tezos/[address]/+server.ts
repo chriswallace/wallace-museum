@@ -1,62 +1,95 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { fetchCreatedNFTsByAddress, fetchOwnedNFTsByAddress } from '$lib/objktHelpers';
-import slugify from 'slugify';
+import { fixIpfsUrl } from '$lib/mediaHelpers';
+
+const fetchMetadataJson = async (ipfsUrl: string) => {
+	try {
+		const response = await fetch(fixIpfsUrl(ipfsUrl));
+		if (!response.ok) throw new Error('Failed to fetch metadata');
+		return await response.json();
+	} catch (error) {
+		console.error('Failed to fetch metadata JSON:', error);
+		return {};
+	}
+};
 
 export const GET: RequestHandler = async ({ params, url }) => {
 	const { address } = params;
 	const type = url.searchParams.get('type');
-	let nfts = [];
+	const limit = parseInt(url.searchParams.get('limit') || '10'); // Default to 10 items if not specified
+	const offset = parseInt(url.searchParams.get('offset') || '0'); // Default to start from 0
+
 	if (!address) {
 		return json({ error: 'Wallet address is required' }, { status: 400 });
 	}
+
 	try {
+		let nfts = [];
+
+		// Fetch the data based on the type and pagination parameters
 		if (type === 'created') {
-			nfts = await fetchCreatedNFTsByAddress(address);
+			nfts = await fetchCreatedNFTsByAddress(address, limit, offset);
 		} else {
-			nfts = await fetchOwnedNFTsByAddress(address);
+			nfts = await fetchOwnedNFTsByAddress(address, limit, offset);
 		}
 
-		nfts = nfts.data.holder[0].held_tokens.map(({ token }) => ({
-			identifier: token.token_id,
-			token_standard: 'FA2',
-			contract: token.fa?.contract,
-			name: token.name || "No Name",
-			description: token.description || "No Description",
-			image_url: token.display_uri ? `https://ipfs.io/ipfs/${token.display_uri.slice(7)}` : (token.artifact_uri ? `https://ipfs.io/ipfs/${token.artifact_uri.slice(7)}` : ""),
-			metadata_url: token.metadata ? `https://ipfs.io/ipfs/${token.metadata.slice(7)}` : "",
-			collection: {
-				name: token.fa?.name || "No Collection Name",
-				collection: token.fa?.contract,
-				blockchain: 'tezos',
-				contracts: [
-					{
-						address: token.fa?.contract,
-						chain: "tezos"
-					}
-				],
-			},
-			artist: {
-				address: token.creators[0]?.holder.address,
-				name: token.creators[0]?.holder.alias || "",
-				bio: token.creators[0]?.holder.description || "No bio provided.",
-				website: token.creators[0]?.holder.website || "",
-				profile_image_url: token.creators[0]?.holder.logo,
-				social_media_accounts: [
-					{
-						platform: "twitter",
-						username: token.creators[0]?.holder.twitter
+		// Normalize and map the fetched data to the desired format
+		nfts = await Promise.all(
+			nfts.data.holder[0].held_tokens.map(async ({ token }) => {
+				const metadata = token.metadata ? await fetchMetadataJson(token.metadata) : {};
+
+				const animationUri = fixIpfsUrl(
+					token.artifact_uri || token.artifactUri || metadata.artifactUri || metadata.artifact_uri
+				);
+
+				const mediaUri = fixIpfsUrl(
+					token.display_uri || metadata.displayUri || metadata.artifactUri || metadata.thumbnailUri
+				);
+
+				if (!animationUri && !mediaUri) {
+					console.error('Both artifactUri and mediaUri are undefined or empty for token:', token);
+					return null; // Skip this token
+				}
+
+				const nftObject = {
+					name: metadata.name || token.name || 'No Name',
+					tokenID: token.token_id,
+					description: metadata.description || token.description,
+					artist: {
+						address: token.creators[0]?.holder.address,
+						username: token.creators[0]?.holder.alias,
+						bio: token.creators[0]?.holder.description,
+						website: token.creators[0]?.holder.website || '',
+						avatarUrl: fixIpfsUrl(token.creators[0]?.holder.logo),
+						social_media_accounts: {
+							twitter: token.creators[0]?.holder.twitter || '',
+							instagram: token.creators[0]?.holder.instagram || ''
+						}
 					},
-					{
-						platform: "instagram",
-						username: token.creators[0]?.holder.instagram
-					}
-				]
-			},
-			updated_at: token.timestamp,
-			is_disabled: false,
-			is_nsfw: false
-		}));
+					mime: token.mime || '',
+					platform: 'Tezos',
+					image_url: mediaUri || '',
+					animation_url: animationUri || '',
+					tags: metadata.tags || [], // Use tags from metadata
+					website: token.creators[0]?.holder.website || '', // If available, otherwise leave empty
+					attributes: metadata.attributes || [], // Use attributes from metadata
+					collection: {
+						name: token.fa?.name || 'No Collection Name',
+						contract: token.fa?.contract,
+						blockchain: 'tezos'
+					},
+					updated_at: token.timestamp,
+					is_disabled: false,
+					is_nsfw: false
+				};
+
+				return nftObject;
+			})
+		);
+
+		// Filter out any null results (in case any tokens were skipped due to missing URLs)
+		nfts = nfts.filter((nft) => nft !== null);
 
 		return json({ success: true, nfts }, { status: 200 });
 	} catch (error) {
