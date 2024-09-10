@@ -160,13 +160,13 @@
 					class="media-container"
 					style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 				>
-					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.mime.startsWith('application') && artwork.animation_url && $isLiveCodeVisible}
+					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.mime?.startsWith('application') && artwork.animation_url && $isLiveCodeVisible}
 						<iframe
 							src={artwork.animation_url}
 							class="live-code"
 							on:load={() => handleMediaLoad(artwork.id)}
 						></iframe>
-					{:else if artwork.mime.startsWith('video') && artwork.animation_url && artwork.animation_url.length > 0}
+					{:else if artwork.mime?.startsWith('video') && artwork.animation_url && artwork.animation_url.length > 0}
 						<video autoplay loop muted on:loadeddata={() => handleMediaLoad(artwork.id)}>
 							<source
 								src={artwork.animation_url}
