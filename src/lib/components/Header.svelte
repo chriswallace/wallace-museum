@@ -40,8 +40,7 @@
 	}
 
 	onMount(() => {
-		if (artworkDetails && artworkDetails.attributes) {
-		}
+		console.log(artworkDetails.ArtistArtworks);
 	});
 </script>
 
@@ -74,17 +73,15 @@
 			<span>{$page.data.artworks?.length ?? 0} artwork{artworkSuffix}</span> in this collection.
 		</div>
 
-		{#if artworkDetails && artworkDetails.ArtistArtworks}
+		{#if artworkDetails && artworkDetails.artist}
 			<div class="artist-details">
-				{#each artworkDetails.ArtistArtworks as artist}
-					<span class="artist-name">
-						{#if artist.artist.websiteUrl}
-							<a href={artist.artist.websiteUrl}>{artist.artist.name} </a>
-						{:else}
-							{artist.artist.name}
-						{/if}
-					</span>
-				{/each}
+				<span class="artist-name">
+					{#if artworkDetails.artist.websiteUrl}
+						<a href={artworkDetails.artist.websiteUrl}>{artworkDetails.artist.name}</a>
+					{:else}
+						{artworkDetails.artist.name}
+					{/if}
+				</span>
 			</div>
 		{/if}
 
@@ -303,7 +300,7 @@
 	}
 
 	.live-code {
-		@apply font-sans leading-loose uppercase mt-6 inline-block mx-auto;
+		@apply font-sans leading-loose uppercase mt-6 inline-block mx-auto flex items-center;
 		font-variation-settings:
 			'CUTT' 100,
 			'wdth' 50,

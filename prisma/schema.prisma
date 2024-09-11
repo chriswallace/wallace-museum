@@ -51,6 +51,7 @@ model Artwork {
   contractAddr   String?
   contractAlias  String?
   totalSupply    Int?
+  symbol         String?
   tokenStandard  String?
   tokenID        String?
   mintDate       DateTime?

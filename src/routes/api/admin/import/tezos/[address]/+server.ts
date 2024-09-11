@@ -17,7 +17,7 @@ const fetchMetadataJson = async (ipfsUrl: string) => {
 export const GET: RequestHandler = async ({ params, url }) => {
 	const { address } = params;
 	const type = url.searchParams.get('type');
-	const limit = parseInt(url.searchParams.get('limit') || '10'); // Default to 10 items if not specified
+	const limit = parseInt(url.searchParams.get('limit') || '100'); // Default to 100 items per page
 	const offset = parseInt(url.searchParams.get('offset') || '0'); // Default to start from 0
 
 	if (!address) {
@@ -27,14 +27,14 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	try {
 		let nfts = [];
 
-		// Fetch the data based on the type and pagination parameters
+		// Fetch NFTs based on type and pagination parameters
 		if (type === 'created') {
 			nfts = await fetchCreatedNFTsByAddress(address, limit, offset);
 		} else {
 			nfts = await fetchOwnedNFTsByAddress(address, limit, offset);
 		}
 
-		// Normalize and map the fetched data to the desired format
+		// Continue with normalization and response as before
 		nfts = await Promise.all(
 			nfts.data.holder[0].held_tokens.map(async ({ token }) => {
 				const metadata = token.metadata ? await fetchMetadataJson(token.metadata) : {};
@@ -79,6 +79,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 						contract: token.fa?.contract,
 						blockchain: 'tezos'
 					},
+					symbol: token.symbol,
 					updated_at: token.timestamp,
 					is_disabled: false,
 					is_nsfw: false
@@ -88,12 +89,12 @@ export const GET: RequestHandler = async ({ params, url }) => {
 			})
 		);
 
-		// Filter out any null results (in case any tokens were skipped due to missing URLs)
+		// Filter out null results
 		nfts = nfts.filter((nft) => nft !== null);
 
 		return json({ success: true, nfts }, { status: 200 });
 	} catch (error) {
-		console.error('Failed to complete the fetch process:', error);
+		console.error('Failed to fetch NFTs:', error);
 		return json({ success: false, error: error.message }, { status: 500 });
 	}
 };

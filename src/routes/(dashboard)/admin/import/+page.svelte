@@ -12,6 +12,11 @@
 		isModalOpen
 	} from '$lib/stores';
 
+	import { closeModal } from '$lib/modal';
+	import EditableCollectionTable from '$lib/components/EditableCollectionTable.svelte';
+	import EditableArtistTable from '$lib/components/EditableArtistTable.svelte';
+	import FinalImportStep from '$lib/components/FinalImportStep.svelte';
+
 	import {
 		finalizeImport,
 		nextStep,
@@ -19,17 +24,14 @@
 		handleCollectionSave,
 		handleArtistSave
 	} from '$lib/importHandler';
+
 	import { intersectionObserver } from '$lib/intersectionObserver';
-	import EditableCollectionTable from '$lib/components/EditableCollectionTable.svelte';
-	import EditableArtistTable from '$lib/components/EditableArtistTable.svelte';
-	import FinalImportStep from '$lib/components/FinalImportStep.svelte';
-	import { closeModal } from '$lib/modal';
 	import { get } from 'svelte/store';
-	import { isImage, isVideo } from '$lib/utils';
 
 	const loadingImageUrl = '/images/medici-image.png';
 
-	$: $isModalOpen;
+	let offset = 0;
+	const limit = 250;
 
 	function handleLazyLoad(node, { src }) {
 		node.src = loadingImageUrl;
@@ -42,10 +44,44 @@
 			};
 		};
 
-		const onLeave = () => {
-		};
+		intersectionObserver(node, { onEnter });
+	}
 
-		intersectionObserver(node, { onEnter, onLeave });
+	async function fetchNfts(loadMore = false) {
+		isLoading.set(true);
+		const wallet = $walletAddress;
+		let blockchain = 'opensea';
+
+		if (wallet.length > 0) {
+			const type = $nftType;
+			if (wallet.startsWith('tz')) {
+				blockchain = 'tezos';
+			}
+			const apiEndpoint = `/api/admin/import/${blockchain}/${wallet}/?type=${type}&limit=${limit}&offset=${offset}`;
+
+			try {
+				const response = await fetch(apiEndpoint);
+				if (response.ok) {
+					const data = await response.json();
+
+					// If loading more, append to existing items
+					if (loadMore) {
+						nfts.update((current) => [...current, ...data.nfts]);
+					} else {
+						nfts.set(data.nfts);
+					}
+
+					// Update the offset for the next load
+					offset += limit;
+				} else {
+					console.error('Failed to fetch NFTs');
+				}
+			} catch (error) {
+				console.error('Error fetching NFTs:', error);
+			} finally {
+				isLoading.set(false);
+			}
+		}
 	}
 
 	function toggleSelection(index) {
@@ -68,48 +104,6 @@
 			selectedNfts.set(new Set($nfts.map((_, index) => index)));
 		} else {
 			selectedNfts.set(new Set());
-		}
-	}
-
-	let offset = 0;
-	const limit = 100;
-
-	async function fetchNfts(loadMore = false) {
-		isLoading.set(true);
-		selectAllChecked.set(false);
-		selectedNfts.set(new Set());
-		const wallet = $walletAddress;
-		let blockchain = 'opensea';
-
-		if (wallet.length > 0) {
-			const type = $nftType;
-			if (wallet.startsWith('tz')) {
-				blockchain = 'tezos';
-			}
-			let apiEndpoint = `/api/admin/import/${blockchain}/${wallet}/?type=${type}&limit=${limit}&offset=${offset}`;
-
-			try {
-				const response = await fetch(apiEndpoint);
-				if (response.ok) {
-					const data = await response.json();
-
-					// If loading more, append to existing items
-					if (loadMore) {
-						nfts.update(current => [...current, ...data.nfts]);
-					} else {
-						nfts.set(data.nfts);
-					}
-
-					// Update the offset for the next load
-					offset += limit;
-				} else {
-					console.error('Failed to fetch NFTs');
-				}
-			} catch (error) {
-				console.error('Error fetching NFTs:', error);
-			} finally {
-				isLoading.set(false);
-			}
 		}
 	}
 </script>
@@ -194,7 +188,6 @@
 				{/each}
 			</div>
 
-			<!-- Load More Button -->
 			<div class="load-more-container">
 				<button class="secondary button" on:click={() => fetchNfts(true)}>
 					Load More

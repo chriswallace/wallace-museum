@@ -93,6 +93,20 @@
 		if (event.key === 'Escape' && get(isMaximized)) {
 			closeFullscreen();
 		}
+		if (event.key === 'ArrowRight') {
+			const currentIndex = data.artworks.findIndex((artwork) => artwork.id === get(selectedArtwork).id);
+			const nextIndex = currentIndex + 1;
+			if (nextIndex < data.artworks.length) {
+				openDetail(data.artworks[nextIndex]);
+			}
+		}
+		if (event.key === 'ArrowLeft') {
+			const currentIndex = data.artworks.findIndex((artwork) => artwork.id === get(selectedArtwork).id);
+			const prevIndex = currentIndex - 1;
+			if (prevIndex >= 0) {
+				openDetail(data.artworks[prevIndex]);
+			}
+		}
 	}
 
 	function setSrcSetAndSizes(artwork, artworkRef) {
@@ -154,13 +168,14 @@
 				style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 				tabindex="0"
 				aria-role="button"
+				on:keydown={handleKeyDown}
 			>
 				<button class="close icon-button" on:click={closeFullscreen}>Close</button>
 				<div
 					class="media-container"
 					style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 				>
-					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.mime?.startsWith('application') && artwork.animation_url && $isLiveCodeVisible}
+					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && (artwork.mime.startsWith('application') || artwork.mime.startsWith('html')) && artwork.animation_url && $isLiveCodeVisible}
 						<iframe
 							src={artwork.animation_url}
 							class="live-code"

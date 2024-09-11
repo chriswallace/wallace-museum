@@ -162,8 +162,8 @@ export async function normalizeTezosMetadata(nft) {
 		animation_url: nft.animation_url,
 		tags: metadata.tags || [],
 		website: metadata.website || '',
-		attributes: metadata.attributes || [],
-		symbol: nft.symbol || '',
+		attributes: nft.attributes || metadata.attributes || [],
+		symbol: nft.symbol || metadata.symbol || '',
 		supply: nft.supply || 1,
 		collection: {
 			name: nft.fa?.name || '',
