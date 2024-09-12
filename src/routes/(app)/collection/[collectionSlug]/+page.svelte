@@ -166,8 +166,9 @@
 				class:maximized={$isMaximized}
 				class="artwork-item {loadedClasses[artwork.id]}"
 				style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
-				tabindex="0"
-				aria-role="button"
+				tabindex="-1"
+				role="button"
+				aria-label="Focus Artwork"
 				on:keydown={handleKeyDown}
 			>
 				<button class="close icon-button" on:click={closeFullscreen}>Close</button>
@@ -175,10 +176,11 @@
 					class="media-container"
 					style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
 				>
-					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && (artwork.mime.startsWith('application') || artwork.mime.startsWith('html')) && artwork.animation_url && $isLiveCodeVisible}
+					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && (artwork.mime.startsWith('application') || artwork.mime.startsWith('text')) && artwork.animation_url && $isLiveCodeVisible}
 						<iframe
 							src={artwork.animation_url}
 							class="live-code"
+							title="Artwork Animation"
 							on:load={() => handleMediaLoad(artwork.id)}
 						></iframe>
 					{:else if artwork.mime?.startsWith('video') && artwork.animation_url && artwork.animation_url.length > 0}
