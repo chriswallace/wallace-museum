@@ -1,6 +1,7 @@
 import prisma from '$lib/prisma';
 import { uploadToImageKit } from '$lib/mediaHelpers';
 import slugify from 'slugify';
+import { fileTypeFromBuffer } from 'file-type';
 
 export async function POST({ request }) {
 	try {
@@ -19,8 +20,24 @@ export async function POST({ request }) {
 		let isVideo = false;
 
 		if (file) {
-			const buffer = await (file as Blob).arrayBuffer();
-			const uploadResponse = await uploadToImageKit(buffer, file.name);
+			const arrayBuffer = await file.arrayBuffer();
+			const buffer = Buffer.from(arrayBuffer); // Convert ArrayBuffer to Buffer
+
+			// Only proceed if the mime type is a supported image or video format
+			if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+				console.error(`Unsupported media type: ${file.type}`);
+				return new Response(JSON.stringify({ error: `Unsupported media type: ${file.type}` }), {
+					status: 400
+				});
+			}
+
+			const uploadResponse = await uploadToImageKit(buffer, file.name, file.type); // Pass both buffer and file name
+			if (!uploadResponse) {
+				console.error('Failed to upload to ImageKit.');
+				return new Response(JSON.stringify({ error: 'Failed to upload to ImageKit.' }), {
+					status: 500
+				});
+			}
 			imageOrVideoUrl = uploadResponse.url;
 			isVideo = uploadResponse.fileType === 'non-image';
 		}
@@ -41,19 +58,19 @@ export async function POST({ request }) {
 		}
 
 		const newArtworkData = {
-			title,
-			description,
-			curatorNotes,
+			title: title ? String(title) : '',
+			description: description ? String(description) : '',
+			curatorNotes: curatorNotes ? String(curatorNotes) : '',
 			enabled: true,
-			artistId: artistId ? parseInt(artistId) : null,
-			collectionId: collectionId ? parseInt(collectionId) : null
+			artistId: artistId ? parseInt(String(artistId)) : null,
+			collectionId: collectionId ? parseInt(String(collectionId)) : null
 		};
 
 		// Assign to the appropriate field based on file type
 		if (isVideo) {
-			newArtworkData.video = imageOrVideoUrl;
+			newArtworkData.animation_url = imageOrVideoUrl;
 		} else {
-			newArtworkData.image = imageOrVideoUrl;
+			newArtworkData.image_url = imageOrVideoUrl;
 		}
 
 		const newArtwork = await prisma.artwork.create({

@@ -9,7 +9,7 @@
 <div class="artwork">
   {#if hasVideo()}
     <video src={artwork.animation_url} autoplay controls playsinline muted loop></video>
-  {:else if (artwork.mime.startsWith('application') || artwork.mime.startsWith('html')) && artwork.animation_url}
+  {:else if ((artwork.mime && (artwork.mime.startsWith('application') || artwork.mime.startsWith('html'))) && artwork.animation_url)}
     <iframe src={artwork.animation_url} class="live-code"></iframe>
   {:else}
     <img src="{artwork.image_url}?tr=w-740,q-70" alt={artwork.title} />

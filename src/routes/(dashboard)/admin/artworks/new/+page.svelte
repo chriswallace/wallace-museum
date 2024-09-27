@@ -5,6 +5,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores'; // Import the page store
 
+	export let artist;
+
 	let artwork = {
 		title: '',
 		description: '',
@@ -22,7 +24,7 @@
 		try {
 			const [artistsRes, collectionsRes] = await Promise.all([
 				fetch('/api/admin/artists'), // Assuming you have an endpoint to fetch artists
-				fetch('/api/admin/collections') // Assuming you have an endpoint to fetch collections
+				fetch('/api/admin/collections/all') // Assuming you have an endpoint to fetch collections
 			]);
 
 			if (artistsRes.ok) {
@@ -41,6 +43,7 @@
 	async function addArtwork() {
 		const formData = new FormData();
 		const fileInput = document.querySelector('input[type="file"]');
+
 		if (fileInput.files[0]) {
 			formData.append('image', fileInput.files[0]);
 		}

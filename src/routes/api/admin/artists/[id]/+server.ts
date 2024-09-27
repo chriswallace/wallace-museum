@@ -35,7 +35,7 @@ export async function PUT({ params, request }) {
 			data: {
 				name: data.name,
 				bio: data.bio,
-				websiteUrl: data.website,
+				websiteUrl: data.websiteUrl,
 				twitterHandle: data.twitterHandle,
 				instagramHandle: data.instagramHandle,
 				avatarUrl: data.profileImageUrl,

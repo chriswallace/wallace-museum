@@ -17,7 +17,6 @@
 		animation_url: '',
 		artistId: '',
 		collectionId: '',
-		liveUri: '',
         mime: '',
 		attributes: '',
 		curatorNotes: '',

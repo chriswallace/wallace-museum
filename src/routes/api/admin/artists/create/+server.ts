@@ -1,35 +1,39 @@
 import prisma from '$lib/prisma';
 import { uploadToImageKit } from '$lib/mediaHelpers';
-import slugify from 'slugify';
 
 export async function POST({ request }) {
 	try {
 		const formData = await request.formData();
-		const file = formData.get('profileImage');
+		const file = formData.get('image');
 		const name = formData.get('name');
 		const bio = formData.get('bio');
-		const website = formData.get('website');
+		const websiteUrl = formData.get('websiteUrl');
 		const twitterHandle = formData.get('twitterHandle');
 		const instagramHandle = formData.get('instagramHandle');
 		let avatarUrl = null;
 
-		if (file) {
-			const buffer = await file.arrayBuffer();
-			const uploadResponse = await uploadToImageKit(buffer, file.name);
+		console.log('FileDetails', file);
 
+		if (file && file.name && file.type) {
+			const buffer = Buffer.from(await file.arrayBuffer()); // Convert ArrayBuffer to Buffer
+			const mimeType = file.type; // Get the MIME type of the file
+			console.log('mimeType', mimeType);
+			const uploadResponse = await uploadToImageKit(buffer, file.name, mimeType); // Pass buffer, file name, and MIME type
 			avatarUrl = uploadResponse.url;
+		} else if (file) {
+			throw new Error('Invalid file uploaded');
 		}
 
 		const newArtistData = {
 			name,
 			bio,
-			websiteUrl: website,
+			websiteUrl,
 			twitterHandle,
 			instagramHandle,
-			avatarUrl,
-			slug: slugify(name, { lower: true, strict: true }),
-			enabled: true
+			avatarUrl
 		};
+
+		console.log(newArtistData);
 
 		const newArtist = await prisma.artist.create({
 			data: newArtistData

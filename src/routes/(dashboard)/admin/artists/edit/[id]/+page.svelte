@@ -12,7 +12,7 @@
 		name: '',
 		bio: '',
 		avatarUrl: '',
-		website: '',
+		websiteUrl: '',
 		twitterHandle: '',
 		instagramHandle: '',
 		collections: []
