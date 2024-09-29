@@ -23,7 +23,7 @@ export async function deleteArtist(artistId) {
         method: 'DELETE'
     });
 
-    if (response.ok) {
+    if (response.ok) {  
         showToast('Artist deleted.', 'success');
         goto('/admin/artists');
     } else {

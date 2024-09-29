@@ -17,7 +17,6 @@
 			<a class="medici" href="/">Medici.</a>
 
 			<div class="primary-nav">
-				<a href="/admin" class={currentPage === '/admin' ? 'selected' : ''}>Dashboard</a>
 				<a href="/admin/collections" class={currentPage === '/admin/collections' ? 'selected' : ''}
 					>Collections</a
 				>
@@ -28,7 +27,7 @@
 					>Artists</a
 				>
 				<a href="/admin/import" class={currentPage === '/admin/import' ? 'selected' : ''}
-					>Import NFTs</a
+					>Import</a
 				>
 			</div>
 

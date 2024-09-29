@@ -32,6 +32,7 @@
 
 	let offset = 0;
 	const limit = 250;
+	let previousWallet = '';
 
 	function handleLazyLoad(node, { src }) {
 		node.src = loadingImageUrl;
@@ -84,6 +85,14 @@
 		}
 	}
 
+	function handleWalletChange() {
+		if ($walletAddress !== previousWallet) {
+			nfts.set([]);
+			offset = 0;
+			previousWallet = $walletAddress;
+		}
+	}
+
 	function toggleSelection(index) {
 		selectedNfts.update((current) => {
 			const newSet = new Set(current);
@@ -128,6 +137,7 @@
 			type="text"
 			bind:value={$walletAddress}
 			placeholder="Wallet Address"
+			on:input={handleWalletChange}
 		/>
 		<button class="primary button flex-shrink mt-0" on:click={fetchNfts}>Fetch NFTs</button>
 	</div>

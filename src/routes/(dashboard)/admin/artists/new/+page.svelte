@@ -80,7 +80,7 @@
                     </div>
                     <div>
                         <label for="website">Website</label>
-                        <input type="url" id="website" name="website" bind:value={website} />
+                        <input type="url" id="website" name="website" bind:value={websiteUrl} />
                     </div>
                     <div>
                         <label for="twitterHandle">Twitter Handle</label>
