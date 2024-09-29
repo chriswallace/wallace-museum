@@ -15,6 +15,9 @@ export async function GET({ url }) {
 			},
 			include: {
 				artworks: true // Optionally include related artworks
+			},
+			orderBy: {
+				name: 'asc' // Order results alphabetically
 			}
 		});
 

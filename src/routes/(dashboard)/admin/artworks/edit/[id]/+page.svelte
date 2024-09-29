@@ -149,7 +149,7 @@
 	{:else}
 		<a class="back-btn" href="/admin/artworks">&lt; Back</a>
 		<h1>Edit artwork</h1>
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-2 gap-12">
 			<div>
 				<ArtworkDisplay {artwork} />
 				<ArtworkMeta {artwork} />

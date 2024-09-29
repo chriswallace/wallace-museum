@@ -13,9 +13,7 @@
 
 	async function fetchArtists(page = 1) {
 		let url = `/api/admin/artists/search/`;
-		if (sortColumn && sortOrder) {
-			url += `?sort=${sortColumn}&order=${sortOrder}`;
-		}
+
 		if (searchQuery) {
 			url += `?search=${encodeURIComponent(searchQuery)}`;
 		}
@@ -75,13 +73,13 @@
 		class="search"
 		on:input={handleSearchInput}
 	/>
-	
+
 {#if artists.length === 0}
 	<div class="empty">
 		<p>No artists found.</p>
 	</div>
 {:else}
-	<div class="grid grid-cols-6 gap-4 w-full">
+	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 w-full">
 		{#each artists as artist}
 			<button class="card" on:click={() => editArtist(artist.id)}>		
 				<img class="avatar" src="{artist.avatarUrl || placeholderAvatar(artist.name)}" alt={artist.name} />
