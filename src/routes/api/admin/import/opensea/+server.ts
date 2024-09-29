@@ -26,11 +26,7 @@ export const POST = async ({ request }) => {
 			const artist = await processArtist(nft.artist);
 			const collection = await processCollection(nft.collection);
 
-			console.log('Processing NFT:', nft);
-
 			const normalizedMetadata = await normalizeOpenSeaMetadata(nft);
-
-			console.log('Normalized metadata:', normalizedMetadata);
 
 			if (normalizedMetadata.image_url && (await isImage(normalizedMetadata.image_url))) {
 				const imageUploadResult = await handleMediaUpload(normalizedMetadata.image_url, nft);

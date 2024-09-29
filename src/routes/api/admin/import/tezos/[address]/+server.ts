@@ -5,6 +5,8 @@ import { fixIpfsUrl } from '$lib/mediaHelpers';
 
 const fetchMetadataJson = async (ipfsUrl: string) => {
 	try {
+		console.log('ipfsUrl', ipfsUrl);
+		console.log('fixIpfsUrl', fixIpfsUrl(ipfsUrl));
 		const response = await fetch(fixIpfsUrl(ipfsUrl));
 		if (!response.ok) throw new Error('Failed to fetch metadata');
 		return await response.json();

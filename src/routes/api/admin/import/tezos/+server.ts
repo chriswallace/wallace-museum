@@ -27,8 +27,6 @@ export const POST = async ({ request }) => {
 
 			let normalizedMetadata = await normalizeTezosMetadata(nft);
 
-			console.log(normalizedMetadata);
-
 			try {
 				if (normalizedMetadata.image_url) {
 					const imageUploadResult = await handleMediaUpload(normalizedMetadata.image_url, nft);
@@ -59,8 +57,6 @@ export const POST = async ({ request }) => {
 			}
 
 			nft.metadata = normalizedMetadata;
-
-			console.log(nft);
 
 			const artwork = await saveArtwork(nft, artist.id, collection.id);
 

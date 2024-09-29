@@ -46,8 +46,6 @@ function extensionFromMimeType(mimeType) {
 }
 
 function generateFileName(artwork, mimeType) {
-	console.log('artwork', artwork);
-	console.log('mimeType', mimeType);
 	let baseName = artwork.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
 
 	const extension = extensionFromMimeType(mimeType);
@@ -296,7 +294,11 @@ export async function handleMediaUpload(mediaUri, artwork) {
 		const resizedBuffer = resizeResult.buffer;
 		const resizedDimensions = resizeResult.dimensions || dimensions;
 
-		const uploadResult = await uploadToImageKit(resizedBuffer, artwork.title, mediaData.mimeType);
+		console.log('resizedBuffer', resizedBuffer);
+		console.log('artwork', artwork.name);
+		console.log('mediaData.mimeType', mediaData.mimeType);
+
+		const uploadResult = await uploadToImageKit(resizedBuffer, artwork.name, mediaData.mimeType);
 
 		return uploadResult
 			? {

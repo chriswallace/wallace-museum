@@ -39,9 +39,6 @@
 		});
 	}
 
-	onMount(() => {
-		console.log(artworkDetails.ArtistArtworks);
-	});
 </script>
 
 <header>

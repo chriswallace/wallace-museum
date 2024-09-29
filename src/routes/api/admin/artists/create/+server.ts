@@ -12,12 +12,9 @@ export async function POST({ request }) {
 		const instagramHandle = formData.get('instagramHandle');
 		let avatarUrl = null;
 
-		console.log('FileDetails', file);
-
 		if (file && file.name && file.type) {
 			const buffer = Buffer.from(await file.arrayBuffer()); // Convert ArrayBuffer to Buffer
 			const mimeType = file.type; // Get the MIME type of the file
-			console.log('mimeType', mimeType);
 			const uploadResponse = await uploadToImageKit(buffer, file.name, mimeType); // Pass buffer, file name, and MIME type
 			avatarUrl = uploadResponse.url;
 		} else if (file) {
@@ -32,8 +29,6 @@ export async function POST({ request }) {
 			instagramHandle,
 			avatarUrl
 		};
-
-		console.log(newArtistData);
 
 		const newArtist = await prisma.artist.create({
 			data: newArtistData

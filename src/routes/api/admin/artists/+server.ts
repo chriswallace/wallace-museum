@@ -6,10 +6,13 @@ export const GET: RequestHandler = async () => {
 	try {
 		const artists = await prisma.artist.findMany({
 			select: {
+				avatarUrl: true,
 				id: true,
-				name: true,
-				avatarUrl: true
+				name: true
 				// Add other fields you need
+			},
+			orderBy: {
+				name: 'asc'
 			}
 		});
 

@@ -3,7 +3,7 @@ import prisma from '$lib/prisma';
 
 // GET: Search Artist Names
 export async function GET({ url }) {
-	const searchQuery = url.searchParams.get('query') || '';
+	const searchQuery = url.searchParams.get('search') || '';
 
 	try {
 		const artists = await prisma.artist.findMany({

@@ -12,12 +12,12 @@
 	let searchQuery = '';
 
 	async function fetchArtists(page = 1) {
-		let url = `/api/admin/artists/?page=${page}`;
+		let url = `/api/admin/artists/search/`;
 		if (sortColumn && sortOrder) {
-			url += `&sort=${sortColumn}&order=${sortOrder}`;
+			url += `?sort=${sortColumn}&order=${sortOrder}`;
 		}
 		if (searchQuery) {
-			url += `&search=${encodeURIComponent(searchQuery)}`;
+			url += `?search=${encodeURIComponent(searchQuery)}`;
 		}
 
 		try {
@@ -69,18 +69,18 @@
 </svelte:head>
 
 <h1>Artists <button class="ghost" on:click={addNew}>+ Add new</button></h1>
-{#if artists.length === 0}
-	<div class="empty">
-		<p>No artists found.</p>
-	</div>
-{:else}
 	<input
 		type="text"
 		placeholder="Search artists..."
 		class="search"
 		on:input={handleSearchInput}
 	/>
-
+	
+{#if artists.length === 0}
+	<div class="empty">
+		<p>No artists found.</p>
+	</div>
+{:else}
 	<div class="grid grid-cols-6 gap-4 w-full">
 		{#each artists as artist}
 			<button class="card" on:click={() => editArtist(artist.id)}>		
