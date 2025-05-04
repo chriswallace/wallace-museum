@@ -1,22 +1,24 @@
 import prisma from '$lib/prisma';
-import { uploadToImageKit } from '$lib/mediaHelpers';
+import { uploadToCloudinary } from '$lib/mediaHelpers';
 
 export async function POST({ request }) {
 	try {
 		const formData = await request.formData();
-		const file = formData.get('image');
-		const name = formData.get('name');
-		const bio = formData.get('bio');
-		const websiteUrl = formData.get('websiteUrl');
-		const twitterHandle = formData.get('twitterHandle');
-		const instagramHandle = formData.get('instagramHandle');
+		const file = formData.get('image') as File | null;
+		const name = formData.get('name') as string;
+		const bio = formData.get('bio') as string;
+		const websiteUrl = formData.get('websiteUrl') as string;
+		const twitterHandle = formData.get('twitterHandle') as string;
+		const instagramHandle = formData.get('instagramHandle') as string;
 		let avatarUrl = null;
 
-		if (file && file.name && file.type) {
-			const buffer = Buffer.from(await file.arrayBuffer()); // Convert ArrayBuffer to Buffer
-			const mimeType = file.type; // Get the MIME type of the file
-			const uploadResponse = await uploadToImageKit(buffer, file.name, mimeType); // Pass buffer, file name, and MIME type
-			avatarUrl = uploadResponse.url;
+		if (file && file instanceof File) {
+			const buffer = Buffer.from(await file.arrayBuffer());
+			const mimeType = file.type;
+			const uploadResponse = await uploadToCloudinary(buffer, file.name, mimeType);
+			if (uploadResponse) {
+				avatarUrl = uploadResponse.url;
+			}
 		} else if (file) {
 			throw new Error('Invalid file uploaded');
 		}
@@ -38,8 +40,8 @@ export async function POST({ request }) {
 			status: 201,
 			headers: { 'Content-Type': 'application/json' }
 		});
-	} catch (error) {
-		console.error('Error in POST request:', error.message);
+	} catch (error: unknown) {
+		console.error('Error in POST request:', error instanceof Error ? error.message : String(error));
 		return new Response(JSON.stringify({ error: 'Error creating new artist' }), {
 			status: 500,
 			headers: { 'Content-Type': 'application/json' }

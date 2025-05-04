@@ -9,12 +9,12 @@ import ffprobePath from '@ffprobe-installer/ffprobe';
 import { fileTypeFromBuffer } from 'file-type';
 import { v2 as cloudinary } from 'cloudinary';
 
-// Import CLOUDINARY_URL instead of individual keys
-import { CLOUDINARY_URL } from '$env/dynamic/private';
+// Import env object instead of a specific variable
+import { env } from '$env/dynamic/private';
 
 // Log check for the URL variable
 console.log('Cloudinary Env Vars Check:');
-console.log('[$env] CLOUDINARY_URL:', CLOUDINARY_URL ? 'Loaded' : 'MISSING');
+console.log('[$env] CLOUDINARY_URL:', env.CLOUDINARY_URL ? 'Loaded' : 'MISSING');
 
 // Remove or comment out the previous check for individual keys
 /*
@@ -126,7 +126,7 @@ export async function uploadToCloudinary(fileBuffer, fileName, mimeType) {
 			);
 			// Log the URL variable itself (be careful if logs are public)
 			console.error(
-				`[uploadToCloudinary] CLOUDINARY_URL value check: ${CLOUDINARY_URL ? 'Exists' : 'MISSING or empty'}`
+				`[uploadToCloudinary] CLOUDINARY_URL value check: ${env.CLOUDINARY_URL ? 'Exists' : 'MISSING or empty'}`
 			);
 			throw new Error('Cloudinary configuration failed internally (URL method).');
 		}

@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { uploadToCloudinary } from '$lib/mediaHelpers'; // Keep helper here for now, but ensure IT doesn't import $env
 
 // Ensure mediaHelpers doesn't ALSO import $env/dynamic/private
-// Ideally, pass credentials from here TO uploadToImageKit if needed
+// Ideally, pass credentials from here if needed
 
 export async function POST({ request }) {
 	try {
