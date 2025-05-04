@@ -1,13 +1,31 @@
 import prisma from '$lib/prisma';
+import { Prisma } from '@prisma/client'; // Import Prisma types
+
+// Define a type for the artist object including relations we expect
+type ArtistWithRelations = Prisma.ArtistGetPayload<{
+	include: {
+		collections: true, // Keep this if needed
+		ArtistArtworks: {
+			include: {
+				artwork: true
+			}
+		}
+	}
+}>
 
 // GET: Fetch Artist Details
 export async function GET({ params }) {
 	const { id } = params;
-	const artist = await prisma.artist.findUnique({
+	const artist: ArtistWithRelations | null = await prisma.artist.findUnique({
 		where: { id: parseInt(id, 10) },
 		include: {
 			collections: true,
-			artworks: true
+			// artworks: true // Removed old relation
+			ArtistArtworks: { // Include via join table
+				include: {
+					artwork: true // Include the actual artwork data
+				}
+			}
 		}
 	});
 
@@ -18,7 +36,14 @@ export async function GET({ params }) {
 		});
 	}
 
-	return new Response(JSON.stringify(artist), {
+	// Transform the result to provide a simple `artworks` array
+	const transformedArtist = {
+		...artist,
+		artworks: artist.ArtistArtworks.map(aa => aa.artwork)
+	};
+	// delete transformedArtist.ArtistArtworks; // Optionally remove join table data
+
+	return new Response(JSON.stringify(transformedArtist), {
 		status: 200,
 		headers: { 'Content-Type': 'application/json' }
 	});
@@ -38,9 +63,9 @@ export async function PUT({ params, request }) {
 				websiteUrl: data.websiteUrl,
 				twitterHandle: data.twitterHandle,
 				instagramHandle: data.instagramHandle,
-				avatarUrl: data.profileImageUrl,
+				avatarUrl: data.avatarUrl,
 				collections: {
-					set: data.collectionIds?.map((collectionId) => ({
+					set: data.collectionIds?.map((collectionId: number) => ({
 						id: collectionId
 					}))
 				}
@@ -70,7 +95,9 @@ export async function DELETE({ params }) {
 
 		return new Response(null, { status: 204 });
 	} catch (error) {
-		return new Response(JSON.stringify({ error: 'Error deleting artist' }), {
+		console.error(`Error deleting artist with ID ${id}:`, error); // Log the specific error
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error deleting artist';
+		return new Response(JSON.stringify({ error: 'Error deleting artist', details: errorMessage }), { // Include details in response
 			status: 500,
 			headers: { 'Content-Type': 'application/json' }
 		});

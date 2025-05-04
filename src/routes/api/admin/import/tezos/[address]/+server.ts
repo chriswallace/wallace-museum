@@ -1,102 +1,155 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { fetchCreatedNFTsByAddress, fetchOwnedNFTsByAddress } from '$lib/objktHelpers';
-import { fixIpfsUrl } from '$lib/mediaHelpers';
+import { convertIpfsToHttpsUrl } from '$lib/mediaUtils';
 
-const fetchMetadataJson = async (ipfsUrl: string) => {
-	try {
-		console.log('ipfsUrl', ipfsUrl);
-		console.log('fixIpfsUrl', fixIpfsUrl(ipfsUrl));
-		const response = await fetch(fixIpfsUrl(ipfsUrl));
-		if (!response.ok) throw new Error('Failed to fetch metadata');
-		return await response.json();
-	} catch (error) {
-		console.error('Failed to fetch metadata JSON:', error);
-		return {};
+const DEFAULT_IPFS_GATEWAY = 'https://ipfs.io/ipfs/'; // Define gateway here
+
+// This constant is defined locally, but convertIpfsToHttpsUrl in mediaUtils now uses its own internal constant.
+// We might need to remove this local one if it causes conflicts or isn't used elsewhere in this file.
+// For now, keeping it commented out to avoid potential conflicts.
+// const ipfsGateways = ['https://gateway.pinata.cloud/ipfs/', 'https://ipfs.io/ipfs/'];
+
+// Define Metadata interface based on usage
+interface Metadata {
+	name?: string;
+	description?: string;
+	artifactUri?: string;
+	artifact_uri?: string;
+	displayUri?: string;
+	thumbnailUri?: string;
+	tags?: string[];
+	attributes?: object[];
+	// Add other potential fields if known
+}
+
+/* // Temporarily comment out as it's not called and causes errors due to refactoring
+// Define using standard function syntax
+async function fetchMetadataJson(ipfsUrl: string, retries: number = 3): Promise<Metadata | null> {
+	for (const gateway of ipfsGateways) { // <-- Uses ipfsGateways
+		try {
+			const fixedUrl = fixIpfsUrl(ipfsUrl, gateway); // <-- Uses fixIpfsUrl with 2 args
+			console.log('Trying IPFS URL:', fixedUrl);
+			const response = await fetch(fixedUrl);
+			if (response.ok) {
+				return await response.json();
+			}
+		} catch (error) {
+			console.error(`Failed to fetch metadata JSON from ${gateway}:`, error);
+		}
 	}
-};
+
+	if (retries > 0) {
+		console.log(`Retrying... (${3 - retries + 1})`);
+		// Ensure the recursive call matches the declared type (retries is optional)
+		return await fetchMetadataJson(ipfsUrl, retries - 1);
+	}
+
+	return null; // Return null to indicate failure to fetch metadata
+}
+*/
 
 export const GET: RequestHandler = async ({ params, url }) => {
 	const { address } = params;
 	const type = url.searchParams.get('type');
-	const limit = parseInt(url.searchParams.get('limit') || '100'); // Default to 100 items per page
-	const offset = parseInt(url.searchParams.get('offset') || '0'); // Default to start from 0
+	const limit = parseInt(url.searchParams.get('limit') || '1000');
+	const offset = parseInt(url.searchParams.get('offset') || '0');
+	const searchTerm = url.searchParams.get('search');
 
 	if (!address) {
 		return json({ error: 'Wallet address is required' }, { status: 400 });
 	}
 
 	try {
-		let nfts = [];
+		let fetchedData;
+		let tokens: any[] = []; // Initialize tokens array
 
 		// Fetch NFTs based on type and pagination parameters
 		if (type === 'created') {
-			nfts = await fetchCreatedNFTsByAddress(address, limit, offset);
+			fetchedData = await fetchCreatedNFTsByAddress(address, limit, offset, searchTerm);
+			// Access tokens specific to this block
+			tokens = fetchedData?.data?.holder?.[0]?.created_tokens || [];
 		} else {
-			nfts = await fetchOwnedNFTsByAddress(address, limit, offset);
+			fetchedData = await fetchOwnedNFTsByAddress(address, limit, offset, searchTerm);
+			// Access tokens specific to this block
+			tokens = fetchedData?.data?.holder?.[0]?.held_tokens || [];
 		}
 
-		// Continue with normalization and response as before
-		nfts = await Promise.all(
-			nfts.data.holder[0].held_tokens.map(async ({ token }) => {
-				const metadata = token.metadata ? await fetchMetadataJson(token.metadata) : {};
+		// Process tokens into normalized NFTs with unique IDs
+		let normalizedNfts = tokens.map(({ token }: { token: any }) => {
+			// Prioritize display_uri for image, artifact_uri for animation
+			let displayUriResult = convertIpfsToHttpsUrl(token.display_uri);
+			let artifactUriResult = convertIpfsToHttpsUrl(token.artifact_uri);
 
-				const animationUri = fixIpfsUrl(
-					token.artifact_uri || token.artifactUri || metadata.artifactUri || metadata.artifact_uri
-				);
-
-				const mediaUri = fixIpfsUrl(
-					token.display_uri || metadata.displayUri || metadata.artifactUri || metadata.thumbnailUri
-				);
-
-				if (!animationUri && !mediaUri) {
-					console.error('Both artifactUri and mediaUri are undefined or empty for token:', token);
-					return null; // Skip this token
+			// Function to prepend gateway if needed
+			const ensureHttpsUrl = (uri: string | unknown): string => {
+				if (typeof uri === 'string' && !uri.startsWith('http') && !uri.startsWith('/ipfs/')) {
+					return `${DEFAULT_IPFS_GATEWAY}${uri}`;
 				}
+				return typeof uri === 'string' ? uri : ''; // Return string or empty string
+			};
 
-				const nftObject = {
-					name: metadata.name || token.name || 'No Name',
-					tokenID: token.token_id,
-					description: metadata.description || token.description,
-					artist: {
-						address: token.creators[0]?.holder.address,
-						username: token.creators[0]?.holder.alias,
-						bio: token.creators[0]?.holder.description,
-						website: token.creators[0]?.holder.website || '',
-						avatarUrl: fixIpfsUrl(token.creators[0]?.holder.logo),
-						social_media_accounts: {
-							twitter: token.creators[0]?.holder.twitter || '',
-							instagram: token.creators[0]?.holder.instagram || ''
-						}
-					},
-					mime: token.mime || '',
-					platform: 'Tezos',
-					image_url: mediaUri || '',
-					animation_url: animationUri || '',
-					tags: metadata.tags || [], // Use tags from metadata
-					website: token.creators[0]?.holder.website || '', // If available, otherwise leave empty
-					attributes: metadata.attributes || [], // Use attributes from metadata
-					collection: {
-						name: token.fa?.name || 'No Collection Name',
-						contract: token.fa?.contract,
-						blockchain: 'tezos'
-					},
-					symbol: token.symbol,
-					updated_at: token.timestamp,
-					is_disabled: false,
-					is_nsfw: false
-				};
+			// Ensure both are valid URLs
+			const finalDisplayUri = ensureHttpsUrl(displayUriResult);
+			const finalArtifactUri = ensureHttpsUrl(artifactUriResult);
 
-				return nftObject;
-			})
-		);
+			// Assign image_url from display_uri (thumbnail)
+			// Assign animation_url from artifact_uri (main media)
+			const imageUrl = finalDisplayUri;
+			const animationUrl = finalArtifactUri; // Always use artifact_uri if it exists
 
-		// Filter out null results
-		nfts = nfts.filter((nft) => nft !== null);
+			// Create a consistent unique ID for this NFT
+			const uniqueId = `tezos/${token.fa?.contract}/${token.token_id}`;
 
-		return json({ success: true, nfts }, { status: 200 });
+			// Extract attributes from token metadata if available
+			let attributes = [];
+			if (token.metadata && Array.isArray(token.metadata.attributes)) {
+				attributes = token.metadata.attributes;
+			}
+
+			return {
+				id: uniqueId,
+				name: token.name || 'No Name (Metadata Skipped)',
+				tokenID: token.token_id,
+				description: token.description || '(Metadata Skipped)',
+				artist: {
+					address: token.creators?.[0]?.creator_address || '',
+					username: token.creators?.[0]?.holder?.alias || '(Metadata Skipped)',
+				},
+				mime: token.mime || '',
+				platform: 'Tezos',
+				image_url: imageUrl, 
+				animation_url: animationUrl,
+				tags: token.tags || [], // Use token.tags if available
+				website: token.creators?.[0]?.holder?.website || '',
+				attributes: attributes, // Use extracted attributes
+				collection: {
+					name: token.fa?.name || '(Metadata Skipped)',
+					contract: token.fa?.contract,
+					blockchain: 'tezos'
+				},
+				symbol: token.symbol,
+				updated_at: token.timestamp,
+				is_disabled: false,
+				is_nsfw: false
+			};
+		});
+
+		// Ensure NFTs have unique IDs to prevent duplicates when client loads more
+		const uniqueNfts = normalizedNfts;
+		const hasMoreItems = normalizedNfts.length >= limit;
+
+		// Return normalized NFTs along with pagination info
+		return json({ 
+			success: true, 
+			nfts: uniqueNfts,
+			limit: limit, 
+			offset: offset,
+			hasMore: hasMoreItems // Add explicit hasMore flag
+		}, { status: 200 });
 	} catch (error) {
 		console.error('Failed to fetch NFTs:', error);
-		return json({ success: false, error: error.message }, { status: 500 });
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		return json({ success: false, error: errorMessage }, { status: 500 });
 	}
 };

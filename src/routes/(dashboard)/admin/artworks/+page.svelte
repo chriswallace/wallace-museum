@@ -141,7 +141,18 @@
 						</button>
 					</td>
 					<td><div>{artwork.title}</div></td>
-					<td><div>{artwork.artist.name}</div></td>
+					<td>
+						<div>
+							{#if artwork.artists && artwork.artists.length > 0}
+								{artwork.artists[0].name}
+								{#if artwork.artists.length > 1}
+									(+{artwork.artists.length - 1} others)
+								{/if}
+							{:else}
+								None
+							{/if}
+						</div>
+					</td>
 					<td><div>
 						{#if artwork.collection}
 							<a href="/admin/collections/{artwork.collection.id}" on:click|preventDefault={() => goto(`/admin/collections/${artwork.collection.id}`)}>{artwork.collection.title}</a>

@@ -28,12 +28,15 @@ export async function load({ params }) {
 						mime: true,
 						tags: true, // Scalar field
 						attributes: true, // Scalar field
-						artist: {
-							// Directly include the artist relation
+						ArtistArtworks: { // Select through ArtistArtworks
 							select: {
-								id: true,
-								name: true,
-								websiteUrl: true
+								artist: { // Select the artist from the join table
+									select: {
+										id: true,
+										name: true,
+										websiteUrl: true
+									}
+								}
 							}
 						}
 					},

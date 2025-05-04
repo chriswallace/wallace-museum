@@ -1,26 +1,39 @@
-<script>
+<script lang="ts">
 	import { page } from '$app/stores';
 	import { selectedArtwork, isMaximized, isLiveCodeVisible } from '$lib/stores';
+	import type { Artwork } from '$lib/stores';
 	import { afterNavigate, beforeNavigate } from '$app/navigation';
 	import { get } from 'svelte/store';
 	import { closeFullscreen, handleMaximize } from '$lib/artworkActions';
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
-	import { isVideo } from '$lib/utils';
+	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
 
-	export let data;
+	export let data: { title: string; artworks: Artwork[] };
 
-	let container;
-	let artworkRefs = [];
-	let loadingStates = {};
+	let container: HTMLDivElement | null = null;
+	let artworkRefs: (HTMLDivElement | null)[] = [];
+	let loadingStates: { [key: string]: boolean } = {};
 
-	data.artworks.forEach((artwork, index) => {
-		loadingStates[artwork.id] = true; // Initially set to true
-		artworkRefs[index] = null; // Initialize the refs
-	});
+	if (data.artworks) {
+		data.artworks.forEach((artwork) => {
+			loadingStates[String(artwork.id)] = true;
+		});
+		artworkRefs = Array(data.artworks.length).fill(null);
+	}
 
 	onMount(() => {
 		window.addEventListener('keydown', handleKeyDown);
+		if (data.artworks && data.artworks.length > 0) {
+			openDetail(data.artworks[0]);
+			data.artworks.forEach((artwork, index) => {
+				setTimeout(() => {
+					if (artworkRefs[index]) {
+						setSrcSetAndSizes(artwork, artworkRefs[index] as HTMLDivElement);
+					}
+				}, 0);
+			});
+		}
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
 		};
@@ -30,36 +43,28 @@
 		selectedArtwork.resetSelected();
 	});
 
-	afterNavigate(() => {
-		data.artworks.forEach((artwork, index) => {
-			setSrcSetAndSizes(artwork, artworkRefs[index]);
+	$: $page.url.pathname, resetScrollPosition();
+
+	$: loadedClasses = (() => {
+		const classes: { [key: string]: string } = {};
+		Object.keys(loadingStates).forEach((id) => {
+			classes[id] = loadingStates[id] ? '' : 'loaded';
 		});
-	});
+		return classes;
+	})();
 
-	$: if (data.artworks) {
-		openDetail(data.artworks[0]);
-	}
+	$: artworkDetails = $selectedArtwork as Artwork | null;
 
-	$: $page.path, resetScrollPosition();
-
-	$: loadedClasses = {};
-
-	$: artworkDetails = $selectedArtwork;
-
-	$: Object.keys(loadingStates).forEach((id) => {
-		loadedClasses[id] = loadingStates[id] ? '' : 'loaded';
-	});
-
-	function toggleMaximize(artworkId) {
+	function toggleMaximize(artworkId: number | string) {
 		if (artworkId) {
-			handleMaximize(artworkId);
+			handleMaximize(String(artworkId));
 		}
 	}
 
 	function resetScrollPosition() {
 		if (container && data.artworks && data.artworks.length > 0) {
-			if (artworkRefs[0]) {
-				const firstArtworkElement = artworkRefs[0];
+			const firstArtworkElement = container.querySelector('[data-artwork-id]');
+			if (firstArtworkElement instanceof HTMLElement) {
 				setTimeout(() => {
 					firstArtworkElement.click();
 				}, 200);
@@ -67,21 +72,25 @@
 		}
 	}
 
-	function handleMediaLoad(artworkId) {
-		loadingStates[artworkId] = false;
-		loadingStates = { ...loadingStates }; // Reassign the object to trigger reactivity
-		setSrcSetAndSizes(artworkRefs[artworkId], artworkId);
+	function handleMediaLoad(artworkId: number | string) {
+		const idStr = String(artworkId);
+		loadingStates[idStr] = false;
+		loadingStates = { ...loadingStates };
+		const artworkIndex = data.artworks.findIndex((a) => String(a.id) === idStr);
+		if (artworkIndex !== -1 && artworkRefs[artworkIndex]) {
+			setSrcSetAndSizes(data.artworks[artworkIndex], artworkRefs[artworkIndex] as HTMLDivElement);
+		}
 	}
 
-	function openDetail(artwork) {
+	function openDetail(artwork: Artwork | null) {
 		selectedArtwork.setSelected(artwork);
 		if (artwork) centerArtwork(artwork.id);
 	}
 
-	function centerArtwork(artworkId) {
+	function centerArtwork(artworkId: number | string) {
 		if (container) {
 			const artworkElement = container.querySelector(`[data-artwork-id="${artworkId}"]`);
-			if (artworkElement && container) {
+			if (artworkElement instanceof HTMLElement && container) {
 				const scrollX =
 					artworkElement.offsetLeft - container.offsetWidth / 2 + artworkElement.offsetWidth / 2;
 				container.scrollTo({ left: scrollX, behavior: 'smooth' });
@@ -89,19 +98,22 @@
 		}
 	}
 
-	function handleKeyDown(event) {
+	function handleKeyDown(event: KeyboardEvent) {
 		if (event.key === 'Escape' && get(isMaximized)) {
 			closeFullscreen();
 		}
+		const currentArtwork = get(selectedArtwork);
+		if (!currentArtwork) return;
+
+		const currentIndex = data.artworks.findIndex((artwork) => artwork.id === currentArtwork.id);
+
 		if (event.key === 'ArrowRight') {
-			const currentIndex = data.artworks.findIndex((artwork) => artwork.id === get(selectedArtwork).id);
 			const nextIndex = currentIndex + 1;
 			if (nextIndex < data.artworks.length) {
 				openDetail(data.artworks[nextIndex]);
 			}
 		}
 		if (event.key === 'ArrowLeft') {
-			const currentIndex = data.artworks.findIndex((artwork) => artwork.id === get(selectedArtwork).id);
 			const prevIndex = currentIndex - 1;
 			if (prevIndex >= 0) {
 				openDetail(data.artworks[prevIndex]);
@@ -109,42 +121,47 @@
 		}
 	}
 
-	function setSrcSetAndSizes(artwork, artworkRef) {
-		if (!artworkRef || !artworkRef.clientWidth) return;
+	function setSrcSetAndSizes(artwork: Artwork, artworkRef: HTMLDivElement) {
+		if (!artworkRef || !artworkRef.clientWidth || !artwork.image_url || !artwork.dimensions) return;
 
-		let newSrc;
+		let newSrc: string | undefined = undefined;
+		let srcsetStr = '';
+		const renderedWidth = Math.round(artworkRef.clientWidth);
 
-		const renderedWidth = artworkRef.clientWidth;
-		const base_url = 'https://ik.imagekit.io/UltraDAO/compendium/';
-		const img_name = artwork.image_url.split('/').pop().split('?')[0];
+		const baseTransform = 'q_auto,f_auto';
 
 		if (artwork.dimensions.width && artwork.dimensions.width <= renderedWidth) {
-			newSrc = `${base_url}${img_name}?tr=q-70`;
+			newSrc = getCloudinaryTransformedUrl(artwork.image_url, `${baseTransform},w_${artwork.dimensions.width}`);
+			srcsetStr = `${newSrc} 1x`;
 		} else {
-			let size_1x = renderedWidth,
-				size_2x = renderedWidth * 2,
-				size_3x = renderedWidth * 3,
-				size_4x = renderedWidth * 4;
+			let size_1x = renderedWidth;
+			let size_2x = renderedWidth * 2;
+			let size_3x = renderedWidth * 3;
 
 			if (artwork.dimensions.width) {
 				size_1x = Math.min(artwork.dimensions.width, size_1x);
 				size_2x = Math.min(artwork.dimensions.width, size_2x);
 				size_3x = Math.min(artwork.dimensions.width, size_3x);
-				size_4x = Math.min(artwork.dimensions.width, size_4x);
 			}
 
-			const srcsetStr = `${base_url}${img_name}?tr=w-${size_1x},q-70 1x,
-							${base_url}${img_name}?tr=w-${size_2x},q-70 2x,
-							${base_url}${img_name}?tr=w-${size_3x},q-70 3x`;
+			const url_1x = getCloudinaryTransformedUrl(artwork.image_url, `${baseTransform},w_${size_1x}`);
+			const url_2x = getCloudinaryTransformedUrl(artwork.image_url, `${baseTransform},w_${size_2x}`);
+			const url_3x = getCloudinaryTransformedUrl(artwork.image_url, `${baseTransform},w_${size_3x}`);
 
-			const updatedArtwork = {
-				...artwork,
+			srcsetStr = `${url_1x} 1x, ${url_2x} 2x, ${url_3x} 3x`;
+			newSrc = url_1x;
+		}
+
+		const index = data.artworks.findIndex((a) => a.id === artwork.id);
+		if (index !== -1) {
+			const updatedArtworks = [...data.artworks];
+			updatedArtworks[index] = {
+				...updatedArtworks[index],
 				src: newSrc,
-				srcset: srcsetStr
+				srcset: srcsetStr,
+				sizes: `(max-width: ${renderedWidth * 1.5}px) 100vw, ${renderedWidth}px`
 			};
-
-			const index = data.artworks.findIndex((a) => a.id === artwork.id);
-			data.artworks[index] = updatedArtwork;
+			data.artworks = updatedArtworks;
 		}
 	}
 </script>
@@ -164,8 +181,8 @@
 				on:click={() => openDetail(artwork)}
 				class:highlighted={$selectedArtwork && $selectedArtwork.id === artwork.id}
 				class:maximized={$isMaximized}
-				class="artwork-item {loadedClasses[artwork.id]}"
-				style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
+				class="artwork-item {loadedClasses[String(artwork.id)]}"
+				style="aspect-ratio: {artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'};"
 				tabindex="-1"
 				role="button"
 				aria-label="Focus Artwork"
@@ -174,9 +191,9 @@
 				<button class="close icon-button" on:click={closeFullscreen}>Close</button>
 				<div
 					class="media-container"
-					style="aspect-ratio: {artwork.dimensions.width}/{artwork.dimensions.height};"
+					style="aspect-ratio: {artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'};"
 				>
-					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && (artwork.mime.startsWith('application') || artwork.mime.startsWith('text')) && artwork.animation_url && $isLiveCodeVisible}
+					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.mime && (artwork.mime.startsWith('application') || artwork.mime.startsWith('text')) && artwork.animation_url && $isLiveCodeVisible}
 						<iframe
 							src={artwork.animation_url}
 							class="live-code"
@@ -188,14 +205,14 @@
 							<source
 								src={artwork.animation_url}
 								type="video/mp4"
-								height={artwork.dimensions.height}
-								width={artwork.dimensions.width}
+								height={artwork.dimensions?.height}
+								width={artwork.dimensions?.width}
 							/>
 							Your browser does not support the video tag.
 						</video>
 					{:else if artwork.image_url}
 						<img
-							bind:this={artworkRefs[artwork.id]}
+							bind:this={artworkRefs[index]}
 							src={artwork.image_url}
 							alt={artwork.title}
 							srcset={artwork.srcset}

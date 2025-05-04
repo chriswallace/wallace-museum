@@ -7,19 +7,54 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobePath from '@ffprobe-installer/ffprobe';
 import { fileTypeFromBuffer } from 'file-type';
-import imageKit from 'imagekit';
+import { v2 as cloudinary } from 'cloudinary';
 
-import { env } from '$env/dynamic/private';
+// Import CLOUDINARY_URL instead of individual keys
+import { CLOUDINARY_URL } from '$env/dynamic/private';
 
-const imagekit = new imageKit({
-	publicKey: env.IMAGEKIT_PUBLIC_KEY,
-	privateKey: env.IMAGEKIT_PRIVATE_KEY,
-	urlEndpoint: env.IMAGEKIT_URL_ENDPOINT
+// Log check for the URL variable
+console.log('Cloudinary Env Vars Check:');
+console.log('[$env] CLOUDINARY_URL:', CLOUDINARY_URL ? 'Loaded' : 'MISSING');
+
+// Remove or comment out the previous check for individual keys
+/*
+console.log('[$env] Cloud Name:', CLOUDINARY_CLOUD_NAME ? 'Loaded' : 'MISSING');
+console.log('[$env] API Key:', CLOUDINARY_API_KEY ? 'Loaded' : 'MISSING');
+console.log('[$env] API Secret:', CLOUDINARY_API_SECRET ? 'Loaded' : 'MISSING');
+*/
+
+// Comment out or remove the top-level config (already commented out)
+/*
+const cloudName = CLOUDINARY_CLOUD_NAME;
+const apiKey = CLOUDINARY_API_KEY;
+const apiSecret = CLOUDINARY_API_SECRET;
+
+if (!apiKey) {
+	console.error('CRITICAL: Cloudinary API Key is missing from both $env and process.env!');
+}
+
+cloudinary.config({
+	cloud_name: cloudName,
+	api_key: apiKey,
+	api_secret: apiSecret,
+	secure: true // Use HTTPS
 });
+*/
 
 // Set the paths to the static binaries
 ffmpeg.setFfmpegPath(ffmpegPath);
 ffmpeg.setFfprobePath(ffprobePath.path);
+
+// Define a list of public IPFS gateways to try
+const IPFS_GATEWAYS = [
+	'https://ipfs.io', // Official IPFS Foundation gateway
+	'https://dweb.link', // Official IPFS Foundation gateway (subdomain)
+	'https://gateway.ipfs.io', // Official IPFS Foundation gateway (alt subdomain)
+	'https://w3s.link', // Web3.Storage gateway
+	'https://gateway.pinata.cloud', // Popular pinning service gateway
+	'https://nftstorage.link', // NFT.Storage gateway
+	'https://ipfs.fleek.co' // Fleek gateway
+];
 
 function createHashForString(string) {
 	if (!string) {
@@ -77,41 +112,80 @@ function removeQueryString(url) {
 	}
 }
 
-export async function uploadToImageKit(fileStream, fileName, mimeType) {
-	const tags = generateTags(fileName);
-
+export async function uploadToCloudinary(fileBuffer, fileName, mimeType) {
 	try {
-		const searchResponse = await imagekit.listFiles({ tags });
+		// Configure Cloudinary HERE, relying on CLOUDINARY_URL environment variable
+		cloudinary.config(); // No arguments - SDK checks environment for CLOUDINARY_URL
 
-		if (searchResponse.length > 0) {
-			return {
-				url: searchResponse[0].url,
-				fileType: searchResponse[0].fileType,
-				dimensions: { height: searchResponse[0].height, width: searchResponse[0].width }
-			};
+		// Check if config worked by checking if cloud_name is now set
+		const currentConfig = cloudinary.config();
+		if (!currentConfig || !currentConfig.cloud_name) {
+			// Check cloud_name as indicator
+			console.error(
+				'[uploadToCloudinary] Failed to configure Cloudinary using CLOUDINARY_URL! Cloud Name MISSING.'
+			);
+			// Log the URL variable itself (be careful if logs are public)
+			console.error(
+				`[uploadToCloudinary] CLOUDINARY_URL value check: ${CLOUDINARY_URL ? 'Exists' : 'MISSING or empty'}`
+			);
+			throw new Error('Cloudinary configuration failed internally (URL method).');
 		}
-	} catch (error) {
-		console.error(`Error searching for existing file in ImageKit: ${error.message}`);
-		return null;
-	}
 
-	try {
-		fileName = generateFileName(fileName, mimeType);
-		const response = await imagekit.upload({
-			file: fileStream,
-			fileName,
-			folder: 'compendium',
-			tags
+		// Config seems okay, log the detected cloud name
+		console.log(`[uploadToCloudinary] Configured via URL. Cloud Name: ${currentConfig.cloud_name}`);
+
+		// Determine resource type based on mime type
+		let resource_type = 'auto';
+		if (mimeType.startsWith('image/')) {
+			resource_type = 'image';
+		} else if (mimeType.startsWith('video/')) {
+			resource_type = 'video';
+		}
+
+		// Generate a unique public_id (optional, but recommended to avoid overwrites)
+		// Using the original filename + a hash might work, or just let Cloudinary generate one
+		const baseName = path.parse(fileName).name;
+		const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex').substring(0, 8);
+		const public_id = `${baseName}_${hash}`;
+
+		const uploadOptions = {
+			public_id: public_id,
+			folder: 'compendium', // Optional: specify a folder in Cloudinary
+			resource_type: resource_type,
+			overwrite: true // Or false if you want unique public_ids enforced
+			// Add tags, context, etc. if needed
+			// tags: generateTags(fileName) // If you adapt generateTags
+		};
+
+		// Upload using buffer
+		const result = await new Promise((resolve, reject) => {
+			const uploadStream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+				if (error) {
+					console.error('Cloudinary Upload Stream Error:', error);
+					reject(error);
+				} else {
+					resolve(result);
+				}
+			});
+			uploadStream.end(fileBuffer);
 		});
 
-		if (response && response.url) {
-			return { url: response.url.split('?')[0], fileType: mimeType };
+		if (result && result.secure_url) {
+			return {
+				url: result.secure_url,
+				fileType: mimeType, // Keep original mime type
+				dimensions: { height: result.height, width: result.width },
+				publicId: result.public_id // Return public_id if needed later
+			};
 		} else {
-			throw new Error('ImageKit upload failed with no response');
+			throw new Error('Cloudinary upload failed or did not return a secure URL.');
 		}
 	} catch (error) {
-		console.error(`Error uploading to ImageKit: ${error.message}`);
-		return null;
+		console.error(`Error uploading to Cloudinary: ${error.message || error}`);
+		if (error.error) {
+			console.error('Cloudinary Error Details:', JSON.stringify(error.error, null, 2));
+		}
+		return null; // Indicate failure
 	}
 }
 
@@ -138,7 +212,8 @@ export async function normalizeTezosMetadata(nft) {
 
 	return {
 		name: metadata.name || nft.name || 'Unknown Name',
-		tokenID: nft.tokenId || nft.tokenID || metadata.tokenId || metadata.tokenID || 'Unknown Token ID',
+		tokenID:
+			nft.tokenId || nft.tokenID || metadata.tokenId || metadata.tokenID || 'Unknown Token ID',
 		description: metadata.description || nft.description || 'No Description Available',
 		artist: {
 			address: creator.creator_address || '',
@@ -149,7 +224,7 @@ export async function normalizeTezosMetadata(nft) {
 			social_media_accounts: {
 				twitter: creator.holder?.twitter || '',
 				instagram: creator.holder?.instagram || ''
-			},
+			}
 		},
 		platform: 'Tezos',
 		mime: nft.mime || '',
@@ -163,7 +238,7 @@ export async function normalizeTezosMetadata(nft) {
 		collection: {
 			name: nft.fa?.name || '',
 			address: nft.fa?.contract || '',
-			blockchain: 'Tezos',
+			blockchain: 'Tezos'
 		}
 	};
 }
@@ -194,39 +269,147 @@ export function fixIpfsUrl(url) {
 }
 
 function convertIpfsUriToHttpUrl(ipfsUri) {
-	if (!ipfsUri) {
-		return '';
+	if (!ipfsUri || typeof ipfsUri !== 'string') {
+		console.warn(`convertIpfsUriToHttpUrl: Input is invalid or not a string: ${ipfsUri}`);
+		return { type: 'error', value: '' }; // Indicate error
 	}
+
 	const ipfsPrefix = 'ipfs://';
+	const ipfsPathPrefix = '/ipfs/';
+
 	if (ipfsUri.startsWith(ipfsPrefix)) {
-		const ipfsHash = ipfsUri.slice(ipfsPrefix.length);
-		return `https://ipfs.io/ipfs/${ipfsHash}`;
+		const cidPath = ipfsUri.slice(ipfsPrefix.length);
+		// Return the CID/path part, fetchMedia will prepend gateways
+		return { type: 'ipfs', value: `/${ipfsPathPrefix}${cidPath}` };
+	} else if (ipfsUri.startsWith(ipfsPathPrefix)) {
+		// Return the path directly, fetchMedia will prepend gateways
+		return { type: 'ipfs', value: ipfsUri };
+	} else if (ipfsUri.startsWith('http://') || ipfsUri.startsWith('https://')) {
+		// If it's already an HTTP/HTTPS URL, return it directly
+		return { type: 'http', value: ipfsUri };
 	}
-	return ipfsUri;
+
+	// If it doesn't match IPFS patterns or HTTP, return original but mark as unknown
+	console.warn(`convertIpfsUriToHttpUrl: Input does not appear to be IPFS or HTTP URI: ${ipfsUri}`);
+	return { type: 'unknown', value: ipfsUri };
 }
 
 export async function fetchMedia(uri) {
+	let response = null;
+	let buffer = null;
+	let httpUrlUsed = ''; // Keep track of the URL that succeeded or last failed
+
 	try {
 		const sanitizedUri = removeQueryString(uri);
-		const httpUrl = convertIpfsUriToHttpUrl(sanitizedUri);
-		const response = await axios.get(httpUrl, { responseType: 'arraybuffer' });
-		const buffer = Buffer.from(response.data);
+		if (!sanitizedUri) {
+			console.error('[fetchMedia] Sanitized URI is empty.');
+			return null;
+		}
+
+		const processedUri = convertIpfsUriToHttpUrl(sanitizedUri);
+
+		if (processedUri.type === 'error' || !processedUri.value) {
+			console.error(`[fetchMedia] Could not process URI: ${uri}`);
+			return null;
+		}
+
+		const axiosOptions = {
+			responseType: 'arraybuffer',
+			timeout: 15000, // 15 second timeout
+			headers: {
+				// Add a basic user-agent, might help with some blocks
+				'User-Agent':
+					'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+			}
+		};
+
+		if (processedUri.type === 'http') {
+			// It's a direct HTTP/HTTPS URL
+			httpUrlUsed = processedUri.value;
+			console.log(`[fetchMedia] Fetching directly from HTTP URL: ${httpUrlUsed}`);
+			try {
+				response = await axios.get(httpUrlUsed, axiosOptions);
+			} catch (error) {
+				console.error(
+					`[fetchMedia] Error fetching direct URL ${httpUrlUsed}:`,
+					error.message || error
+				);
+				// Potentially add retry logic here if needed
+				throw error; // Re-throw to be caught by the outer catch block
+			}
+		} else if (processedUri.type === 'ipfs') {
+			// It's an IPFS path, try gateways
+			const ipfsPath = processedUri.value;
+			console.log(`[fetchMedia] Attempting to fetch IPFS resource: ${ipfsPath}`);
+
+			for (const gateway of IPFS_GATEWAYS) {
+				httpUrlUsed = `${gateway}${ipfsPath}`; // Construct full URL
+				console.log(`[fetchMedia] Trying IPFS gateway: ${httpUrlUsed}`);
+				try {
+					response = await axios.get(httpUrlUsed, axiosOptions);
+					// If successful (status 2xx), break the loop
+					if (response.status >= 200 && response.status < 300) {
+						console.log(`[fetchMedia] Successfully fetched from ${httpUrlUsed}`);
+						break; // Exit loop on success
+					} else {
+						console.warn(`[fetchMedia] Gateway ${httpUrlUsed} returned status ${response.status}`);
+						response = null; // Reset response to try next gateway
+					}
+				} catch (error) {
+					const errorMessage = error.response
+						? `status ${error.response.status}`
+						: error.message || 'Unknown error';
+					console.warn(`[fetchMedia] Failed to fetch from ${httpUrlUsed}: ${errorMessage}`);
+					response = null; // Reset response if fetch failed
+				}
+			}
+
+			if (!response) {
+				// Check if a successful response was ever received
+				throw new Error(`Failed to fetch from all IPFS gateways for resource: ${ipfsPath}`);
+			}
+		} else {
+			// Handle 'unknown' type or add more types if needed
+			console.error(`[fetchMedia] Unhandled URI type '${processedUri.type}' for URI: ${uri}`);
+			return null;
+		}
+
+		// --- Process the successful response ---
+		buffer = Buffer.from(response.data);
 
 		const fileTypeResult = await fileTypeFromBuffer(buffer);
 		if (!fileTypeResult) {
-			console.error('Could not determine file type.');
+			console.error(`[fetchMedia] Could not determine file type for ${httpUrlUsed}`);
 			return null;
 		}
 
 		const mimeType = fileTypeResult.mime;
 
-		// Only proceed if the mime type is a supported image or video format
 		if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) {
-			console.error(`Unsupported media type: ${mimeType}`);
+			console.error(`[fetchMedia] Unsupported media type: ${mimeType} from ${httpUrlUsed}`);
 			return null;
 		}
 
-		const fileName = path.basename(new URL(httpUrl).pathname) + '.' + fileTypeResult.ext;
+		// Try creating filename from URL path, fallback if needed
+		let fileName;
+		try {
+			// Extract filename from the successfully used URL
+			fileName = path.basename(new URL(httpUrlUsed).pathname);
+			// Basic sanitization and ensure extension matches detected type
+			const baseName = fileName.includes('.')
+				? fileName.substring(0, fileName.lastIndexOf('.'))
+				: fileName;
+			const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9_.-]/g, '_'); // Allow dots and hyphens
+			fileName = `${sanitizedBaseName}.${fileTypeResult.ext}`;
+		} catch (e) {
+			// Fallback filename if URL parsing/basename extraction fails
+			console.warn(
+				`[fetchMedia] Could not parse filename from URL ${httpUrlUsed}, generating fallback.`
+			);
+			const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+			fileName = `${hash}.${fileTypeResult.ext}`;
+		}
+
 		let dimensions = null;
 
 		if (mimeType.startsWith('image/')) {
@@ -234,10 +417,25 @@ export async function fetchMedia(uri) {
 				const metadata = await sharp(buffer).metadata();
 				dimensions = { width: metadata.width, height: metadata.height };
 			} catch (sharpError) {
-				console.error('Error processing image with sharp:', sharpError);
+				console.error(
+					`[fetchMedia] Error processing image with sharp from ${httpUrlUsed}:`,
+					sharpError
+				);
+				// Continue without dimensions, or return null if critical
 			}
 		} else if (mimeType.startsWith('video/')) {
-			dimensions = await getVideoDimensions(buffer);
+			// SKIP GETTING VIDEO DIMENSIONS TO AVOID TEMP FILE
+			/*
+			try {
+				dimensions = await getVideoDimensions(buffer);
+			} catch (videoError) {
+				console.error(
+					`[fetchMedia] Error getting video dimensions from ${httpUrlUsed}:`,
+					videoError
+				);
+				// Continue without dimensions, or return null if critical
+			}
+			*/
 		}
 
 		return {
@@ -247,7 +445,17 @@ export async function fetchMedia(uri) {
 			dimensions
 		};
 	} catch (error) {
-		console.error('Error fetching media:', error);
+		// Log the detailed error from Axios or other steps
+		const errorMessage = error.response?.data
+			? Buffer.from(error.response.data).toString()
+			: error.message || String(error);
+		console.error(`[fetchMedia] Error fetching media for URI "${uri}": ${errorMessage}`);
+		if (httpUrlUsed) {
+			console.error(`[fetchMedia] Last attempted/failed URL: ${httpUrlUsed}`);
+		}
+		if (error.response) {
+			console.error(`[fetchMedia] Failed with status: ${error.response.status}`);
+		}
 		return null;
 	}
 }
@@ -262,7 +470,7 @@ async function getVideoDimensions(buffer) {
 			if (err) {
 				reject(`Error processing video with ffmpeg: ${err.message}`);
 			} else {
-				const stream = metadata.streams.find(s => s.width && s.height);
+				const stream = metadata.streams.find((s) => s.width && s.height);
 				if (stream) {
 					resolve({ width: stream.width, height: stream.height });
 				} else {
@@ -289,23 +497,35 @@ export async function handleMediaUpload(mediaUri, artwork) {
 	}
 
 	try {
-		const resizeResult = await resizeMedia(mediaData.buffer, mediaData.mimeType, dimensions);
+		let finalBuffer = mediaData.buffer;
+		let finalDimensions = dimensions;
 
-		const resizedBuffer = resizeResult.buffer;
-		const resizedDimensions = resizeResult.dimensions || dimensions;
+		// Only resize if it's an image
+		if (mediaData.mimeType.startsWith('image/')) {
+			const resizeResult = await resizeMedia(mediaData.buffer, mediaData.mimeType, dimensions);
+			finalBuffer = resizeResult.buffer;
+			finalDimensions = resizeResult.dimensions || dimensions;
+		} else {
+			// If it's a video, skip resizing and use original buffer/dimensions (which will be null if fetchMedia was modified)
+			console.log(`[handleMediaUpload] Skipping resize for video: ${mediaUri}`);
+		}
 
-		console.log('resizedBuffer', resizedBuffer);
-		console.log('artwork', artwork.name);
-		console.log('mediaData.mimeType', mediaData.mimeType);
+		console.log('finalBuffer (pre-upload)', finalBuffer);
+		console.log('artwork name', artwork.name);
+		console.log('mimeType', mediaData.mimeType);
 
-		const uploadResult = await uploadToImageKit(resizedBuffer, artwork.name, mediaData.mimeType);
+		const uploadResult = await uploadToCloudinary(
+			finalBuffer,
+			mediaData.fileName,
+			mediaData.mimeType
+		);
 
 		return uploadResult
 			? {
-				url: uploadResult.url.split('?')[0],
-				fileType: mediaData.mimeType,
-				dimensions: resizedDimensions
-			}
+					url: uploadResult.url,
+					fileType: mediaData.mimeType,
+					dimensions: finalDimensions
+				}
 			: null;
 	} catch (error) {
 		console.error(`Failed to handle media upload for URI: ${mediaUri}`, error);
@@ -370,7 +590,10 @@ export async function resizeMedia(buffer, mimeType, dimensions, maxSizeMB = 25) 
 			console.warn('Unable to reduce file size below 25MB after several attempts.');
 		}
 
-		return { buffer: resizedBuffer, dimensions: { width: dimensions.width, height: dimensions.height } };
+		return {
+			buffer: resizedBuffer,
+			dimensions: { width: dimensions.width, height: dimensions.height }
+		};
 	} catch (error) {
 		console.error('Error resizing media:', error);
 		throw error;

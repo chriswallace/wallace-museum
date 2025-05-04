@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import {
 		nfts,
 		isLoading,
@@ -9,7 +9,8 @@
 		reviewData,
 		selectAllChecked,
 		currentStep,
-		isModalOpen
+		isModalOpen,
+		type Artwork
 	} from '$lib/stores';
 
 	import { closeModal } from '$lib/modal';
@@ -28,13 +29,51 @@
 	import { intersectionObserver } from '$lib/intersectionObserver';
 	import { get } from 'svelte/store';
 
-	const loadingImageUrl = '/images/medici-image.png';
+	// Define a type that's compatible with the Artwork type in the store
+	// but has additional properties we need for the NFT importer
+	interface ImportNft {
+		id: number;
+		title: string; // corresponds to name in API response
+		description: string;
+		image_url?: string; // no null in Artwork
+		animation_url?: string; // no null in Artwork
+		mime?: string; // no null in Artwork
+		// Other Artwork properties...
+		
+		// NFT-specific fields not in Artwork
+		name?: string; // for backward compatibility
+		tokenID?: string;
+		platform?: string;
+		artist?: {
+			address: string;
+			username: string;
+		};
+		tags?: string[];
+		website?: string;
+		attributes?: any[];
+		collection?: {
+			name: string;
+			contract?: string;
+			blockchain: string;
+		};
+		symbol?: string;
+		updated_at?: string;
+		is_disabled?: boolean;
+		is_nsfw?: boolean;
+	}
 
-	let offset = 0;
-	const limit = 250;
-	let previousWallet = '';
+	let loadingImageUrl = '/images/medici-image.png';
 
-	function handleLazyLoad(node, { src }) {
+	// Explicitly type nextCursor
+	let nextCursor: string | null = null;
+	const limit: number = 50;
+	let previousWallet: string = '';
+	let searchTerm: string = ''; // Add state for search term
+	let currentOffset: number = 0; // Add state for Tezos offset
+	let hasMorePages: boolean = false; // Track if more pages exist (for Tezos)
+
+	// Add types for handleLazyLoad parameters
+	function handleLazyLoad(node: HTMLImageElement, { src }: { src: string }) {
 		node.src = loadingImageUrl;
 
 		const onEnter = () => {
@@ -45,40 +84,107 @@
 			};
 		};
 
-		intersectionObserver(node, { onEnter });
+		// Add empty onLeave function
+		intersectionObserver(node, { onEnter, onLeave: () => {} });
 	}
 
-	async function fetchNfts(loadMore = false) {
+	async function fetchNfts(loadMore: boolean = false) {
 		isLoading.set(true);
 		const wallet = $walletAddress;
 		let blockchain = 'opensea';
+		const currentSearchTerm = searchTerm; // Capture search term at start of fetch
 
 		if (wallet.length > 0) {
 			const type = $nftType;
 			if (wallet.startsWith('tz')) {
 				blockchain = 'tezos';
 			}
-			const apiEndpoint = `/api/admin/import/${blockchain}/${wallet}/?type=${type}&limit=${limit}&offset=${offset}`;
+
+			// Reset if not loading more OR if starting a new search
+			if (!loadMore) { // Reset fully only if not loading more
+				nextCursor = null;
+				currentOffset = 0;
+				hasMorePages = false;
+				nfts.set([]);
+				selectAllChecked.set(false);
+				selectedNfts.set(new Set<number>());
+			}
+
+			// Build API endpoint based on blockchain
+			let apiEndpoint = `/api/admin/import/${blockchain}/${wallet}/?type=${type}&limit=${limit}`;
+			if (blockchain === 'tezos') {
+				apiEndpoint += `&offset=${currentOffset}`;
+			} else { // opensea (or default)
+				if (nextCursor && loadMore) {
+					apiEndpoint += `&next=${nextCursor}`;
+				}
+			}
+			// Add search term if present
+			if (currentSearchTerm) {
+				apiEndpoint += `&search=${encodeURIComponent(currentSearchTerm)}`;
+			}
 
 			try {
 				const response = await fetch(apiEndpoint);
 				if (response.ok) {
-					const data = await response.json();
+					// Type the expected API response structure
+					const data: { 
+						success: boolean;
+						nfts: any[]; // Use any[] for API response
+						next?: string | null; // Optional for OpenSea
+						limit?: number; // Optional for Tezos
+						offset?: number; // Optional for Tezos
+						hasMore?: boolean; // New field from server for Tezos
+					} = await response.json();
 
-					// If loading more, append to existing items
-					if (loadMore) {
-						nfts.update((current) => [...current, ...data.nfts]);
+					// Map API response to compatible Artwork objects
+					const mappedNfts = data.nfts.map(nft => {
+						// Map API response fields to Artwork fields
+						return {
+							...nft,
+							// Ensure these fields meet Artwork type requirements
+							id: nft.id,
+							title: nft.name || 'Untitled', // map name to title for Artwork compatibility
+							description: nft.description || '',
+							image_url: nft.image_url || undefined, // convert null to undefined
+							animation_url: nft.animation_url || undefined // convert null to undefined
+						} as Artwork;
+					});
+
+					// Update the store
+					nfts.update(current => {
+						const existingIds = new Set(current.map(item => item.id));
+						const newNfts = mappedNfts.filter(nft => !existingIds.has(nft.id));
+						return loadMore ? [...current, ...newNfts] : newNfts;
+					});
+
+					// Update pagination state based on blockchain
+					if (blockchain === 'tezos') {
+						const returnedCount = data.nfts?.length || 0;
+						const responseLimit = data.limit || limit; // Use response limit or default
+						
+						// Use hasMore flag from server if available, otherwise calculate it
+						hasMorePages = data.hasMore !== undefined 
+							? data.hasMore 
+							: returnedCount >= responseLimit;
+							
+						currentOffset = (data.offset ?? currentOffset) + returnedCount;
+						nextCursor = null; // Ensure cursor is null for Tezos
 					} else {
-						nfts.set(data.nfts);
+						// Use nullish coalescing to handle potential undefined
+						nextCursor = data.next ?? null;
+						hasMorePages = !!nextCursor; // Or simply check if cursor exists
 					}
 
-					// Update the offset for the next load
-					offset += limit;
 				} else {
 					console.error('Failed to fetch NFTs');
+					nextCursor = null;
+					hasMorePages = false;
 				}
 			} catch (error) {
 				console.error('Error fetching NFTs:', error);
+				nextCursor = null;
+				hasMorePages = false;
 			} finally {
 				isLoading.set(false);
 			}
@@ -87,13 +193,19 @@
 
 	function handleWalletChange() {
 		if ($walletAddress !== previousWallet) {
-			nfts.set([]);
-			offset = 0;
+			nfts.set([]); 
+			nextCursor = null;
 			previousWallet = $walletAddress;
+			selectAllChecked.set(false);
+			selectedNfts.set(new Set<number>());
+			searchTerm = ''; // Clear search term on wallet change
+			currentOffset = 0; // Reset offset on wallet change
+			hasMorePages = false;
 		}
 	}
 
-	function toggleSelection(index) {
+	// Add type for toggleSelection index
+	function toggleSelection(index: number) {
 		selectedNfts.update((current) => {
 			const newSet = new Set(current);
 			if (newSet.has(index)) {
@@ -101,19 +213,34 @@
 			} else {
 				newSet.add(index);
 			}
+			// Ensure get(nfts) returns Artwork[] before accessing length
 			selectAllChecked.set(newSet.size === get(nfts).length);
 			return newSet;
 		});
 	}
 
-	function toggleSelectAll(event) {
-		const isChecked = event.target.checked;
+	// Add type for toggleSelectAll event
+	function toggleSelectAll(event: Event) {
+		// Type cast target to HTMLInputElement
+		const isChecked = (event.target as HTMLInputElement).checked;
 		selectAllChecked.set(isChecked);
 		if (isChecked) {
-			selectedNfts.set(new Set($nfts.map((_, index) => index)));
+			// Ensure get(nfts) returns Artwork[] before mapping
+			selectedNfts.set(new Set(get(nfts).map((_, index) => index)));
 		} else {
-			selectedNfts.set(new Set());
+			selectedNfts.set(new Set<number>()); // Type the Set
 		}
+	}
+
+	// Separate handler for select change
+	function handleTypeChange() {
+		searchTerm = ''; // Clear search on type change
+		fetchNfts(false); 
+	}
+
+	function handleFetchClick() {
+		// Explicitly trigger fetch, resetting pagination/results
+		fetchNfts(false);
 	}
 </script>
 
@@ -127,7 +254,7 @@
 
 <div>
 	<div class="flex mb-8 gap-2">
-		<select class="flex-shrink w-auto mb-0 px-4" bind:value={$nftType} on:change={fetchNfts}>
+		<select class="flex-shrink w-auto mb-0 px-4" bind:value={$nftType} on:change={handleTypeChange}>
 			<option value="collected">Collected</option>
 			<option value="created">Created</option>
 		</select>
@@ -139,7 +266,13 @@
 			placeholder="Wallet Address"
 			on:input={handleWalletChange}
 		/>
-		<button class="primary button flex-shrink mt-0" on:click={fetchNfts}>Fetch NFTs</button>
+		<input
+			class="search flex-grow"
+			type="text"
+			bind:value={searchTerm}
+			placeholder="Search by name..."
+		/>
+		<button class="primary button flex-shrink mt-0" on:click={handleFetchClick}>Fetch NFTs</button>
 	</div>
 
 	<div class="relative">
@@ -171,37 +304,39 @@
 			</div>
 
 			<div class="nft-gallery">
-				{#each $nfts as { animation_url, image_url, name, mime }, index}
+				{#each $nfts as nft, index (nft.id)}
 					<button
 						class="nft-card {$selectedNfts.has(index) ? 'selected' : ''}"
 						on:click={() => toggleSelection(index)}
 					>
-						{#if image_url && image_url.endsWith('.mp4')}
+						{#if nft.image_url && nft.image_url.endsWith('.mp4')}
 							<video autoplay playsinline muted loop>
-								<source src={image_url} type="video/mp4" />
+								<source src={nft.image_url} type="video/mp4" />
 							</video>
-						{:else if animation_url && animation_url.endsWith('mp4')}
+						{:else if nft.animation_url && nft.animation_url.endsWith('mp4')}
 							<video autoplay playsinline muted loop>
-								<source src={animation_url} type="video/mp4" />
+								<source src={nft.animation_url} type="video/mp4" />
 							</video>
-						{:else if image_url}
-							<img use:handleLazyLoad={{ src: image_url }} alt={name} class="nft-image" />
-						{:else if animation_url}
-							<img use:handleLazyLoad={{ src: animation_url }} alt={name} class="nft-image" />
+						{:else if nft.image_url}
+							<img use:handleLazyLoad={{ src: nft.image_url }} alt={nft.title} class="nft-image" />
+						{:else if nft.animation_url}
+							<img use:handleLazyLoad={{ src: nft.animation_url }} alt={nft.title} class="nft-image" />
 						{:else }
 							<div class="nft-image bg-gray-200 aspect-square flex items-center text-center justify-center">No Image</div>
 						{/if}
 						<div class="inner-container">
-							<h3>{name}</h3>
+							<h3>{nft.title}</h3>
 						</div>
 					</button>
 				{/each}
 			</div>
 
 			<div class="load-more-container">
-				<button class="secondary button" on:click={() => fetchNfts(true)}>
-					Load More
-				</button>
+				{#if (nextCursor || hasMorePages)}
+					<button class="secondary button" on:click={() => fetchNfts(true)} disabled={$isLoading}>
+						{#if $isLoading}Loading...{:else}Load More{/if}
+					</button>
+				{/if}
 			</div>
 		{/if}
 	</div>

@@ -12,14 +12,19 @@
 
 	$: $page, (artworkId = $page.params.id);
 
+	interface Artist {
+		id: number;
+		name: string;
+	}
+
 	interface Artwork {
-		id?: string;
+		id?: number;
 		title: string;
 		description: string;
 		image_url: string;
 		animation_url: string;
-		artistId: string;
-		collectionId: string;
+		artists?: Artist[];
+		collectionId: number | null;
 		mime: string;
 		attributes: string;
 		curatorNotes: string;
@@ -30,6 +35,7 @@
 		blockchain: string;
 		tokenID: string;
 		mintDate: string;
+		enabled: boolean;
 	}
 
 	let artwork: Artwork = {
@@ -37,8 +43,8 @@
 		description: '',
 		image_url: '',
 		animation_url: '',
-		artistId: '',
-		collectionId: '',
+		artists: [],
+		collectionId: null,
 		mime: '',
 		attributes: '',
 		curatorNotes: '',
@@ -48,37 +54,46 @@
 		symbol: '',
 		blockchain: '',
 		tokenID: '',
-		mintDate: ''
+		mintDate: '',
+		enabled: true,
 	};
 
-	interface Artist {
-		id: string;
-		name: string;
-	}
-
 	interface Collection {
-		id: string;
+		id: number;
 		title: string;
 	}
 
-	let artists: Artist[] = [];
+	let allArtists: Artist[] = [];
+	let selectedArtistIds: number[] = [];
 	let collections: Collection[] = [];
 	let error: string = '';
 	let isLoading: boolean = true;
 
 	async function updateArtwork(event: Event) {
+		const payload = {
+			title: artwork.title,
+			description: artwork.description,
+			enabled: artwork.enabled,
+			collectionId: artwork.collectionId,
+			artistIds: selectedArtistIds
+		};
+
 		const response = await fetch(`/api/admin/artworks/${artwork.id}`, {
 			method: 'PUT',
 			headers: {
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify(artwork)
+			body: JSON.stringify(payload)
 		});
 
 		if (response.ok) {
 			showToast('Artwork saved.', 'success');
+			const updatedData = await response.json();
+			artwork = updatedData;
+			selectedArtistIds = artwork.artists?.map(a => a.id) || [];
 		} else {
-			showToast('Failed to update artwork.', 'error');
+			const errorData = await response.json();
+			showToast(`Failed to update artwork: ${errorData.details || errorData.error || 'Unknown error'}`, 'error');
 		}
 	}
 
@@ -91,7 +106,8 @@
 			showToast('Artwork deleted.', 'success');
 			goto('/admin/artworks');
 		} else {
-			showToast('Failed to delete artwork.', 'error');
+			const errorData = await response.json();
+			showToast(`Failed to delete artwork: ${errorData.details || errorData.error || 'Unknown error'}`, 'error');
 		}
 	}
 
@@ -111,12 +127,13 @@
 
 			if (artworkRes.ok) {
 				artwork = await artworkRes.json();
+				selectedArtistIds = artwork.artists?.map(a => a.id) || [];
 			} else {
 				error = 'Failed to fetch artwork';
 			}
 
 			if (artistsRes.ok) {
-				artists = await artistsRes.json();
+				allArtists = await artistsRes.json();
 			}
 
 			if (collectionsRes.ok) {
@@ -132,7 +149,7 @@
 
 	onMount(() => {
 		if (browser) {
-            fetchArtwork();
+			fetchArtwork();
 		}
 	});
 </script>
@@ -165,18 +182,18 @@
 						<textarea id="description" bind:value={artwork.description}></textarea>
 					</div>
 					<div>
-						<label for="artist">Artist</label>
-						<select id="artist" bind:value={artwork.artistId}>
-							<option value="" disabled selected>Select Artist</option>
-							{#each artists as artist}
+						<label for="artist">Artists</label>
+						<select id="artist" multiple bind:value={selectedArtistIds} class="multi-select">
+							{#each allArtists as artist}
 								<option value={artist.id}>{artist.name}</option>
 							{/each}
 						</select>
+						<small>Hold Command/Ctrl to select multiple.</small>
 					</div>
 					<div>
 						<label for="collection">Collection</label>
 						<select id="collection" bind:value={artwork.collectionId}>
-                            <option value="" disabled selected>Select your option</option>
+							<option value={null}>-- No Collection --</option>
 							{#each collections as collection}
 							<option value={collection.id}>{collection.title}</option>
 							{/each}
@@ -196,7 +213,7 @@
 
 <style>
 	h1 {
-		margin-bottom: 3rem; /* Example styling */
+		margin-bottom: 3rem;
 	}
 
 	.container {
@@ -206,5 +223,33 @@
 
 	.error {
 		color: red;
+	}
+
+	.multi-select {
+		min-height: 100px;
+		width: 100%;
+		padding: 0.5rem;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+	}
+	
+	form > div {
+		margin-bottom: 1rem;
+	}
+
+	label {
+		display: block;
+		font-weight: bold;
+		margin-bottom: 0.5rem;
+	}
+
+	input[type="text"],
+	input[type="url"],
+	textarea,
+	select {
+		width: 100%;
+		padding: 0.5rem;
+		border: 1px solid #ccc;
+		border-radius: 4px;
 	}
 </style>

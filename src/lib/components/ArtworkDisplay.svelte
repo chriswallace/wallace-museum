@@ -1,4 +1,5 @@
 <script>
+  import { getCloudinaryImageUrl } from '$lib/cloudinaryUtils';
   export let artwork;
   
   function hasVideo() {
@@ -12,7 +13,7 @@
   {:else if ((artwork.mime && (artwork.mime.startsWith('application') || artwork.mime.startsWith('html'))) && artwork.animation_url)}
     <iframe src={artwork.animation_url} class="live-code"></iframe>
   {:else}
-    <img src="{artwork.image_url}?tr=w-740,q-70" alt={artwork.title} />
+    <img src={getCloudinaryImageUrl(artwork.image_url, 740)} alt={artwork.title} />
   {/if}
 </div>
 

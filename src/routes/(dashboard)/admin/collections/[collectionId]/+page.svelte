@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { isModalOpen } from '$lib/stores';
@@ -7,16 +7,36 @@
 	import Modal from '$lib/components/Modal.svelte';
 	import { goto } from '$app/navigation';
 	import { closeModal, openModal } from '$lib/modal';
+	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
 
-	let collectionId;
+	// Define a basic Artwork type (adjust properties as needed based on actual data)
+	interface Artwork {
+		id: number | string;
+		title?: string;
+		image_url?: string;
+		mime?: string;
+		// Add other properties returned by your API
+	}
+
+	// Define type for the collection state
+	interface Collection {
+		title: string;
+		description: string;
+		curatorNotes: string;
+		slug: string;
+		enabled: boolean;
+		artworks: Artwork[];
+	}
+
+	let collectionId: string;
 	let searchQuery = '';
-	let searchResults = [];
+	let searchResults: Artwork[] = []; // Use Artwork type
 	let isLoading = true;
-	let activeTab = 'artworks';
+	let activeTab: 'artworks' | 'details' = 'artworks'; // Type for tabs
 
 	$: $page, (collectionId = $page.params.collectionId);
 
-	let collection = {
+	let collection: Collection = {
 		title: '',
 		description: '',
 		curatorNotes: '',
@@ -25,15 +45,15 @@
 		artworks: []
 	};
 
-	let selectedArtworks = new Set();
+	let selectedArtworks = new Set<number | string>(); // Specify Set type
 
 	$: selectedArtworksArray = Array.from(selectedArtworks); // Reactive conversion to array for reactivity and iteration
 
 	// Assuming Modal is already imported and set up for dynamic content
 	let confirmationModalOpen = false;
-	let confirmationPromiseResolve;
+	let confirmationPromiseResolve: (value: boolean | PromiseLike<boolean>) => void;
 
-	function confirmAction(message) {
+	function confirmAction(message: string): Promise<boolean> { // Type message and return
 		return new Promise((resolve) => {
 			confirmationModalOpen = true;
 			// This function will be called with true or false when the user responds
@@ -41,7 +61,7 @@
 		});
 	}
 
-	async function confirmRemoval(artworkToRemove) {
+	async function confirmRemoval(artworkToRemove: Artwork) { // Type artworkToRemove
 		const confirmed = await confirmAction(
 			'Are you sure you want to remove this artwork from the collection?'
 		);
@@ -91,7 +111,7 @@
 		searchResults = [];
 	}
 
-	async function removeArtworkFromCollection(artworkToRemove) {
+	async function removeArtworkFromCollection(artworkToRemove: Artwork) { // Type artworkToRemove
 		try {
 			// Call your API to remove the artwork from the collection
 			const response = await fetch(
@@ -122,13 +142,13 @@
 		);
 		if (response.ok) {
 			const data = await response.json();
-			searchResults = data;
+			searchResults = data; // Assumes API returns Artwork[]
 		} else {
 			showToast('Failed to search artworks', 'error');
 		}
 	}
 
-	function toggleArtworkSelection(artworkId) {
+	function toggleArtworkSelection(artworkId: number | string) { // Type artworkId
 		if (selectedArtworks.has(artworkId)) {
 			selectedArtworks.delete(artworkId);
 		} else {
@@ -182,7 +202,7 @@
 		}
 	});
 
-	function switchTab(tab) {
+	function switchTab(tab: 'artworks' | 'details') { // Type tab
 		activeTab = tab;
 	}
 </script>
@@ -234,23 +254,20 @@
 						class:active={selectedArtworks.has(artwork.id)}
 						on:click={() => toggleArtworkSelection(artwork.id)}
 					>
-						{#if artwork.image_url?.endsWith(".mp4")}
+						{#if artwork.mime?.startsWith('video') || artwork.image_url?.endsWith(".mp4")}
 							<video
-								alt={artwork.title}
 								width="204"
 								height="204"
-								nocontrols
 								loop
 								muted
 								playsinline
-								autoplay
 							>
 							<source src="{artwork.image_url}" type="video/mp4" />
 						</video>
 						{:else}
 						<img
-							src="{artwork.image_url}?tr=w-400,h-400,q-70,cm-pad_resize,bg-e9e9e9"
-							alt={artwork.title}
+							src={getCloudinaryTransformedUrl(artwork.image_url, 'w_400,h_400,c_pad,q_auto,f_auto,b_rgb:e9e9e9')}
+							alt={artwork.title || 'Artwork thumbnail'}
 						/>
 						{/if}
 						<p>{artwork.title}</p>
@@ -297,17 +314,19 @@
 						<div>
 							{#if artwork.mime?.startsWith('video') || artwork.image_url?.endsWith(".mp4")}
 								<video
-									alt={artwork.title}
-									nocontrols
+									width="204"
+									height="204"
 									loop
 									muted
 									playsinline
-									autoplay
 								>
 								<source src="{artwork.image_url}" type="video/mp4" />
 							</video>
 							{:else}
-								<img src="{artwork.image_url}?tr=w-400,h-400,q-70,cm-pad_resize,bg-e9e9e9" alt="" />
+								<img 
+									src={getCloudinaryTransformedUrl(artwork.image_url, 'w_204,h_204,c_thumb,q_auto,f_auto')}
+									alt={artwork.title || 'Artwork thumbnail'}
+								/>
 							{/if}
 							<h3>{artwork.title}</h3>
 							<button class="remove" on:click={() => confirmRemoval(artwork)}>

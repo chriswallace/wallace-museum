@@ -18,8 +18,7 @@ model Artist {
   avatarUrl         String?
   twitterHandle     String?
   instagramHandle   String?
-  collections       Collection[] // Many-to-many relation
-  artworks          Artwork[] // One-to-many relation
+  collections       Collection[] // Many-to-many relation via ArtistCollections
   ArtistCollections ArtistCollections[]
   ArtistArtworks    ArtistArtworks[]
 }
@@ -56,8 +55,6 @@ model Artwork {
   tokenID        String?
   mintDate       DateTime?
   tags           Json?
-  artistId       Int
-  artist         Artist           @relation(fields: [artistId], references: [id])
   collectionId   Int?
   collection     Collection?       @relation(fields: [collectionId], references: [id])
   ArtistArtworks ArtistArtworks[]
@@ -67,7 +64,7 @@ model Artwork {
 
 model ArtistCollections {
   artistId Int
-  artist   Artist @relation(fields: [artistId], references: [id])
+  artist   Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
   collectionId Int
   collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
@@ -77,7 +74,7 @@ model ArtistCollections {
 
 model ArtistArtworks {
   artistId Int
-  artist   Artist @relation(fields: [artistId], references: [id])
+  artist   Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
   artworkId Int
   artwork   Artwork @relation(fields: [artworkId], references: [id], onDelete: Cascade)
