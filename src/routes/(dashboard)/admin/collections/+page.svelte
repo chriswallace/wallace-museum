@@ -1,6 +1,7 @@
 <script>
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
 
 	let collections = [];
 	let page = 1;
@@ -85,8 +86,9 @@
 							/>
 						{:else}
 							<img
-								src="{image}?tr=w-250,h-250,q-70,dpr-auto"
+								src="{image}?tr=w-250,h-250,c_fill,q-70,dpr-auto"
 								alt=""
+								class="aspect-square object-cover"
 							/>
 						{/if}
 						{/each}
