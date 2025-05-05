@@ -14,7 +14,11 @@ export async function GET({ url }) {
 				}
 			},
 			include: {
-				artist: true, // Include artist details
+				ArtistArtworks: {
+					include: {
+						artist: true
+					}
+				},
 				collection: true // Include collection details if needed
 			}
 		});
