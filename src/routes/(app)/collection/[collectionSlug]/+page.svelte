@@ -222,13 +222,13 @@
 					{/if}
 
 					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && !$isMaximized}
-						<a
-							href="#"
+						<button
+							type="button"
 							class="maximize icon-button"
-							on:click|preventDefault={() => toggleMaximize(artwork.id)}
+							on:click={() => toggleMaximize(artwork.id)}
 						>
 							View Full Screen
-						</a>
+						</button>
 					{/if}
 				</div>
 			</div>

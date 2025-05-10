@@ -192,10 +192,6 @@
 	.logo {
 		@apply text-white inline-block mt-3 mb-8 flex gap-4;
 
-		.w {
-			fill: black;
-		}
-
 		span {
 			@apply grow text-gray-700 inline-block uppercase;
 			font-size: 0.7em;
@@ -271,14 +267,6 @@
 		.logo {
 			span {
 				@apply text-white;
-			}
-
-			path {
-				fill: #fafafa;
-			}
-
-			.w {
-				fill: white;
 			}
 
 			.topline {

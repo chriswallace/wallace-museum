@@ -149,6 +149,14 @@
 		color: #1e1e1e;
 		font-family: var(--font-family);
 	}
+	
+	.error {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		height: 100vh;
+		text-align: center;
+	}
 
 	.content {
 		@apply max-w-[calc(100%-4rem)] mx-auto;
