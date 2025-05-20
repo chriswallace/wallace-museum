@@ -8,16 +8,8 @@
 	<link rel="stylesheet" href="https://use.typekit.net/dpg0jya.css" />
 </svelte:head>
 
-<div class="page-grid">
-	<div class="left-column">
-		<Header />
-	</div>
-
-	<div class="main-column">
-		<main>
-			<slot />
-		</main>
-	</div>
+<div class="page-container">
+	<slot />
 </div>
 
 <div class="mobile-notice">
@@ -43,20 +35,8 @@
 			color: rgb(68, 240, 114);
 		}
 	}
-	.page-grid {
-		@apply h-screen min-w-[800px] md:flex;
-	}
-
-	.page-grid .left-column {
-		@apply w-[380px] h-full;
-	}
-
-	.page-grid .left-column header {
-		@apply h-full;
-	}
-
-	.page-grid .main-column {
-		@apply flex-grow overflow-x-auto w-full;
+	.page-container {
+		@apply min-h-screen;
 	}
 
 	.mobile-notice {
