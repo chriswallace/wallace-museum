@@ -170,36 +170,43 @@ export async function fetchNFTsByAddress(
 			continue;
 		}
 
-		// Log and normalize all possible image/animation IPFS URLs
+		// Normalize all possible image/animation URLs from metadata if present
+		if (currentNft.metadata) {
+			if (currentNft.metadata.image) {
+				currentNft.metadata.image = ipfsToHttpUrl(currentNft.metadata.image);
+			}
+			if (currentNft.metadata.image_url) {
+				currentNft.metadata.image_url = ipfsToHttpUrl(currentNft.metadata.image_url);
+			}
+			if (currentNft.metadata.animation_url) {
+				currentNft.metadata.animation_url = ipfsToHttpUrl(currentNft.metadata.animation_url);
+			}
+		}
+
+		// Log and normalize all possible image/animation IPFS URLs from NFT object
 		if (currentNft.image_url) {
-			const orig = currentNft.image_url;
-			const norm = ipfsToHttpUrl(orig);
-			currentNft.image_url = norm;
+			currentNft.image_url = ipfsToHttpUrl(currentNft.image_url);
 		}
 		if (currentNft.image) {
-			const orig = currentNft.image;
-			const norm = ipfsToHttpUrl(orig);
-			currentNft.image = norm;
+			currentNft.image = ipfsToHttpUrl(currentNft.image);
 		}
 		if (currentNft.image_preview_url) {
-			const orig = currentNft.image_preview_url;
-			const norm = ipfsToHttpUrl(orig);
-			currentNft.image_preview_url = norm;
+			currentNft.image_preview_url = ipfsToHttpUrl(currentNft.image_preview_url);
 		}
 		if (currentNft.image_thumbnail_url) {
-			const orig = currentNft.image_thumbnail_url;
-			const norm = ipfsToHttpUrl(orig);
-			currentNft.image_thumbnail_url = norm;
+			currentNft.image_thumbnail_url = ipfsToHttpUrl(currentNft.image_thumbnail_url);
 		}
 		if (currentNft.image_original_url) {
-			const orig = currentNft.image_original_url;
-			const norm = ipfsToHttpUrl(orig);
-			currentNft.image_original_url = norm;
+			currentNft.image_original_url = ipfsToHttpUrl(currentNft.image_original_url);
 		}
 		if (currentNft.animation_url) {
-			const orig = currentNft.animation_url;
-			const norm = ipfsToHttpUrl(orig);
-			currentNft.animation_url = norm;
+			currentNft.animation_url = ipfsToHttpUrl(currentNft.animation_url);
+		}
+		if (currentNft.display_image_url) {
+			currentNft.display_image_url = ipfsToHttpUrl(currentNft.display_image_url);
+		}
+		if (currentNft.display_animation_url) {
+			currentNft.display_animation_url = ipfsToHttpUrl(currentNft.display_animation_url);
 		}
 
 		fetchedNfts.push(currentNft);
@@ -255,14 +262,20 @@ export async function fetchMetadata(url) {
 			const response = await fetch(url, {
 				headers: { 'X-API-KEY': env.OPENSEA_API_KEY }
 			});
-			if (!response.ok) throw new Error(`Failed to fetch metadata from ${url}`);
+			if (!response.ok) {
+				console.warn(
+					`[NFT Import] Failed to fetch metadata from ${url}, status: ${response.status}`
+				);
+				return null; // Return null instead of throwing error
+			}
 			const metadata = await response.json();
 			console.log('[NFT Import] Step 5: Fetched metadata for URL:', url);
 			return metadata;
 		}
+		return null; // Return null for unsupported URL types
 	} catch (error) {
-		console.error(`Error fetching metadata:`, error);
-		return null;
+		console.error(`[NFT Import] Error fetching metadata:`, error);
+		return null; // Return null for any errors
 	}
 }
 

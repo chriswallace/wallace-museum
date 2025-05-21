@@ -6,6 +6,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	const artist = await prisma.artist.findUnique({
 		where: { id: artistId },
 		include: {
+			addresses: true,
 			ArtistArtworks: {
 				include: {
 					artwork: {
@@ -61,7 +62,8 @@ export const load: PageServerLoad = async ({ params }) => {
 		artist: {
 			id: artist.id,
 			name: artist.name,
+			addresses: artist.addresses,
 			artworks
 		}
 	};
-}; 
+};

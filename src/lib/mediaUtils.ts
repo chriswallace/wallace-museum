@@ -8,6 +8,7 @@ import crypto from 'crypto';
 // 	'https://ipfs.io/ipfs/'
 // ];
 const DEFAULT_IPFS_GATEWAY = 'https://w3s.link/ipfs/';
+const ONCHFS_GATEWAY = 'https://onchfs.fxhash2.xyz/';
 
 export function createHashForString(inputString: string | null | undefined): string {
 	if (!inputString) {
@@ -25,31 +26,76 @@ export function extensionFromMimeType(mimeType: string): string {
 			return '.png';
 		case 'image/gif':
 			return '.gif';
+		case 'image/webp':
+			return '.webp';
+		case 'image/svg+xml':
+			return '.svg';
 		case 'video/mp4':
 			return '.mp4';
+		case 'video/webm':
+			return '.webm';
+		case 'video/ogg':
+			return '.ogv';
+		case 'application/pdf':
+			return '.pdf';
+		case 'text/html':
+			return '.html';
 		default:
 			console.error(`Unsupported MIME type for extension: ${mimeType}`);
 			return '';
 	}
 }
 
-export function generateFileName(name: string, mimeType: string): string {
-	if (!name) {
-		console.warn('generateFileName called with empty name, using "untitled".');
-		name = 'untitled';
-	}
-	// Revert: Replace spaces with underscores first, then remove other invalid chars
-	let baseName = name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.]/g, '');
-
-	const extension = extensionFromMimeType(mimeType);
-	if (!extension) {
-		console.warn(`Could not determine extension for mimeType: ${mimeType}. Using default.`);
-		return `${baseName}_${Date.now()}`;
-	}
-	return `${baseName}${extension}`;
+export function isValidMimeType(mimeType: string): boolean {
+	const validMimeTypes = [
+		'image/jpeg',
+		'image/png',
+		'image/gif',
+		'image/webp',
+		'image/svg+xml',
+		'video/mp4',
+		'video/webm',
+		'video/ogg',
+		'application/pdf',
+		'text/html',
+		'text/javascript',
+		'application/json'
+	];
+	return validMimeTypes.includes(mimeType);
 }
 
-export function generateTags(baseName: string, mimeType: string, contractAddr?: string, tokenID?: string | number): string {
+export function getMediaType(
+	mimeType: string
+): 'image' | 'video' | 'document' | 'interactive' | 'unknown' {
+	if (mimeType.startsWith('image/')) return 'image';
+	if (mimeType.startsWith('video/')) return 'video';
+	if (mimeType === 'application/pdf') return 'document';
+	if (mimeType === 'text/html' || mimeType === 'text/javascript' || mimeType === 'application/json')
+		return 'interactive';
+	return 'unknown';
+}
+
+export function sanitizeCloudinaryPublicId(name: string): string {
+	// Remove special characters and replace spaces with underscores
+	return name
+		.replace(/[#?&]/g, '') // Remove #, ?, and & characters
+		.replace(/[^a-zA-Z0-9\-_]/g, '_') // Replace other special chars with underscore
+		.replace(/_{2,}/g, '_') // Replace multiple consecutive underscores with single
+		.replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+}
+
+export function generateFileName(baseName: string, mimeType: string): string {
+	const sanitizedName = sanitizeCloudinaryPublicId(baseName);
+	const hash = createHashForString(baseName).substring(0, 8);
+	return `${sanitizedName}_${hash}`;
+}
+
+export function generateTags(
+	baseName: string,
+	mimeType: string,
+	contractAddr?: string,
+	tokenID?: string | number
+): string {
 	let tags: string[] = [];
 
 	// Combine base name and mime type for a unique identifier string
@@ -98,16 +144,25 @@ export function removeQueryString(url: string | null | undefined): string {
 /**
  * Converts any IPFS-style URI to a full HTTP(S) URL using the default gateway.
  * - Accepts ipfs://[cid]/foo or ipfs:/[cid]/foo and returns gateway + [cid]/foo
+ * - Accepts onchfs://[cid]/foo and returns onchfs gateway + [cid]/foo
  * - Leaves HTTP(S) and data URIs untouched.
  * - Optionally allows overriding the gateway.
  * @param uri - The IPFS URI or existing HTTP/S URL.
  * @param gateway - Optional gateway to use (default: DEFAULT_IPFS_GATEWAY)
  * @returns A full HTTPS URL for the IPFS content, or the original HTTP/S/data URI.
  */
-export function ipfsToHttpUrl(uri: string | null | undefined, gateway: string = DEFAULT_IPFS_GATEWAY): string {
+export function ipfsToHttpUrl(
+	uri: string | null | undefined,
+	gateway: string = DEFAULT_IPFS_GATEWAY
+): string {
 	if (!uri || typeof uri !== 'string') return '';
 	if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:')) {
 		return uri;
+	}
+	// Handle onchfs:// protocol
+	if (uri.startsWith('onchfs://')) {
+		let cleaned = uri.replace(/^onchfs:\/\//, '');
+		return ONCHFS_GATEWAY + cleaned;
 	}
 	// Remove ipfs:// or ipfs:/ prefix
 	let cleaned = uri.replace(/^ipfs:\/\//, '');
@@ -117,4 +172,4 @@ export function ipfsToHttpUrl(uri: string | null | undefined, gateway: string = 
 /**
  * @deprecated Use ipfsToHttpUrl instead.
  */
-export const convertIpfsToHttpsUrl = ipfsToHttpUrl; 
+export const convertIpfsToHttpsUrl = ipfsToHttpUrl;

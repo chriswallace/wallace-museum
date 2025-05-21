@@ -7,7 +7,6 @@ import ffmpegPath from 'ffmpeg-static';
 import ffprobePath from '@ffprobe-installer/ffprobe';
 import { fileTypeFromBuffer, type FileTypeResult } from 'file-type';
 import { v2 as cloudinary, type UploadApiOptions, type UploadApiResponse } from 'cloudinary';
-
 import { env } from '$env/dynamic/private';
 
 // Import the moved utility functions
@@ -17,52 +16,118 @@ import {
 	generateFileName,
 	generateTags,
 	removeQueryString,
-	convertIpfsToHttpsUrl
+	convertIpfsToHttpsUrl,
+	isValidMimeType,
+	getMediaType,
+	sanitizeCloudinaryPublicId
 } from './mediaUtils';
 
-// Added Cloudinary initialization
-cloudinary.config({
-	// Use the public cloud name variable, also available privately
-	cloud_name: env.PUBLIC_CLOUDINARY_CLOUD_NAME, 
-	api_key: env.CLOUDINARY_API_KEY, 
-	api_secret: env.CLOUDINARY_API_SECRET,
-	secure: true
-});
+// Configure Cloudinary with environment variables
+const configureCloudinary = () => {
+	const config = {
+		cloud_name: env.PUBLIC_CLOUDINARY_CLOUD_NAME,
+		api_key: env.CLOUDINARY_API_KEY,
+		api_secret: env.CLOUDINARY_API_SECRET,
+		secure: true
+	};
+
+	// Validate required configuration
+	if (!config.cloud_name || !config.api_key || !config.api_secret) {
+		console.error('[CLOUDINARY_CONFIG] Missing required Cloudinary configuration:', {
+			hasCloudName: !!config.cloud_name,
+			hasApiKey: !!config.api_key,
+			hasApiSecret: !!config.api_secret
+		});
+		throw new Error('Missing required Cloudinary configuration');
+	}
+
+	try {
+		cloudinary.config(config);
+		console.log(
+			'[CLOUDINARY_CONFIG] Successfully configured Cloudinary with cloud name:',
+			config.cloud_name
+		);
+	} catch (error) {
+		console.error('[CLOUDINARY_CONFIG] Failed to configure Cloudinary:', error);
+		throw error;
+	}
+};
+
+// Configure Cloudinary immediately
+configureCloudinary();
 
 // Set the paths to the static binaries
 if (typeof ffmpegPath === 'string') {
 	ffmpeg.setFfmpegPath(ffmpegPath!);
 } else {
-	console.error("ffmpeg-static path is null or not a string.");
+	console.error('ffmpeg-static path is null or not a string.');
 	// Handle error appropriately, maybe throw or disable features
 }
 if (typeof ffprobePath?.path === 'string') {
 	ffmpeg.setFfprobePath(ffprobePath.path);
 } else {
-	console.error("@ffprobe-installer/ffprobe path is null or not a string.");
+	console.error('@ffprobe-installer/ffprobe path is null or not a string.');
 	// Handle error appropriately
 }
 
 // Add a list of IPFS gateways to try
 const IPFS_GATEWAYS = [
 	'https://gateway.pinata.cloud/ipfs/', // Added Pinata
-	'https://nftstorage.link/ipfs/',     // Added NFT.Storage
-	'https://dweb.link/ipfs/',           // Added Dweb
-	'https://ipfs.io/ipfs/'              // Kept ipfs.io
+	'https://nftstorage.link/ipfs/', // Added NFT.Storage
+	'https://dweb.link/ipfs/', // Added Dweb
+	'https://ipfs.io/ipfs/' // Kept ipfs.io
 	// Add more gateways here if needed
 ];
 
 // Define simple dimension type
 interface Dimensions {
-	width: number | undefined;
-	height: number | undefined;
+	width: number;
+	height: number;
 }
+
+interface PartialDimensions {
+	width?: number;
+	height?: number;
+}
+
+const DEFAULT_DIMENSIONS: Dimensions = {
+	width: 1000,
+	height: 1000
+};
+
+function isDimensions(obj: any): obj is Dimensions {
+	return (
+		obj &&
+		typeof obj === 'object' &&
+		typeof obj.width === 'number' &&
+		typeof obj.height === 'number'
+	);
+}
+
+function ensureDimensions(dimensions: unknown): Dimensions {
+	if (isDimensions(dimensions)) {
+		return dimensions;
+	}
+	return { ...DEFAULT_DIMENSIONS };
+}
+
+function createDimensions(width: number | undefined, height: number | undefined): Dimensions {
+	return {
+		width: typeof width === 'number' && width > 0 ? width : DEFAULT_DIMENSIONS.width,
+		height: typeof height === 'number' && height > 0 ? height : DEFAULT_DIMENSIONS.height
+	};
+}
+
+const createDefaultDimensions = (aspectRatio?: number): Dimensions => ({
+	width: aspectRatio ? Math.round(1000 * aspectRatio) : DEFAULT_DIMENSIONS.width,
+	height: DEFAULT_DIMENSIONS.height
+});
 
 // Define return type for uploadToCloudinary
 interface UploadResult {
 	url: string;
 	fileType: string;
-	dimensions: Dimensions | null;
+	dimensions: Dimensions;
 }
 
 // Define basic structure for NFT and Metadata for normalization functions
@@ -84,10 +149,14 @@ interface NftData {
 	name?: string;
 	description?: string;
 	creator?: any; // Could be string or object depending on source
+	creator_address?: string; // Add this field
 	image_url?: string;
 	display_image_url?: string;
 	animation_url?: string;
 	display_animation_url?: string;
+	image_original_url?: string;
+	image_preview_url?: string;
+	image_thumbnail_url?: string;
 	tags?: string[];
 	website?: string;
 	traits?: any[];
@@ -105,14 +174,33 @@ interface NftData {
 		contract?: string;
 		blockchain?: string;
 		total_supply?: number;
+		symbol?: string;
 	};
+	contract?: string; // OpenSea contract field
 	symbol?: string;
 	supply?: number;
 	attributes?: any[];
+	properties?: any;
 	contractAddress?: string;
-	dimensions?: { width?: number; height?: number };
+	contractAlias?: string;
+	dimensions?: Dimensions; // Change this to use the Dimensions type
 	token_standard?: string;
 	updated_at?: string | Date;
+	aspect_ratio?: number;
+	// Additional properties for Art Blocks and Tezos
+	script_type?: string;
+	license?: string;
+	is_static?: boolean;
+	platform?: string;
+	features?: any;
+	marketplace?: string;
+	editions?: number | string;
+	displayUri?: string;
+	artifactUri?: string;
+	animationUri?: string;
+	interactive_uri?: string;
+	collection_name?: string;
+	collection_address?: string;
 }
 
 // Define return type for fetchMedia
@@ -147,104 +235,237 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 	});
 }
 
-export async function uploadToCloudinary(fileStream: Buffer | NodeJS.ReadableStream, baseName: string, mimeType: string, tagsToApply?: string): Promise<UploadResult | null> {
-	// console.log(`[uploadToCloudinary] Uploading based on: ${baseName}, Mime: ${mimeType}`);
-
+const isArtBlocksUrl = (url: string): boolean => {
+	const artBlocksDomains = [
+		'generator.artblocks.io',
+		'media-proxy.artblocks.io',
+		'artblocks.io',
+		'api.artblocks.io',
+		'token.artblocks.io'
+	];
 	try {
-		const generatedFileName = generateFileName(baseName, mimeType);
-		// console.log(`[uploadToCloudinary] Uploading as public_id: ${generatedFileName}...`);
-
-		const uploadOptions: UploadApiOptions = {
-			public_id: generatedFileName,
-			folder: 'compendium',
-			tags: tagsToApply ? tagsToApply.split(',') : undefined,
-			resource_type: 'auto', // Let Cloudinary detect image/video
-			overwrite: false, // Don't overwrite if public_id exists (existence check should handle this)
-			use_filename: true, // Use the public_id as the base filename
-			unique_filename: false // We are generating a unique name, don't let Cloudinary add random chars
-		};
-
-		// --- DEBUG LOG: Options before upload ---
-		// console.log(`[DEBUG][uploadToCloudinary] Uploading. Options:`, JSON.stringify({
-		// ... existing code ...
-
-
-		const uploadPromise = new Promise<UploadApiResponse | undefined>((resolve, reject) => {
-			const uploadStream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
-				if (error) {
-					console.error('[uploadToCloudinary] Cloudinary upload stream error:', error);
-					reject(error);
-				} else {
-					resolve(result);
-				}
-			});
-
-			if (Buffer.isBuffer(fileStream)) {
-				uploadStream.end(fileStream);
-			} else {
-				fileStream.pipe(uploadStream);
-			}
-		});
-
-		const response = await uploadPromise;
-
-		// --- DEBUG LOG: Raw response from Cloudinary ---
-		// console.log(`[DEBUG][uploadToCloudinary] Raw response for ${generatedFileName}:`, JSON.stringify(response));
-
-		if (response && response.secure_url) {
-			const dimensions: Dimensions | null = response.height && response.width ? { height: response.height, width: response.width } : null;
-			// Determine a general fileType ('image', 'video', 'raw') based on resource_type or mimeType
-			let fileType = 'raw'; // Default
-			if (response.resource_type === 'image') fileType = 'image';
-			else if (response.resource_type === 'video') fileType = 'video';
-			else if (mimeType.startsWith('image/')) fileType = 'image';
-			else if (mimeType.startsWith('video/')) fileType = 'video';
-
-			const result: UploadResult = {
-				url: response.secure_url.split('?')[0], // Use secure_url and remove query params if any
-				fileType: fileType, // Use determined file type
-				dimensions
-			};
-
-			// --- DEBUG LOG: Result returned by uploadToCloudinary ---
-			// console.log(`[DEBUG][uploadToCloudinary] Returning result for ${generatedFileName}:`, JSON.stringify(result));
-
-			return result;
-		} else {
-			console.error('[uploadToCloudinary] Cloudinary upload failed or returned no secure_url. Response:', response);
-			// Throw error if response is missing or doesn't contain secure_url
-			throw new Error(`Cloudinary upload failed with response: ${JSON.stringify(response)}`);
-		}
-	} catch (error: unknown) {
-		const message = error instanceof Error ? error.message : String(error);
-		console.error(`[uploadToCloudinary] Error during Cloudinary upload: ${message}`);
-		// Rethrow or handle specific errors as needed
-		// For now, return null to indicate failure to the caller
-		return null;
+		const urlObj = new URL(url);
+		return artBlocksDomains.some((domain) => urlObj.hostname.endsWith(domain));
+	} catch {
+		return false;
 	}
+};
+
+const getArtBlocksMediaType = (url: string): 'generator' | 'image' | 'unknown' => {
+	if (url.includes('generator.artblocks.io')) {
+		return 'generator';
+	}
+	if (url.includes('media-proxy.artblocks.io') || url.match(/\.(png|jpg|jpeg|gif|webp)$/i)) {
+		return 'image';
+	}
+	return 'unknown';
+};
+
+const isFxHashUrl = (url: string): boolean => {
+	const fxhashDomains = ['onchfs.fxhash2.xyz', 'fxhash.xyz'];
+	try {
+		const urlObj = new URL(url);
+		return (
+			fxhashDomains.some((domain) => urlObj.hostname.endsWith(domain)) ||
+			url.startsWith('onchfs://')
+		);
+	} catch {
+		return url.startsWith('onchfs://');
+	}
+};
+
+function constructFxHashGeneratorUrl(metadata: any): string | null {
+	// Check for fxhash display_animation_url
+	if (metadata?.display_animation_url?.includes('onchfs.fxhash2.xyz')) {
+		return metadata.display_animation_url;
+	}
+	return null;
 }
+
+function detectGenerativeArtPlatform(metadata: any, contractAddress?: string): string | null {
+	// Check for fxhash
+	if (metadata?.display_animation_url?.includes('onchfs.fxhash2.xyz')) {
+		return 'fxhash';
+	}
+
+	// Check for Alba.art
+	if (metadata?.collectionId && metadata?.seed) {
+		return 'alba';
+	}
+
+	// Check for GM Studio
+	if (metadata?.project && metadata?.seed) {
+		return 'gmstudio';
+	}
+
+	// Check for known GM Studio contracts
+	const GM_STUDIO_CONTRACTS = [
+		'0x32d4be5ee74376e08038d652d4dc26e62c67f436' // Factura
+		// Add other GM Studio contracts here
+	];
+
+	if (contractAddress && GM_STUDIO_CONTRACTS.includes(contractAddress.toLowerCase())) {
+		return 'gmstudio';
+	}
+
+	return null;
+}
+
+import { isArtBlocksContract, getArtBlocksContractAlias } from './constants/artBlocks';
 
 export async function normalizeOpenSeaMetadata(nft: NftData): Promise<any> {
 	const metadata = nft.metadata || {};
 
-	return {
-		name: metadata.name || nft.name,
-		tokenID: metadata.tokenID || metadata.tokenId || nft.tokenID || nft.tokenId || nft.identifier,
-		description: metadata.description || nft.description,
-		artist: nft.creator || 'Unknown Artist',
-		blockchain: 'Ethereum',
-		image_url: metadata.image || nft.image_url || nft.display_image_url,
-		animation_url: metadata.animation_url || nft.animation_url || nft.display_animation_url,
-		tags: nft.tags || [],
-		website: nft.website || metadata.external_url || '',
-		attributes: metadata.attributes || nft.traits || []
+	// Extract platform-specific metadata
+	const platformMetadata = metadata.platform_metadata || {};
+
+	// Extract contract details
+	const contractAddress = nft.contractAddress || nft.contract || metadata.contractAddress;
+	const contractAlias = metadata.contractAlias || nft.contractAlias;
+	const tokenStandard = metadata.token_standard || nft.token_standard;
+	const symbol = metadata.symbol || nft.symbol;
+	const totalSupply = metadata.supply || nft.supply;
+	const platform = metadata.platform || nft.platform;
+
+	// Extract generator URL if available
+	const generator_url = metadata.generator_url || '';
+
+	// Process artist information
+	const artist = {
+		name:
+			metadata.artist ||
+			nft.creator?.name ||
+			nft.creator ||
+			metadata.creator?.name ||
+			metadata.creator ||
+			'',
+		address: metadata.creator?.address || nft.creator?.address || nft.creator_address || '',
+		bio: metadata.creator?.bio || metadata.creator?.description || nft.creator?.bio || '',
+		avatarUrl: metadata.creator?.image || metadata.creator?.avatar || nft.creator?.image || '',
+		website:
+			metadata.creator?.website || metadata.creator?.external_url || nft.creator?.website || '',
+		social_media_accounts: {
+			twitter: metadata.creator?.twitter || nft.creator?.twitter || '',
+			instagram: metadata.creator?.instagram || nft.creator?.instagram || ''
+		}
 	};
+
+	console.log('[METADATA_DEBUG] Processed artist info:', artist);
+
+	// Normalize attributes
+	const attributes = normalizeAttributes(nft, {
+		metadata,
+		platformMetadata,
+		includeNullValues: false
+	});
+
+	// Prioritize image fields
+	const image_url =
+		nft.image_url ||
+		nft.display_image_url || // Add display_image_url from fxhash
+		metadata.image ||
+		metadata.image_url ||
+		nft.image_original_url ||
+		nft.image_preview_url ||
+		nft.image_thumbnail_url;
+
+	// Prioritize animation fields with fxhash support
+	const animation_url =
+		nft.display_animation_url || // Prioritize fxhash display_animation_url
+		nft.animation_url ||
+		metadata.animation_url;
+
+	// Ensure collection contract is properly set
+	const collection = {
+		name: contractAlias,
+		contract: contractAddress,
+		blockchain: 'Ethereum',
+		platform: platform || 'Ethereum',
+		total_supply: totalSupply
+	};
+
+	const result = {
+		name: metadata.name || nft.name || 'Unknown Name',
+		tokenID: nft.identifier || nft.tokenId || nft.tokenID || metadata.tokenId || metadata.tokenID,
+		description: metadata.description || nft.description || '',
+		artist: artist.name || '',
+		artist_info: artist,
+		blockchain: 'Ethereum',
+		image_url,
+		animation_url,
+		generator_url,
+		tags: nft.tags || metadata.tags || [],
+		website: nft.website || metadata.external_url || '',
+		attributes: attributes,
+		collection,
+		contractAlias,
+		symbol,
+		token_standard: tokenStandard,
+		raw_data: {
+			attributes: metadata.attributes || nft.attributes,
+			traits: metadata.traits || nft.traits,
+			features: metadata.features || nft.features,
+			seed: metadata.seed,
+			collectionId: metadata.collectionId
+		}
+	};
+
+	console.log('[METADATA_DEBUG] Final normalized result:', {
+		name: result.name,
+		tokenID: result.tokenID,
+		artist: result.artist,
+		artist_info: result.artist_info
+	});
+
+	return result;
 }
 
 export async function normalizeTezosMetadata(nft: NftData): Promise<any> {
 	const metadata = nft.metadata || {};
-	const creator: NftCreator = (nft.creators && nft.creators.length > 0 ? nft.creators[0] : {});
-	const holder = creator.holder || {}; // Handle potential undefined holder
+
+	// Extract contract details
+	const contractAddress = nft.contractAddress || nft.contract || metadata.contractAddress;
+	const contractAlias = metadata.contractAlias || nft.contractAlias;
+	const tokenStandard = metadata.token_standard || nft.token_standard;
+	const symbol = metadata.symbol || nft.symbol;
+	const totalSupply = metadata.supply || nft.supply;
+
+	// Extract creator information
+	const creator = {
+		creator_address: metadata.creator_address || nft.creator_address || '',
+		holder: metadata.creator?.holder || nft.creator?.holder || {}
+	};
+
+	// Extract social media accounts
+	const social_media_accounts = {
+		twitter: creator.holder?.twitter || metadata.creator?.twitter || nft.creator?.twitter || '',
+		instagram:
+			creator.holder?.instagram || metadata.creator?.instagram || nft.creator?.instagram || ''
+	};
+
+	// Process image and animation URLs
+	const image_url =
+		metadata.image_url ||
+		metadata.image ||
+		metadata.artifactUri ||
+		metadata.displayUri ||
+		metadata.thumbnailUri ||
+		nft.image_url ||
+		nft.artifactUri ||
+		nft.displayUri;
+
+	const animation_url =
+		metadata.animation_url || metadata.animationUri || nft.animation_url || nft.animationUri;
+
+	// Process attributes
+	const attributes = normalizeAttributes(nft, {
+		metadata,
+		platformMetadata: {
+			Platform: 'Tezos',
+			'Token Standard': tokenStandard
+		},
+		includeNullValues: false
+	});
 
 	return {
 		name: metadata.name || nft.name || 'Unknown Name',
@@ -253,29 +474,33 @@ export async function normalizeTezosMetadata(nft: NftData): Promise<any> {
 		description: metadata.description || nft.description || 'No Description Available',
 		artist: {
 			address: creator.creator_address || '',
-			username: holder.alias || '',
-			bio: holder.description || '',
-			avatarUrl: holder.logo || '',
-			website: holder.website || '',
-			social_media_accounts: {
-				twitter: holder.twitter || '',
-				instagram: holder.instagram || ''
-			}
+			username: creator.holder?.alias || '',
+			bio: creator.holder?.description || '',
+			avatarUrl: creator.holder?.logo || '',
+			website: creator.holder?.website || '',
+			social_media_accounts: JSON.stringify(social_media_accounts)
 		},
 		platform: 'Tezos',
-		mime: nft.mime || '',
-		image_url: nft.image_url,
-		animation_url: nft.animation_url,
-		tags: metadata.tags || [],
-		website: holder.website || '',
-		attributes: nft.attributes || metadata.attributes || [],
-		symbol: nft.symbol || metadata.symbol || '',
-		supply: nft.supply || 1,
+		mime: metadata.mimeType || metadata.mime || nft.mime || '',
+		image_url,
+		animation_url,
+		tags: metadata.tags || nft.tags || [],
+		website: metadata.website || metadata.homepage || nft.website || '',
+		attributes: JSON.stringify(attributes),
+		symbol,
+		token_standard: tokenStandard,
+		contractAlias,
 		collection: {
-			name: nft.fa?.name || '',
-			address: nft.fa?.contract || '',
-			blockchain: 'Tezos'
-		}
+			name: nft.fa?.name || metadata.collection_name || nft.collection_name || '',
+			contract: contractAddress,
+			blockchain: 'Tezos',
+			total_supply: totalSupply
+		},
+		raw_data: JSON.stringify({
+			attributes: metadata.attributes || nft.attributes,
+			properties: metadata.properties || nft.properties,
+			traits: metadata.traits || nft.traits
+		})
 	};
 }
 
@@ -293,7 +518,9 @@ export async function fetchWithRetry(url: string, retries = 3, delay = 1000): Pr
 		} catch (error: unknown) {
 			const message = error instanceof Error ? error.message : String(error);
 			if (i < retries - 1) {
-				console.warn(`Retry ${i + 1}/${retries} for ${url} failed: ${message}. Retrying in ${delay}ms...`);
+				console.warn(
+					`Retry ${i + 1}/${retries} for ${url} failed: ${message}. Retrying in ${delay}ms...`
+				);
 				await new Promise((resolve) => setTimeout(resolve, delay));
 				continue;
 			} else {
@@ -333,7 +560,8 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 		const fetchOptions: RequestInit = {
 			method: 'GET',
 			headers: {
-				'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+				'User-Agent':
+					'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 			},
 			signal: AbortSignal.timeout(15000) // 15 second timeout for fetch
 		};
@@ -347,7 +575,6 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 			if (!response.ok) {
 				throw new Error(`HTTP error ${response.status} fetching direct URL`);
 			}
-
 		} else if (ipfsResource) {
 			for (const gateway of IPFS_GATEWAYS) {
 				httpUrlUsed = `${gateway}${ipfsResource}`;
@@ -366,7 +593,9 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 				}
 			}
 			if (!response || !response.ok) {
-				console.log(`[MEDIA_DEBUG] Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`);
+				console.log(
+					`[MEDIA_DEBUG] Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`
+				);
 				throw new Error(`Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`);
 			}
 		} else {
@@ -377,20 +606,32 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 		const arrayBuffer = await response.arrayBuffer();
 		buffer = Buffer.from(arrayBuffer);
 		const fileTypeResult: FileTypeResult | undefined = await fileTypeFromBuffer(buffer);
-		console.log(`[MEDIA_DEBUG] Detected file type: ${fileTypeResult ? fileTypeResult.mime : 'undefined'}`);
+		console.log(
+			`[MEDIA_DEBUG] Detected file type: ${fileTypeResult ? fileTypeResult.mime : 'undefined'}`
+		);
 		if (!fileTypeResult) {
-			return { httpUrlUsed: httpUrlUsed, error: 'type_detection_error', message: `Could not determine file type for ${httpUrlUsed}` };
+			return {
+				httpUrlUsed: httpUrlUsed,
+				error: 'type_detection_error',
+				message: `Could not determine file type for ${httpUrlUsed}`
+			};
 		}
 
 		const mimeType = fileTypeResult.mime;
 
 		if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) {
-			return { httpUrlUsed: httpUrlUsed, error: 'unsupported_type', message: `Unsupported media type: ${mimeType}` };
+			return {
+				httpUrlUsed: httpUrlUsed,
+				error: 'unsupported_type',
+				message: `Unsupported media type: ${mimeType}`
+			};
 		}
 
 		let fileName;
 		try {
-			if (!httpUrlUsed) { throw new Error('httpUrlUsed is undefined before creating filename'); }
+			if (!httpUrlUsed) {
+				throw new Error('httpUrlUsed is undefined before creating filename');
+			}
 			fileName = path.basename(new URL(httpUrlUsed).pathname);
 			if (!fileName.includes('.') || path.extname(fileName).substring(1) !== fileTypeResult.ext) {
 				fileName = `${fileName}.${fileTypeResult.ext}`;
@@ -400,23 +641,26 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 			fileName = `${hash}.${fileTypeResult.ext}`;
 		}
 
-		let dimensions = null;
+		let dimensions: Dimensions | null = null;
 
 		if (mimeType.startsWith('image/')) {
 			try {
 				const metadata = await sharp(buffer).metadata();
-				dimensions = { width: metadata.width, height: metadata.height };
-			} catch (sharpError: unknown) {
-			}
+				if (metadata.width && metadata.height) {
+					dimensions = createDimensions(metadata.width, metadata.height);
+				}
+			} catch (sharpError: unknown) {}
 		} else if (mimeType.startsWith('video/')) {
 			try {
-				dimensions = await getVideoDimensions(buffer);
-			} catch (videoError: unknown) {
-			}
+				const videoDimensions = await getVideoDimensions(buffer);
+				if (videoDimensions) {
+					dimensions = createDimensions(videoDimensions.width, videoDimensions.height);
+				}
+			} catch (videoError: unknown) {}
 		}
 
-		if (!httpUrlUsed) { 
-			throw new Error('httpUrlUsed is undefined before successful return'); 
+		if (!httpUrlUsed) {
+			throw new Error('httpUrlUsed is undefined before successful return');
 		}
 
 		return {
@@ -440,11 +684,15 @@ async function getVideoDimensions(buffer: Buffer): Promise<Dimensions | null> {
 
 		return new Promise((resolve, reject) => {
 			ffmpeg.ffprobe(tmpFile, (err, metadata) => {
-				fs.unlink(tmpFile).catch(unlinkErr => console.error(`Error unlinking temp file ${tmpFile}:`, unlinkErr)); // Clean up the temp file, handle unlink error
+				fs.unlink(tmpFile).catch((unlinkErr) =>
+					console.error(`Error unlinking temp file ${tmpFile}:`, unlinkErr)
+				); // Clean up the temp file, handle unlink error
 				if (err) {
 					reject(`Error processing video with ffmpeg: ${err.message}`);
 				} else {
-					const stream = metadata?.streams?.find((s) => s.codec_type === 'video' && s.width && s.height);
+					const stream = metadata?.streams?.find(
+						(s) => s.codec_type === 'video' && s.width && s.height
+					);
 					if (stream && typeof stream.width === 'number' && typeof stream.height === 'number') {
 						resolve({ width: stream.width, height: stream.height });
 					} else {
@@ -457,201 +705,190 @@ async function getVideoDimensions(buffer: Buffer): Promise<Dimensions | null> {
 	} catch (writeError: unknown) {
 		console.error(`[getVideoDimensions] Error writing temp file ${tmpFile}:`, writeError);
 		// Attempt cleanup even if write failed, might not exist
-		fs.unlink(tmpFile).catch(unlinkErr => console.error(`Error unlinking temp file ${tmpFile} after write error:`, unlinkErr));
+		fs.unlink(tmpFile).catch((unlinkErr) =>
+			console.error(`Error unlinking temp file ${tmpFile} after write error:`, unlinkErr)
+		);
 		return null; // Or throw error
 	}
 }
 
-export async function handleMediaUpload(mediaUri: string, artwork: NftData): Promise<UploadResult | null> {
-	// 1. Fetch Media
-	let fetchedMediaResult: FetchedMedia | FetchedMediaError | null;
-	try {
-		fetchedMediaResult = await fetchMedia(mediaUri);
-		// console.log(`[DEBUG][handleMediaUpload] Received result for ${mediaUri}. Type: ${typeof fetchedMediaResult}. Is error obj: ${fetchedMediaResult && typeof fetchedMediaResult === 'object' && 'error' in fetchedMediaResult}`);
-	} catch (fetchError: unknown) {
-		// This catch block might be redundant if fetchMedia now returns error objects
-		// But keep it for safety in case of unexpected throws within fetchMedia itself
-		const message = fetchError instanceof Error ? fetchError.message : String(fetchError);
-		console.error(`[handleMediaUpload] Unexpected error during fetchMedia call for ${mediaUri}: ${message}`);
+export async function handleMediaUpload(
+	mediaUri: string,
+	artwork: NftData
+): Promise<UploadResult | null> {
+	if (!mediaUri || typeof mediaUri !== 'string') {
+		console.error('[MEDIA_UPLOAD_DEBUG] Invalid media URI provided:', mediaUri);
 		return null;
 	}
 
-	// Handle errors returned by fetchMedia
-	if (!fetchedMediaResult || (fetchedMediaResult && 'error' in fetchedMediaResult)) {
-		const errorInfo = fetchedMediaResult as FetchedMediaError | null;
-		
-		// Explicitly check if errorInfo exists and has a non-empty httpUrlUsed
-		const hasErrorInfo = !!errorInfo;
-		const hasUrl = !!(errorInfo && errorInfo.httpUrlUsed && typeof errorInfo.httpUrlUsed === 'string' && errorInfo.httpUrlUsed.length > 0);
-		// console.log(`[DEBUG][handleMediaUpload] Error check: hasErrorInfo=${hasErrorInfo}, hasUrl=${hasUrl}`);
+	console.log(`[MEDIA_UPLOAD_DEBUG] Starting media upload for URI: ${mediaUri}`);
+	console.log(`[MEDIA_UPLOAD_DEBUG] Artwork info:`, {
+		name: artwork?.name,
+		tokenID: artwork?.tokenID,
+		collection: artwork?.collection?.name,
+		mime: artwork?.mime
+	});
 
-		if (hasErrorInfo && hasUrl) {
-			// Log ENTRY and values
-			// console.log(`[DEBUG][handleMediaUpload] Entered error handling block for error='${errorInfo.error}'. httpUrlUsed='${errorInfo.httpUrlUsed}'.`); 
-			// console.log(`[handleMediaUpload] fetchMedia reported error ('${errorInfo.error}') but provided a URL for URI: ${mediaUri}. Assuming HTML/interactive.`);
-			const assumedMime = errorInfo.message?.includes('application/pdf') ? 'application/pdf' : 'text/html'; 
-			
-			// Ensure httpUrlUsed is valid string before assignment (already checked by hasUrl, but to satisfy linter)
-			if (typeof errorInfo.httpUrlUsed !== 'string' || errorInfo.httpUrlUsed.length === 0) {
-				console.error('[handleMediaUpload] Inconsistent state: hasUrl was true but httpUrlUsed is invalid.');
-				return null; // Should not happen
-			}
+	// Retry configuration
+	const MAX_RETRIES = 3;
+	const RETRY_DELAY = 2000; // 2 seconds
+	let retryCount = 0;
 
-			const result: UploadResult = {
-				url: errorInfo.httpUrlUsed, 
-				fileType: assumedMime, // Indicate it's likely interactive content
-				dimensions: null // No dimensions applicable
+	// Special handling for fxhash URLs
+	if (isFxHashUrl(mediaUri)) {
+		console.log(`[MEDIA_UPLOAD_DEBUG] Detected fxhash URL: ${mediaUri}`);
+		const dimensions = ensureDimensions(artwork.dimensions);
+		return {
+			url: mediaUri,
+			fileType: 'text/html',
+			dimensions
+		};
+	}
+
+	// Special handling for Art Blocks URLs
+	if (isArtBlocksUrl(mediaUri)) {
+		console.log(`[MEDIA_UPLOAD_DEBUG] Detected Art Blocks URL: ${mediaUri}`);
+		const mediaType = getArtBlocksMediaType(mediaUri);
+
+		const defaultDimensions = artwork.aspect_ratio
+			? createDimensions(Math.round(1000 * artwork.aspect_ratio), 1000)
+			: DEFAULT_DIMENSIONS;
+
+		if (mediaType === 'generator') {
+			console.log('[MEDIA_UPLOAD_DEBUG] Detected Art Blocks generator URL');
+			return {
+				url: mediaUri,
+				fileType: 'text/html',
+				dimensions: artwork.dimensions || defaultDimensions
 			};
-			// console.log('[handleMediaUpload] Returning assumed result:', JSON.stringify(result));
-			return result;
-		} else {
-			// Log ENTRY into the ELSE block
-			// console.log(`[DEBUG][handleMediaUpload] Entered ELSE block for error handling. errorInfo:`, JSON.stringify(errorInfo));
-			const errorMsg = errorInfo ? `${errorInfo.error}: ${errorInfo.message}` : 'fetchMedia returned null';
-			console.error(`[handleMediaUpload] fetchMedia failed definitively for URI: ${mediaUri}. Error: ${errorMsg}`);
-			console.log('[handleMediaUpload] Returning null due to fetch error or null result.');
+		}
+
+		if (mediaType === 'image') {
+			while (retryCount < MAX_RETRIES) {
+				try {
+					const mediaData = await fetchMedia(mediaUri);
+					if (!mediaData || 'error' in mediaData) {
+						throw new Error(`Failed to fetch Art Blocks image: ${mediaUri}`);
+					}
+
+					if (!isValidMimeType(mediaData.mimeType)) {
+						throw new Error(`Invalid MIME type detected: ${mediaData.mimeType}`);
+					}
+
+					const uploadResult = await uploadToCloudinary(
+						mediaData.buffer,
+						artwork.name || 'artblocks_image',
+						mediaData.mimeType,
+						generateTags(
+							artwork.name || 'artblocks_image',
+							mediaData.mimeType,
+							artwork.collection?.contract,
+							artwork.tokenID
+						)
+					);
+
+					if (!uploadResult) {
+						throw new Error('Cloudinary upload failed');
+					}
+
+					const finalDimensions = ensureDimensions(uploadResult.dimensions || mediaData.dimensions);
+					return {
+						url: uploadResult.url,
+						fileType: mediaData.mimeType,
+						dimensions: finalDimensions
+					};
+				} catch (error) {
+					console.error(`[MEDIA_UPLOAD_DEBUG] Attempt ${retryCount + 1} failed:`, error);
+					retryCount++;
+					if (retryCount < MAX_RETRIES) {
+						await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+					}
+				}
+			}
+			console.error('[MEDIA_UPLOAD_DEBUG] All retry attempts failed for Art Blocks image');
 			return null;
 		}
 	}
 
-	// Type assertion: If we reach here, it must be a successful FetchedMedia result
-	const fetchedMedia = fetchedMediaResult as FetchedMedia;
-
-	// console.log(`[handleMediaUpload] fetchMedia successful for ${mediaUri}. Mime: ${fetchedMedia.mimeType}, Proceeding with Cloudinary check/upload.`);
-
-	const { buffer: originalBuffer, mimeType, fileName: originalFileNameFromFetch, dimensions: originalDimensions } = fetchedMedia;
-	// Use the base name for tags and processing, generate filename separately if needed for upload
-	const nameForProcessing = artwork?.metadata?.name || artwork?.name || originalFileNameFromFetch || 'untitled';
-	
-	// Generate tags including the unique mediaHash
-	const tagsToSearch = generateTags(nameForProcessing, mimeType, artwork.collection?.contract, artwork.tokenID);
-	// Extract the mediaHash tag for the specific search (assuming it's the first tag)
-	const mediaHashTag = tagsToSearch.split(',').find(tag => tag.startsWith('mediaHash:'));
-
-	// 2. Check Existence in Cloudinary using the specific mediaHash TAG
-	let existingFileResult: UploadResult | null = null;
-	if (mediaHashTag) { // Only search if we have the hash tag
-		try {
-			// console.log(`[handleMediaUpload] Searching Cloudinary for existing file with tag: ${mediaHashTag}`);
-			// Search using the single mediaHash tag
-			const searchResult = await cloudinary.search
-				.expression(`tags:${mediaHashTag}`)
-				.max_results(1) // We only need one match
-				.execute();
-
-			// console.log(`[handleMediaUpload] Cloudinary search found ${searchResult.total_count ?? 0} files with matching tag.`);
-
-			if (searchResult.resources && searchResult.resources.length > 0) {
-				const existingFile = searchResult.resources[0];
-				// console.log(
-				//     `[handleMediaUpload] Found existing file in Cloudinary via tag ${mediaHashTag}: ${existingFile.secure_url}`
-				// );
-				// Determine general fileType
-				let fileType = 'raw';
-				if (existingFile.resource_type === 'image') fileType = 'image';
-				else if (existingFile.resource_type === 'video') fileType = 'video';
-
-				existingFileResult = {
-					url: existingFile.secure_url, // Use secure_url
-					fileType: fileType,
-					dimensions: { height: existingFile.height, width: existingFile.width }
-				};
-				return existingFileResult; // Return if found
-			}
-		} catch (searchError: unknown) {
-			const message = searchError instanceof Error ? searchError.message : String(searchError);
-			// Log specific Cloudinary search errors if possible
-			if (searchError && typeof searchError === 'object' && 'error' in searchError) {
- 				const cldError = searchError as { error: { message: string } };
- 				console.error(`[handleMediaUpload] Cloudinary search API error for tag ${mediaHashTag}: ${cldError.error.message}`);
- 			} else {
- 				console.error(`[handleMediaUpload] Error searching Cloudinary for tag ${mediaHashTag}: ${message}`);
- 			}
-		}
-	} else {
-		// console.warn(`[handleMediaUpload] Could not generate mediaHash tag for ${nameForProcessing} / ${mimeType}. Skipping duplicate check.`);
+	// Regular media handling
+	let fetchedMediaResult: FetchedMedia | FetchedMediaError | null;
+	try {
+		fetchedMediaResult = await fetchMedia(mediaUri);
+	} catch (error) {
+		console.error('[MEDIA_UPLOAD_DEBUG] Error fetching media:', error);
+		return null;
 	}
 
-	// --- File Not Found by mediaHash Tag - Proceed with Resize/Upload ---
-	const generatedFileNameForUpload = generateFileName(nameForProcessing, mimeType); // Regenerate filename for upload call consistency
-	// console.log(`[handleMediaUpload] File with tag ${mediaHashTag || 'N/A'} not found in Cloudinary. Proceeding with processing/upload as ${generatedFileNameForUpload}.`);
-	let bufferToUpload = originalBuffer;
-	let finalDimensions = originalDimensions;
-	const MAX_SIZE_MB = 25;
+	if (!fetchedMediaResult || 'error' in fetchedMediaResult) {
+		const errorInfo = fetchedMediaResult as FetchedMediaError | null;
+		console.log(`[MEDIA_UPLOAD_DEBUG] Handling fetch error:`, errorInfo);
 
-	try {
-		// 3. Conditional Resize (If Not Found)
-		const sizeMB = originalBuffer.length / (1024 * 1024);
-		// Check mimeType directly for image/video, ignore MAX_SIZE_MB for videos here as resizeMedia handles video size check
-		const needsResize = mimeType.startsWith('image/') || mimeType.startsWith('video/'); // Resize will check size internally
+		if (errorInfo?.httpUrlUsed && typeof errorInfo.httpUrlUsed === 'string') {
+			const mediaType = getMediaType(
+				errorInfo.message?.includes('application/pdf') ? 'application/pdf' : 'text/html'
+			);
 
-		if (needsResize) {
-			// console.log(`[handleMediaUpload] Attempting resize for ${generatedFileNameForUpload} (Original Size: ${sizeMB.toFixed(2)}MB, Type: ${mimeType})`);
-			try {
-				// Pass MAX_SIZE_MB to resizeMedia
-				const resizeResult = await resizeMedia(originalBuffer, mimeType, originalDimensions, MAX_SIZE_MB);
-				if (resizeResult && resizeResult.buffer) {
-					// Check if buffer actually changed size (resize might skip if already small enough)
-					if (resizeResult.buffer.length !== originalBuffer.length) {
-						bufferToUpload = resizeResult.buffer;
-						finalDimensions = resizeResult.dimensions ?? finalDimensions; // Use dimensions from resize result
-						// console.log(`[handleMediaUpload] Resized buffer size: ${(bufferToUpload.length / (1024 * 1024)).toFixed(2)}MB`);
-					} else {
-						// console.log(`[handleMediaUpload] resizeMedia returned original buffer for ${generatedFileNameForUpload}, likely already within size limits.`);
-						// Keep original buffer and dimensions
-						bufferToUpload = originalBuffer;
-						finalDimensions = originalDimensions;
-					}
-				} else {
-					// Log failure but proceed with original buffer
-					// console.warn(`[handleMediaUpload] resizeMedia returned null or no buffer for ${generatedFileNameForUpload}. Attempting upload with original buffer.`);
-					bufferToUpload = originalBuffer; // Fallback
-					finalDimensions = originalDimensions; // Use original dimensions
-				}
-			} catch (resizeError: unknown) {
-				// Log error but proceed with original buffer
-				const resizeMsg = resizeError instanceof Error ? resizeError.message : String(resizeError);
-				// console.warn(`[handleMediaUpload] Error during resizeMedia for ${generatedFileNameForUpload}: ${resizeMsg}. Attempting upload with original buffer.`);
-				bufferToUpload = originalBuffer; // Fallback
-				finalDimensions = originalDimensions; // Use original dimensions
+			if (mediaType === 'interactive' || mediaType === 'document') {
+				return {
+					url: errorInfo.httpUrlUsed,
+					fileType: mediaType === 'document' ? 'application/pdf' : 'text/html',
+					dimensions: DEFAULT_DIMENSIONS
+				};
 			}
-		} else {
-			// console.log(`[handleMediaUpload] Skipping resize for ${generatedFileNameForUpload} (Size: ${sizeMB.toFixed(2)}MB, Type: ${mimeType})`);
 		}
 
-
-		// 4. Conditional Upload (If Not Found)
-		// console.log(`[handleMediaUpload] Attempting upload for ${generatedFileNameForUpload}...`);
-		// Pass all generated tags (including mediaHash) to uploadToCloudinary for organization
-		const uploadResult = await uploadToCloudinary(bufferToUpload, nameForProcessing, mimeType, tagsToSearch);
-
-		if (!uploadResult || !uploadResult.url) {
-			console.error(`[handleMediaUpload] uploadToCloudinary failed for ${nameForProcessing}`);
-			return null; // Upload failed
-		}
-
-		// console.log(
-		//     `[handleMediaUpload] uploadToCloudinary successful for ${nameForProcessing}. URL: ${uploadResult.url}`
-		// );
-
-		// 5. Return URL and Details
-		// Prioritize dimensions calculated *after* potential resize (finalDimensions)
-		// Fallback to dimensions reported by Cloudinary if resize didn't happen or failed
-		const returnDimensions = (finalDimensions?.width && finalDimensions.width > 0) ? finalDimensions : uploadResult.dimensions;
-		const finalResult: UploadResult = {
-			url: uploadResult.url,
-			fileType: uploadResult.fileType, // Use fileType determined by uploadToCloudinary
-			dimensions: returnDimensions
-		};
-		// console.log('[handleMediaUpload] Returning final Cloudinary upload result:', JSON.stringify(finalResult));
-		return finalResult;
-	} catch (processingError: unknown) { // Catch errors from resize or upload attempt
-		const message = processingError instanceof Error ? processingError.message : String(processingError);
 		console.error(
-			`[handleMediaUpload] Error during media processing/upload for ${generatedFileNameForUpload}: ${message}`
+			`[MEDIA_UPLOAD_DEBUG] Media fetch failed: ${errorInfo?.error}: ${errorInfo?.message}`
 		);
 		return null;
 	}
+
+	const fetchedMedia = fetchedMediaResult as FetchedMedia;
+	if (!isValidMimeType(fetchedMedia.mimeType)) {
+		console.error(`[MEDIA_UPLOAD_DEBUG] Invalid MIME type: ${fetchedMedia.mimeType}`);
+		return null;
+	}
+
+	const mediaType = getMediaType(fetchedMedia.mimeType);
+	if (mediaType === 'unknown') {
+		console.error(`[MEDIA_UPLOAD_DEBUG] Unsupported media type: ${fetchedMedia.mimeType}`);
+		return null;
+	}
+
+	while (retryCount < MAX_RETRIES) {
+		try {
+			const uploadResult = await uploadToCloudinary(
+				fetchedMedia.buffer,
+				artwork.name || fetchedMedia.fileName || 'artwork',
+				fetchedMedia.mimeType,
+				generateTags(
+					artwork.name || fetchedMedia.fileName || 'artwork',
+					fetchedMedia.mimeType,
+					artwork.collection?.contract,
+					artwork.tokenID
+				)
+			);
+
+			if (!uploadResult) {
+				throw new Error('Cloudinary upload failed');
+			}
+
+			return {
+				url: uploadResult.url,
+				fileType: fetchedMedia.mimeType,
+				dimensions: uploadResult.dimensions || fetchedMedia.dimensions || DEFAULT_DIMENSIONS
+			};
+		} catch (error) {
+			console.error(`[MEDIA_UPLOAD_DEBUG] Upload attempt ${retryCount + 1} failed:`, error);
+			retryCount++;
+			if (retryCount < MAX_RETRIES) {
+				await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+			}
+		}
+	}
+
+	console.error('[MEDIA_UPLOAD_DEBUG] All upload retry attempts failed');
+	return null;
 }
 
 interface ResizeResult {
@@ -659,14 +896,25 @@ interface ResizeResult {
 	dimensions: Dimensions;
 }
 
-export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: Dimensions | null, maxSizeMB = 25): Promise<ResizeResult | null> {
+export async function resizeMedia(
+	buffer: Buffer,
+	mimeType: string,
+	dimensions: Dimensions | null,
+	maxSizeMB = 25
+): Promise<ResizeResult | null> {
 	// Check if dimensions are valid at the start
-	if (!dimensions || typeof dimensions.width !== 'number' || typeof dimensions.height !== 'number' || dimensions.width <= 0 || dimensions.height <= 0) {
-        // console.warn("[resizeMedia] Invalid or missing dimensions provided, skipping resize.", dimensions);
-        // Return original buffer and best-effort dimensions if skipping, but indicate potential issue by returning maybe null?
+	if (
+		!dimensions ||
+		typeof dimensions.width !== 'number' ||
+		typeof dimensions.height !== 'number' ||
+		dimensions.width <= 0 ||
+		dimensions.height <= 0
+	) {
+		// console.warn("[resizeMedia] Invalid or missing dimensions provided, skipping resize.", dimensions);
+		// Return original buffer and best-effort dimensions if skipping, but indicate potential issue by returning maybe null?
 		// Let's return null to indicate resize wasn't properly possible due to bad input
 		return null;
-    }
+	}
 
 	try {
 		let sizeMB = Buffer.byteLength(buffer) / (1024 * 1024);
@@ -683,7 +931,7 @@ export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: 
 				const currentHeight = dimensions?.height ?? 0;
 				if (currentWidth <= 0 || currentHeight <= 0) {
 					// console.error("[resizeMedia] Invalid dimensions provided for scaling image.", dimensions);
-					throw new Error("Invalid dimensions for scaling");
+					throw new Error('Invalid dimensions for scaling');
 				}
 
 				let newWidth = Math.floor(currentWidth * scaleFactor);
@@ -708,7 +956,7 @@ export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: 
 				const currentHeight = dimensions?.height ?? 0;
 				if (currentWidth <= 0 || currentHeight <= 0) {
 					// console.error("[resizeMedia] Invalid dimensions provided for scaling video.", dimensions);
-					throw new Error("Invalid dimensions for scaling");
+					throw new Error('Invalid dimensions for scaling');
 				}
 
 				let newWidth = Math.floor(currentWidth * scaleFactor);
@@ -727,21 +975,24 @@ export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: 
 								.outputOptions('-movflags', '+faststart') // Good for web video
 								.on('end', () => {
 									fs.readFile(tmpOutputFile)
-										.then(resized => {
+										.then((resized) => {
 											// Clean up both files
-											Promise.all([fs.unlink(tmpInputFile), fs.unlink(tmpOutputFile)])
-												.catch(unlinkErr => console.error(`Error unlinking temp files:`, unlinkErr));
+											Promise.all([fs.unlink(tmpInputFile), fs.unlink(tmpOutputFile)]).catch(
+												(unlinkErr) => console.error(`Error unlinking temp files:`, unlinkErr)
+											);
 											resolve(resized);
 										})
-										.catch(readErr => {
+										.catch((readErr) => {
 											// Clean up both files even if read fails
-											Promise.all([fs.unlink(tmpInputFile), fs.unlink(tmpOutputFile)])
-												.catch(unlinkErr => console.error(`Error unlinking temp files after read error:`, unlinkErr));
+											Promise.all([fs.unlink(tmpInputFile), fs.unlink(tmpOutputFile)]).catch(
+												(unlinkErr) =>
+													console.error(`Error unlinking temp files after read error:`, unlinkErr)
+											);
 											reject(`Error reading resized file: ${readErr}`);
 										});
 								});
 						})
-						.catch(writeErr => {
+						.catch((writeErr) => {
 							console.error(`[resizeMedia] Error writing resized file: ${writeErr}`);
 							reject(writeErr);
 						});
@@ -760,11 +1011,15 @@ export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: 
 		}
 
 		// Try to get dimensions of the final buffer (original or resized)
-		const finalDimensions = await (mimeType.startsWith('image/') ? sharp(resizedBuffer).metadata().then(m => ({width: m.width, height: m.height})) : getVideoDimensions(resizedBuffer))
-				.catch(e => {
-					// console.error("[resizeMedia] Failed to get dimensions after resize/processing:", e);
-					return null; // Return null if dimension extraction fails
-				});
+		const finalDimensions = await (
+			mimeType.startsWith('image/')
+				? sharp(resizedBuffer)
+						.metadata()
+						.then((m) =>
+							createDimensions(m.width || dimensions.width, m.height || dimensions.height)
+						)
+				: getVideoDimensions(resizedBuffer).then((d) => d || dimensions)
+		).catch(() => dimensions);
 
 		if (!finalDimensions) {
 			// console.warn("[resizeMedia] Could not determine final dimensions, resize considered failed.");
@@ -779,5 +1034,282 @@ export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: 
 		const message = error instanceof Error ? error.message : String(error);
 		console.error(`[resizeMedia] Error during resizing: ${message}`);
 		return null; // Return null on any exception during resize
+	}
+}
+
+// Define the attribute interface
+interface Attribute {
+	trait_type: string;
+	value: string;
+}
+
+/**
+ * Normalizes attributes/traits into a consistent format
+ * @param {Object} data - The NFT data containing attributes/traits
+ * @param {Object} options - Additional options for normalization
+ * @returns {Array<Attribute>} Normalized attributes array
+ */
+function normalizeAttributes(
+	data: any,
+	options: { metadata?: any; platformMetadata?: any; includeNullValues?: boolean } = {}
+): Attribute[] {
+	const { metadata = {}, platformMetadata = {}, includeNullValues = false } = options;
+
+	let attributes: Attribute[] = [];
+
+	// Process standard attributes array
+	const standardAttrs = data.attributes || metadata.attributes || [];
+	if (Array.isArray(standardAttrs)) {
+		attributes = attributes.concat(
+			standardAttrs
+				.map((attr: any) => {
+					if (typeof attr === 'object' && attr !== null) {
+						return {
+							trait_type: String(attr.trait_type || attr.name || '').trim(),
+							value: String(attr.value || '').trim()
+						};
+					}
+					return null;
+				})
+				.filter((attr): attr is Attribute => attr !== null)
+		);
+	}
+
+	// Process traits array
+	const traits = data.traits || metadata.traits || [];
+	if (Array.isArray(traits)) {
+		attributes = attributes.concat(
+			traits
+				.map((trait: any) => {
+					if (typeof trait === 'object' && trait !== null) {
+						return {
+							trait_type: String(trait.trait_type || trait.name || '').trim(),
+							value: String(trait.value || '').trim()
+						};
+					}
+					return null;
+				})
+				.filter((attr): attr is Attribute => attr !== null)
+		);
+	}
+
+	// Process properties object
+	const properties = data.properties || metadata.properties || {};
+	if (typeof properties === 'object' && properties !== null && !Array.isArray(properties)) {
+		const propertyTraits = Object.entries(properties)
+			.filter(([_, value]) => includeNullValues || value !== null)
+			.map(([key, value]) => ({
+				trait_type: String(key).trim(),
+				value: String(value || '').trim()
+			}));
+		attributes = attributes.concat(propertyTraits);
+	}
+
+	// Process features object (common in Art Blocks)
+	const features = data.features || metadata.features || {};
+	if (typeof features === 'object' && features !== null && !Array.isArray(features)) {
+		const featureTraits = Object.entries(features)
+			.filter(([_, value]) => includeNullValues || value !== null)
+			.map(([key, value]) => ({
+				trait_type: String(key).trim(),
+				value: String(value || '').trim()
+			}));
+		attributes = attributes.concat(featureTraits);
+	}
+
+	// Add platform-specific metadata
+	if (platformMetadata && typeof platformMetadata === 'object') {
+		const metadataTraits = Object.entries(platformMetadata)
+			.filter(([_, value]) => value !== '' && (includeNullValues || value !== null))
+			.map(([key, value]) => ({
+				trait_type: String(key).trim(),
+				value: String(value || '').trim()
+			}));
+		attributes = attributes.concat(metadataTraits);
+	}
+
+	// Remove duplicates while preserving order
+	const seenTraits = new Set();
+	attributes = attributes.filter((attr) => {
+		if (!attr || !attr.trait_type) return false;
+		const key = `${attr.trait_type.toLowerCase()}:${attr.value.toLowerCase()}`;
+		if (seenTraits.has(key)) return false;
+		seenTraits.add(key);
+		return true;
+	});
+
+	return attributes;
+}
+
+async function searchCloudinaryByTag(tag: string): Promise<UploadApiResponse | null> {
+	try {
+		const searchResult = await new Promise<any>((resolve, reject) => {
+			cloudinary.search
+				.expression(`tags=${tag}`)
+				.with_field('tags')
+				.max_results(1)
+				.execute()
+				.then(resolve)
+				.catch(reject);
+		});
+
+		if (searchResult?.resources?.length > 0) {
+			console.log('[CLOUDINARY_DEBUG] Found existing resource with tag:', tag);
+			return searchResult.resources[0];
+		}
+		return null;
+	} catch (error) {
+		console.error('[CLOUDINARY_DEBUG] Error searching Cloudinary:', error);
+		return null;
+	}
+}
+
+export async function uploadToCloudinary(
+	fileStream: Buffer | NodeJS.ReadableStream,
+	baseName: string,
+	mimeType: string,
+	tagsToApply?: string
+): Promise<UploadResult | null> {
+	try {
+		// First, check if we already have this file using the mediaHash tag
+		if (tagsToApply) {
+			const mediaHashTag = tagsToApply.split(',').find((tag) => tag.startsWith('mediaHash:'));
+			if (mediaHashTag) {
+				const existingResource = await searchCloudinaryByTag(mediaHashTag);
+				if (existingResource) {
+					console.log('[CLOUDINARY_DEBUG] Using existing resource:', existingResource.public_id);
+					return {
+						url: existingResource.secure_url.split('?')[0],
+						fileType:
+							existingResource.resource_type === 'image'
+								? 'image'
+								: existingResource.resource_type === 'video'
+									? 'video'
+									: 'raw',
+						dimensions: createDimensions(existingResource.width, existingResource.height)
+					};
+				}
+			}
+		}
+
+		// If no existing resource found, proceed with upload
+		const sanitizedFileName = sanitizeCloudinaryPublicId(baseName);
+		const hash = createHashForString(baseName).substring(0, 8);
+		const fullPublicId = `compendium/${sanitizedFileName}_${hash}`;
+
+		console.log('[CLOUDINARY_DEBUG] Generated public_id:', fullPublicId);
+
+		const uploadOptions: UploadApiOptions = {
+			public_id: fullPublicId,
+			tags: tagsToApply ? tagsToApply.split(',') : undefined,
+			resource_type: 'auto',
+			overwrite: false,
+			use_filename: false, // Changed to false since we're handling the full public_id
+			unique_filename: false // Changed to false since we're handling uniqueness with hash
+		};
+
+		const uploadPromise = new Promise<UploadApiResponse | undefined>((resolve, reject) => {
+			const uploadStream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+				if (error) {
+					console.error('[CLOUDINARY_DEBUG] Upload stream error:', error);
+					reject(error);
+				} else {
+					console.log('[CLOUDINARY_DEBUG] Upload successful:', {
+						public_id: result?.public_id,
+						url: result?.secure_url
+					});
+					resolve(result);
+				}
+			});
+
+			if (Buffer.isBuffer(fileStream)) {
+				uploadStream.end(fileStream);
+			} else {
+				fileStream.pipe(uploadStream);
+			}
+		});
+
+		const response = await uploadPromise;
+
+		if (response && response.secure_url) {
+			const dimensions = createDimensions(response.width, response.height);
+			return {
+				url: response.secure_url.split('?')[0],
+				fileType:
+					response.resource_type === 'image'
+						? 'image'
+						: response.resource_type === 'video'
+							? 'video'
+							: 'raw',
+				dimensions
+			};
+		} else {
+			console.error(
+				'[CLOUDINARY_DEBUG] Upload failed or returned no secure_url. Response:',
+				response
+			);
+			throw new Error(`Upload failed with response: ${JSON.stringify(response)}`);
+		}
+	} catch (error: unknown) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`[CLOUDINARY_DEBUG] Error during upload: ${message}`);
+		return null;
+	}
+}
+
+function constructAlbaGeneratorUrl(metadata: any): string | null {
+	// Check if we have the required Alba.art fields
+	if (metadata?.collectionId && metadata?.seed && metadata?.tokenId !== undefined) {
+		// Construct the Alba.art generator URL with default resolution
+		return `https://api.alba.art/render-preview/${metadata.collectionId}/seed/${metadata.seed}/token/${metadata.tokenId}/res/735`;
+	}
+	return null;
+}
+
+function constructGMStudioGeneratorUrl(metadata: any): string | null {
+	// Check if we have GM Studio specific fields
+	if (metadata?.project && metadata?.seed) {
+		// Construct the GM Studio URL with their live render format
+		return `https://www.gmstudio.art/live/${metadata.project}/${metadata.seed}`;
+	}
+	return null;
+}
+
+async function fetchOpenSeaCollectionData(
+	contractAddress: string
+): Promise<{ name: string; symbol: string; total_supply: number | null } | null> {
+	if (!contractAddress) return null;
+
+	try {
+		const apiKey = env.OPENSEA_API_KEY;
+		if (!apiKey) {
+			console.warn('[OPENSEA_DEBUG] No OpenSea API key found in environment variables');
+			return null;
+		}
+
+		const response = await fetch(
+			`https://api.opensea.io/api/v2/chain/ethereum/contract/${contractAddress}`,
+			{
+				headers: {
+					'X-API-KEY': apiKey,
+					Accept: 'application/json'
+				}
+			}
+		);
+
+		if (!response.ok) {
+			console.error(`[OPENSEA_DEBUG] Failed to fetch collection data: ${response.status}`);
+			return null;
+		}
+
+		const data = await response.json();
+		return {
+			name: data.collection?.name || data.name || null,
+			symbol: data.symbol || null,
+			total_supply: data.total_supply || null
+		};
+	} catch (error) {
+		console.error('[OPENSEA_DEBUG] Error fetching OpenSea collection data:', error);
+		return null;
 	}
 }

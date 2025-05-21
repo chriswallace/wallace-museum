@@ -4,6 +4,17 @@ import { normalizeOpenSeaMetadata, handleMediaUpload } from '$lib/mediaHelpers';
 import { fetchMetadata } from '$lib/openseaHelpers.js';
 import { processArtist, processCollection, saveArtwork } from '$lib/adminOperations.js';
 import { isVideo, isImage } from '$lib/utils';
+import { syncCollection } from '$lib/collectionSync';
+
+interface Dimensions {
+	width: number;
+	height: number;
+}
+
+const DEFAULT_DIMENSIONS: Dimensions = {
+	width: 1000,
+	height: 1000
+};
 
 export const POST = async ({ request }) => {
 	try {
@@ -13,124 +24,141 @@ export const POST = async ({ request }) => {
 			return json({ error: 'No NFTs provided for import.' }, { status: 400 });
 		}
 
-		const importPromises = nfts.map(async (nft, currentIndex) => {
+		const importPromises = nfts.map(async (nft) => {
+			// Fetch metadata if available
 			let fetchedMetadata = null;
-
 			if (nft.metadata_url) {
-				fetchedMetadata = await fetchMetadata(nft.metadata_url);
-				if (fetchedMetadata) {
-					nft.metadata = fetchedMetadata;
-				}
-			}
-
-			const artist = await processArtist(nft.artist);
-
-			// Ensure collection object exists
-			if (!nft.collection) {
-				nft.collection = {};
-			}
-
-			// Prefer top-level contract field, then nested, then fallback
-			nft.collection.contract =
-				nft.contract ||
-				nft.collection.contract ||
-				(Array.isArray(nft.collection.contracts) && nft.collection.contracts.length > 0
-					? nft.collection.contracts[0].address
-					: undefined) ||
-				nft.collection.slug ||
-				nft.collection.id ||
-				'unknown';
-
-			if (!nft.collection.contract || nft.collection.contract === 'unknown') {
-				console.warn('WARNING: Collection contract is missing or unknown for NFT:', nft.identifier || nft.id, nft.collection);
-				// Optionally: flag for review, skip, or proceed as is
-			}
-
-			const collection = await processCollection(nft.collection);
-
-			let normalizedMetadata = await normalizeOpenSeaMetadata(nft);
-			nft.tokenID = normalizedMetadata.tokenID; // Ensure tokenID is set from OpenSea identifier
-			// Process media URLs and store final results
-			let finalImageUrl = '';
-			let finalAnimationUrl = '';
-			let finalMime = normalizedMetadata.mime || ''; // Start with mime from normalization if available
-			let finalDimensions = normalizedMetadata.dimensions || { width: undefined, height: undefined };
-
-			try {
-				// Process animation_url first (primary asset)
-				if (normalizedMetadata.animation_url) {
-					console.log(`[OS_IMPORT_PROCESS] NFT: ${nft.identifier} - Handling primary media (from animation_url): ${normalizedMetadata.animation_url}`);
-					const primaryMediaResult = await handleMediaUpload(normalizedMetadata.animation_url, nft);
-					if (primaryMediaResult?.url) {
-						if (primaryMediaResult.fileType.startsWith('video/') || primaryMediaResult.fileType === 'text/html' || primaryMediaResult.fileType === 'application/pdf') {
-							finalAnimationUrl = primaryMediaResult.url;
-							finalMime = primaryMediaResult.fileType;
-							if (primaryMediaResult.dimensions) finalDimensions = primaryMediaResult.dimensions;
-						} else if (primaryMediaResult.fileType.startsWith('image/')) {
-							// If animation_url pointed to an image, use it as the image_url
-							finalImageUrl = primaryMediaResult.url;
-							finalMime = primaryMediaResult.fileType;
-							if (primaryMediaResult.dimensions) finalDimensions = primaryMediaResult.dimensions;
-						} else {
-							console.warn(`[OS_IMPORT_PROCESS] NFT: ${nft.identifier} - Unexpected fileType '${primaryMediaResult.fileType}' from animation_url upload.`);
-						}
-					} else {
-						console.warn(`[OS_IMPORT_PROCESS] NFT: ${nft.identifier} - Primary media upload (from animation_url) failed.`);
+				try {
+					fetchedMetadata = await fetchMetadata(nft.metadata_url);
+					if (fetchedMetadata) {
+						nft.metadata = fetchedMetadata;
 					}
+				} catch (error) {
+					console.warn(`[OS_IMPORT] Failed to fetch metadata for NFT ${nft.identifier}:`, error);
 				}
-
-				// Process image_url (only if different and no image resolved yet)
-				if (normalizedMetadata.image_url && normalizedMetadata.image_url !== normalizedMetadata.animation_url && !finalImageUrl) {
-					console.log(`[OS_IMPORT_PROCESS] NFT: ${nft.identifier} - Handling image upload (from image_url): ${normalizedMetadata.image_url}`);
-					const imageUploadResult = await handleMediaUpload(normalizedMetadata.image_url, nft);
-					if (imageUploadResult?.url) {
-						if (imageUploadResult.fileType.startsWith('image/')) {
-							finalImageUrl = imageUploadResult.url;
-							if (!finalMime) finalMime = imageUploadResult.fileType;
-							if (!finalDimensions.width && imageUploadResult.dimensions) {
-								finalDimensions = imageUploadResult.dimensions;
-							}
-						} else {
-							console.warn(`[OS_IMPORT_PROCESS] NFT: ${nft.identifier} - Expected image fileType but got '${imageUploadResult.fileType}' from image_url upload.`);
-						}
-					} else {
-						console.warn(`[OS_IMPORT_PROCESS] NFT: ${nft.identifier} - Image upload (from image_url) failed.`);
-					}
-				}
-
-				// Fallback checks
-				if (!finalImageUrl && !finalAnimationUrl) {
-					console.error(`[OS_IMPORT_PROCESS] NFT: ${nft.identifier} - Failed to resolve any valid media URL.`);
-					// Consider skipping or using placeholder
-					// For now, we'll let it proceed, but saveArtwork might fail or save empty URLs
-				}
-
-			} catch (error) {
-				console.error(`[OS_IMPORT_PROCESS] NFT: ${nft.identifier} - Error processing media upload:`, error);
-				// Continue processing other NFTs, this one might fail saving or have empty URLs
 			}
 
-			// Update nft object with processed data before saving
-			nft.metadata = {
-				...normalizedMetadata, // Keep other normalized fields
-				image_url: finalImageUrl,
-				animation_url: finalAnimationUrl
-			};
-			nft.mime = finalMime;
-			nft.dimensions = finalDimensions;
-			// Ensure tokenID/identifier consistency - normalizeOpenSeaMetadata should handle this
-			// nft.metadata.tokenID = nft.metadata.identifier;
-			// nft.tokenID = nft.metadata.identifier;
-
-			console.log(`[OS_IMPORT_SAVE] NFT: ${nft.identifier} - Pre-save image_url: ${nft.metadata.image_url}, Pre-save animation_url: ${nft.metadata.animation_url}, Pre-save mime: ${nft.mime}`);
-
-			console.log('NFT about to import:', {
-				id: nft.id,
-				collection: nft.collection
+			// Process artist from metadata
+			console.log('[OS_IMPORT] Raw NFT data:', {
+				metadata_artist: nft.metadata?.artist,
+				creator: nft.creator,
+				metadata_creator_name: nft.metadata?.creator?.name,
+				metadata_creator: nft.metadata?.creator,
+				raw_nft: nft
 			});
 
-			const artwork = await saveArtwork(nft, artist.id, collection.id);
+			const artistInfo = {
+				username:
+					nft.artist?.username ||
+					nft.metadata?.artist ||
+					nft.creator ||
+					nft.metadata?.creator?.name ||
+					nft.metadata?.creator,
+				address:
+					nft.artist?.address ||
+					nft.creator ||
+					nft.metadata?.creator?.address ||
+					nft.creator_address,
+				blockchain: nft.collection?.blockchain?.toLowerCase() || 'ethereum',
+				bio: nft.metadata?.creator?.bio || nft.metadata?.creator?.description,
+				avatarUrl: nft.metadata?.creator?.image || nft.metadata?.creator?.avatar,
+				website: nft.metadata?.creator?.website || nft.metadata?.creator?.external_url,
+				social_media_accounts: {
+					twitter: nft.metadata?.creator?.twitter || '',
+					instagram: nft.metadata?.creator?.instagram || ''
+				}
+			};
 
+			console.log('[OS_IMPORT] Processed artist info:', artistInfo);
+
+			// Process artist with complete info
+			const artist = await processArtist(artistInfo);
+
+			// If no valid artist was found or created, skip this artwork
+			if (!artist) {
+				console.log('[OS_IMPORT] No valid artist found for NFT:', nft.identifier);
+				return null;
+			}
+
+			console.log('[OS_IMPORT] Final processed artist:', artist);
+
+			// Sync collection from OpenSea
+			const collection = await syncCollection(
+				nft.collection?.slug || nft.collection?.contract || nft.contractAddr,
+				'opensea'
+			);
+
+			// Process media URLs
+			let finalImageUrl = '';
+			let finalAnimationUrl = '';
+			let finalGeneratorUrl = '';
+			let finalMime = '';
+			let finalDimensions = DEFAULT_DIMENSIONS;
+
+			try {
+				// First check for generator URL
+				if (nft.metadata?.generator_url) {
+					console.log(`[OS_IMPORT] Found generator URL for NFT ${nft.identifier}`);
+					finalGeneratorUrl = nft.metadata.generator_url;
+					finalMime = 'text/html'; // Generator URLs are typically HTML
+				}
+
+				// Process animation_url if available and no generator URL
+				if (nft.metadata?.animation_url && !finalGeneratorUrl) {
+					console.log(`[OS_IMPORT] Processing animation_url for NFT ${nft.identifier}`);
+					const animationResult = await handleMediaUpload(nft.metadata.animation_url, nft);
+					if (animationResult?.url) {
+						finalAnimationUrl = animationResult.url;
+						finalMime = animationResult.fileType;
+						finalDimensions = {
+							width: animationResult.dimensions.width,
+							height: animationResult.dimensions.height
+						};
+					}
+				}
+
+				// Process image_url if available
+				if (nft.metadata?.image_url) {
+					console.log(`[OS_IMPORT] Processing image_url for NFT ${nft.identifier}`);
+					const imageResult = await handleMediaUpload(nft.metadata.image_url, nft);
+					if (imageResult?.url) {
+						finalImageUrl = imageResult.url;
+						if (!finalMime) finalMime = imageResult.fileType;
+						if (!finalDimensions.width) {
+							finalDimensions = {
+								width: imageResult.dimensions.width,
+								height: imageResult.dimensions.height
+							};
+						}
+					}
+				}
+			} catch (error) {
+				console.error('[OS_IMPORT] Error processing media:', error);
+			}
+
+			// Update metadata with final URLs
+			const finalMetadata = {
+				...nft.metadata,
+				image_url: finalImageUrl || nft.metadata?.image_url,
+				animation_url: finalAnimationUrl || nft.metadata?.animation_url,
+				generator_url: finalGeneratorUrl || nft.metadata?.generator_url
+			};
+
+			// Save artwork
+			const artwork = await saveArtwork(
+				{
+					...nft,
+					metadata: finalMetadata,
+					mime: finalMime,
+					dimensions: finalDimensions,
+					tokenID: nft.identifier || nft.tokenId || nft.tokenID,
+					generator_url: finalGeneratorUrl
+				},
+				artist.id,
+				collection.id
+			);
+
+			// Create artist-collection relationship
 			await prisma.artistCollections.upsert({
 				where: {
 					artistId_collectionId: {
@@ -145,6 +173,7 @@ export const POST = async ({ request }) => {
 				}
 			});
 
+			// Create artist-artwork relationship
 			await prisma.artistArtworks.upsert({
 				where: {
 					artistId_artworkId: {
@@ -158,13 +187,21 @@ export const POST = async ({ request }) => {
 					artworkId: artwork.id
 				}
 			});
+
+			return artwork;
 		});
 
-		await Promise.all(importPromises);
+		// Filter out null results (skipped artworks) and wait for all promises
+		const results = await Promise.all(importPromises);
+		const successfulImports = results.filter((result) => result !== null);
 
-		return json({ success: true, message: 'Import completed successfully.' });
+		return json({
+			success: true,
+			message: `Import completed successfully. ${successfulImports.length} artworks imported.`,
+			skipped: results.length - successfulImports.length
+		});
 	} catch (error) {
-		console.error('Error processing request:', error);
+		console.error('[OS_IMPORT] Error processing request:', error);
 		return json({ success: false, message: 'Server error occurred.' }, { status: 500 });
 	}
 };

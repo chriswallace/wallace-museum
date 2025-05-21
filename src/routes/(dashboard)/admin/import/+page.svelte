@@ -15,15 +15,13 @@
 
 	import { closeModal } from '$lib/modal';
 	import EditableCollectionTable from '$lib/components/EditableCollectionTable.svelte';
-	import EditableArtistTable from '$lib/components/EditableArtistTable.svelte';
 	import FinalImportStep from '$lib/components/FinalImportStep.svelte';
 
 	import {
 		finalizeImport,
 		nextStep,
 		openReviewModal,
-		handleCollectionSave,
-		handleArtistSave
+		handleCollectionSave
 	} from '$lib/importHandler';
 
 	import { intersectionObserver } from '$lib/intersectionObserver';
@@ -39,7 +37,7 @@
 		animation_url?: string; // no null in Artwork
 		mime?: string; // no null in Artwork
 		// Other Artwork properties...
-		
+
 		// NFT-specific fields not in Artwork
 		name?: string; // for backward compatibility
 		tokenID?: string;
@@ -101,7 +99,8 @@
 			}
 
 			// Reset if not loading more OR if starting a new search
-			if (!loadMore) { // Reset fully only if not loading more
+			if (!loadMore) {
+				// Reset fully only if not loading more
 				nextCursor = null;
 				currentOffset = 0;
 				hasMorePages = false;
@@ -114,7 +113,8 @@
 			let apiEndpoint = `/api/admin/import/${blockchain}/${wallet}/?type=${type}&limit=${limit}`;
 			if (blockchain === 'tezos') {
 				apiEndpoint += `&offset=${currentOffset}`;
-			} else { // opensea (or default)
+			} else {
+				// opensea (or default)
 				if (nextCursor && loadMore) {
 					apiEndpoint += `&next=${nextCursor}`;
 				}
@@ -128,7 +128,7 @@
 				const response = await fetch(apiEndpoint);
 				if (response.ok) {
 					// Type the expected API response structure
-					const data: { 
+					const data: {
 						success: boolean;
 						nfts: any[]; // Use any[] for API response
 						next?: string | null; // Optional for OpenSea
@@ -170,9 +170,9 @@
 					});
 
 					// Update the store
-					nfts.update(current => {
-						const existingIds = new Set(current.map(item => item.id));
-						const newNfts = mappedNfts.filter(nft => !existingIds.has(nft.id));
+					nfts.update((current) => {
+						const existingIds = new Set(current.map((item) => item.id));
+						const newNfts = mappedNfts.filter((nft) => !existingIds.has(nft.id));
 						return loadMore ? [...current, ...newNfts] : newNfts;
 					});
 
@@ -180,12 +180,11 @@
 					if (blockchain === 'tezos') {
 						const returnedCount = data.nfts?.length || 0;
 						const responseLimit = data.limit || limit; // Use response limit or default
-						
+
 						// Use hasMore flag from server if available, otherwise calculate it
-						hasMorePages = data.hasMore !== undefined 
-							? data.hasMore 
-							: returnedCount >= responseLimit;
-							
+						hasMorePages =
+							data.hasMore !== undefined ? data.hasMore : returnedCount >= responseLimit;
+
 						currentOffset = (data.offset ?? currentOffset) + returnedCount;
 						nextCursor = null; // Ensure cursor is null for Tezos
 					} else {
@@ -193,7 +192,6 @@
 						nextCursor = data.next ?? null;
 						hasMorePages = !!nextCursor; // Or simply check if cursor exists
 					}
-
 				} else {
 					console.error('Failed to fetch NFTs');
 					nextCursor = null;
@@ -211,7 +209,7 @@
 
 	function handleWalletChange() {
 		if ($walletAddress !== previousWallet) {
-			nfts.set([]); 
+			nfts.set([]);
 			nextCursor = null;
 			previousWallet = $walletAddress;
 			selectAllChecked.set(false);
@@ -253,12 +251,33 @@
 	// Separate handler for select change
 	function handleTypeChange() {
 		searchTerm = ''; // Clear search on type change
-		fetchNfts(false); 
+		fetchNfts(false);
 	}
 
 	function handleFetchClick() {
 		// Explicitly trigger fetch, resetting pagination/results
 		fetchNfts(false);
+	}
+
+	async function handleImportSelected() {
+		const allNfts = get(nfts);
+		const selectedIndices = Array.from(get(selectedNfts));
+
+		// Map selected NFTs to the format needed for import
+		const selectedNftsForImport = selectedIndices.map((index) => {
+			const nft = allNfts[index];
+			return {
+				...nft,
+				contractAddr: nft.collection?.contract || nft.contractAddr,
+				contractAlias: nft.collection?.name || nft.contractAlias
+			};
+		});
+
+		// Set the NFTs to be imported
+		updatedNfts.set(selectedNftsForImport);
+
+		// Start the import process directly
+		await finalizeImport();
 	}
 </script>
 
@@ -314,7 +333,7 @@
 				</div>
 				<button
 					class="primary button"
-					on:click={openReviewModal}
+					on:click={handleImportSelected}
 					disabled={$selectedNfts.size === 0}
 				>
 					Import {$selectedNfts.size} Selected
@@ -336,11 +355,29 @@
 								<source src={nft.animation_url} type="video/mp4" />
 							</video>
 						{:else if nft.image_url}
-							<img use:handleLazyLoad={{ src: nft.image_url }} alt={nft.title} class="nft-image" on:error={(e) => { e.target.src = loadingImageUrl; }} />
+							<img
+								use:handleLazyLoad={{ src: nft.image_url }}
+								alt={nft.title}
+								class="nft-image"
+								on:error={(e) => {
+									e.target.src = loadingImageUrl;
+								}}
+							/>
 						{:else if nft.animation_url}
-							<img use:handleLazyLoad={{ src: nft.animation_url }} alt={nft.title} class="nft-image" on:error={(e) => { e.target.src = loadingImageUrl; }} />
-						{:else }
-							<div class="nft-image bg-gray-200 aspect-square flex items-center text-center justify-center">No Image</div>
+							<img
+								use:handleLazyLoad={{ src: nft.animation_url }}
+								alt={nft.title}
+								class="nft-image"
+								on:error={(e) => {
+									e.target.src = loadingImageUrl;
+								}}
+							/>
+						{:else}
+							<div
+								class="nft-image bg-gray-200 aspect-square flex items-center text-center justify-center"
+							>
+								No Image
+							</div>
 						{/if}
 						<div class="inner-container">
 							<h3>{nft.title}</h3>
@@ -350,7 +387,7 @@
 			</div>
 
 			<div class="load-more-container">
-				{#if (nextCursor || hasMorePages)}
+				{#if nextCursor || hasMorePages}
 					<button class="secondary button" on:click={() => fetchNfts(true)} disabled={$isLoading}>
 						{#if $isLoading}Loading...{:else}Load More{/if}
 					</button>
@@ -369,14 +406,6 @@
 				onClose={closeModal}
 			/>
 		{:else if $currentStep === 2}
-			<EditableArtistTable
-				title="Review/edit {$reviewData.artists.length} artists to be imported"
-				items={$reviewData.artists}
-				onSave={handleArtistSave}
-				onNext={nextStep}
-				onClose={closeModal}
-			/>
-		{:else if $currentStep === 3}
 			<FinalImportStep
 				title="Review and finalize import"
 				nfts={$updatedNfts}

@@ -4,49 +4,55 @@ import { Prisma } from '@prisma/client'; // Import Prisma types
 // Define a type for the artist object including relations we expect
 type ArtistWithRelations = Prisma.ArtistGetPayload<{
 	include: {
-		collections: true, // Keep this if needed
+		collections: true; // Keep this if needed
 		ArtistArtworks: {
 			include: {
-				artwork: true
-			}
-		}
-	}
-}>
+				artwork: true;
+			};
+		};
+	};
+}>;
 
 // GET: Fetch Artist Details
 export async function GET({ params }) {
 	const { id } = params;
-	const artist: ArtistWithRelations | null = await prisma.artist.findUnique({
-		where: { id: parseInt(id, 10) },
-		include: {
-			collections: true,
-			// artworks: true // Removed old relation
-			ArtistArtworks: { // Include via join table
-				include: {
-					artwork: true // Include the actual artwork data
+
+	try {
+		const artist = await prisma.artist.findUnique({
+			where: { id: parseInt(id, 10) },
+			include: {
+				ArtistArtworks: {
+					include: {
+						artwork: {
+							select: {
+								id: true,
+								title: true,
+								image_url: true,
+								enabled: true
+							}
+						}
+					}
 				}
 			}
-		}
-	});
+		});
 
-	if (!artist) {
-		return new Response(JSON.stringify({ error: 'Artist not found' }), {
-			status: 404,
+		if (!artist) {
+			return new Response(JSON.stringify({ error: 'Artist not found' }), {
+				status: 404,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+
+		return new Response(JSON.stringify(artist), {
+			status: 200,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	} catch (error) {
+		return new Response(JSON.stringify({ error: 'Error fetching artist' }), {
+			status: 500,
 			headers: { 'Content-Type': 'application/json' }
 		});
 	}
-
-	// Transform the result to provide a simple `artworks` array
-	const transformedArtist = {
-		...artist,
-		artworks: artist.ArtistArtworks.map(aa => aa.artwork)
-	};
-	// delete transformedArtist.ArtistArtworks; // Optionally remove join table data
-
-	return new Response(JSON.stringify(transformedArtist), {
-		status: 200,
-		headers: { 'Content-Type': 'application/json' }
-	});
 }
 
 // PUT: Update Artist Details
@@ -68,6 +74,21 @@ export async function PUT({ params, request }) {
 					set: data.collectionIds?.map((collectionId: number) => ({
 						id: collectionId
 					}))
+				}
+			},
+			include: {
+				addresses: true,
+				ArtistArtworks: {
+					include: {
+						artwork: {
+							select: {
+								id: true,
+								title: true,
+								image_url: true,
+								enabled: true
+							}
+						}
+					}
 				}
 			}
 		});
@@ -97,7 +118,8 @@ export async function DELETE({ params }) {
 	} catch (error) {
 		console.error(`Error deleting artist with ID ${id}:`, error); // Log the specific error
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error deleting artist';
-		return new Response(JSON.stringify({ error: 'Error deleting artist', details: errorMessage }), { // Include details in response
+		return new Response(JSON.stringify({ error: 'Error deleting artist', details: errorMessage }), {
+			// Include details in response
 			status: 500,
 			headers: { 'Content-Type': 'application/json' }
 		});

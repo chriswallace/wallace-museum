@@ -9,6 +9,7 @@ import ffprobePath from '@ffprobe-installer/ffprobe';
 import { fileTypeFromBuffer } from 'file-type';
 import { v2 as cloudinary } from 'cloudinary';
 import { ipfsToHttpUrl } from './mediaUtils';
+import { sanitizeCloudinaryPublicId } from './cloudinaryUtils';
 
 // Import env object instead of a specific variable
 import { env } from '$env/dynamic/private';
@@ -88,19 +89,14 @@ export async function uploadToCloudinary(fileBuffer, fileName, mimeType) {
 		// Check if config worked by checking if cloud_name is now set
 		const currentConfig = cloudinary.config();
 		if (!currentConfig || !currentConfig.cloud_name) {
-			// Check cloud_name as indicator
 			console.error(
 				'[uploadToCloudinary] Failed to configure Cloudinary using CLOUDINARY_URL! Cloud Name MISSING.'
 			);
-			// Log the URL variable itself (be careful if logs are public)
 			console.error(
 				`[uploadToCloudinary] CLOUDINARY_URL value check: ${env.CLOUDINARY_URL ? 'Exists' : 'MISSING or empty'}`
 			);
 			throw new Error('Cloudinary configuration failed internally (URL method).');
 		}
-
-		// Config seems okay, log the detected cloud name
-		// console.log(`[uploadToCloudinary] Configured via URL. Cloud Name: ${currentConfig.cloud_name}`);
 
 		// Determine resource type based on mime type
 		let resource_type = 'auto';
@@ -110,19 +106,16 @@ export async function uploadToCloudinary(fileBuffer, fileName, mimeType) {
 			resource_type = 'video';
 		}
 
-		// Generate a unique public_id (optional, but recommended to avoid overwrites)
-		// Using the original filename + a hash might work, or just let Cloudinary generate one
+		// Generate a unique public_id using sanitized filename + hash
 		const baseName = path.parse(fileName).name;
 		const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex').substring(0, 8);
-		const public_id = `${baseName}_${hash}`;
+		const sanitizedBaseName = sanitizeCloudinaryPublicId(baseName);
+		const public_id = `compendium/${sanitizedBaseName}_${hash}`;
 
 		const uploadOptions = {
 			public_id: public_id,
-			folder: 'compendium', // Optional: specify a folder in Cloudinary
 			resource_type: resource_type,
-			overwrite: true // Or false if you want unique public_ids enforced
-			// Add tags, context, etc. if needed
-			// tags: generateTags(fileName) // If you adapt generateTags
+			overwrite: true
 		};
 
 		// Upload using buffer
@@ -141,9 +134,9 @@ export async function uploadToCloudinary(fileBuffer, fileName, mimeType) {
 		if (result && result.secure_url) {
 			return {
 				url: result.secure_url,
-				fileType: mimeType, // Keep original mime type
+				fileType: mimeType,
 				dimensions: { height: result.height, width: result.width },
-				publicId: result.public_id // Return public_id if needed later
+				publicId: result.public_id
 			};
 		} else {
 			throw new Error('Cloudinary upload failed or did not return a secure URL.');
@@ -153,8 +146,103 @@ export async function uploadToCloudinary(fileBuffer, fileName, mimeType) {
 		if (error.error) {
 			console.error('Cloudinary Error Details:', JSON.stringify(error.error, null, 2));
 		}
-		return null; // Indicate failure
+		return null;
 	}
+}
+
+/**
+ * Normalizes attributes/traits into a consistent format
+ * @param {Object} data - The NFT data containing attributes/traits
+ * @param {Object} options - Additional options for normalization
+ * @returns {Array} Normalized attributes array
+ */
+function normalizeAttributes(data, options = {}) {
+	const { metadata = {}, platformMetadata = {}, includeNullValues = false } = options;
+
+	let attributes = [];
+
+	// Process standard attributes array
+	const standardAttrs = data.attributes || metadata.attributes || [];
+	if (Array.isArray(standardAttrs)) {
+		attributes = attributes.concat(
+			standardAttrs
+				.map((attr) => {
+					if (typeof attr === 'object' && attr !== null) {
+						return {
+							trait_type: String(attr.trait_type || attr.name || '').trim(),
+							value: String(attr.value || '').trim()
+						};
+					}
+					return null;
+				})
+				.filter(Boolean)
+		);
+	}
+
+	// Process traits array
+	const traits = data.traits || metadata.traits || [];
+	if (Array.isArray(traits)) {
+		attributes = attributes.concat(
+			traits
+				.map((trait) => {
+					if (typeof trait === 'object' && trait !== null) {
+						return {
+							trait_type: String(trait.trait_type || trait.name || '').trim(),
+							value: String(trait.value || '').trim()
+						};
+					}
+					return null;
+				})
+				.filter(Boolean)
+		);
+	}
+
+	// Process properties object
+	const properties = data.properties || metadata.properties || {};
+	if (typeof properties === 'object' && properties !== null && !Array.isArray(properties)) {
+		const propertyTraits = Object.entries(properties)
+			.filter(([_, value]) => includeNullValues || value !== null)
+			.map(([key, value]) => ({
+				trait_type: String(key).trim(),
+				value: String(value || '').trim()
+			}));
+		attributes = attributes.concat(propertyTraits);
+	}
+
+	// Process features object (common in Art Blocks)
+	const features = data.features || metadata.features || {};
+	if (typeof features === 'object' && features !== null && !Array.isArray(features)) {
+		const featureTraits = Object.entries(features)
+			.filter(([_, value]) => includeNullValues || value !== null)
+			.map(([key, value]) => ({
+				trait_type: String(key).trim(),
+				value: String(value || '').trim()
+			}));
+		attributes = attributes.concat(featureTraits);
+	}
+
+	// Add platform-specific metadata
+	if (platformMetadata && typeof platformMetadata === 'object') {
+		const metadataTraits = Object.entries(platformMetadata)
+			.filter(([_, value]) => value !== '' && (includeNullValues || value !== null))
+			.map(([key, value]) => ({
+				trait_type: String(key).trim(),
+				value: String(value || '').trim()
+			}));
+		attributes = attributes.concat(metadataTraits);
+	}
+
+	// Remove duplicates while preserving order
+	const seenTraits = new Set();
+	attributes = attributes.filter((attr) => {
+		if (!attr || !attr.trait_type) return false;
+		const key = `${attr.trait_type.toLowerCase()}:${attr.value.toLowerCase()}`;
+		if (seenTraits.has(key)) return false;
+		seenTraits.add(key);
+		return true;
+	});
+
+	return attributes;
 }
 
 export async function normalizeOpenSeaMetadata(nft) {
@@ -167,33 +255,105 @@ export async function normalizeOpenSeaMetadata(nft) {
 	} else if (nft.contract || nft.slug) {
 		contract = nft.contract || nft.slug;
 	} else if (nft.collection) {
-		// fallback: try to use any string property as contract
 		contract = nft.collection.id || nft.collection.name || '';
 	}
+
+	// Prioritize image fields
+	const image_url =
+		metadata.image ||
+		metadata.image_url ||
+		nft.image ||
+		nft.image_url ||
+		nft.image_original_url ||
+		nft.image_preview_url ||
+		nft.display_image_url ||
+		nft.image_thumbnail_url;
+
+	// Prioritize animation fields
+	const animation_url = metadata.animation_url || nft.animation_url || nft.display_animation_url;
+
+	// Platform-specific metadata for attributes
+	const platformMetadata = {
+		Platform: metadata.platform === 'Art Blocks Presents' ? 'Art Blocks Presents' : 'Ethereum',
+		'Script Type': metadata.script_type || nft.script_type || '',
+		License: metadata.license || nft.license || '',
+		'Is Static': String(metadata.is_static || nft.is_static || false)
+	};
+
+	// Normalize attributes
+	const attributes = normalizeAttributes(nft, {
+		metadata,
+		platformMetadata,
+		includeNullValues: false
+	});
 
 	return {
 		name: metadata.name || nft.name,
 		tokenID: metadata.tokenID || metadata.tokenId || nft.tokenID || nft.tokenId || nft.identifier,
 		description: metadata.description || nft.description,
-		artist: nft.creator || 'Unknown Artist',
+		artist: metadata.artist || nft.artist || 'Unknown Artist',
 		blockchain: 'Ethereum',
-		image_url: metadata.image || nft.image_url || nft.display_image_url,
-		animation_url: metadata.animation_url || nft.animation_url || nft.display_animation_url,
-		tags: nft.tags || [],
-		website: nft.website || metadata.external_url || '',
-		attributes: metadata.attributes || nft.traits || [],
+		image_url,
+		animation_url,
+		tags: metadata.tags || nft.tags || [],
+		website: metadata.website || metadata.external_url || nft.website || nft.external_url || '',
+		attributes: JSON.stringify(attributes),
 		collection: {
 			name: (nft.collection && nft.collection.name) || '',
 			contract: contract,
 			blockchain: 'Ethereum',
-			total_supply: (nft.collection && nft.collection.total_supply) || undefined
-		}
+			platform: metadata.platform || nft.platform || 'Ethereum'
+		},
+		raw_data: JSON.stringify({
+			attributes: metadata.attributes || nft.attributes,
+			traits: metadata.traits || nft.traits,
+			features: metadata.features || nft.features
+		})
 	};
 }
 
 export async function normalizeTezosMetadata(nft) {
 	const metadata = nft.metadata || {};
 	const creator = nft.creators && nft.creators.length > 0 ? nft.creators[0] : {};
+
+	// Normalize media URLs
+	const image_url =
+		metadata.image ||
+		metadata.displayUri ||
+		metadata.artifactUri ||
+		nft.image_url ||
+		nft.displayUri ||
+		nft.artifactUri;
+
+	// For Tezos, animation_url could be in various fields
+	const animation_url =
+		metadata.animation_url ||
+		metadata.animationUri ||
+		metadata.interactive_uri ||
+		nft.animation_url ||
+		nft.animationUri ||
+		nft.interactive_uri;
+
+	// Platform-specific metadata for attributes
+	const platformMetadata = {
+		Platform: 'Tezos',
+		Marketplace: metadata.marketplace || nft.marketplace || '',
+		Editions: String(metadata.editions || nft.editions || '1'),
+		'MIME Type': metadata.mimeType || metadata.mime || nft.mime || ''
+	};
+
+	// Normalize attributes
+	const attributes = normalizeAttributes(nft, {
+		metadata,
+		platformMetadata,
+		includeNullValues: false
+	});
+
+	// Format social media accounts
+	const social_media_accounts = {
+		twitter: creator.holder?.twitter || '',
+		instagram: creator.holder?.instagram || ''
+	};
 
 	return {
 		name: metadata.name || nft.name || 'Unknown Name',
@@ -206,25 +366,27 @@ export async function normalizeTezosMetadata(nft) {
 			bio: creator.holder?.description || '',
 			avatarUrl: creator.holder?.logo || '',
 			website: creator.holder?.website || '',
-			social_media_accounts: {
-				twitter: creator.holder?.twitter || '',
-				instagram: creator.holder?.instagram || ''
-			}
+			social_media_accounts: JSON.stringify(social_media_accounts)
 		},
 		platform: 'Tezos',
-		mime: nft.mime || '',
-		image_url: nft.image_url,
-		animation_url: nft.animation_url,
-		tags: metadata.tags || [],
-		website: metadata.website || '',
-		attributes: nft.attributes || metadata.attributes || [],
-		symbol: nft.symbol || metadata.symbol || '',
-		supply: nft.supply || 1,
+		mime: metadata.mimeType || metadata.mime || nft.mime || '',
+		image_url,
+		animation_url,
+		tags: metadata.tags || nft.tags || [],
+		website: metadata.website || metadata.homepage || nft.website || '',
+		attributes: JSON.stringify(attributes),
+		symbol: metadata.symbol || nft.symbol || '',
+		supply: metadata.editions || nft.editions || metadata.supply || nft.supply || 1,
 		collection: {
-			name: nft.fa?.name || '',
-			address: nft.fa?.contract || '',
+			name: nft.fa?.name || metadata.collection_name || nft.collection_name || '',
+			address: nft.fa?.contract || metadata.collection_address || nft.collection_address || '',
 			blockchain: 'Tezos'
-		}
+		},
+		raw_data: JSON.stringify({
+			attributes: metadata.attributes || nft.attributes,
+			properties: metadata.properties || nft.properties,
+			traits: metadata.traits || nft.traits
+		})
 	};
 }
 
@@ -330,18 +492,137 @@ async function getVideoDimensions(buffer) {
 }
 
 export async function handleMediaUpload(mediaUri, artwork) {
+	if (!mediaUri) {
+		console.error('No media URI provided for upload');
+		return null;
+	}
+
+	console.log(
+		`[MEDIA_UPLOAD] Processing media URI: ${mediaUri} for artwork:`,
+		artwork?.name || 'Unknown'
+	);
+
+	// Special handling for Art Blocks generator URLs
+	if (mediaUri && mediaUri.includes('generator.artblocks.io')) {
+		console.log('[MEDIA_UPLOAD] Detected Art Blocks generator URL');
+		return {
+			url: mediaUri,
+			fileType: 'text/html',
+			dimensions: artwork.dimensions || {
+				width: artwork.aspect_ratio ? Math.round(1000 * artwork.aspect_ratio) : 1000,
+				height: 1000
+			}
+		};
+	}
+
+	// Handle Art Blocks media proxy URLs and direct image URLs
+	if (
+		mediaUri &&
+		(mediaUri.includes('media-proxy.artblocks.io') ||
+			mediaUri.includes('artblocks.io') ||
+			mediaUri.match(/\.(png|jpg|jpeg|gif|webp)$/i))
+	) {
+		console.log('[MEDIA_UPLOAD] Detected Art Blocks media URL or image file');
+
+		try {
+			// Always try to fetch and process the image
+			const mediaData = await fetchMedia(mediaUri);
+			if (!mediaData || !mediaData.buffer) {
+				console.error(`[MEDIA_UPLOAD] Failed to fetch media from ${mediaUri}`);
+				return null;
+			}
+
+			// Upload to Cloudinary
+			console.log('[MEDIA_UPLOAD] Uploading to Cloudinary...');
+			const uploadResult = await uploadToCloudinary(
+				mediaData.buffer,
+				artwork.name || 'artblocks_image',
+				mediaData.mimeType || 'image/png'
+			);
+
+			if (!uploadResult) {
+				console.error('[MEDIA_UPLOAD] Cloudinary upload failed');
+				return null;
+			}
+
+			console.log('[MEDIA_UPLOAD] Successfully uploaded to Cloudinary:', uploadResult.url);
+			return {
+				url: uploadResult.url,
+				fileType: mediaData.mimeType || 'image/png',
+				dimensions: uploadResult.dimensions ||
+					artwork.dimensions || {
+						width: artwork.aspect_ratio ? Math.round(1000 * artwork.aspect_ratio) : 1000,
+						height: 1000
+					}
+			};
+		} catch (error) {
+			console.error('[MEDIA_UPLOAD] Error processing Art Blocks media:', error);
+			return null;
+		}
+	}
+
+	// Special handling for Tezos IPFS URLs
+	if (
+		mediaUri &&
+		(mediaUri.includes('ipfs://') ||
+			mediaUri.includes('ipfs.io') ||
+			mediaUri.includes('cloudflare-ipfs.com') ||
+			mediaUri.includes('pinata.cloud'))
+	) {
+		// Convert IPFS URL to HTTP URL if needed
+		const httpUrl = ipfsToHttpUrl(mediaUri);
+
+		// For known HTML/interactive content
+		if (
+			(artwork.mime && artwork.mime === 'text/html') ||
+			httpUrl.includes('fxhash.xyz') ||
+			httpUrl.includes('objkt.com/o/')
+		) {
+			return {
+				url: httpUrl,
+				fileType: 'text/html',
+				dimensions: artwork.dimensions || { width: 1000, height: 1000 }
+			};
+		}
+
+		// For known image types
+		const isImage =
+			httpUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ||
+			(artwork.mime && artwork.mime.startsWith('image/'));
+
+		if (isImage) {
+			return {
+				url: httpUrl,
+				fileType: artwork.mime || 'image/png',
+				dimensions: artwork.dimensions || { width: 1000, height: 1000 }
+			};
+		}
+
+		// For known video types
+		const isVideo =
+			httpUrl.match(/\.(mp4|webm|ogg)$/i) || (artwork.mime && artwork.mime.startsWith('video/'));
+
+		if (isVideo) {
+			return {
+				url: httpUrl,
+				fileType: artwork.mime || 'video/mp4',
+				dimensions: artwork.dimensions || { width: 1000, height: 1000 }
+			};
+		}
+	}
+
+	// Regular media handling for other URLs
+	console.log('[MEDIA_UPLOAD] Processing as regular media URL');
 	const mediaData = await fetchMedia(mediaUri);
 	if (!mediaData) {
-		console.error(`Unsupported or unprocessable media at URI: ${mediaUri}`);
+		console.error(`[MEDIA_UPLOAD] Failed to fetch/process media from ${mediaUri}`);
 		return null;
 	}
 
 	let dimensions = mediaData.dimensions;
 	if (!dimensions || dimensions.width === 0 || dimensions.height === 0) {
-		console.warn(
-			'Dimensions are missing or invalid, resizing might not correctly adjust dimensions.'
-		);
-		dimensions = { width: undefined, height: undefined };
+		console.warn('[MEDIA_UPLOAD] Missing dimensions, using defaults');
+		dimensions = { width: 1000, height: 1000 };
 	}
 
 	try {
@@ -350,33 +631,32 @@ export async function handleMediaUpload(mediaUri, artwork) {
 
 		// Only resize if it's an image
 		if (mediaData.mimeType.startsWith('image/')) {
+			console.log('[MEDIA_UPLOAD] Resizing image...');
 			const resizeResult = await resizeMedia(mediaData.buffer, mediaData.mimeType, dimensions);
 			finalBuffer = resizeResult.buffer;
 			finalDimensions = resizeResult.dimensions || dimensions;
-		} else {
-			// If it's a video, skip resizing and use original buffer/dimensions (which will be null if fetchMedia was modified)
-			// console.log(`[handleMediaUpload] Skipping resize for video: ${mediaUri}`);
 		}
 
-		// console.log('finalBuffer (pre-upload)', finalBuffer);
-		// console.log('artwork name', artwork.name);
-		// console.log('mimeType', mediaData.mimeType);
-
+		console.log('[MEDIA_UPLOAD] Uploading to Cloudinary...');
 		const uploadResult = await uploadToCloudinary(
 			finalBuffer,
-			mediaData.fileName,
+			artwork.name || 'artwork',
 			mediaData.mimeType
 		);
 
-		return uploadResult
-			? {
-					url: uploadResult.url,
-					fileType: mediaData.mimeType,
-					dimensions: finalDimensions
-				}
-			: null;
+		if (!uploadResult) {
+			console.error('[MEDIA_UPLOAD] Cloudinary upload failed');
+			return null;
+		}
+
+		console.log('[MEDIA_UPLOAD] Successfully uploaded to Cloudinary:', uploadResult.url);
+		return {
+			url: uploadResult.url,
+			fileType: mediaData.mimeType,
+			dimensions: finalDimensions
+		};
 	} catch (error) {
-		console.error(`Failed to handle media upload for URI: ${mediaUri}`, error);
+		console.error('[MEDIA_UPLOAD] Error during media processing:', error);
 		return null;
 	}
 }

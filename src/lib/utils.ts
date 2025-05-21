@@ -24,7 +24,10 @@ export function placeholderAvatar(name: string): string {
 }
 
 // Helper function to find a specific attribute by name
-export function findAttribute(attributes: Attribute[] | null | undefined, trait_type: string): any | null {
+export function findAttribute(
+	attributes: Attribute[] | null | undefined,
+	trait_type: string
+): any | null {
 	if (!attributes || !Array.isArray(attributes)) return null;
 	const attribute = attributes.find((attr) => attr.trait_type === trait_type);
 	return attribute ? attribute.value : null;
@@ -55,3 +58,25 @@ export const isImage = async (url: string): Promise<boolean> => {
 		return false;
 	}
 };
+
+export function getContractUrl(address: string, blockchain?: string): string | undefined {
+	if (!address) return undefined;
+
+	// Handle Tezos addresses
+	if (address.startsWith('KT1') || address.startsWith('KT2')) {
+		return `https://tzkt.io/${address}`;
+	}
+
+	// Handle Ethereum-like addresses
+	if (address.startsWith('0x')) {
+		switch (blockchain?.toLowerCase()) {
+			case 'polygon':
+				return `https://polygonscan.com/address/${address}`;
+			case 'ethereum':
+			default:
+				return `https://etherscan.io/address/${address}`;
+		}
+	}
+
+	return undefined;
+}

@@ -1,13 +1,32 @@
-<script>
+<script lang="ts">
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { showToast } from '$lib/toastHelper';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores'; // Import the page store
 
-	export let artist;
+	interface Artist {
+		id: number;
+		name: string;
+	}
 
-	let artwork = {
+	interface Collection {
+		id: number;
+		title: string;
+	}
+
+	interface Artwork {
+		title: string;
+		description: string;
+		image: string;
+		curatorNotes: string;
+		artistId: string;
+		collectionId: string;
+	}
+
+	export let artist: Artist | undefined;
+
+	let artwork: Artwork = {
 		title: '',
 		description: '',
 		image: '',
@@ -16,9 +35,13 @@
 		collectionId: ''
 	};
 
-	let artists = [];
-	let collections = [];
+	let artists: Artist[] = [];
+	let collections: Collection[] = [];
 	let error = '';
+
+	function goBack() {
+		history.back();
+	}
 
 	async function fetchArtwork() {
 		try {
@@ -42,9 +65,9 @@
 
 	async function addArtwork() {
 		const formData = new FormData();
-		const fileInput = document.querySelector('input[type="file"]');
+		const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
 
-		if (fileInput.files[0]) {
+		if (fileInput?.files?.[0]) {
 			formData.append('image', fileInput.files[0]);
 		}
 
@@ -89,7 +112,10 @@
 		if (browser) {
 			fetchArtwork().then(() => {
 				if (collections.length > 0) {
-					artwork.collectionId = Number($page.url.searchParams.get('cID'));
+					const collectionId = $page.url.searchParams.get('cID');
+					if (collectionId) {
+						artwork.collectionId = collectionId;
+					}
 				}
 			});
 		}
@@ -104,9 +130,9 @@
 	{#if error}
 		<p class="error">{error}</p>
 	{:else}
-        <div>
-            <a class="back-btn" href="/admin/collections">&lt; Back to Collections</a>
-        </div>
+		<div>
+			<button class="back-btn" on:click={goBack}>&lt; Back</button>
+		</div>
 		<h1>Add new artwork</h1>
 		<div class="edit-form">
 			<div class="artwork">

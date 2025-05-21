@@ -55,7 +55,7 @@
 		blockchain: '',
 		tokenID: '',
 		mintDate: '',
-		enabled: true,
+		enabled: true
 	};
 
 	interface Collection {
@@ -90,10 +90,13 @@
 			showToast('Artwork saved.', 'success');
 			const updatedData = await response.json();
 			artwork = updatedData;
-			selectedArtistIds = artwork.artists?.map(a => a.id) || [];
+			selectedArtistIds = artwork.artists?.map((a) => a.id) || [];
 		} else {
 			const errorData = await response.json();
-			showToast(`Failed to update artwork: ${errorData.details || errorData.error || 'Unknown error'}`, 'error');
+			showToast(
+				`Failed to update artwork: ${errorData.details || errorData.error || 'Unknown error'}`,
+				'error'
+			);
 		}
 	}
 
@@ -107,7 +110,10 @@
 			goto('/admin/artworks');
 		} else {
 			const errorData = await response.json();
-			showToast(`Failed to delete artwork: ${errorData.details || errorData.error || 'Unknown error'}`, 'error');
+			showToast(
+				`Failed to delete artwork: ${errorData.details || errorData.error || 'Unknown error'}`,
+				'error'
+			);
 		}
 	}
 
@@ -127,7 +133,7 @@
 
 			if (artworkRes.ok) {
 				artwork = await artworkRes.json();
-				selectedArtistIds = artwork.artists?.map(a => a.id) || [];
+				selectedArtistIds = artwork.artists?.map((a) => a.id) || [];
 			} else {
 				error = 'Failed to fetch artwork';
 			}
@@ -147,6 +153,10 @@
 		}
 	}
 
+	function goBack() {
+		history.back();
+	}
+
 	onMount(() => {
 		if (browser) {
 			fetchArtwork();
@@ -164,7 +174,7 @@
 	{:else if error}
 		<p class="error">{error}</p>
 	{:else}
-		<a class="back-btn" href="/admin/artworks">&lt; Back</a>
+		<button class="back-btn" on:click={goBack}>&lt; Back</button>
 		<h1>Edit artwork</h1>
 		<div class="grid grid-cols-2 gap-12">
 			<div>
@@ -195,7 +205,7 @@
 						<select id="collection" bind:value={artwork.collectionId}>
 							<option value={null}>-- No Collection --</option>
 							{#each collections as collection}
-							<option value={collection.id}>{collection.title}</option>
+								<option value={collection.id}>{collection.title}</option>
 							{/each}
 						</select>
 					</div>
@@ -232,7 +242,7 @@
 		border: 1px solid #ccc;
 		border-radius: 4px;
 	}
-	
+
 	form > div {
 		margin-bottom: 1rem;
 	}
@@ -243,8 +253,8 @@
 		margin-bottom: 0.5rem;
 	}
 
-	input[type="text"],
-	input[type="url"],
+	input[type='text'],
+	input[type='url'],
 	textarea,
 	select {
 		width: 100%;

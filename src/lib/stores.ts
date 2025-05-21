@@ -66,7 +66,8 @@ function createSelectedArtworkStore(): SelectedArtworkStore {
 
 // Helper function to safely access localStorage
 function safeLocalStorage() {
-	if (browser) { // Use imported browser check
+	if (browser) {
+		// Use imported browser check
 		return window.localStorage;
 	}
 	// Mock localStorage for server-side compatibility
@@ -102,15 +103,16 @@ export function createLocalStorageStore<T>(key: string, startValue: T): LocalSto
 
 		// Safely add event listener for storage events
 		window.addEventListener('storage', (event) => {
-			if (event.key === key && event.newValue) { // Check if newValue exists
+			if (event.key === key && event.newValue) {
+				// Check if newValue exists
 				try {
 					set(JSON.parse(event.newValue));
 				} catch (e) {
-					 console.error(`Error parsing storage event for key "${key}":`, e);
+					console.error(`Error parsing storage event for key "${key}":`, e);
 				}
 			} else if (event.key === key && !event.newValue) {
-				 // Handle removal or clearing of the item
-				 set(startValue); // Reset to startValue or handle as appropriate
+				// Handle removal or clearing of the item
+				set(startValue); // Reset to startValue or handle as appropriate
 			}
 		});
 	}
@@ -148,7 +150,7 @@ export function createLocalStorageStore<T>(key: string, startValue: T): LocalSto
 			if (browser) {
 				const json = storage.getItem(key);
 				if (json) {
-					 try {
+					try {
 						set(JSON.parse(json));
 					} catch (e) {
 						console.error(`Error parsing localStorage key "${key}" on useLocalStorage:`, e);
@@ -175,7 +177,7 @@ export const isLoading = writable<boolean>(false);
 export const isModalOpen = writable<boolean>(false);
 export const selectedNfts = writable<Set<number>>(new Set()); // Assuming IDs are numbers
 export const selectAllChecked = writable<boolean>(false);
-export const reviewData = writable<{ collections: any[], artists: any[] }>({ collections: [], artists: [] }); // Use specific types if known
+export const reviewData = writable<{ collections: any[] }>({ collections: [] });
 export const updatedNfts = writable<Artwork[]>([]);
 export const selectedArtwork = createSelectedArtworkStore();
 export const isMaximized = writable<boolean>(false);

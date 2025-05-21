@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
+	import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
 
 	export let data: { title: string; artworks: Artwork[] };
 
@@ -131,7 +132,10 @@
 		const baseTransform = 'q_auto,f_auto';
 
 		if (artwork.dimensions.width && artwork.dimensions.width <= renderedWidth) {
-			newSrc = getCloudinaryTransformedUrl(artwork.image_url, `${baseTransform},w_${artwork.dimensions.width}`);
+			newSrc = getCloudinaryTransformedUrl(
+				artwork.image_url,
+				`${baseTransform},w_${artwork.dimensions.width}`
+			);
 			srcsetStr = `${newSrc} 1x`;
 		} else {
 			let size_1x = renderedWidth;
@@ -144,9 +148,18 @@
 				size_3x = Math.min(artwork.dimensions.width, size_3x);
 			}
 
-			const url_1x = getCloudinaryTransformedUrl(artwork.image_url, `${baseTransform},w_${size_1x}`);
-			const url_2x = getCloudinaryTransformedUrl(artwork.image_url, `${baseTransform},w_${size_2x}`);
-			const url_3x = getCloudinaryTransformedUrl(artwork.image_url, `${baseTransform},w_${size_3x}`);
+			const url_1x = getCloudinaryTransformedUrl(
+				artwork.image_url,
+				`${baseTransform},w_${size_1x}`
+			);
+			const url_2x = getCloudinaryTransformedUrl(
+				artwork.image_url,
+				`${baseTransform},w_${size_2x}`
+			);
+			const url_3x = getCloudinaryTransformedUrl(
+				artwork.image_url,
+				`${baseTransform},w_${size_3x}`
+			);
 
 			srcsetStr = `${url_1x} 1x, ${url_2x} 2x, ${url_3x} 3x`;
 			newSrc = url_1x;
@@ -182,7 +195,9 @@
 				class:highlighted={$selectedArtwork && $selectedArtwork.id === artwork.id}
 				class:maximized={$isMaximized}
 				class="artwork-item {loadedClasses[String(artwork.id)]}"
-				style="aspect-ratio: {artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'};"
+				style="aspect-ratio: {artwork.dimensions
+					? `${artwork.dimensions.width}/${artwork.dimensions.height}`
+					: '1/1'};"
 				tabindex="-1"
 				role="button"
 				aria-label="Focus Artwork"
@@ -191,17 +206,33 @@
 				<button class="close icon-button" on:click={closeFullscreen}>Close</button>
 				<div
 					class="media-container"
-					style="aspect-ratio: {artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'};"
+					style="aspect-ratio: {artwork.dimensions
+						? `${artwork.dimensions.width}/${artwork.dimensions.height}`
+						: '1/1'};"
 				>
+					{#if loadingStates[String(artwork.id)]}
+						<SkeletonLoader
+							height={artwork.dimensions ? `${artwork.dimensions.height}px` : '100%'}
+							width={artwork.dimensions ? `${artwork.dimensions.width}px` : '100%'}
+						/>
+					{/if}
+
 					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.mime && (artwork.mime.startsWith('application') || artwork.mime.startsWith('text')) && artwork.animation_url && $isLiveCodeVisible}
 						<iframe
 							src={artwork.animation_url}
 							class="live-code"
 							title="Artwork Animation"
 							on:load={() => handleMediaLoad(artwork.id)}
+							class:hidden={loadingStates[String(artwork.id)]}
 						></iframe>
 					{:else if artwork.mime?.startsWith('video') && artwork.animation_url && artwork.animation_url.length > 0}
-						<video autoplay loop muted on:loadeddata={() => handleMediaLoad(artwork.id)}>
+						<video
+							autoplay
+							loop
+							muted
+							on:loadeddata={() => handleMediaLoad(artwork.id)}
+							class:hidden={loadingStates[String(artwork.id)]}
+						>
 							<source
 								src={artwork.animation_url}
 								type="video/mp4"
@@ -218,6 +249,7 @@
 							srcset={artwork.srcset}
 							sizes={artwork.sizes}
 							on:load={() => handleMediaLoad(artwork.id)}
+							class:hidden={loadingStates[String(artwork.id)]}
 						/>
 					{/if}
 
@@ -368,5 +400,9 @@
 			@apply bg-black;
 			background-image: url('/images/close-dark-mode.svg');
 		}
+	}
+
+	.hidden {
+		@apply opacity-0;
 	}
 </style>

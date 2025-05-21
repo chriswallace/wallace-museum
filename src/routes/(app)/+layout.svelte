@@ -9,19 +9,34 @@
 </svelte:head>
 
 <div class="page-container">
-	<slot />
-	
+	<div class="content">
+		<slot />
+	</div>
+
 	<footer class="site-footer">
 		<div class="footer-content">
-			<div class="copyright">				
-				<p class="text-white font-bold">The Wallace Collection</p>
-				<p>{new Date().getFullYear()} &copy; Chris Wallace. All rights reserved. All artworks remain the property of their respective creators.</p>
+			<div class="copyright">
+				<p class="text-white font-bold">Wallace Museum</p>
+				<p>
+					{new Date().getFullYear()} &copy; Chris Wallace. All rights reserved. All artworks remain the
+					property of their respective creators.
+				</p>
 			</div>
 			<div class="social-links">
-				<a href="https://twitter.com/chriswallace" target="_blank" rel="noopener noreferrer" class="social-link">
+				<a
+					href="https://twitter.com/chriswallace"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="social-link"
+				>
 					@chriswallace
 				</a>
-				<a href="https://chriswallace.net" target="_blank" rel="noopener noreferrer" class="social-link">
+				<a
+					href="https://chriswallace.net"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="social-link"
+				>
 					chriswallace.net
 				</a>
 			</div>
@@ -43,12 +58,18 @@
 			color: rgb(68, 240, 114);
 		}
 	}
+
 	.page-container {
-		@apply min-h-screen;
+		@apply min-h-screen flex flex-col relative;
+	}
+
+	.content {
+		@apply flex-grow;
 	}
 
 	.site-footer {
-		@apply py-8 mt-16 border-t border-gray-900/20;
+		@apply py-8 mt-16 border-t border-gray-900/20 relative z-10;
+		background: rgba(0, 0, 0, 0.95);
 	}
 
 	.footer-content {
@@ -56,11 +77,11 @@
 	}
 
 	.copyright {
-		@apply text-base font-semibold text-gray-600 tracking-tight;
+		@apply text-base text-gray-600 tracking-tight;
 	}
 
 	.copyright p {
-		@apply m-0 mb-1 text-base font-bold;
+		@apply m-0 mb-1 text-base;
 	}
 
 	.artists-copyright {

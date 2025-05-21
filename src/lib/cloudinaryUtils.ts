@@ -1,3 +1,5 @@
+import { env } from '$env/dynamic/public';
+
 // ** IMPORTANT: This file currently uses a placeholder for the Cloudinary Cloud Name. **
 // ** You MUST define PUBLIC_CLOUDINARY_CLOUD_NAME in your SvelteKit environment **
 // ** (e.g., in .env file) and uncomment the import below for Cloudinary URLs to work correctly. **
@@ -5,7 +7,7 @@
 // import { PUBLIC_CLOUDINARY_CLOUD_NAME as CLOUD_NAME_FROM_ENV } from '$env/dynamic/public'; // Uncomment after defining in .env
 
 // Placeholder logic - Relies solely on this until import is uncommented
-const PUBLIC_CLOUDINARY_CLOUD_NAME = 'your_cloud_name_placeholder';
+const PUBLIC_CLOUDINARY_CLOUD_NAME = env.PUBLIC_CLOUDINARY_CLOUD_NAME;
 // const PUBLIC_CLOUDINARY_CLOUD_NAME = CLOUD_NAME_FROM_ENV || 'your_cloud_name_placeholder'; // Use this line once import is restored
 
 /**
@@ -13,7 +15,10 @@ const PUBLIC_CLOUDINARY_CLOUD_NAME = 'your_cloud_name_placeholder';
  * Assumes URL format like: https://res.cloudinary.com/<cloud_name>/<resource_type>/upload/<version>/<public_id>.<format>
  * or https://res.cloudinary.com/<cloud_name>/<resource_type>/upload/<public_id>
  */
-function extractPublicIdAndResourceType(url: string): { publicId: string | null; resourceType: string | null } {
+function extractPublicIdAndResourceType(url: string): {
+	publicId: string | null;
+	resourceType: string | null;
+} {
 	if (!url) {
 		return { publicId: null, resourceType: null };
 	}
@@ -32,12 +37,12 @@ function extractPublicIdAndResourceType(url: string): { publicId: string | null;
 		// Remove version prefix if present (e.g., v1234567890/)
 		const publicIdWithoutVersion = publicIdWithPotentialVersion.replace(/^v\d+\//, '');
 		// Remove format extension
-		const publicId = publicIdWithoutVersion.replace(/\.[^/.]+$/, "");
+		const publicId = publicIdWithoutVersion.replace(/\.[^/.]+$/, '');
 
 		if (!publicId || !resourceType) {
- 			console.warn('[cloudinaryUtils] Could not extract publicId or resourceType:', url);
- 			return { publicId: null, resourceType: null };
- 		}
+			console.warn('[cloudinaryUtils] Could not extract publicId or resourceType:', url);
+			return { publicId: null, resourceType: null };
+		}
 
 		return { publicId, resourceType };
 	} catch (error) {
@@ -52,14 +57,22 @@ function extractPublicIdAndResourceType(url: string): { publicId: string | null;
  * @param transformations Cloudinary transformation string (e.g., "w_400,q_auto,f_auto").
  * @returns The transformed URL, or the original URL if extraction fails.
  */
-export function getCloudinaryTransformedUrl(baseUrl: string | undefined | null, transformations: string): string {
+export function getCloudinaryTransformedUrl(
+	baseUrl: string | undefined | null,
+	transformations: string
+): string {
 	if (!baseUrl) return ''; // Return empty string if no base URL
 
 	// Check if using the placeholder
-	if (!PUBLIC_CLOUDINARY_CLOUD_NAME || PUBLIC_CLOUDINARY_CLOUD_NAME === 'your_cloud_name_placeholder') {
-		console.warn('*** CLOUDINARY WARNING: Using placeholder cloud name. Define PUBLIC_CLOUDINARY_CLOUD_NAME in your environment and update cloudinaryUtils.ts. ***');
+	if (
+		!PUBLIC_CLOUDINARY_CLOUD_NAME ||
+		PUBLIC_CLOUDINARY_CLOUD_NAME === 'your_cloud_name_placeholder'
+	) {
+		console.warn(
+			'*** CLOUDINARY WARNING: Using placeholder cloud name. Define PUBLIC_CLOUDINARY_CLOUD_NAME in your environment and update cloudinaryUtils.ts. ***'
+		);
 		// Return original URL if env var is missing or using placeholder
-        return baseUrl; 
+		return baseUrl;
 	}
 
 	const { publicId, resourceType } = extractPublicIdAndResourceType(baseUrl);
@@ -78,7 +91,21 @@ export function getCloudinaryTransformedUrl(baseUrl: string | undefined | null, 
  * Primarily used for simple image displays where only width might be needed.
  */
 export function getCloudinaryImageUrl(baseUrl: string | undefined | null, width?: number): string {
-    const baseTransforms = 'q_auto,f_auto';
-    const widthTransform = width ? `,w_${width}` : '';
-    return getCloudinaryTransformedUrl(baseUrl, `${baseTransforms}${widthTransform}`);
-} 
+	const baseTransforms = 'q_auto,f_auto';
+	const widthTransform = width ? `,w_${width}` : '';
+	return getCloudinaryTransformedUrl(baseUrl, `${baseTransforms}${widthTransform}`);
+}
+
+/**
+ * Sanitizes a string to be used as a Cloudinary public_id.
+ * Replaces invalid characters and ensures the result is URL and Cloudinary-safe.
+ */
+export function sanitizeCloudinaryPublicId(input: string): string {
+	if (!input) return '';
+
+	return input
+		.replace(/[^a-zA-Z0-9]/g, '_') // Replace any non-alphanumeric chars with underscore
+		.replace(/_+/g, '_') // Replace multiple underscores with single underscore
+		.replace(/^_|_$/g, '') // Remove leading/trailing underscores
+		.toLowerCase(); // Convert to lowercase for consistency
+}

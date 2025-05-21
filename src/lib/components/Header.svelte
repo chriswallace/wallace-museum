@@ -1,7 +1,7 @@
 <script lang="ts">
 	import CollectionDropdown from '$lib/components/CollectionDropdown.svelte';
 	import { page } from '$app/stores';
-	import { selectedArtwork, isLiveCodeVisible } from '$lib/stores.ts';
+	import { selectedArtwork, isLiveCodeVisible } from '$lib/stores';
 	import { get } from 'svelte/store';
 	import { onMount } from 'svelte';
 
@@ -69,6 +69,18 @@
 		});
 	}
 
+	function parseAttributes(
+		attributes: string | any[] | null | undefined
+	): { trait_type: string; value: string }[] {
+		if (!attributes) return [];
+		if (Array.isArray(attributes)) return attributes;
+		try {
+			const parsed = JSON.parse(attributes);
+			return Array.isArray(parsed) ? parsed : [];
+		} catch {
+			return [];
+		}
+	}
 </script>
 
 <header>
@@ -98,11 +110,16 @@
 				{#each artworkDetails.ArtistArtworks as artistArtwork, i (artistArtwork.artist.id)}
 					<span class="artist-name">
 						{#if artistArtwork.artist.websiteUrl}
-							<a href={artistArtwork.artist.websiteUrl} target="_blank" rel="noopener noreferrer">{artistArtwork.artist.name}</a>
+							<a href={artistArtwork.artist.websiteUrl} target="_blank" rel="noopener noreferrer"
+								>{artistArtwork.artist.name}</a
+							>
 						{:else}
 							{artistArtwork.artist.name}
 						{/if}
-					</span>{artworkDetails.ArtistArtworks.length > 1 && i < artworkDetails.ArtistArtworks.length - 1 ? ', ' : ''}
+					</span>{artworkDetails.ArtistArtworks.length > 1 &&
+					i < artworkDetails.ArtistArtworks.length - 1
+						? ', '
+						: ''}
 				{/each}
 			</div>
 		{/if}
@@ -115,10 +132,10 @@
 
 				<p class="artwork-description">{@html convertToHTML(artworkDetails.description)}</p>
 
-				{#if artworkDetails && artworkDetails.attributes && artworkDetails.attributes.length > 0}
+				{#if artworkDetails && artworkDetails.attributes}
 					<h3 class="mt-8 mb-4">Attributes</h3>
 					<dl>
-						{#each artworkDetails.attributes as attribute}
+						{#each parseAttributes(artworkDetails.attributes) as attribute}
 							<dt>{attribute.trait_type}</dt>
 							<dd>{attribute.value}</dd>
 						{/each}
@@ -243,7 +260,7 @@
 		content: '';
 	}
 
-	.artist-name{
+	.artist-name {
 		@apply text-sm font-normal;
 	}
 
@@ -251,7 +268,7 @@
 		@apply text-2xl mb-4 font-bold leading-normal;
 	}
 
-	.artwork-description{
+	.artwork-description {
 		@apply text-sm leading-relaxed max-w-full overflow-x-hidden;
 	}
 
@@ -288,7 +305,6 @@
 		.collection-details {
 			@apply border-gray-700;
 		}
-
 	}
 
 	.live-code {

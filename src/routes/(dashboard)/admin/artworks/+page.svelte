@@ -2,12 +2,13 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { toast } from '@zerodevx/svelte-toast';
+	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
 
 	let artworks = [];
 	let page = 1;
 	let totalPages = 0;
-	let sortColumn = null;
-	let sortOrder = null; // 'asc' for ascending, 'desc' for descending
+	let sortColumn = 'title';
+	let sortOrder = 'asc'; // 'asc' for ascending, 'desc' for descending
 	let searchQuery = '';
 
 	async function fetchArtworks(page = 1) {
@@ -46,7 +47,6 @@
 	});
 
 	function editArtwork(id) {
-		// navigate to the artwork edit page
 		goto(`/admin/artworks/edit/${id}`);
 	}
 
@@ -59,7 +59,7 @@
 
 	function changeSorting(column) {
 		if (sortColumn === column) {
-			sortOrder = sortOrder === 'asc' ? 'desc' : sortOrder === 'desc' ? null : 'asc';
+			sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
 		} else {
 			sortColumn = column;
 			sortOrder = 'asc';
@@ -137,7 +137,13 @@
 					</td>
 					<td>
 						<button class="image" on:click={() => editArtwork(artwork.id)}>
-							<img src="{artwork.image_url}?tr=h-120,w-120,q-70" alt="" />
+							<img
+								src={getCloudinaryTransformedUrl(
+									artwork.image_url,
+									'w_120,h_120,c_fill,g_center,q_70'
+								)}
+								alt=""
+							/>
 						</button>
 					</td>
 					<td><div>{artwork.title}</div></td>
@@ -153,13 +159,20 @@
 							{/if}
 						</div>
 					</td>
-					<td><div>
-						{#if artwork.collection}
-							<a href="/admin/collections/{artwork.collection.id}" on:click|preventDefault={() => goto(`/admin/collections/${artwork.collection.id}`)}>{artwork.collection.title}</a>
-						{:else}
-							None
-						{/if}
-					</div></td>
+					<td
+						><div>
+							{#if artwork.collection}
+								<a
+									href="/admin/collections/{artwork.collection.id}"
+									on:click|preventDefault={() =>
+										goto(`/admin/collections/${artwork.collection.id}`)}
+									>{artwork.collection.title}</a
+								>
+							{:else}
+								None
+							{/if}
+						</div></td
+					>
 					<td class="text-center"
 						><button class="edit button" on:click={() => editArtwork(artwork.id)}>Edit</button></td
 					>
