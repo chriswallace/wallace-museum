@@ -66,7 +66,7 @@
 
 	// Explicitly type nextCursor
 	let nextCursor: string | null = null;
-	const limit: number = 50;
+	const limit: number = 200;
 	let previousWallet: string = '';
 	let searchTerm: string = ''; // Add state for search term
 	let currentOffset: number = 0; // Add state for Tezos offset
@@ -138,16 +138,34 @@
 					} = await response.json();
 
 					// Map API response to compatible Artwork objects
-					const mappedNfts = data.nfts.map(nft => {
-						// Map API response fields to Artwork fields
+					const mappedNfts = data.nfts.map((nft, idx) => {
+						// Compose a unique id for Svelte keyed each
+						let uniqueId = '';
+						if (nft.platform === 'Tezos' || nft.blockchain === 'tezos') {
+							uniqueId = `tezos/${nft.collection?.contract || 'unknown'}/${nft.tokenID || nft.token_id || nft.id}`;
+						} else if (nft.contract_address || nft.contractAddr) {
+							uniqueId = `eth/${nft.contract_address || nft.contractAddr || 'unknown'}/${nft.tokenID || nft.token_id || nft.id}`;
+						} else if (nft.id !== undefined && nft.id !== null) {
+							// Try to use more info if available
+							if (nft.contract || nft.contract_address || nft.collection?.contract) {
+								uniqueId = `generic/${nft.id}/${nft.contract || nft.contract_address || nft.collection?.contract}`;
+							} else if (nft.tokenID || nft.token_id) {
+								uniqueId = `generic/${nft.id}/${nft.tokenID || nft.token_id}`;
+							} else {
+								// Fallback: add index to ensure uniqueness
+								uniqueId = `generic/${nft.id}/${idx}`;
+							}
+						} else {
+							// Fallback: use index or a random string (should be rare)
+							uniqueId = `fallback/${idx}_${Math.random().toString(36).slice(2)}`;
+						}
 						return {
 							...nft,
-							// Ensure these fields meet Artwork type requirements
-							id: nft.id,
-							title: nft.name || 'Untitled', // map name to title for Artwork compatibility
+							id: uniqueId,
+							title: nft.name || 'Untitled',
 							description: nft.description || '',
-							image_url: nft.image_url || undefined, // convert null to undefined
-							animation_url: nft.animation_url || undefined // convert null to undefined
+							image_url: nft.image_url || undefined,
+							animation_url: nft.animation_url || undefined
 						} as Artwork;
 					});
 
@@ -318,9 +336,9 @@
 								<source src={nft.animation_url} type="video/mp4" />
 							</video>
 						{:else if nft.image_url}
-							<img use:handleLazyLoad={{ src: nft.image_url }} alt={nft.title} class="nft-image" />
+							<img use:handleLazyLoad={{ src: nft.image_url }} alt={nft.title} class="nft-image" on:error={(e) => { e.target.src = loadingImageUrl; }} />
 						{:else if nft.animation_url}
-							<img use:handleLazyLoad={{ src: nft.animation_url }} alt={nft.title} class="nft-image" />
+							<img use:handleLazyLoad={{ src: nft.animation_url }} alt={nft.title} class="nft-image" on:error={(e) => { e.target.src = loadingImageUrl; }} />
 						{:else }
 							<div class="nft-image bg-gray-200 aspect-square flex items-center text-center justify-center">No Image</div>
 						{/if}

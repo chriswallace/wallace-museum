@@ -7,7 +7,7 @@ import crypto from 'crypto';
 // 	'https://dweb.link/ipfs/',
 // 	'https://ipfs.io/ipfs/'
 // ];
-const DEFAULT_IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
+const DEFAULT_IPFS_GATEWAY = 'https://w3s.link/ipfs/';
 
 export function createHashForString(inputString: string | null | undefined): string {
 	if (!inputString) {
@@ -95,64 +95,26 @@ export function removeQueryString(url: string | null | undefined): string {
 	}
 }
 
-// Removed fixIpfsUrl function as its logic is consolidated into convertIpfsToHttpsUrl
+/**
+ * Converts any IPFS-style URI to a full HTTP(S) URL using the default gateway.
+ * - Accepts ipfs://[cid]/foo or ipfs:/[cid]/foo and returns gateway + [cid]/foo
+ * - Leaves HTTP(S) and data URIs untouched.
+ * - Optionally allows overriding the gateway.
+ * @param uri - The IPFS URI or existing HTTP/S URL.
+ * @param gateway - Optional gateway to use (default: DEFAULT_IPFS_GATEWAY)
+ * @returns A full HTTPS URL for the IPFS content, or the original HTTP/S/data URI.
+ */
+export function ipfsToHttpUrl(uri: string | null | undefined, gateway: string = DEFAULT_IPFS_GATEWAY): string {
+	if (!uri || typeof uri !== 'string') return '';
+	if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:')) {
+		return uri;
+	}
+	// Remove ipfs:// or ipfs:/ prefix
+	let cleaned = uri.replace(/^ipfs:\/\//, '');
+	return gateway + cleaned;
+}
 
 /**
- * Converts various IPFS URI formats or standalone hashes into a full HTTPS URL
- * using the default IPFS gateway. Preserves existing HTTP/S URLs.
- * Handles null, undefined, empty, or non-string inputs by returning an empty string.
- * @param uri - The IPFS URI, hash, or existing HTTP/S URL.
- * @returns A full HTTPS URL for the IPFS content, the original HTTP/S URL, or an empty string for invalid/empty inputs.
+ * @deprecated Use ipfsToHttpUrl instead.
  */
-export function convertIpfsToHttpsUrl(uri: string | null | undefined): string | unknown {
-    // Handle null, undefined, empty string
-    if (uri === null || uri === undefined) {
-        console.warn('convertIpfsToHttpsUrl: Input is null or undefined.');
-        return '';
-    }
-    if (uri === '') {
-        return '';
-    }
-
-    // If not a string, warn and return original value
-    if (typeof uri !== 'string') {
-        console.warn(`convertIpfsToHttpsUrl: Input is not a string: ${uri}`);
-        return uri;
-    }
-
-    // If it's already an HTTP(S) URL, return it as is
-    if (uri.startsWith('http://') || uri.startsWith('https://')) {
-        return uri;
-    }
-
-    // --- MODIFICATION START: Handle /ipfs/ path differently ---
-    // If it starts with /ipfs/, return original path directly
-    const ipfsPathPrefix = '/ipfs/';
-    if (uri.startsWith(ipfsPathPrefix)) {
-        return uri; // Return the full original path
-    }
-    // --- MODIFICATION END ---
-
-    const ipfsPrefix = 'ipfs://';
-    let hashOrPath: string | null = null;
-
-    if (uri.startsWith(ipfsPrefix)) {
-        hashOrPath = uri.slice(ipfsPrefix.length);
-    } else if (!uri.includes('/') && uri.length > 40) {
-        // Basic check for standalone hash potentially being a CID v0 or v1
-         const cidPattern = /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{58,})$/;
-         if (cidPattern.test(uri)) {
-            hashOrPath = uri;
-         } else {
-             // console.warn(`[convertIpfsToHttpsUrl] String resembles a hash but doesn't match known CID patterns, returning original: ${uri}`);
-         }
-    }
-
-    if (hashOrPath) {
-        return hashOrPath;
-    }
-
-    // If none of the above apply (not HTTP/S, not recognized IPFS format),
-    // return the original string. (Removed warning for this case as tests imply it's expected)
-    return uri;
-} 
+export const convertIpfsToHttpsUrl = ipfsToHttpUrl; 

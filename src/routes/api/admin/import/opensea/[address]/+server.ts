@@ -18,7 +18,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	const type = url.searchParams.get('type');
 	const limitParam = url.searchParams.get('limit');
 	const nextCursor = url.searchParams.get('next');
-	const limit = limitParam ? parseInt(limitParam, 10) : 50;
+	const limit = limitParam ? parseInt(limitParam, 10) : 500;
 	const searchTerm = url.searchParams.get('search');
 
 	if (!address) {

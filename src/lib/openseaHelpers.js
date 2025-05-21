@@ -1,6 +1,5 @@
 import { env } from '$env/dynamic/private';
-import { fixIpfsUrl } from '$lib/mediaHelpers';
-
+import { ipfsToHttpUrl } from './mediaUtils';
 /**
  * @typedef {object} CollectionInfo
  * @property {string} collection - The collection slug or identifier.
@@ -49,10 +48,17 @@ export async function fetchCollection(slug) {
 	}
 	const data = await response.json();
 
+	// Extract the first contract address if available
+	if (data.contracts && data.contracts.length > 0) {
+		data.contract = data.contracts[0].address;
+	} else {
+		data.contract = '';
+	}
+
 	if (data.contracts[0] && data.contracts[0].blockchain) {
 		data.blockchain = data.contracts[0].blockchain;
 	}
-	return data || [];
+	return data || {};
 }
 
 /**
@@ -147,32 +153,69 @@ export async function fetchNFTsByAddress(
 	for (let nft of data.nfts) {
 		if (!nft || typeof nft !== 'object') continue;
 
-		// Cast to access properties safely, assuming OpenSea NFT structure
 		const currentNft = /** @type {any} */ (nft);
 
-		// Ensure a unique 'id' property exists, mapping from 'identifier'
+		/** @type {any} */
+		const nftAny = currentNft;
+		// @ts-ignore
+		console.log(
+			'[NFT Import] Step 1: Found metadata_url:',
+			nftAny['metadata_url'] ?? '[undefined]'
+		);
+
 		if (!currentNft.id && currentNft.identifier) {
-			currentNft.id = currentNft.identifier; // Use identifier as id if id is missing
+			currentNft.id = currentNft.identifier;
 		}
-		// If still no id, skip? Or generate one? For now, let's rely on identifier.
 		if (!currentNft.id) {
-			console.warn('NFT missing identifier, skipping:', currentNft);
 			continue;
 		}
 
-		if (currentNft.image)
-			currentNft.image_url = fixIpfsUrl(
-				currentNft.image_url ||
-					currentNft.image_preview_url || // Assuming these might exist on the fetched object
-					currentNft.image_thumbnail_url ||
-					currentNft.image_original_url ||
-					currentNft.image // Keep original image property if it exists
-			);
+		// Log and normalize all possible image/animation IPFS URLs
+		if (currentNft.image_url) {
+			const orig = currentNft.image_url;
+			const norm = ipfsToHttpUrl(orig);
+			currentNft.image_url = norm;
+		}
+		if (currentNft.image) {
+			const orig = currentNft.image;
+			const norm = ipfsToHttpUrl(orig);
+			currentNft.image = norm;
+		}
+		if (currentNft.image_preview_url) {
+			const orig = currentNft.image_preview_url;
+			const norm = ipfsToHttpUrl(orig);
+			currentNft.image_preview_url = norm;
+		}
+		if (currentNft.image_thumbnail_url) {
+			const orig = currentNft.image_thumbnail_url;
+			const norm = ipfsToHttpUrl(orig);
+			currentNft.image_thumbnail_url = norm;
+		}
+		if (currentNft.image_original_url) {
+			const orig = currentNft.image_original_url;
+			const norm = ipfsToHttpUrl(orig);
+			currentNft.image_original_url = norm;
+		}
+		if (currentNft.animation_url) {
+			const orig = currentNft.animation_url;
+			const norm = ipfsToHttpUrl(orig);
+			currentNft.animation_url = norm;
+		}
+
 		fetchedNfts.push(currentNft);
 	}
 
 	// Ensure fetchedNfts contains items with valid 'id' before filtering
 	let validNfts = fetchedNfts.filter((nft) => nft && nft.id !== undefined && nft.id !== null);
+
+	// Log metadata_url before normalization
+	validNfts.forEach((nft) => {
+		// eslint-disable-next-line
+		console.log(
+			'[NFT Import] Step 2: Before normalization, metadata_url:',
+			nft && nft['metadata_url'] !== undefined ? nft['metadata_url'] : '[undefined]'
+		);
+	});
 
 	let filteredNfts = validNfts;
 	if (searchTerm) {
@@ -184,6 +227,14 @@ export async function fetchNFTsByAddress(
 		});
 	}
 
+	// Log metadata_url after normalization/filtering
+	filteredNfts.forEach((nft) => {
+		console.log(
+			'[NFT Import] Step 3: After normalization/filtering, metadata_url:',
+			nft && nft['metadata_url'] !== undefined ? nft['metadata_url'] : '[undefined]'
+		);
+	});
+
 	return { nfts: filteredNfts, nextCursor: data.next };
 }
 
@@ -192,10 +243,12 @@ export async function fetchNFTsByAddress(
  */
 export async function fetchMetadata(url) {
 	try {
+		console.log('[NFT Import] Step 4: About to fetch metadata for metadata_url:', url);
 		// Check if the URL is actually a data URI - ensure it's a string first
 		if (typeof url === 'string' && isDataUri(url)) {
 			// Parse and return the JSON directly from the data URI
 			const metadata = parseJsonFromDataUri(url);
+			console.log('[NFT Import] Step 5: Fetched metadata for data URI:', url);
 			return metadata;
 		} else if (typeof url === 'string' || url instanceof URL || url instanceof Request) {
 			// Make an HTTP request to fetch the metadata from a regular URL
@@ -203,7 +256,9 @@ export async function fetchMetadata(url) {
 				headers: { 'X-API-KEY': env.OPENSEA_API_KEY }
 			});
 			if (!response.ok) throw new Error(`Failed to fetch metadata from ${url}`);
-			return await response.json();
+			const metadata = await response.json();
+			console.log('[NFT Import] Step 5: Fetched metadata for URL:', url);
+			return metadata;
 		}
 	} catch (error) {
 		console.error(`Error fetching metadata:`, error);

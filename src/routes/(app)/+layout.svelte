@@ -10,15 +10,23 @@
 
 <div class="page-container">
 	<slot />
-</div>
-
-<div class="mobile-notice">
-	<img src="/images/wallace-museum.png" alt="Wallace Museum" />
-	<p>
-		This experience was designed for modern graphics processing hardware and wide-format displays.
-		Please access it from a modern tablet, notebook, or PC for the optimal experience.<br /><br
-		/><span>- Chris Wallace</span>
-	</p>
+	
+	<footer class="site-footer">
+		<div class="footer-content">
+			<div class="copyright">				
+				<p class="text-white font-bold">The Wallace Collection</p>
+				<p>{new Date().getFullYear()} &copy; Chris Wallace. All rights reserved. All artworks remain the property of their respective creators.</p>
+			</div>
+			<div class="social-links">
+				<a href="https://twitter.com/chriswallace" target="_blank" rel="noopener noreferrer" class="social-link">
+					@chriswallace
+				</a>
+				<a href="https://chriswallace.net" target="_blank" rel="noopener noreferrer" class="social-link">
+					chriswallace.net
+				</a>
+			</div>
+		</div>
+	</footer>
 </div>
 
 <style lang="scss" global>
@@ -39,35 +47,31 @@
 		@apply min-h-screen;
 	}
 
-	.mobile-notice {
-		@apply md:hidden flex flex-col bg-gray-200 w-screen text-black justify-center items-center h-screen font-display text-2xl p-6 sm:p-12 mx-auto;
-
-		font-variation-settings:
-			'wght' 500,
-			'wdth' 80,
-			'CUTT' 80;
-
-		img {
-			@apply max-w-[220px] mb-12 mr-auto;
-		}
-
-		p {
-			@apply mr-12;
-		}
-
-		span {
-			@apply uppercase text-xl ml-4;
-			font-variation-settings:
-				'wght' 400,
-				'wdth' 40,
-				'CUTT' 80;
-		}
+	.site-footer {
+		@apply py-8 mt-16 border-t border-gray-900/20;
 	}
 
-	@media (prefers-color-scheme: dark) {
-		.mobile-notice {
-			background-color: black;
-			color: white;
-		}
+	.footer-content {
+		@apply max-w-[840px] mx-auto px-4 text-sm;
+	}
+
+	.copyright {
+		@apply text-base font-semibold text-gray-600 tracking-tight;
+	}
+
+	.copyright p {
+		@apply m-0 mb-1 text-base font-bold;
+	}
+
+	.artists-copyright {
+		@apply text-xs;
+	}
+
+	.social-links {
+		@apply mt-6;
+	}
+
+	.social-link {
+		@apply font-bold text-yellow-500 no-underline hover:underline transition-colors first:mr-4;
 	}
 </style>

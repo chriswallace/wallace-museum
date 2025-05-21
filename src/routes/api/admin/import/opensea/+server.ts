@@ -24,9 +24,32 @@ export const POST = async ({ request }) => {
 			}
 
 			const artist = await processArtist(nft.artist);
+
+			// Ensure collection object exists
+			if (!nft.collection) {
+				nft.collection = {};
+			}
+
+			// Prefer top-level contract field, then nested, then fallback
+			nft.collection.contract =
+				nft.contract ||
+				nft.collection.contract ||
+				(Array.isArray(nft.collection.contracts) && nft.collection.contracts.length > 0
+					? nft.collection.contracts[0].address
+					: undefined) ||
+				nft.collection.slug ||
+				nft.collection.id ||
+				'unknown';
+
+			if (!nft.collection.contract || nft.collection.contract === 'unknown') {
+				console.warn('WARNING: Collection contract is missing or unknown for NFT:', nft.identifier || nft.id, nft.collection);
+				// Optionally: flag for review, skip, or proceed as is
+			}
+
 			const collection = await processCollection(nft.collection);
 
 			let normalizedMetadata = await normalizeOpenSeaMetadata(nft);
+			nft.tokenID = normalizedMetadata.tokenID; // Ensure tokenID is set from OpenSea identifier
 			// Process media URLs and store final results
 			let finalImageUrl = '';
 			let finalAnimationUrl = '';
@@ -100,6 +123,11 @@ export const POST = async ({ request }) => {
 			// nft.tokenID = nft.metadata.identifier;
 
 			console.log(`[OS_IMPORT_SAVE] NFT: ${nft.identifier} - Pre-save image_url: ${nft.metadata.image_url}, Pre-save animation_url: ${nft.metadata.animation_url}, Pre-save mime: ${nft.mime}`);
+
+			console.log('NFT about to import:', {
+				id: nft.id,
+				collection: nft.collection
+			});
 
 			const artwork = await saveArtwork(nft, artist.id, collection.id);
 

@@ -148,11 +148,11 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 }
 
 export async function uploadToCloudinary(fileStream: Buffer | NodeJS.ReadableStream, baseName: string, mimeType: string, tagsToApply?: string): Promise<UploadResult | null> {
-	console.log(`[uploadToCloudinary] Uploading based on: ${baseName}, Mime: ${mimeType}`);
+	// console.log(`[uploadToCloudinary] Uploading based on: ${baseName}, Mime: ${mimeType}`);
 
 	try {
 		const generatedFileName = generateFileName(baseName, mimeType);
-		console.log(`[uploadToCloudinary] Uploading as public_id: ${generatedFileName}...`);
+		// console.log(`[uploadToCloudinary] Uploading as public_id: ${generatedFileName}...`);
 
 		const uploadOptions: UploadApiOptions = {
 			public_id: generatedFileName,
@@ -165,15 +165,8 @@ export async function uploadToCloudinary(fileStream: Buffer | NodeJS.ReadableStr
 		};
 
 		// --- DEBUG LOG: Options before upload ---
-		console.log(`[DEBUG][uploadToCloudinary] Uploading. Options:`, JSON.stringify({
-			public_id: uploadOptions.public_id,
-			folder: uploadOptions.folder,
-			resource_type: uploadOptions.resource_type,
-			overwrite: uploadOptions.overwrite,
-			use_filename: uploadOptions.use_filename,
-			unique_filename: uploadOptions.unique_filename,
-			tags: uploadOptions.tags
-		}));
+		// console.log(`[DEBUG][uploadToCloudinary] Uploading. Options:`, JSON.stringify({
+		// ... existing code ...
 
 
 		const uploadPromise = new Promise<UploadApiResponse | undefined>((resolve, reject) => {
@@ -196,7 +189,7 @@ export async function uploadToCloudinary(fileStream: Buffer | NodeJS.ReadableStr
 		const response = await uploadPromise;
 
 		// --- DEBUG LOG: Raw response from Cloudinary ---
-		console.log(`[DEBUG][uploadToCloudinary] Raw response for ${generatedFileName}:`, JSON.stringify(response));
+		// console.log(`[DEBUG][uploadToCloudinary] Raw response for ${generatedFileName}:`, JSON.stringify(response));
 
 		if (response && response.secure_url) {
 			const dimensions: Dimensions | null = response.height && response.width ? { height: response.height, width: response.width } : null;
@@ -214,7 +207,7 @@ export async function uploadToCloudinary(fileStream: Buffer | NodeJS.ReadableStr
 			};
 
 			// --- DEBUG LOG: Result returned by uploadToCloudinary ---
-			console.log(`[DEBUG][uploadToCloudinary] Returning result for ${generatedFileName}:`, JSON.stringify(result));
+			// console.log(`[DEBUG][uploadToCloudinary] Returning result for ${generatedFileName}:`, JSON.stringify(result));
 
 			return result;
 		} else {
@@ -327,97 +320,82 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 		if (typeof ipfsResourceResult === 'string') {
 			ipfsResource = ipfsResourceResult;
 		} else if (ipfsResourceResult && typeof ipfsResourceResult === 'object') {
-			// Now TypeScript knows about type and value from the interface
 			if (ipfsResourceResult.type === 'ipfs' || ipfsResourceResult.type === 'http') {
 				ipfsResource = ipfsResourceResult.value;
 			}
 		}
 
 		if (!ipfsResource) {
+			console.log(`[MEDIA_DEBUG] Could not resolve URI to a fetchable resource: ${uri}`);
 			throw new Error(`Could not resolve URI to a fetchable resource: ${uri}`);
 		}
 
 		const fetchOptions: RequestInit = {
 			method: 'GET',
 			headers: {
-				// Add a basic user-agent, might help with some blocks
 				'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 			},
 			signal: AbortSignal.timeout(15000) // 15 second timeout for fetch
 		};
 
 		if (ipfsResource.startsWith('http://') || ipfsResource.startsWith('https://')) {
-			// It's already an HTTP URL
 			httpUrlUsed = ipfsResource;
-			console.log(`[fetchMedia] Fetching directly from HTTP URL: ${httpUrlUsed}`);
+			console.log(`[MEDIA_DEBUG] Fetching HTTP(S) URL: ${httpUrlUsed}`);
 			response = await fetch(httpUrlUsed, fetchOptions);
+			console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
+			console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
 			if (!response.ok) {
 				throw new Error(`HTTP error ${response.status} fetching direct URL`);
 			}
 
 		} else if (ipfsResource) {
-			// It's an IPFS hash or potentially unrecognized format treated as hash
-			console.log(`[fetchMedia] Attempting to fetch IPFS resource: ${ipfsResource}`);
 			for (const gateway of IPFS_GATEWAYS) {
 				httpUrlUsed = `${gateway}${ipfsResource}`;
-				console.log(`[fetchMedia] Trying IPFS gateway: ${httpUrlUsed}`);
+				console.log(`[MEDIA_DEBUG] Trying IPFS gateway: ${httpUrlUsed}`);
 				try {
 					response = await fetch(httpUrlUsed, fetchOptions);
-
-					// If successful (status 2xx), break the loop
+					console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
+					console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
 					if (response.ok) {
-						console.log(`[fetchMedia] Successfully fetched from ${httpUrlUsed}`);
 						break;
 					} else {
-						console.warn(`[fetchMedia] Gateway ${httpUrlUsed} returned status ${response.status}`);
-						response = null; // Reset response to try next gateway
+						response = null;
 					}
 				} catch (error: unknown) {
-					const message = error instanceof Error ? error.message : 'Unknown fetch error';
-					// Log specific error (e.g., timeout) and try next gateway
-					console.warn(`[fetchMedia] Failed to fetch from ${httpUrlUsed}: ${message}`);
-					response = null; // Reset response if fetch failed
+					response = null;
 				}
 			}
-			if (!response || !response.ok) { // Check if a successful response was ever received
+			if (!response || !response.ok) {
+				console.log(`[MEDIA_DEBUG] Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`);
 				throw new Error(`Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`);
 			}
 		} else {
+			console.log(`[MEDIA_DEBUG] Invalid or empty URI provided: ${uri}`);
 			throw new Error(`Invalid or empty URI provided: ${uri}`);
 		}
 
-		// Process the successful response
 		const arrayBuffer = await response.arrayBuffer();
 		buffer = Buffer.from(arrayBuffer);
 		const fileTypeResult: FileTypeResult | undefined = await fileTypeFromBuffer(buffer);
+		console.log(`[MEDIA_DEBUG] Detected file type: ${fileTypeResult ? fileTypeResult.mime : 'undefined'}`);
 		if (!fileTypeResult) {
-			console.error(`[fetchMedia] Could not determine file type for ${httpUrlUsed}`);
-			// Return specific error object for type detection failure
 			return { httpUrlUsed: httpUrlUsed, error: 'type_detection_error', message: `Could not determine file type for ${httpUrlUsed}` };
 		}
 
 		const mimeType = fileTypeResult.mime;
 
-		// Allow image and video types. Other types will be handled based on the error mechanism.
 		if (!mimeType.startsWith('image/') && !mimeType.startsWith('video/')) {
-			console.warn(`[fetchMedia] Unsupported media type detected by file-type: ${mimeType} from ${httpUrlUsed}`);
-			// Return specific error object for unsupported type
 			return { httpUrlUsed: httpUrlUsed, error: 'unsupported_type', message: `Unsupported media type: ${mimeType}` };
 		}
 
-		// Try creating filename from URL, fallback if needed
 		let fileName;
 		try {
-			// Ensure httpUrlUsed is defined before using it
 			if (!httpUrlUsed) { throw new Error('httpUrlUsed is undefined before creating filename'); }
 			fileName = path.basename(new URL(httpUrlUsed).pathname);
-			// Append extension if it's missing or doesn't match detected type
 			if (!fileName.includes('.') || path.extname(fileName).substring(1) !== fileTypeResult.ext) {
 				fileName = `${fileName}.${fileTypeResult.ext}`;
 			}
 		} catch (e) {
-			// Fallback filename if URL parsing fails
-			console.warn(`[fetchMedia] Could not parse pathname from URL ${httpUrlUsed}, generating fallback filename.`);
 			const hash = crypto.createHash('sha256').update(buffer).digest('hex');
 			fileName = `${hash}.${fileTypeResult.ext}`;
 		}
@@ -429,26 +407,18 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 				const metadata = await sharp(buffer).metadata();
 				dimensions = { width: metadata.width, height: metadata.height };
 			} catch (sharpError: unknown) {
-				const message = sharpError instanceof Error ? sharpError.message : String(sharpError);
-				console.error(`[fetchMedia] Error processing image with sharp from ${httpUrlUsed}:`, message);
-				// Optionally return null or continue without dimensions
 			}
 		} else if (mimeType.startsWith('video/')) {
 			try {
 				dimensions = await getVideoDimensions(buffer);
 			} catch (videoError: unknown) {
-				const message = videoError instanceof Error ? videoError.message : String(videoError);
-				console.error(`[fetchMedia] Error getting video dimensions from ${httpUrlUsed}:`, message);
-				// Optionally return null or continue without dimensions
 			}
 		}
 
-		// Ensure httpUrlUsed is defined before successful return
 		if (!httpUrlUsed) { 
 			throw new Error('httpUrlUsed is undefined before successful return'); 
 		}
 
-		// If we reach here, media is supported (image or video)
 		return {
 			buffer,
 			mimeType,
@@ -458,16 +428,7 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 		};
 	} catch (error: unknown) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		console.error(`[fetchMedia] Error fetching media for URI "${uri}": ${errorMessage}`);
-		// Log the specific URL that failed if available
-		if (httpUrlUsed) {
-			console.error(`[fetchMedia] Last attempted URL: ${httpUrlUsed}`);
-		}
-		// Log status if available from a failed fetch response
-		if (response && !response.ok) {
-            console.error(`[fetchMedia] Fetch failed with status: ${response.status} ${response.statusText}`);
-        }
-		// Return specific error object for fetch errors
+		console.log(`[MEDIA_DEBUG] Error fetching media for URI "${uri}": ${errorMessage}`);
 		return { httpUrlUsed: httpUrlUsed, error: 'fetch_error', message: errorMessage };
 	}
 }
@@ -487,7 +448,7 @@ async function getVideoDimensions(buffer: Buffer): Promise<Dimensions | null> {
 					if (stream && typeof stream.width === 'number' && typeof stream.height === 'number') {
 						resolve({ width: stream.width, height: stream.height });
 					} else {
-						console.warn(`[getVideoDimensions] Could not find video stream with dimensions in metadata for ${tmpFile}`);
+						// console.warn(`[getVideoDimensions] Could not find video stream with dimensions in metadata for ${tmpFile}`);
 						resolve(null); // Resolve with null if no suitable stream found
 					}
 				}
@@ -506,7 +467,7 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
 	let fetchedMediaResult: FetchedMedia | FetchedMediaError | null;
 	try {
 		fetchedMediaResult = await fetchMedia(mediaUri);
-		console.log(`[DEBUG][handleMediaUpload] Received result for ${mediaUri}. Type: ${typeof fetchedMediaResult}. Is error obj: ${fetchedMediaResult && typeof fetchedMediaResult === 'object' && 'error' in fetchedMediaResult}`);
+		// console.log(`[DEBUG][handleMediaUpload] Received result for ${mediaUri}. Type: ${typeof fetchedMediaResult}. Is error obj: ${fetchedMediaResult && typeof fetchedMediaResult === 'object' && 'error' in fetchedMediaResult}`);
 	} catch (fetchError: unknown) {
 		// This catch block might be redundant if fetchMedia now returns error objects
 		// But keep it for safety in case of unexpected throws within fetchMedia itself
@@ -522,12 +483,12 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
 		// Explicitly check if errorInfo exists and has a non-empty httpUrlUsed
 		const hasErrorInfo = !!errorInfo;
 		const hasUrl = !!(errorInfo && errorInfo.httpUrlUsed && typeof errorInfo.httpUrlUsed === 'string' && errorInfo.httpUrlUsed.length > 0);
-		console.log(`[DEBUG][handleMediaUpload] Error check: hasErrorInfo=${hasErrorInfo}, hasUrl=${hasUrl}`);
+		// console.log(`[DEBUG][handleMediaUpload] Error check: hasErrorInfo=${hasErrorInfo}, hasUrl=${hasUrl}`);
 
 		if (hasErrorInfo && hasUrl) {
 			// Log ENTRY and values
 			// console.log(`[DEBUG][handleMediaUpload] Entered error handling block for error='${errorInfo.error}'. httpUrlUsed='${errorInfo.httpUrlUsed}'.`); 
-			console.log(`[handleMediaUpload] fetchMedia reported error ('${errorInfo.error}') but provided a URL for URI: ${mediaUri}. Assuming HTML/interactive.`);
+			// console.log(`[handleMediaUpload] fetchMedia reported error ('${errorInfo.error}') but provided a URL for URI: ${mediaUri}. Assuming HTML/interactive.`);
 			const assumedMime = errorInfo.message?.includes('application/pdf') ? 'application/pdf' : 'text/html'; 
 			
 			// Ensure httpUrlUsed is valid string before assignment (already checked by hasUrl, but to satisfy linter)
@@ -541,11 +502,11 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
 				fileType: assumedMime, // Indicate it's likely interactive content
 				dimensions: null // No dimensions applicable
 			};
-			console.log('[handleMediaUpload] Returning assumed result:', JSON.stringify(result));
+			// console.log('[handleMediaUpload] Returning assumed result:', JSON.stringify(result));
 			return result;
 		} else {
 			// Log ENTRY into the ELSE block
-			console.log(`[DEBUG][handleMediaUpload] Entered ELSE block for error handling. errorInfo:`, JSON.stringify(errorInfo));
+			// console.log(`[DEBUG][handleMediaUpload] Entered ELSE block for error handling. errorInfo:`, JSON.stringify(errorInfo));
 			const errorMsg = errorInfo ? `${errorInfo.error}: ${errorInfo.message}` : 'fetchMedia returned null';
 			console.error(`[handleMediaUpload] fetchMedia failed definitively for URI: ${mediaUri}. Error: ${errorMsg}`);
 			console.log('[handleMediaUpload] Returning null due to fetch error or null result.');
@@ -556,7 +517,7 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
 	// Type assertion: If we reach here, it must be a successful FetchedMedia result
 	const fetchedMedia = fetchedMediaResult as FetchedMedia;
 
-	console.log(`[handleMediaUpload] fetchMedia successful for ${mediaUri}. Mime: ${fetchedMedia.mimeType}, Proceeding with Cloudinary check/upload.`);
+	// console.log(`[handleMediaUpload] fetchMedia successful for ${mediaUri}. Mime: ${fetchedMedia.mimeType}, Proceeding with Cloudinary check/upload.`);
 
 	const { buffer: originalBuffer, mimeType, fileName: originalFileNameFromFetch, dimensions: originalDimensions } = fetchedMedia;
 	// Use the base name for tags and processing, generate filename separately if needed for upload
@@ -571,20 +532,20 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
 	let existingFileResult: UploadResult | null = null;
 	if (mediaHashTag) { // Only search if we have the hash tag
 		try {
-			console.log(`[handleMediaUpload] Searching Cloudinary for existing file with tag: ${mediaHashTag}`);
+			// console.log(`[handleMediaUpload] Searching Cloudinary for existing file with tag: ${mediaHashTag}`);
 			// Search using the single mediaHash tag
 			const searchResult = await cloudinary.search
 				.expression(`tags:${mediaHashTag}`)
 				.max_results(1) // We only need one match
 				.execute();
 
-			console.log(`[handleMediaUpload] Cloudinary search found ${searchResult.total_count ?? 0} files with matching tag.`);
+			// console.log(`[handleMediaUpload] Cloudinary search found ${searchResult.total_count ?? 0} files with matching tag.`);
 
 			if (searchResult.resources && searchResult.resources.length > 0) {
 				const existingFile = searchResult.resources[0];
-				console.log(
-					`[handleMediaUpload] Found existing file in Cloudinary via tag ${mediaHashTag}: ${existingFile.secure_url}`
-				);
+				// console.log(
+				//     `[handleMediaUpload] Found existing file in Cloudinary via tag ${mediaHashTag}: ${existingFile.secure_url}`
+				// );
 				// Determine general fileType
 				let fileType = 'raw';
 				if (existingFile.resource_type === 'image') fileType = 'image';
@@ -608,12 +569,12 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
  			}
 		}
 	} else {
-		console.warn(`[handleMediaUpload] Could not generate mediaHash tag for ${nameForProcessing} / ${mimeType}. Skipping duplicate check.`);
+		// console.warn(`[handleMediaUpload] Could not generate mediaHash tag for ${nameForProcessing} / ${mimeType}. Skipping duplicate check.`);
 	}
 
 	// --- File Not Found by mediaHash Tag - Proceed with Resize/Upload ---
 	const generatedFileNameForUpload = generateFileName(nameForProcessing, mimeType); // Regenerate filename for upload call consistency
-	console.log(`[handleMediaUpload] File with tag ${mediaHashTag || 'N/A'} not found in Cloudinary. Proceeding with processing/upload as ${generatedFileNameForUpload}.`);
+	// console.log(`[handleMediaUpload] File with tag ${mediaHashTag || 'N/A'} not found in Cloudinary. Proceeding with processing/upload as ${generatedFileNameForUpload}.`);
 	let bufferToUpload = originalBuffer;
 	let finalDimensions = originalDimensions;
 	const MAX_SIZE_MB = 25;
@@ -625,7 +586,7 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
 		const needsResize = mimeType.startsWith('image/') || mimeType.startsWith('video/'); // Resize will check size internally
 
 		if (needsResize) {
-			console.log(`[handleMediaUpload] Attempting resize for ${generatedFileNameForUpload} (Original Size: ${sizeMB.toFixed(2)}MB, Type: ${mimeType})`);
+			// console.log(`[handleMediaUpload] Attempting resize for ${generatedFileNameForUpload} (Original Size: ${sizeMB.toFixed(2)}MB, Type: ${mimeType})`);
 			try {
 				// Pass MAX_SIZE_MB to resizeMedia
 				const resizeResult = await resizeMedia(originalBuffer, mimeType, originalDimensions, MAX_SIZE_MB);
@@ -634,33 +595,33 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
 					if (resizeResult.buffer.length !== originalBuffer.length) {
 						bufferToUpload = resizeResult.buffer;
 						finalDimensions = resizeResult.dimensions ?? finalDimensions; // Use dimensions from resize result
-						console.log(`[handleMediaUpload] Resized buffer size: ${(bufferToUpload.length / (1024 * 1024)).toFixed(2)}MB`);
+						// console.log(`[handleMediaUpload] Resized buffer size: ${(bufferToUpload.length / (1024 * 1024)).toFixed(2)}MB`);
 					} else {
-						console.log(`[handleMediaUpload] resizeMedia returned original buffer for ${generatedFileNameForUpload}, likely already within size limits.`);
+						// console.log(`[handleMediaUpload] resizeMedia returned original buffer for ${generatedFileNameForUpload}, likely already within size limits.`);
 						// Keep original buffer and dimensions
 						bufferToUpload = originalBuffer;
 						finalDimensions = originalDimensions;
 					}
 				} else {
 					// Log failure but proceed with original buffer
-					console.warn(`[handleMediaUpload] resizeMedia returned null or no buffer for ${generatedFileNameForUpload}. Attempting upload with original buffer.`);
+					// console.warn(`[handleMediaUpload] resizeMedia returned null or no buffer for ${generatedFileNameForUpload}. Attempting upload with original buffer.`);
 					bufferToUpload = originalBuffer; // Fallback
 					finalDimensions = originalDimensions; // Use original dimensions
 				}
 			} catch (resizeError: unknown) {
 				// Log error but proceed with original buffer
 				const resizeMsg = resizeError instanceof Error ? resizeError.message : String(resizeError);
-				console.warn(`[handleMediaUpload] Error during resizeMedia for ${generatedFileNameForUpload}: ${resizeMsg}. Attempting upload with original buffer.`);
+				// console.warn(`[handleMediaUpload] Error during resizeMedia for ${generatedFileNameForUpload}: ${resizeMsg}. Attempting upload with original buffer.`);
 				bufferToUpload = originalBuffer; // Fallback
 				finalDimensions = originalDimensions; // Use original dimensions
 			}
 		} else {
-			console.log(`[handleMediaUpload] Skipping resize for ${generatedFileNameForUpload} (Size: ${sizeMB.toFixed(2)}MB, Type: ${mimeType})`);
+			// console.log(`[handleMediaUpload] Skipping resize for ${generatedFileNameForUpload} (Size: ${sizeMB.toFixed(2)}MB, Type: ${mimeType})`);
 		}
 
 
 		// 4. Conditional Upload (If Not Found)
-		console.log(`[handleMediaUpload] Attempting upload for ${generatedFileNameForUpload}...`);
+		// console.log(`[handleMediaUpload] Attempting upload for ${generatedFileNameForUpload}...`);
 		// Pass all generated tags (including mediaHash) to uploadToCloudinary for organization
 		const uploadResult = await uploadToCloudinary(bufferToUpload, nameForProcessing, mimeType, tagsToSearch);
 
@@ -669,9 +630,9 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
 			return null; // Upload failed
 		}
 
-		console.log(
-			`[handleMediaUpload] uploadToCloudinary successful for ${nameForProcessing}. URL: ${uploadResult.url}`
-		);
+		// console.log(
+		//     `[handleMediaUpload] uploadToCloudinary successful for ${nameForProcessing}. URL: ${uploadResult.url}`
+		// );
 
 		// 5. Return URL and Details
 		// Prioritize dimensions calculated *after* potential resize (finalDimensions)
@@ -682,7 +643,7 @@ export async function handleMediaUpload(mediaUri: string, artwork: NftData): Pro
 			fileType: uploadResult.fileType, // Use fileType determined by uploadToCloudinary
 			dimensions: returnDimensions
 		};
-		console.log('[handleMediaUpload] Returning final Cloudinary upload result:', JSON.stringify(finalResult));
+		// console.log('[handleMediaUpload] Returning final Cloudinary upload result:', JSON.stringify(finalResult));
 		return finalResult;
 	} catch (processingError: unknown) { // Catch errors from resize or upload attempt
 		const message = processingError instanceof Error ? processingError.message : String(processingError);
@@ -701,7 +662,7 @@ interface ResizeResult {
 export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: Dimensions | null, maxSizeMB = 25): Promise<ResizeResult | null> {
 	// Check if dimensions are valid at the start
 	if (!dimensions || typeof dimensions.width !== 'number' || typeof dimensions.height !== 'number' || dimensions.width <= 0 || dimensions.height <= 0) {
-        console.warn("[resizeMedia] Invalid or missing dimensions provided, skipping resize.", dimensions);
+        // console.warn("[resizeMedia] Invalid or missing dimensions provided, skipping resize.", dimensions);
         // Return original buffer and best-effort dimensions if skipping, but indicate potential issue by returning maybe null?
 		// Let's return null to indicate resize wasn't properly possible due to bad input
 		return null;
@@ -721,7 +682,7 @@ export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: 
 				const currentWidth = dimensions?.width ?? 0;
 				const currentHeight = dimensions?.height ?? 0;
 				if (currentWidth <= 0 || currentHeight <= 0) {
-					console.error("[resizeMedia] Invalid dimensions provided for scaling image.", dimensions);
+					// console.error("[resizeMedia] Invalid dimensions provided for scaling image.", dimensions);
 					throw new Error("Invalid dimensions for scaling");
 				}
 
@@ -746,7 +707,7 @@ export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: 
 				const currentWidth = dimensions?.width ?? 0;
 				const currentHeight = dimensions?.height ?? 0;
 				if (currentWidth <= 0 || currentHeight <= 0) {
-					console.error("[resizeMedia] Invalid dimensions provided for scaling video.", dimensions);
+					// console.error("[resizeMedia] Invalid dimensions provided for scaling video.", dimensions);
 					throw new Error("Invalid dimensions for scaling");
 				}
 
@@ -792,7 +753,7 @@ export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: 
 		}
 
 		if (!success && sizeMB > maxSizeMB) {
-			console.warn(`[resizeMedia] Unable to reduce file size below ${maxSizeMB}MB after several attempts.`);
+			// console.warn(`[resizeMedia] Unable to reduce file size below ${maxSizeMB}MB after several attempts.`);
 			// Decide how to handle failure to resize enough: return original? return null?
 			// Returning null signals failure to meet size requirement.
 			return null;
@@ -801,12 +762,12 @@ export async function resizeMedia(buffer: Buffer, mimeType: string, dimensions: 
 		// Try to get dimensions of the final buffer (original or resized)
 		const finalDimensions = await (mimeType.startsWith('image/') ? sharp(resizedBuffer).metadata().then(m => ({width: m.width, height: m.height})) : getVideoDimensions(resizedBuffer))
 				.catch(e => {
-					console.error("[resizeMedia] Failed to get dimensions after resize/processing:", e);
+					// console.error("[resizeMedia] Failed to get dimensions after resize/processing:", e);
 					return null; // Return null if dimension extraction fails
 				});
 
 		if (!finalDimensions) {
-			console.warn("[resizeMedia] Could not determine final dimensions, resize considered failed.");
+			// console.warn("[resizeMedia] Could not determine final dimensions, resize considered failed.");
 			return null; // Fail if we can't get final dimensions
 		}
 

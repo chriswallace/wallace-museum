@@ -69,7 +69,8 @@ export async function processArtist(artistInfo: ArtistInfo) {
 }
 
 export async function processCollection(collectionInfo: CollectionInfo) {
-	return await prisma.collection.upsert({
+	//console.log('[processCollection] Received collectionInfo:', JSON.stringify(collectionInfo));
+	const upsertParams = {
 		where: { slug: collectionInfo.contract },
 		update: {
 			title: collectionInfo.name ?? '',
@@ -84,7 +85,9 @@ export async function processCollection(collectionInfo: CollectionInfo) {
 			enabled: true,
 			curatorNotes: collectionInfo.curatorNotes ?? ''
 		}
-	});
+	};
+	//console.log('[processCollection] Upsert params:', JSON.stringify(upsertParams));
+	return await prisma.collection.upsert(upsertParams);
 }
 
 export async function saveArtwork(nft: NftInfo, artistId: number, collectionId: number) {

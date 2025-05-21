@@ -9,11 +9,12 @@ export interface PreviewArtwork {
 	image_url: string | null; // Changed to allow null
 }
 
-// Define the structure for an Artist, including a potential preview artwork
+// Define the structure for an Artist, including all artworks
 export interface ArtistWithPreview {
-	id: number; // Changed to number based on linter hint for Artist.id
+	id: number;
 	name: string;
 	previewArtwork: PreviewArtwork | null;
+	artworks: PreviewArtwork[]; // Add all artworks for preloading
 }
 
 export const load: ServerLoad = async () => {
@@ -21,39 +22,42 @@ export const load: ServerLoad = async () => {
 		const artistsFromDb = await prisma.artist.findMany({
 			// where: { enabled: true }, // Uncomment if you have an 'enabled' field for artists
 			include: {
-				artworks: {
-					// Include artworks to find a preview
-					orderBy: {
-						// createdAt: 'asc', // Or some other criteria to pick a consistent preview
-						// For now, just take any one that might be returned by default ordering
-					},
-					take: 1, // We only need one artwork for the preview
-					select: {
-						// Select only necessary fields for the preview artwork
-						id: true,
-						title: true,
-						image_url: true // Changed from imageUrl
+				ArtistArtworks: {
+					include: {
+						artwork: {
+							select: {
+								id: true,
+								title: true,
+								image_url: true
+							}
+						}
 					}
-				}
+				},
 			}
 		});
 
-		// Filter out artists who don't have any artworks (if `take: 1` didn't implicitly handle this with an empty array)
-		// And map to the desired structure for the frontend
+		// Map to the desired structure for the frontend, using the first artwork from ArtistArtworks if available
 		const artists: ArtistWithPreview[] = artistsFromDb
-			.filter((artist) => artist.artworks && artist.artworks.length > 0)
+			.filter((artist) => artist.ArtistArtworks && artist.ArtistArtworks.length > 0)
 			.map((artist) => {
-				const artworkPreviewData = artist.artworks[0];
+				const aa = artist.ArtistArtworks[0];
+				const artworkPreviewData = aa?.artwork;
+				const allArtworks = artist.ArtistArtworks.map((aa) => ({
+					id: String(aa.artwork.id),
+					title: aa.artwork.title,
+					image_url: aa.artwork.image_url
+				}));
 				return {
-					id: artist.id, // This should now match ArtistWithPreview.id (number)
+					id: artist.id,
 					name: artist.name,
 					previewArtwork: artworkPreviewData
 						? {
-								id: String(artworkPreviewData.id), // Ensure Artwork ID is string if PreviewArtwork.id is string
-								title: artworkPreviewData.title,
-								image_url: artworkPreviewData.image_url
-							}
-						: null
+							id: String(artworkPreviewData.id),
+							title: artworkPreviewData.title,
+							image_url: artworkPreviewData.image_url
+						}
+						: null,
+					artworks: allArtworks
 				};
 			});
 
