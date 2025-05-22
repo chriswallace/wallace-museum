@@ -61,8 +61,10 @@
 	<div class="homepage-intro">
 		<h1 class="collection-title">Wallace Museum</h1>
 		<p class="collection-description">
-			A curated selection of artworks from the personal collection of Chris Wallace featuring some
-			of the world's most innovative artists.
+			The Wallace Museum showcases pioneering works from bleeding-edge artists pushing the
+			boundaries of computational aesthetics and algorithmic expression. Each piece in the
+			collection represents an evolving dialogue between human imagination and digital
+			innovation—where mathematics becomes poetry and algorithms transform into art.
 		</p>
 	</div>
 
@@ -136,11 +138,11 @@
 	}
 
 	.collection-title {
-		@apply text-2xl font-bold text-yellow-500 inline-block tracking-tight;
+		@apply text-xl font-bold text-yellow-500 inline-block tracking-tight;
 	}
 
 	.collection-description {
-		@apply mt-24 mb-12 pb-12 border-b border-gray-800 text-[2rem] max-w-full text-gray-100 font-semibold m-0 leading-[1.2] tracking-tight;
+		@apply mt-24 mb-12 pb-12 border-b border-gray-800 text-[1.3rem] max-w-full text-gray-100 font-semibold m-0 leading-normal tracking-tight;
 		overflow-wrap: break-word;
 		word-wrap: break-word;
 	}
@@ -161,7 +163,7 @@
 		display: grid;
 		grid-template-columns: 1fr auto;
 		align-items: center;
-		@apply w-full text-[2rem] text-white font-semibold no-underline bg-none border-none p-0 py-1.5 cursor-pointer outline-none leading-[1.4] hover:text-white opacity-60 rounded-md;
+		@apply w-full text-[2rem] text-white font-semibold no-underline bg-none border-none p-0 py-1.5 cursor-pointer outline-none leading-[1.4] hover:text-white opacity-100 rounded-md;
 		overflow: hidden;
 	}
 
@@ -170,7 +172,7 @@
 	}
 
 	.artist-list .artist-row {
-		@apply opacity-20 transition-opacity transition-[color] duration-300;
+		@apply opacity-30 duration-300;
 	}
 
 	.artist-list:hover .artist-row:hover {
@@ -182,7 +184,7 @@
 	}
 
 	.artwork-count {
-		@apply text-[1.1rem] text-gray-400 font-normal ml-4 whitespace-nowrap;
+		@apply text-[1.1rem] font-medium ml-4 whitespace-nowrap;
 	}
 
 	.floating-artwork-preview {

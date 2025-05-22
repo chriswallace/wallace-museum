@@ -4,8 +4,10 @@
 
 :root {
 	/* Global */
-	--font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-	--heading-font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+	--font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial,
+		sans-serif;
+	--heading-font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue',
+		Arial, sans-serif;
 	--pure-white: #ffffff;
 	--heading-color: #1e1e1e;
 	--text-color: #020202;
@@ -18,7 +20,7 @@
 	--border-radius-md: 12px;
 	--border-radius-lg: 18px;
 
-	--color-primary: #EAB308;
+	--color-primary: #eab308;
 	--color-secondary: #242424;
 	--color-background-error: #f20000;
 	--color-text-error: #fff;
@@ -28,11 +30,11 @@
 	--grid-spacing: 8px;
 
 	--button-color-background-primary: var(--color-primary);
-	--button-color-background-primary-dark: #F7D34C;
+	--button-color-background-primary-dark: #f7d34c;
 	--button-color-text-primary: #ffffff;
 	--button-color-text-primary-dark: #000000;
-	--button-color-background-primary-hover: #F7D34C;
-	--button-color-background-primary-dark-hover: #CA9C09;
+	--button-color-background-primary-hover: #f7d34c;
+	--button-color-background-primary-dark-hover: #ca9c09;
 	--button-color-text-primary-hover: #000000;
 	--button-color-text-primary-dark-hover: #000000;
 
@@ -52,7 +54,7 @@
 		--background-without-opacity: #f5f5f5;
 		--logo-color: #eaeaea;
 
-		--color-primary: #EAB308;
+		--color-primary: #eab308;
 		--color-secondary: #888888;
 		--color-background-error: #b00020;
 		--color-text-error: #fff;
@@ -60,11 +62,11 @@
 		--color-text-success: #fff;
 
 		--button-color-background-primary: var(--color-primary);
-		--button-color-background-primary-dark: #F7D34C;
+		--button-color-background-primary-dark: #f7d34c;
 		--button-color-text-primary: #ffffff;
 		--button-color-text-primary-dark: #000000;
-		--button-color-background-primary-hover: #F7D34C;
-		--button-color-background-primary-dark-hover: #CA9C09;
+		--button-color-background-primary-hover: #f7d34c;
+		--button-color-background-primary-dark-hover: #ca9c09;
 		--button-color-text-primary-hover: #000000;
 		--button-color-text-primary-dark-hover: #000000;
 
@@ -129,7 +131,7 @@
 		color: #1e1e1e;
 		font-family: var(--font-family);
 	}
-	
+
 	.error {
 		display: flex;
 		justify-content: center;

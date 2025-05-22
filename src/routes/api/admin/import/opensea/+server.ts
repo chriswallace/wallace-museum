@@ -11,10 +11,10 @@ interface Dimensions {
 	height: number;
 }
 
-const DEFAULT_DIMENSIONS: Dimensions = {
-	width: 1000,
-	height: 1000
-};
+// const DEFAULT_DIMENSIONS: Dimensions = {
+// 	width: 1000,
+// 	height: 1000
+// };
 
 export const POST = async ({ request }) => {
 	try {
@@ -38,15 +38,6 @@ export const POST = async ({ request }) => {
 				}
 			}
 
-			// Process artist from metadata
-			console.log('[OS_IMPORT] Raw NFT data:', {
-				metadata_artist: nft.metadata?.artist,
-				creator: nft.creator,
-				metadata_creator_name: nft.metadata?.creator?.name,
-				metadata_creator: nft.metadata?.creator,
-				raw_nft: nft
-			});
-
 			const artistInfo = {
 				username:
 					nft.artist?.username ||
@@ -69,18 +60,14 @@ export const POST = async ({ request }) => {
 				}
 			};
 
-			console.log('[OS_IMPORT] Processed artist info:', artistInfo);
-
 			// Process artist with complete info
 			const artist = await processArtist(artistInfo);
 
 			// If no valid artist was found or created, skip this artwork
 			if (!artist) {
-				console.log('[OS_IMPORT] No valid artist found for NFT:', nft.identifier);
+				console.warn('[OS_IMPORT] No valid artist found for NFT:', nft.identifier);
 				return null;
 			}
-
-			console.log('[OS_IMPORT] Final processed artist:', artist);
 
 			// Sync collection from OpenSea
 			const collection = await syncCollection(
@@ -92,44 +79,116 @@ export const POST = async ({ request }) => {
 			let finalImageUrl = '';
 			let finalAnimationUrl = '';
 			let finalGeneratorUrl = '';
-			let finalMime = '';
-			let finalDimensions = DEFAULT_DIMENSIONS;
-
+			let finalMime = ''; // Start with no mime, let processing determine it.
+			let finalDimensions = null; // We'll get dimensions from Cloudinary uploads
+			
 			try {
 				// First check for generator URL
 				if (nft.metadata?.generator_url) {
-					console.log(`[OS_IMPORT] Found generator URL for NFT ${nft.identifier}`);
 					finalGeneratorUrl = nft.metadata.generator_url;
 					finalMime = 'text/html'; // Generator URLs are typically HTML
 				}
 
 				// Process animation_url if available and no generator URL
 				if (nft.metadata?.animation_url && !finalGeneratorUrl) {
-					console.log(`[OS_IMPORT] Processing animation_url for NFT ${nft.identifier}`);
+					console.log(`[OS_IMPORT] Processing animation_url: ${nft.metadata.animation_url}`);
 					const animationResult = await handleMediaUpload(nft.metadata.animation_url, nft);
 					if (animationResult?.url) {
 						finalAnimationUrl = animationResult.url;
-						finalMime = animationResult.fileType;
-						finalDimensions = {
-							width: animationResult.dimensions.width,
-							height: animationResult.dimensions.height
-						};
+						console.log(`[OS_IMPORT] Animation upload successful: ${finalAnimationUrl}`);
+						
+						// Update mime type if we got one from the upload
+						if (animationResult.fileType && (!finalMime || finalMime === 'application/octet-stream')) {
+							finalMime = animationResult.fileType;
+							console.log(`[OS_IMPORT] Updated mime type from animation: ${finalMime}`);
+						}
+						
+						// Update dimensions from animation if available
+						if (animationResult.dimensions) {
+							finalDimensions = animationResult.dimensions;
+							console.log(`[OS_IMPORT] Got dimensions from animation upload: ${finalDimensions.width}x${finalDimensions.height}`);
+						}
+					} else {
+						console.log(`[OS_IMPORT] Animation upload failed for: ${nft.metadata.animation_url}`);
 					}
 				}
 
-				// Process image_url if available
-				if (nft.metadata?.image_url) {
-					console.log(`[OS_IMPORT] Processing image_url for NFT ${nft.identifier}`);
-					const imageResult = await handleMediaUpload(nft.metadata.image_url, nft);
+				// Prioritize full-resolution images from metadata or original URLs
+				// First try image_url from metadata which is usually full resolution
+				if (nft.metadata?.image_url || nft.image_url || nft.image_original_url) {
+					// Use highest resolution image available
+					const imageUrl = nft.metadata?.image_url || nft.image_url || nft.image_original_url;
+					console.log(`[OS_IMPORT] Processing full-resolution image_url: ${imageUrl}`);
+					const imageResult = await handleMediaUpload(imageUrl, nft);
 					if (imageResult?.url) {
 						finalImageUrl = imageResult.url;
-						if (!finalMime) finalMime = imageResult.fileType;
-						if (!finalDimensions.width) {
-							finalDimensions = {
-								width: imageResult.dimensions.width,
-								height: imageResult.dimensions.height
-							};
+						console.log(`[OS_IMPORT] Full-resolution image upload successful: ${finalImageUrl}`);
+						
+						// Update mime type if we got one from the upload, preferring image types
+						if (imageResult.fileType?.startsWith('image/')) {
+							if (!finalMime || finalMime === 'application/octet-stream' || finalMime === 'text/html') {
+								finalMime = imageResult.fileType;
+								console.log(`[OS_IMPORT] Updated mime type from image: ${finalMime}`);
+							}
+						} else if (imageResult.fileType && (!finalMime || finalMime === 'application/octet-stream')) {
+							finalMime = imageResult.fileType;
+							console.log(`[OS_IMPORT] Updated mime type from image: ${finalMime}`);
 						}
+						
+						// Update dimensions from image upload if available
+						if (imageResult.dimensions) {
+							finalDimensions = imageResult.dimensions;
+							console.log(`[OS_IMPORT] Got dimensions from full-resolution image: ${finalDimensions.width}x${finalDimensions.height}`);
+						}
+					} else {
+						console.log(`[OS_IMPORT] Full-resolution image upload failed for: ${imageUrl}`);
+					}
+				}
+
+				// Only fallback to display_image_url if we couldn't get a full-resolution image
+				// display_image_url is often a lower resolution thumbnail from OpenSea
+				if (!finalImageUrl && nft.display_image_url) {
+					console.log(`[OS_IMPORT] No full-res image available, falling back to display_image_url: ${nft.display_image_url}`);
+					const displayImageResult = await handleMediaUpload(nft.display_image_url, nft);
+					if (displayImageResult?.url) {
+						finalImageUrl = displayImageResult.url;
+						console.log(`[OS_IMPORT] Display image upload successful: ${finalImageUrl}`);
+						
+						// Update mime type if we got one from the upload, preferring image types
+						if (displayImageResult.fileType?.startsWith('image/')) {
+							if (!finalMime || finalMime === 'application/octet-stream' || finalMime === 'text/html') {
+								finalMime = displayImageResult.fileType;
+								console.log(`[OS_IMPORT] Updated mime type from display image: ${finalMime}`);
+							}
+						} else if (displayImageResult.fileType && (!finalMime || finalMime === 'application/octet-stream')) {
+							finalMime = displayImageResult.fileType;
+							console.log(`[OS_IMPORT] Updated mime type from display image: ${finalMime}`);
+						}
+						
+						// Update dimensions from image upload
+						if (displayImageResult.dimensions) {
+							finalDimensions = displayImageResult.dimensions;
+							console.log(`[OS_IMPORT] Got dimensions from display image: ${finalDimensions.width}x${finalDimensions.height}`);
+						}
+					} else {
+						console.log(`[OS_IMPORT] Display image upload failed for: ${nft.display_image_url}`);
+					}
+				}
+				
+				// Try to get dimensions from metadata if we still don't have them
+				if (!finalDimensions) {
+					if (nft.metadata?.image_details?.width && nft.metadata?.image_details?.height) {
+						finalDimensions = {
+							width: nft.metadata.image_details.width,
+							height: nft.metadata.image_details.height
+						};
+						console.log(`[OS_IMPORT] Using dimensions from metadata.image_details: ${finalDimensions.width}x${finalDimensions.height}`);
+					} else if (nft.metadata?.animation_details?.width && nft.metadata?.animation_details?.height) {
+						finalDimensions = {
+							width: nft.metadata.animation_details.width,
+							height: nft.metadata.animation_details.height
+						};
+						console.log(`[OS_IMPORT] Using dimensions from metadata.animation_details: ${finalDimensions.width}x${finalDimensions.height}`);
 					}
 				}
 			} catch (error) {
@@ -144,7 +203,29 @@ export const POST = async ({ request }) => {
 				generator_url: finalGeneratorUrl || nft.metadata?.generator_url
 			};
 
-			// Save artwork
+			console.log("[Final Metadata Before Save]", finalMetadata);
+			console.log("[Final Dimensions Before Save]", finalDimensions);
+
+			// Ensure collection contract is set before saving
+			if (!nft.collection || !nft.collection.contract) {
+				console.error('[OS_IMPORT] Missing contract address for NFT:', nft.identifier || nft.tokenId || nft.tokenID);
+				if (collection && collection.slug) {
+					console.warn('[OS_IMPORT] Using collection slug as contract address fallback:', collection.slug);
+					nft.collection = {
+						...(nft.collection || {}),
+						contract: collection.slug,
+						blockchain: nft.collection?.blockchain || 'ethereum'
+					};
+				} else {
+					console.error('[OS_IMPORT] Cannot import NFT without contract address');
+					return null;
+				}
+			}
+			
+			// Log the contract address being used
+			console.log('[OS_IMPORT] Using contract address:', nft.collection.contract);
+			
+			// Save artwork with validated data
 			const artwork = await saveArtwork(
 				{
 					...nft,

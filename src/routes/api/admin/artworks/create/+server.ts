@@ -1,5 +1,5 @@
 import prisma from '$lib/prisma';
-import { uploadToCloudinary } from '$lib/mediaHelpers';
+import { uploadToCloudinary, getCloudinaryImageDimensions } from '$lib/mediaHelpers';
 import slugify from 'slugify';
 import { fileTypeFromBuffer } from 'file-type';
 
@@ -12,6 +12,34 @@ interface ArtworkData {
 	collectionId: number | null;
 	animation_url?: string | null;
 	image_url?: string | null;
+	dimensions?: any; // Changed to any to be compatible with Prisma's JSON type
+	mime?: string;
+}
+
+// Simple function to guess mime type from URL
+function guessMimeTypeFromUrl(url: string): string | null {
+	// Check extensions
+	if (url.match(/\.(mp4|webm|mov)$/i)) return 'video/mp4';
+	if (url.match(/\.(jpg|jpeg)$/i)) return 'image/jpeg';
+	if (url.match(/\.(png)$/i)) return 'image/png';
+	if (url.match(/\.(gif)$/i)) return 'image/gif';
+	if (url.match(/\.(webp)$/i)) return 'image/webp';
+	if (url.match(/\.(pdf)$/i)) return 'application/pdf';
+	if (url.match(/\.(html|htm)$/i)) return 'text/html';
+	if (url.match(/\.(js)$/i)) return 'application/javascript';
+	
+	// Check for common patterns
+	if (url.includes('cloudinary.com')) {
+		if (url.includes('/video/')) return 'video/mp4';
+		if (url.includes('/image/')) return 'image/jpeg';
+	}
+	
+	// For common interactive art platforms
+	if (url.includes('fxhash.xyz') || url.includes('generator.artblocks.io')) {
+		return 'application/javascript';
+	}
+	
+	return null;
 }
 
 export async function POST({ request }) {
@@ -21,6 +49,7 @@ export async function POST({ request }) {
 		const title = formData.get('title') as string;
 		const description = formData.get('description') as string;
 		const curatorNotes = formData.get('curatorNotes') as string;
+		const animation_url = formData.get('animation_url') as string | null;
 
 		let artistId = formData.get('artistId') as string | null;
 		const newArtistName = formData.get('newArtistName') as string | null;
@@ -29,7 +58,10 @@ export async function POST({ request }) {
 
 		let imageOrVideoUrl = null;
 		let isVideo = false;
+		let dimensions = null;
+		let mimeType = null;
 
+		// Handle file upload
 		if (file && file instanceof File) {
 			const arrayBuffer = await file.arrayBuffer();
 			const buffer = Buffer.from(arrayBuffer); // Convert ArrayBuffer to Buffer
@@ -51,6 +83,31 @@ export async function POST({ request }) {
 			}
 			imageOrVideoUrl = uploadResponse.url;
 			isVideo = file.type.startsWith('video/');
+			dimensions = uploadResponse.dimensions;
+			mimeType = file.type; // Get MIME type directly from file
+			console.log(`Uploaded file with mime type: ${mimeType}`);
+		} else {
+			// If we have an image URL from a previous upload
+			const existingUrl = formData.get('imageUrl') as string | null;
+			if (existingUrl) {
+				imageOrVideoUrl = existingUrl;
+				
+				// Simple mime type detection for existing URL
+				const guessedType = guessMimeTypeFromUrl(existingUrl);
+				if (guessedType) {
+					mimeType = guessedType;
+					isVideo = guessedType.startsWith('video/');
+				}
+			}
+		}
+
+		// Handle animation_url if provided
+		if (animation_url) {
+			const animationMimeType = guessMimeTypeFromUrl(animation_url);
+			if (animationMimeType) {
+				mimeType = animationMimeType;
+				isVideo = animationMimeType.startsWith('video/');
+			}
 		}
 
 		// Create new artist if provided
@@ -77,11 +134,40 @@ export async function POST({ request }) {
 			collectionId: collectionId ? parseInt(String(collectionId)) : null
 		};
 
-		// Assign to the appropriate field based on file type
-		if (isVideo) {
-			newArtworkData.animation_url = imageOrVideoUrl;
-		} else {
-			newArtworkData.image_url = imageOrVideoUrl;
+		// Prioritize animation_url if provided
+		if (animation_url) {
+			newArtworkData.animation_url = animation_url;
+			
+			// Only set mime type for animation_url content
+			const animationMimeType = guessMimeTypeFromUrl(animation_url);
+			if (animationMimeType) {
+				newArtworkData.mime = animationMimeType;
+			}
+			
+			// If we have a file upload too, use it as the image_url (without setting mime)
+			if (imageOrVideoUrl) {
+				newArtworkData.image_url = imageOrVideoUrl;
+			}
+		} else if (imageOrVideoUrl) {
+			// Assign to the appropriate field based on file type
+			if (isVideo) {
+				newArtworkData.animation_url = imageOrVideoUrl;
+				// Set mime type for video since it's in animation_url
+				if (mimeType && mimeType.startsWith('video/')) {
+					newArtworkData.mime = mimeType;
+				}
+			} else {
+				newArtworkData.image_url = imageOrVideoUrl;
+				// Don't set mime type for image_url
+			}
+		}
+
+		// Store the dimensions if available
+		if (dimensions && dimensions.width && dimensions.height) {
+			newArtworkData.dimensions = {
+				width: dimensions.width,
+				height: dimensions.height
+			};
 		}
 
 		const newArtwork = await prisma.artwork.create({

@@ -21,13 +21,12 @@ export async function POST({ request }) {
 		if (uploadResponse && uploadResponse.url) {
 			return json({ url: uploadResponse.url }, { status: 200 });
 		} else {
-			console.error("Cloudinary upload failed or returned invalid response:", uploadResponse);
+			console.error('Cloudinary upload failed or returned invalid response:', uploadResponse);
 			return json({ error: 'Image upload failed on server' }, { status: 500 });
 		}
-
 	} catch (error) {
 		console.error('Error in image upload endpoint:', error);
 		const message = error instanceof Error ? error.message : 'Unknown error';
 		return json({ error: 'Server error during image upload', details: message }, { status: 500 });
 	}
-} 
+}

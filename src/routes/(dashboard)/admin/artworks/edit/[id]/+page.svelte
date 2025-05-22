@@ -75,7 +75,10 @@
 			description: artwork.description,
 			enabled: artwork.enabled,
 			collectionId: artwork.collectionId,
-			artistIds: selectedArtistIds
+			artistIds: selectedArtistIds,
+			image_url: artwork.image_url,
+			animation_url: artwork.animation_url,
+			mime: artwork.mime
 		};
 
 		const response = await fetch(`/api/admin/artworks/${artwork.id}`, {
@@ -190,6 +193,26 @@
 					<div>
 						<label for="description">Description</label>
 						<textarea id="description" bind:value={artwork.description}></textarea>
+					</div>
+					<div>
+						<label for="image_url">Image URL</label>
+						<input 
+							type="url" 
+							id="image_url" 
+							bind:value={artwork.image_url} 
+							placeholder="https://res.cloudinary.com/..."
+						/>
+						<small>Change the image URL to update the artwork image. Cloudinary URLs will have dimensions automatically detected.</small>
+					</div>
+					<div>
+						<label for="animation_url">Animation URL</label>
+						<input 
+							type="url" 
+							id="animation_url" 
+							bind:value={artwork.animation_url} 
+							placeholder="https://res.cloudinary.com/..."
+						/>
+						<small>URL for animation or interactive content. This will be prioritized over the image URL when present. MIME type will be auto-detected.</small>
 					</div>
 					<div>
 						<label for="artist">Artists</label>

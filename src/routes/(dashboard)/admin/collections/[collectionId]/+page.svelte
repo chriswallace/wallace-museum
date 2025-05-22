@@ -53,7 +53,8 @@
 	let confirmationModalOpen = false;
 	let confirmationPromiseResolve: (value: boolean | PromiseLike<boolean>) => void;
 
-	function confirmAction(message: string): Promise<boolean> { // Type message and return
+	function confirmAction(message: string): Promise<boolean> {
+		// Type message and return
 		return new Promise((resolve) => {
 			confirmationModalOpen = true;
 			// This function will be called with true or false when the user responds
@@ -61,7 +62,8 @@
 		});
 	}
 
-	async function confirmRemoval(artworkToRemove: Artwork) { // Type artworkToRemove
+	async function confirmRemoval(artworkToRemove: Artwork) {
+		// Type artworkToRemove
 		const confirmed = await confirmAction(
 			'Are you sure you want to remove this artwork from the collection?'
 		);
@@ -111,7 +113,8 @@
 		searchResults = [];
 	}
 
-	async function removeArtworkFromCollection(artworkToRemove: Artwork) { // Type artworkToRemove
+	async function removeArtworkFromCollection(artworkToRemove: Artwork) {
+		// Type artworkToRemove
 		try {
 			// Call your API to remove the artwork from the collection
 			const response = await fetch(
@@ -148,7 +151,8 @@
 		}
 	}
 
-	function toggleArtworkSelection(artworkId: number | string) { // Type artworkId
+	function toggleArtworkSelection(artworkId: number | string) {
+		// Type artworkId
 		if (selectedArtworks.has(artworkId)) {
 			selectedArtworks.delete(artworkId);
 		} else {
@@ -202,7 +206,8 @@
 		}
 	});
 
-	function switchTab(tab: 'artworks' | 'details') { // Type tab
+	function switchTab(tab: 'artworks' | 'details') {
+		// Type tab
 		activeTab = tab;
 	}
 </script>
@@ -254,21 +259,18 @@
 						class:active={selectedArtworks.has(artwork.id)}
 						on:click={() => toggleArtworkSelection(artwork.id)}
 					>
-						{#if artwork.mime?.startsWith('video') || artwork.image_url?.endsWith(".mp4")}
-							<video
-								width="204"
-								height="204"
-								loop
-								muted
-								playsinline
-							>
-							<source src="{artwork.image_url}" type="video/mp4" />
-						</video>
+						{#if artwork.mime?.startsWith('video') || artwork.image_url?.endsWith('.mp4')}
+							<video width="204" height="204" loop muted playsinline>
+								<source src={artwork.image_url} type="video/mp4" />
+							</video>
 						{:else}
-						<img
-							src={getCloudinaryTransformedUrl(artwork.image_url, 'w_400,h_400,c_pad,q_auto,f_auto,b_rgb:e9e9e9')}
-							alt={artwork.title || 'Artwork thumbnail'}
-						/>
+							<img
+								src={getCloudinaryTransformedUrl(
+									artwork.image_url,
+									'w_400,h_400,c_pad,q_auto,f_auto,b_rgb:e9e9e9'
+								)}
+								alt={artwork.title || 'Artwork thumbnail'}
+							/>
 						{/if}
 						<p>{artwork.title}</p>
 						{#if selectedArtworks.has(artwork.id)}
@@ -292,10 +294,10 @@
 	{#if isLoading}
 		<p>Loading...</p>
 	{:else}
-        <div>
-            <a class="back-btn" href="/admin/collections">&lt; Back to Collections</a>
-        </div>
-	
+		<div>
+			<a class="back-btn" href="/admin/collections">&lt; Back to Collections</a>
+		</div>
+
 		<h1>Edit {collection.title}</h1>
 
 		<div class="tabs">
@@ -312,19 +314,16 @@
 				<div class="artwork-grid">
 					{#each collection.artworks as artwork}
 						<div>
-							{#if artwork.mime?.startsWith('video') || artwork.image_url?.endsWith(".mp4")}
-								<video
-									width="204"
-									height="204"
-									loop
-									muted
-									playsinline
-								>
-								<source src="{artwork.image_url}" type="video/mp4" />
-							</video>
+							{#if artwork.mime?.startsWith('video') || artwork.image_url?.endsWith('.mp4')}
+								<video width="204" height="204" loop muted playsinline>
+									<source src={artwork.image_url} type="video/mp4" />
+								</video>
 							{:else}
-								<img 
-									src={getCloudinaryTransformedUrl(artwork.image_url, 'w_204,h_204,c_thumb,q_auto,f_auto')}
+								<img
+									src={getCloudinaryTransformedUrl(
+										artwork.image_url,
+										'w_204,h_204,c_thumb,q_auto,f_auto'
+									)}
 									alt={artwork.title || 'Artwork thumbnail'}
 								/>
 							{/if}

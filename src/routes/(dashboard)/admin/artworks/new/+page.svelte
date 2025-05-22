@@ -22,6 +22,8 @@
 		curatorNotes: string;
 		artistId: string;
 		collectionId: string;
+		animation_url?: string;
+		mime?: string;
 	}
 
 	export let artist: Artist | undefined;
@@ -32,7 +34,9 @@
 		image: '',
 		curatorNotes: '',
 		artistId: '',
-		collectionId: ''
+		collectionId: '',
+		animation_url: '',
+		mime: ''
 	};
 
 	let artists: Artist[] = [];
@@ -55,11 +59,12 @@
 			}
 
 			if (collectionsRes.ok) {
-				collections = await collectionsRes.json();
-				collections = collections.collections;
+				const collectionsData = await collectionsRes.json();
+				collections = collectionsData.collections || collectionsData;
 			}
-		} catch (e) {
-			error = e.message;
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			error = errorMessage;
 		}
 	}
 
@@ -74,6 +79,14 @@
 		formData.append('title', artwork.title);
 		formData.append('description', artwork.description);
 		formData.append('curatorNotes', artwork.curatorNotes);
+		
+		// Add animation_url and mime if provided
+		if (artwork.animation_url) {
+			formData.append('animation_url', artwork.animation_url);
+			if (artwork.mime) {
+				formData.append('mime', artwork.mime);
+			}
+		}
 
 		// Append artist and collection IDs or new names
 		if (addingNewArtist) {
@@ -151,6 +164,11 @@
 					<div>
 						<label for="description">Description</label>
 						<textarea id="description" bind:value={artwork.description}></textarea>
+					</div>
+					<div>
+						<label for="animation_url">Animation URL (Optional)</label>
+						<input type="url" id="animation_url" bind:value={artwork.animation_url} />
+						<small>URL for animation or interactive content. Will be used if no file is uploaded. MIME type will be auto-detected.</small>
 					</div>
 					<fieldset>
 						<label for="artist">Artist</label>

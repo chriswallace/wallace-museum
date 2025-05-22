@@ -32,7 +32,7 @@ export const load: ServerLoad = async () => {
 							}
 						}
 					}
-				},
+				}
 			}
 		});
 
@@ -52,10 +52,10 @@ export const load: ServerLoad = async () => {
 					name: artist.name,
 					previewArtwork: artworkPreviewData
 						? {
-							id: String(artworkPreviewData.id),
-							title: artworkPreviewData.title,
-							image_url: artworkPreviewData.image_url
-						}
+								id: String(artworkPreviewData.id),
+								title: artworkPreviewData.title,
+								image_url: artworkPreviewData.image_url
+							}
 						: null,
 					artworks: allArtworks
 				};

@@ -26,11 +26,11 @@ export async function GET({ url }) {
 		});
 
 		// OPTIONAL: Transform the result if needed to provide a simple `artworks` array per artist
-		const transformedArtists = artists.map(artist => ({
+		const transformedArtists = artists.map((artist) => ({
 			...artist,
-			artworks: artist.ArtistArtworks.map(aa => aa.artwork)
+			artworks: artist.ArtistArtworks.map((aa) => aa.artwork)
 			// Optionally remove ArtistArtworks if not needed directly:
-			// delete artist.ArtistArtworks; 
+			// delete artist.ArtistArtworks;
 		}));
 
 		return new Response(JSON.stringify(transformedArtists), {

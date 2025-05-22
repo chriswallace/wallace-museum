@@ -9,6 +9,17 @@ import crypto from 'crypto';
 // ];
 const DEFAULT_IPFS_GATEWAY = 'https://w3s.link/ipfs/';
 const ONCHFS_GATEWAY = 'https://onchfs.fxhash2.xyz/';
+const ARWEAVE_GATEWAY = 'https://arweave.net/';
+
+/**
+ * A set of reliable IPFS gateways to try in sequence
+ */
+export const IPFS_GATEWAYS = [
+	'https://w3s.link/ipfs/',
+	'https://nftstorage.link/ipfs/',
+	'https://cloudflare-ipfs.com/ipfs/',
+	'https://ipfs.io/ipfs/'
+];
 
 export function createHashForString(inputString: string | null | undefined): string {
 	if (!inputString) {
@@ -142,31 +153,59 @@ export function removeQueryString(url: string | null | undefined): string {
 }
 
 /**
- * Converts any IPFS-style URI to a full HTTP(S) URL using the default gateway.
+ * Converts any IPFS or Arweave style URI to a full HTTP(S) URL using the appropriate gateway.
  * - Accepts ipfs://[cid]/foo or ipfs:/[cid]/foo and returns gateway + [cid]/foo
  * - Accepts onchfs://[cid]/foo and returns onchfs gateway + [cid]/foo
+ * - Accepts ar://[tx] or raw Arweave transaction IDs and returns Arweave gateway URL
  * - Leaves HTTP(S) and data URIs untouched.
  * - Optionally allows overriding the gateway.
- * @param uri - The IPFS URI or existing HTTP/S URL.
- * @param gateway - Optional gateway to use (default: DEFAULT_IPFS_GATEWAY)
- * @returns A full HTTPS URL for the IPFS content, or the original HTTP/S/data URI.
+ * @param uri - The URI to convert (IPFS, Arweave, or existing HTTP/S URL)
+ * @param gateway - Optional gateway to use for IPFS (default: DEFAULT_IPFS_GATEWAY)
+ * @returns A full HTTPS URL for the content, or the original HTTP/S/data URI.
  */
 export function ipfsToHttpUrl(
 	uri: string | null | undefined,
 	gateway: string = DEFAULT_IPFS_GATEWAY
 ): string {
 	if (!uri || typeof uri !== 'string') return '';
+	
+	// Already HTTP(S) or data URI
 	if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:')) {
 		return uri;
 	}
-	// Handle onchfs:// protocol
+	
+	// Handle onchfs:// protocol (fxhash)
 	if (uri.startsWith('onchfs://')) {
 		let cleaned = uri.replace(/^onchfs:\/\//, '');
 		return ONCHFS_GATEWAY + cleaned;
 	}
-	// Remove ipfs:// or ipfs:/ prefix
-	let cleaned = uri.replace(/^ipfs:\/\//, '');
-	return gateway + cleaned;
+	
+	// Handle Arweave
+	if (uri.startsWith('ar://')) {
+		let txId = uri.replace(/^ar:\/\//, '');
+		return ARWEAVE_GATEWAY + txId;
+	}
+	
+	// Handle raw Arweave transaction ID (43 characters)
+	if (uri.match(/^[a-zA-Z0-9_-]{43}$/)) {
+		return ARWEAVE_GATEWAY + uri;
+	}
+	
+	// Handle IPFS URIs
+	if (uri.startsWith('ipfs://') || uri.startsWith('ipfs:/')) {
+		// Remove ipfs:// or ipfs:/ prefix
+		let cleaned = uri.replace(/^ipfs:\/\//, '').replace(/^ipfs:\//, '');
+		return gateway + cleaned;
+	}
+	
+	// Handle IPFS paths without protocol
+	if (uri.startsWith('Qm') || uri.startsWith('bafy')) {
+		return gateway + uri;
+	}
+	
+	// If nothing matched, return as is - might be a relative URL or something else
+	console.warn(`[ipfsToHttpUrl] Unrecognized URI format: ${uri}`);
+	return uri;
 }
 
 /**

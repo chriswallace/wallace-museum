@@ -38,8 +38,7 @@
 			</tr>
 		</tfoot>
 	</table>
-
-	</Modal>
+</Modal>
 
 <style lang="scss">
 	table {

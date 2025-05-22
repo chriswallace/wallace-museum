@@ -21,6 +21,14 @@
 		return Boolean(artwork.animation_url && artwork.mime?.startsWith('video'));
 	}
 
+	function hasApplicationMime(): boolean {
+		return Boolean(
+			artwork.animation_url && 
+			artwork.mime && 
+			artwork.mime.startsWith('application')
+		);
+	}
+
 	function handleLoad(): void {
 		isLoading = false;
 	}
@@ -34,25 +42,35 @@
 		/>
 	{/if}
 
-	{#if hasVideo()}
-		<video
-			src={artwork.animation_url}
-			autoplay
-			controls
-			playsinline
-			muted
-			loop
-			on:loadeddata={handleLoad}
-			class:hidden={isLoading}
-		></video>
-	{:else if artwork.mime && (artwork.mime.startsWith('application') || artwork.mime.startsWith('html')) && artwork.animation_url}
-		<iframe
-			src={artwork.animation_url}
-			class="live-code"
-			on:load={handleLoad}
-			class:hidden={isLoading}
-		></iframe>
-	{:else}
+	{#if artwork.animation_url}
+		{#if hasVideo()}
+			<video
+				src={artwork.animation_url}
+				autoplay
+				controls
+				playsinline
+				muted
+				loop
+				on:loadeddata={handleLoad}
+				class:hidden={isLoading}
+			></video>
+		{:else if hasApplicationMime()}
+			<iframe
+				src={artwork.animation_url}
+				class="live-code"
+				on:load={handleLoad}
+				class:hidden={isLoading}
+			></iframe>
+		{:else}
+			<!-- Fall back to image_url for non-application, non-video animation_url types -->
+			<img
+				src={getCloudinaryImageUrl(artwork.image_url, 740)}
+				alt={artwork.title}
+				on:load={handleLoad}
+				class:hidden={isLoading}
+			/>
+		{/if}
+	{:else if artwork.image_url}
 		<img
 			src={getCloudinaryImageUrl(artwork.image_url, 740)}
 			alt={artwork.title}

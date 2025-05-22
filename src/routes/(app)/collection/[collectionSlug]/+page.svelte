@@ -217,30 +217,42 @@
 						/>
 					{/if}
 
-					{#if $selectedArtwork && $selectedArtwork.id === artwork.id && artwork.mime && (artwork.mime.startsWith('application') || artwork.mime.startsWith('text')) && artwork.animation_url && $isLiveCodeVisible}
-						<iframe
-							src={artwork.animation_url}
-							class="live-code"
-							title="Artwork Animation"
-							on:load={() => handleMediaLoad(artwork.id)}
-							class:hidden={loadingStates[String(artwork.id)]}
-						></iframe>
-					{:else if artwork.mime?.startsWith('video') && artwork.animation_url && artwork.animation_url.length > 0}
-						<video
-							autoplay
-							loop
-							muted
-							on:loadeddata={() => handleMediaLoad(artwork.id)}
-							class:hidden={loadingStates[String(artwork.id)]}
-						>
-							<source
+					{#if artwork.animation_url}
+						{#if artwork.mime?.startsWith('video')}
+							<video
+								autoplay
+								loop
+								muted
+								on:loadeddata={() => handleMediaLoad(artwork.id)}
+								class:hidden={loadingStates[String(artwork.id)]}
+							>
+								<source
+									src={artwork.animation_url}
+									type="video/mp4"
+									height={artwork.dimensions?.height}
+									width={artwork.dimensions?.width}
+								/>
+								Your browser does not support the video tag.
+							</video>
+						{:else if artwork.mime && artwork.mime.startsWith('application')}
+							<iframe
 								src={artwork.animation_url}
-								type="video/mp4"
-								height={artwork.dimensions?.height}
-								width={artwork.dimensions?.width}
+								class="live-code"
+								title="Artwork Animation"
+								on:load={() => handleMediaLoad(artwork.id)}
+								class:hidden={loadingStates[String(artwork.id)]}
+							></iframe>
+						{:else if artwork.image_url}
+							<img
+								bind:this={artworkRefs[index]}
+								src={artwork.image_url}
+								alt={artwork.title}
+								srcset={artwork.srcset}
+								sizes={artwork.sizes}
+								on:load={() => handleMediaLoad(artwork.id)}
+								class:hidden={loadingStates[String(artwork.id)]}
 							/>
-							Your browser does not support the video tag.
-						</video>
+						{/if}
 					{:else if artwork.image_url}
 						<img
 							bind:this={artworkRefs[index]}

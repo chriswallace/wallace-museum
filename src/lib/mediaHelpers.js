@@ -287,6 +287,22 @@ export async function normalizeOpenSeaMetadata(nft) {
 		includeNullValues: false
 	});
 
+	// Extract dimensions from metadata if available
+	let dimensions = null;
+	if (
+		metadata.image_details &&
+		typeof metadata.image_details.width === 'number' &&
+		typeof metadata.image_details.height === 'number'
+	) {
+		dimensions = {
+			width: metadata.image_details.width,
+			height: metadata.image_details.height
+		};
+		console.log(
+			`[OPENSEA_METADATA] Found dimensions in metadata: ${dimensions.width}x${dimensions.height}`
+		);
+	}
+
 	return {
 		name: metadata.name || nft.name,
 		tokenID: metadata.tokenID || metadata.tokenId || nft.tokenID || nft.tokenId || nft.identifier,
@@ -304,6 +320,7 @@ export async function normalizeOpenSeaMetadata(nft) {
 			blockchain: 'Ethereum',
 			platform: metadata.platform || nft.platform || 'Ethereum'
 		},
+		dimensions: dimensions,
 		raw_data: JSON.stringify({
 			attributes: metadata.attributes || nft.attributes,
 			traits: metadata.traits || nft.traits,
@@ -497,14 +514,8 @@ export async function handleMediaUpload(mediaUri, artwork) {
 		return null;
 	}
 
-	console.log(
-		`[MEDIA_UPLOAD] Processing media URI: ${mediaUri} for artwork:`,
-		artwork?.name || 'Unknown'
-	);
-
 	// Special handling for Art Blocks generator URLs
 	if (mediaUri && mediaUri.includes('generator.artblocks.io')) {
-		console.log('[MEDIA_UPLOAD] Detected Art Blocks generator URL');
 		return {
 			url: mediaUri,
 			fileType: 'text/html',
@@ -522,18 +533,14 @@ export async function handleMediaUpload(mediaUri, artwork) {
 			mediaUri.includes('artblocks.io') ||
 			mediaUri.match(/\.(png|jpg|jpeg|gif|webp)$/i))
 	) {
-		console.log('[MEDIA_UPLOAD] Detected Art Blocks media URL or image file');
-
 		try {
 			// Always try to fetch and process the image
 			const mediaData = await fetchMedia(mediaUri);
 			if (!mediaData || !mediaData.buffer) {
-				console.error(`[MEDIA_UPLOAD] Failed to fetch media from ${mediaUri}`);
 				return null;
 			}
 
 			// Upload to Cloudinary
-			console.log('[MEDIA_UPLOAD] Uploading to Cloudinary...');
 			const uploadResult = await uploadToCloudinary(
 				mediaData.buffer,
 				artwork.name || 'artblocks_image',
@@ -545,7 +552,6 @@ export async function handleMediaUpload(mediaUri, artwork) {
 				return null;
 			}
 
-			console.log('[MEDIA_UPLOAD] Successfully uploaded to Cloudinary:', uploadResult.url);
 			return {
 				url: uploadResult.url,
 				fileType: mediaData.mimeType || 'image/png',
@@ -612,7 +618,6 @@ export async function handleMediaUpload(mediaUri, artwork) {
 	}
 
 	// Regular media handling for other URLs
-	console.log('[MEDIA_UPLOAD] Processing as regular media URL');
 	const mediaData = await fetchMedia(mediaUri);
 	if (!mediaData) {
 		console.error(`[MEDIA_UPLOAD] Failed to fetch/process media from ${mediaUri}`);
@@ -622,24 +627,15 @@ export async function handleMediaUpload(mediaUri, artwork) {
 	let dimensions = mediaData.dimensions;
 	if (!dimensions || dimensions.width === 0 || dimensions.height === 0) {
 		console.warn('[MEDIA_UPLOAD] Missing dimensions, using defaults');
-		dimensions = { width: 1000, height: 1000 };
+		dimensions = null;
 	}
 
 	try {
-		let finalBuffer = mediaData.buffer;
-		let finalDimensions = dimensions;
+		// Skip resizing and directly upload the media
+		console.log('[MEDIA_UPLOAD] Uploading media directly without resizing');
 
-		// Only resize if it's an image
-		if (mediaData.mimeType.startsWith('image/')) {
-			console.log('[MEDIA_UPLOAD] Resizing image...');
-			const resizeResult = await resizeMedia(mediaData.buffer, mediaData.mimeType, dimensions);
-			finalBuffer = resizeResult.buffer;
-			finalDimensions = resizeResult.dimensions || dimensions;
-		}
-
-		console.log('[MEDIA_UPLOAD] Uploading to Cloudinary...');
 		const uploadResult = await uploadToCloudinary(
-			finalBuffer,
+			mediaData.buffer,
 			artwork.name || 'artwork',
 			mediaData.mimeType
 		);
@@ -649,11 +645,10 @@ export async function handleMediaUpload(mediaUri, artwork) {
 			return null;
 		}
 
-		console.log('[MEDIA_UPLOAD] Successfully uploaded to Cloudinary:', uploadResult.url);
 		return {
 			url: uploadResult.url,
 			fileType: mediaData.mimeType,
-			dimensions: finalDimensions
+			dimensions: uploadResult.dimensions || dimensions
 		};
 	} catch (error) {
 		console.error('[MEDIA_UPLOAD] Error during media processing:', error);

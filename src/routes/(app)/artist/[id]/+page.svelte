@@ -181,31 +181,40 @@
 			{#key currentIndex}
 				<div class="museum-content">
 					<div class="artwork-container">
-						{#if currentArtwork.animation_url && currentArtwork.mime && currentArtwork.mime.startsWith('video')}
-							<video
-								src={currentArtwork.animation_url}
-								autoplay
-								loop
-								muted
-								playsinline
-								class="artwork-media"
-							/>
-						{:else if currentArtwork.animation_url && currentArtwork.mime && (currentArtwork.mime.startsWith('application') || currentArtwork.mime.startsWith('text'))}
-							<div class="iframe-container" style="aspect-ratio: {aspectRatio}">
-								<iframe
-									bind:this={iframeEl}
-									on:load={handleIframeLoad}
+						{#if currentArtwork.animation_url}
+							{#if currentArtwork.mime && currentArtwork.mime.startsWith('video')}
+								<video
 									src={currentArtwork.animation_url}
-									width="100%"
-									height="100%"
-									title="Artwork Animation"
-									class="artwork-iframe"
-									scrolling="no"
-									frameborder="0"
-									sandbox="allow-scripts allow-same-origin"
-									allowfullscreen
+									autoplay
+									loop
+									muted
+									playsinline
+									class="artwork-media"
 								/>
-							</div>
+							{:else if currentArtwork.mime && currentArtwork.mime.startsWith('application')}
+								<div class="iframe-container" style="aspect-ratio: {aspectRatio}">
+									<iframe
+										bind:this={iframeEl}
+										on:load={handleIframeLoad}
+										src={currentArtwork.animation_url}
+										width="100%"
+										height="100%"
+										title="Artwork Animation"
+										class="artwork-iframe"
+										scrolling="no"
+										frameborder="0"
+										sandbox="allow-scripts allow-same-origin"
+										allowfullscreen
+									/>
+								</div>
+							{:else if currentArtwork.image_url}
+								<!-- Fall back to image_url for non-application, non-video animation_url types -->
+								<img
+									src={getCloudinaryTransformedUrl(currentArtwork.image_url, 'w_2000,q_90,f_auto')}
+									alt={currentArtwork.title}
+									class="artwork-media"
+								/>
+							{/if}
 						{:else if currentArtwork.image_url}
 							<img
 								src={getCloudinaryTransformedUrl(currentArtwork.image_url, 'w_2000,q_90,f_auto')}

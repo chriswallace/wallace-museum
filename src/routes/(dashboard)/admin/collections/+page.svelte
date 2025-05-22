@@ -73,24 +73,24 @@
 				<div class="cover-image-wrap">
 					<div class="cover-image-grid">
 						{#each collection.coverImages as image}
-						{#if image.endsWith(".mp4")}
-							<video
-								src="{image}"
-								autoplay
-								loop
-								muted
-								playsinline
-								class="object-cover"
-								width="250"
-								height="250"
-							/>
-						{:else}
-							<img
-								src="{image}?tr=w-250,h-250,c_fill,q-70,dpr-auto"
-								alt=""
-								class="aspect-square object-cover"
-							/>
-						{/if}
+							{#if image.endsWith('.mp4')}
+								<video
+									src={image}
+									autoplay
+									loop
+									muted
+									playsinline
+									class="object-cover"
+									width="250"
+									height="250"
+								/>
+							{:else}
+								<img
+									src="{image}?tr=w-250,h-250,c_fill,q-70,dpr-auto"
+									alt=""
+									class="aspect-square object-cover"
+								/>
+							{/if}
 						{/each}
 					</div>
 				</div>
@@ -115,8 +115,8 @@
 	.card {
 		@apply cursor-pointer bg-white rounded-md shadow-md overflow-hidden p-0;
 	}
-	.cover-image-wrap{
-		 @apply overflow-hidden;
+	.cover-image-wrap {
+		@apply overflow-hidden;
 	}
 	.cover-image-grid {
 		@apply w-full aspect-square grid grid-cols-2 transition duration-200 ease-in-out hover:scale-105;

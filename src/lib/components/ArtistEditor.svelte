@@ -97,6 +97,7 @@
 		if (!newAddress.address) return;
 
 		try {
+			console.log('Sending request to add address:', newAddress);
 			const response = await fetch(`/api/admin/artists/${artist.id}/addresses`, {
 				method: 'POST',
 				headers: {
@@ -107,14 +108,26 @@
 
 			if (response.ok) {
 				const address = await response.json();
+				console.log('Successfully added address:', address);
 				artist.addresses = [...artist.addresses, address];
 				newAddress = { address: '', blockchain: 'ethereum' };
 				showToast('Address added successfully.', 'success');
 			} else {
-				showToast('Failed to add address.', 'error');
+				// Try to get detailed error message
+				let errorMessage = 'Failed to add address.';
+				try {
+					const errorData = await response.json();
+					console.error('Server error response:', errorData);
+					errorMessage = errorData.details || errorData.error || errorMessage;
+				} catch (e) {
+					console.error('Could not parse error response');
+				}
+				showToast(errorMessage, 'error');
 			}
 		} catch (error) {
-			showToast('Failed to add address.', 'error');
+			console.error('Client-side error adding address:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			showToast(`Failed to add address: ${errorMessage}`, 'error');
 		}
 	}
 

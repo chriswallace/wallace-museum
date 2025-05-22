@@ -142,7 +142,13 @@ export async function fetchOwnedNFTsByAddress(
                     supply
                     symbol
                     metadata
-                    tags
+                    dimensions
+                    extra
+                    tags{
+                        tag {
+                            name
+                        }
+                    }
                     fa {
                         name
                         metadata
@@ -238,7 +244,13 @@ export async function fetchCreatedNFTsByAddress(
                     supply
                     symbol
                     metadata
-                    tags
+                    dimensions
+                    extra
+                    tags{
+                        tag {
+                            name
+                        }
+                    }
                     fa {
                         name,
 						contract

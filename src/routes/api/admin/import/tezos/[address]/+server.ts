@@ -114,11 +114,11 @@ export const GET: RequestHandler = async ({ params, url }) => {
 				description: token.description || '(Metadata Skipped)',
 				artist: {
 					address: token.creators?.[0]?.creator_address || '',
-					username: token.creators?.[0]?.holder?.alias || '(Metadata Skipped)',
+					username: token.creators?.[0]?.holder?.alias || '(Metadata Skipped)'
 				},
 				mime: token.mime || '',
 				platform: 'Tezos',
-				image_url: imageUrl, 
+				image_url: imageUrl,
 				animation_url: animationUrl,
 				tags: token.tags || [], // Use token.tags if available
 				website: token.creators?.[0]?.holder?.website || '',
@@ -140,13 +140,16 @@ export const GET: RequestHandler = async ({ params, url }) => {
 		const hasMoreItems = normalizedNfts.length >= limit;
 
 		// Return normalized NFTs along with pagination info
-		return json({ 
-			success: true, 
-			nfts: uniqueNfts,
-			limit: limit, 
-			offset: offset,
-			hasMore: hasMoreItems // Add explicit hasMore flag
-		}, { status: 200 });
+		return json(
+			{
+				success: true,
+				nfts: uniqueNfts,
+				limit: limit,
+				offset: offset,
+				hasMore: hasMoreItems // Add explicit hasMore flag
+			},
+			{ status: 200 }
+		);
 	} catch (error) {
 		console.error('Failed to fetch NFTs:', error);
 		const errorMessage = error instanceof Error ? error.message : String(error);

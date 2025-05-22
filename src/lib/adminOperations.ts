@@ -1,4 +1,5 @@
 import prisma from '$lib/prisma';
+import type { Artist, ArtistAddress, Collection } from '@prisma/client';
 
 // Define interfaces for expected data structures
 interface SocialMediaAccounts {
@@ -48,116 +49,119 @@ interface NftInfo {
 }
 
 export async function processArtist(artistInfo: ArtistInfo) {
-	// Add checks for social_media_accounts and its properties
-	const twitterHandle = artistInfo.social_media_accounts?.twitter ?? '';
-	const instagramHandle = artistInfo.social_media_accounts?.instagram ?? '';
-
-	// Validate address - if no valid address and no username, return null
 	const zeroAddress = '0x0000000000000000000000000000000000000000';
-	if (!artistInfo.username && (!artistInfo.address || artistInfo.address === zeroAddress)) {
-		console.log('[ARTIST_PROCESS] Invalid address and no username detected:', artistInfo.address);
-		return null; // Return null instead of creating an unknown artist
-	}
+	let artistName = artistInfo.username;
 
-	// Use the provided username or address as the name, but sanitize it
-	let artistName = artistInfo.username || artistInfo.address;
-
-	// If we only have a zero address, return null
-	if (artistName === zeroAddress) {
-		return null;
-	}
-
-	console.log('[ARTIST_PROCESS] Looking for existing artist:', {
-		name: artistName,
-		address: artistInfo.address
-	});
-
-	// First try to find an artist by the desired name
-	let artist = await prisma.artist.findFirst({
-		where: {
-			name: artistName
-		},
-		include: {
-			addresses: true
+	// Fallback to address if username is missing, empty, or zero address
+	if (!artistName || artistName.trim() === '' || artistName === zeroAddress) {
+		if (artistInfo.address && artistInfo.address !== zeroAddress) {
+			artistName = artistInfo.address;
+		} else {
+			// If both username and address are invalid, cannot process artist
+			console.warn('[ARTIST_PROCESS] Invalid artist name and address provided.');
+			return null;
 		}
-	});
+	}
 
-	// If no artist found by name, look for one by address
-	if (!artist && artistInfo.address && artistInfo.address !== zeroAddress) {
-		artist = await prisma.artist.findFirst({
+	const artistData = {
+		name: artistName,
+		bio: artistInfo.bio || '',
+		websiteUrl: artistInfo.website || '',
+		avatarUrl: artistInfo.avatarUrl || '',
+		twitterHandle: artistInfo.social_media_accounts?.twitter || '',
+		instagramHandle: artistInfo.social_media_accounts?.instagram || ''
+	};
+
+	let artist: (Artist & { addresses: ArtistAddress[] }) | null = null;
+
+	// Try to find an existing artist by address first
+	if (artistInfo.address && artistInfo.address !== zeroAddress) {
+		const existingArtistAddress = await prisma.artistAddress.findUnique({
 			where: {
-				addresses: {
-					some: {
-						address: artistInfo.address
-					}
+				address_blockchain: {
+					address: artistInfo.address,
+					blockchain: artistInfo.blockchain || 'ethereum'
 				}
 			},
 			include: {
-				addresses: true
+				artist: {
+					include: {
+						addresses: true
+					}
+				}
 			}
 		});
-	}
 
-	console.log('[ARTIST_PROCESS] Found existing artist:', artist);
-
-	// Prepare the update/create data
-	const artistData = {
-		bio: artistInfo.bio,
-		avatarUrl: artistInfo.avatarUrl,
-		websiteUrl: artistInfo.website,
-		twitterHandle: twitterHandle,
-		instagramHandle: instagramHandle
-	};
-
-	console.log('[ARTIST_PROCESS] Artist data to apply:', artistData);
-
-	if (artist) {
-		// Update existing artist - but don't try to update the name if it would cause a conflict
-		console.log('[ARTIST_PROCESS] Updating existing artist with ID:', artist.id);
-		try {
-			// Only update name if current name is an address and we have a better name
-			const shouldUpdateName = artist.name.startsWith('0x') && !artistName.startsWith('0x');
-
-			artist = await prisma.artist.update({
-				where: { id: artist.id },
-				data: {
-					...artistData,
-					...(shouldUpdateName ? { name: artistName } : {})
-				},
-				include: {
-					addresses: true
-				}
-			});
-
-			// Add the address if it's new and valid
-			if (artistInfo.address && artistInfo.address !== zeroAddress) {
-				const existingAddress = artist.addresses.find((a) => a.address === artistInfo.address);
-				if (!existingAddress) {
-					await prisma.artistAddress.create({
-						data: {
-							address: artistInfo.address,
-							blockchain: artistInfo.blockchain || 'ethereum',
-							artistId: artist.id
-						}
-					});
-				}
-			}
-		} catch (error: any) {
-			if (error?.code === 'P2002' && error?.meta?.target?.includes('name')) {
-				// If name update fails, keep the original name
-				console.log('[ARTIST_PROCESS] Name conflict detected, keeping original name');
+		if (existingArtistAddress && existingArtistAddress.artist) {
+			artist = existingArtistAddress.artist as Artist & { addresses: ArtistAddress[] };
+			console.log('[ARTIST_PROCESS] Found existing artist by address:', artist.name);
+			// Update existing artist if necessary (e.g. if username changed or new info available)
+			// We only update if the current artist name is the address itself, implying it might be a placeholder
+			if (artist.name === artistInfo.address && artistName !== artistInfo.address) {
 				artist = await prisma.artist.update({
 					where: { id: artist.id },
 					data: artistData,
 					include: {
 						addresses: true
 					}
+				}) as Artist & { addresses: ArtistAddress[] };
+				console.log('[ARTIST_PROCESS] Updated artist with new name:', artist.name);
+			}
+			// Ensure the specific address is linked if it wasn't the one found (e.g. artist has multiple addresses)
+			const addressExists = artist.addresses.find(
+				(a: ArtistAddress) => a.address === artistInfo.address && a.blockchain === (artistInfo.blockchain || 'ethereum')
+			);
+			if (!addressExists) {
+				await prisma.artistAddress.create({
+					data: {
+						artistId: artist.id,
+						address: artistInfo.address,
+						blockchain: artistInfo.blockchain || 'ethereum'
+					}
 				});
-			} else {
-				throw error;
+				// Re-fetch artist to include the new address
+				artist = await prisma.artist.findUnique({ where: { id: artist.id }, include: { addresses: true } }) as Artist & { addresses: ArtistAddress[] };
+			}
+			return artist;
+		}
+	}
+
+	// If no artist found by address, try to find by name
+	// This is less reliable, so we only do this if no address was provided or no artist was found by address
+	if (!artist) {
+		const existingArtistByName = await prisma.artist.findUnique({
+			where: { name: artistName },
+			include: {
+				addresses: true
+			}
+		});
+
+		if (existingArtistByName) {
+			artist = existingArtistByName as Artist & { addresses: ArtistAddress[] };
+			console.log('[ARTIST_PROCESS] Found existing artist by name:', artist.name);
+			// If an address is provided and not yet linked, link it
+			if (artistInfo.address && artistInfo.address !== zeroAddress) {
+				const addressExists = artist.addresses.find(
+					(a: ArtistAddress) => a.address === artistInfo.address && a.blockchain === (artistInfo.blockchain || 'ethereum')
+				);
+				if (!addressExists) {
+					await prisma.artistAddress.create({
+						data: {
+							artistId: artist.id,
+							address: artistInfo.address,
+							blockchain: artistInfo.blockchain || 'ethereum'
+						}
+					});
+					// Re-fetch artist to include the new address
+					artist = await prisma.artist.findUnique({ where: { id: artist.id }, include: { addresses: true } }) as Artist & { addresses: ArtistAddress[] };
+				}
 			}
 		}
-	} else {
+	}
+
+
+	// If still no artist, create a new one
+	if (!artist) {
 		// Only create new artist if we have valid information
 		if (artistName && artistName !== zeroAddress) {
 			console.log('[ARTIST_PROCESS] Creating new artist');
@@ -165,7 +169,6 @@ export async function processArtist(artistInfo: ArtistInfo) {
 				artist = await prisma.artist.create({
 					data: {
 						...artistData,
-						name: artistName,
 						addresses:
 							artistInfo.address && artistInfo.address !== zeroAddress
 								? {
@@ -181,7 +184,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					include: {
 						addresses: true
 					}
-				});
+				}) as Artist & { addresses: ArtistAddress[] };
 			} catch (error: any) {
 				if (error?.code === 'P2002' && error?.meta?.target?.includes('name')) {
 					// If name conflict, append part of the address or timestamp to make it unique
@@ -206,7 +209,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 						include: {
 							addresses: true
 						}
-					});
+					}) as Artist & { addresses: ArtistAddress[] };
 				} else {
 					throw error;
 				}
@@ -246,12 +249,22 @@ export async function saveArtwork(nft: NftInfo, artistId: number, collectionId: 
 	// Ensure attributes is treated as JSON, default to empty array if null/undefined
 	const attributes = nft.metadata.attributes || [];
 
-	// Log the attributes for debugging
-	console.log(`[SAVE_ARTWORK] Token: ${nft.tokenID} - Attributes:`, JSON.stringify(attributes));
-	console.log(`[SAVE_ARTWORK] Creator address:`, nft.creator);
+	//console.log(nft);
 
-	// Ensure dimensions is treated as JSON, default to empty object if null/undefined
-	const dimensions = JSON.stringify(nft.dimensions || {});
+	// Validate that collection contract exists
+	if (!nft.collection || !nft.collection.contract) {
+		throw new Error(`Missing contract address for NFT ${nft.tokenID}`);
+	}
+
+	// Ensure dimensions has proper width and height values
+	const normalizedDimensions = nft.dimensions && typeof nft.dimensions.width === 'number' && typeof nft.dimensions.height === 'number'
+		? { width: nft.dimensions.width, height: nft.dimensions.height }
+		: null;
+	
+	console.log(`Chris Dimensions:`, JSON.stringify(normalizedDimensions));
+	
+	// Convert to JSON for storage
+	const dimensions = JSON.stringify(normalizedDimensions);
 
 	try {
 		// Use a transaction to ensure both the artwork and artist relationship are created/updated atomically
@@ -345,3 +358,5 @@ export async function saveArtwork(nft: NftInfo, artistId: number, collectionId: 
 		throw error;
 	}
 }
+
+

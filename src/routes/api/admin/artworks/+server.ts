@@ -4,14 +4,14 @@ import { Prisma } from '@prisma/client';
 // Define a type for the artwork object including relations we expect
 type ArtworkWithRelations = Prisma.ArtworkGetPayload<{
 	include: {
-		collection: true,
+		collection: true;
 		ArtistArtworks: {
 			include: {
-				artist: true
-			}
-		}
-	}
-}>
+				artist: true;
+			};
+		};
+	};
+}>;
 
 export async function GET({ url }) {
 	try {
@@ -48,7 +48,11 @@ export async function GET({ url }) {
 			whereClause = {
 				OR: [
 					{ title: { contains: search, mode: 'insensitive' } },
-					{ ArtistArtworks: { some: { artist: { name: { contains: search, mode: 'insensitive' } } } } },
+					{
+						ArtistArtworks: {
+							some: { artist: { name: { contains: search, mode: 'insensitive' } } }
+						}
+					},
 					{ collection: { title: { contains: search, mode: 'insensitive' } } }
 				]
 			};
@@ -71,9 +75,9 @@ export async function GET({ url }) {
 			}
 		});
 
-		const transformedArtworks = artworks.map(artwork => {
+		const transformedArtworks = artworks.map((artwork) => {
 			type ArtistArtworkJoin = Prisma.ArtistArtworksGetPayload<{ include: { artist: true } }>;
-			
+
 			const transformed = {
 				...artwork,
 				artists: artwork.ArtistArtworks.map((aa: ArtistArtworkJoin) => aa.artist)
@@ -96,7 +100,7 @@ export async function GET({ url }) {
 			}
 		);
 	} catch (error) {
-		console.error("Error fetching artworks list:", error);
+		console.error('Error fetching artworks list:', error);
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 		return new Response(JSON.stringify({ error: 'An error occurred', details: errorMessage }), {
 			status: 500,

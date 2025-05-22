@@ -90,11 +90,6 @@ interface PartialDimensions {
 	height?: number;
 }
 
-const DEFAULT_DIMENSIONS: Dimensions = {
-	width: 1000,
-	height: 1000
-};
-
 function isDimensions(obj: any): obj is Dimensions {
 	return (
 		obj &&
@@ -104,30 +99,35 @@ function isDimensions(obj: any): obj is Dimensions {
 	);
 }
 
-function ensureDimensions(dimensions: unknown): Dimensions {
+function ensureDimensions(dimensions: unknown): Dimensions | null {
 	if (isDimensions(dimensions)) {
 		return dimensions;
 	}
-	return { ...DEFAULT_DIMENSIONS };
+	// return { ...DEFAULT_DIMENSIONS };
+	return null;
 }
 
-function createDimensions(width: number | undefined, height: number | undefined): Dimensions {
-	return {
-		width: typeof width === 'number' && width > 0 ? width : DEFAULT_DIMENSIONS.width,
-		height: typeof height === 'number' && height > 0 ? height : DEFAULT_DIMENSIONS.height
-	};
+function createDimensions(width: number | undefined, height: number | undefined): Dimensions | null {
+	// return {
+	// 	width: typeof width === 'number' && width > 0 ? width : DEFAULT_DIMENSIONS.width,
+	// 	height: typeof height === 'number' && height > 0 ? height : DEFAULT_DIMENSIONS.height
+	// };
+	if (typeof width === 'number' && width > 0 && typeof height === 'number' && height > 0) {
+		return { width, height };
+	}
+	return null;
 }
 
-const createDefaultDimensions = (aspectRatio?: number): Dimensions => ({
-	width: aspectRatio ? Math.round(1000 * aspectRatio) : DEFAULT_DIMENSIONS.width,
-	height: DEFAULT_DIMENSIONS.height
-});
+// const createDefaultDimensions = (aspectRatio?: number): Dimensions => ({
+// 	width: aspectRatio ? Math.round(1000 * aspectRatio) : DEFAULT_DIMENSIONS.width,
+// 	heigh: DEFAULT_DIMENSIONS.height
+// });
 
 // Define return type for uploadToCloudinary
 interface UploadResult {
 	url: string;
 	fileType: string;
-	dimensions: Dimensions;
+	dimensions: Dimensions | null;
 }
 
 // Define basic structure for NFT and Metadata for normalization functions
@@ -183,10 +183,10 @@ interface NftData {
 	properties?: any;
 	contractAddress?: string;
 	contractAlias?: string;
-	dimensions?: Dimensions; // Change this to use the Dimensions type
 	token_standard?: string;
 	updated_at?: string | Date;
 	aspect_ratio?: number;
+	dimensions?: Dimensions | null; // Add dimensions property
 	// Additional properties for Art Blocks and Tezos
 	script_type?: string;
 	license?: string;
@@ -208,7 +208,6 @@ interface FetchedMedia {
 	buffer: Buffer;
 	mimeType: string;
 	fileName: string;
-	dimensions: Dimensions | null;
 	httpUrlUsed: string;
 	error?: undefined;
 }
@@ -540,67 +539,120 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 
 	try {
 		const sanitizedUri = removeQueryString(uri);
-		// Assume convertIpfsToHttpsUrl returns IpfsUrlResult or string
-		const ipfsResourceResult = convertIpfsToHttpsUrl(sanitizedUri) as IpfsUrlResult | string;
+		console.log(`[MEDIA_DEBUG] Processing URI: ${sanitizedUri}`);
+		
+		// Check if the URL is an Arweave URL with or without prefix
+		const isArweave = 
+			sanitizedUri.startsWith('ar://') || 
+			sanitizedUri.includes('arweave.net/') || 
+			(sanitizedUri.startsWith('https://') && sanitizedUri.includes('.arweave.net/')) ||
+			(sanitizedUri.match(/^[a-zA-Z0-9_-]{43}$/) !== null); // Raw Arweave transaction ID (43 chars)
 
-		let ipfsResource: string | null = null;
-		if (typeof ipfsResourceResult === 'string') {
-			ipfsResource = ipfsResourceResult;
-		} else if (ipfsResourceResult && typeof ipfsResourceResult === 'object') {
-			if (ipfsResourceResult.type === 'ipfs' || ipfsResourceResult.type === 'http') {
-				ipfsResource = ipfsResourceResult.value;
+		if (isArweave) {
+			console.log(`[MEDIA_DEBUG] Detected Arweave URL: ${sanitizedUri}`);
+			let arweaveUrl = sanitizedUri;
+			
+			// Handle ar:// protocol
+			if (arweaveUrl.startsWith('ar://')) {
+				const txId = arweaveUrl.replace('ar://', '');
+				arweaveUrl = `https://arweave.net/${txId}`;
+			} 
+			// Handle raw transaction ID
+			else if (arweaveUrl.match(/^[a-zA-Z0-9_-]{43}$/)) {
+				arweaveUrl = `https://arweave.net/${arweaveUrl}`;
+			}
+			// Handle URLs that end with a slash
+			else if (arweaveUrl.endsWith('/')) {
+				arweaveUrl = arweaveUrl.slice(0, -1);
+			}
+			
+			console.log(`[MEDIA_DEBUG] Fetching from Arweave URL: ${arweaveUrl}`);
+			httpUrlUsed = arweaveUrl;
+			
+			try {
+				response = await fetch(arweaveUrl, {
+					method: 'GET',
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+					},
+					signal: AbortSignal.timeout(20000) // 20 second timeout for Arweave which can be slow
+				});
+				
+				if (!response.ok) {
+					throw new Error(`HTTP error ${response.status} fetching Arweave URL`);
+				}
+				
+				console.log(`[MEDIA_DEBUG] Successful Arweave response: ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
+			} catch (arweaveError) {
+				console.error(`[MEDIA_DEBUG] Error fetching from Arweave: ${arweaveError}`);
+				// Fall back to regular IPFS/HTTP handling
 			}
 		}
+		
+		// If not an Arweave URL or Arweave fetch failed, continue with regular IPFS/HTTP handling
+		if (!response || !response.ok) {
+			// Assume convertIpfsToHttpsUrl returns IpfsUrlResult or string
+			const ipfsResourceResult = convertIpfsToHttpsUrl(sanitizedUri) as IpfsUrlResult | string;
 
-		if (!ipfsResource) {
-			console.log(`[MEDIA_DEBUG] Could not resolve URI to a fetchable resource: ${uri}`);
-			throw new Error(`Could not resolve URI to a fetchable resource: ${uri}`);
-		}
-
-		const fetchOptions: RequestInit = {
-			method: 'GET',
-			headers: {
-				'User-Agent':
-					'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-			},
-			signal: AbortSignal.timeout(15000) // 15 second timeout for fetch
-		};
-
-		if (ipfsResource.startsWith('http://') || ipfsResource.startsWith('https://')) {
-			httpUrlUsed = ipfsResource;
-			console.log(`[MEDIA_DEBUG] Fetching HTTP(S) URL: ${httpUrlUsed}`);
-			response = await fetch(httpUrlUsed, fetchOptions);
-			console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
-			console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
-			if (!response.ok) {
-				throw new Error(`HTTP error ${response.status} fetching direct URL`);
-			}
-		} else if (ipfsResource) {
-			for (const gateway of IPFS_GATEWAYS) {
-				httpUrlUsed = `${gateway}${ipfsResource}`;
-				console.log(`[MEDIA_DEBUG] Trying IPFS gateway: ${httpUrlUsed}`);
-				try {
-					response = await fetch(httpUrlUsed, fetchOptions);
-					console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
-					console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
-					if (response.ok) {
-						break;
-					} else {
-						response = null;
-					}
-				} catch (error: unknown) {
-					response = null;
+			let ipfsResource: string | null = null;
+			if (typeof ipfsResourceResult === 'string') {
+				ipfsResource = ipfsResourceResult;
+			} else if (ipfsResourceResult && typeof ipfsResourceResult === 'object') {
+				if (ipfsResourceResult.type === 'ipfs' || ipfsResourceResult.type === 'http') {
+					ipfsResource = ipfsResourceResult.value;
 				}
 			}
-			if (!response || !response.ok) {
-				console.log(
-					`[MEDIA_DEBUG] Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`
-				);
-				throw new Error(`Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`);
+
+			if (!ipfsResource) {
+				console.log(`[MEDIA_DEBUG] Could not resolve URI to a fetchable resource: ${uri}`);
+				throw new Error(`Could not resolve URI to a fetchable resource: ${uri}`);
 			}
-		} else {
-			console.log(`[MEDIA_DEBUG] Invalid or empty URI provided: ${uri}`);
-			throw new Error(`Invalid or empty URI provided: ${uri}`);
+
+			const fetchOptions: RequestInit = {
+				method: 'GET',
+				headers: {
+					'User-Agent':
+						'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+				},
+				signal: AbortSignal.timeout(15000) // 15 second timeout for fetch
+			};
+
+			if (ipfsResource.startsWith('http://') || ipfsResource.startsWith('https://')) {
+				httpUrlUsed = ipfsResource;
+				console.log(`[MEDIA_DEBUG] Fetching HTTP(S) URL: ${httpUrlUsed}`);
+				response = await fetch(httpUrlUsed, fetchOptions);
+				console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
+				console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
+				if (!response.ok) {
+					throw new Error(`HTTP error ${response.status} fetching direct URL`);
+				}
+			} else if (ipfsResource) {
+				for (const gateway of IPFS_GATEWAYS) {
+					httpUrlUsed = `${gateway}${ipfsResource}`;
+					console.log(`[MEDIA_DEBUG] Trying IPFS gateway: ${httpUrlUsed}`);
+					try {
+						response = await fetch(httpUrlUsed, fetchOptions);
+						console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
+						console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
+						if (response.ok) {
+							break;
+						} else {
+							response = null;
+						}
+					} catch (error: unknown) {
+						response = null;
+					}
+				}
+				if (!response || !response.ok) {
+					console.log(
+						`[MEDIA_DEBUG] Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`
+					);
+					throw new Error(`Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`);
+				}
+			} else {
+				console.log(`[MEDIA_DEBUG] Invalid or empty URI provided: ${uri}`);
+				throw new Error(`Invalid or empty URI provided: ${uri}`);
+			}
 		}
 
 		const arrayBuffer = await response.arrayBuffer();
@@ -610,6 +662,20 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 			`[MEDIA_DEBUG] Detected file type: ${fileTypeResult ? fileTypeResult.mime : 'undefined'}`
 		);
 		if (!fileTypeResult) {
+			// For files with no detectable type, check the Content-Type header
+			const contentType = response.headers.get('content-type');
+			if (contentType && (contentType.startsWith('image/') || contentType.startsWith('video/'))) {
+				console.log(`[MEDIA_DEBUG] Using Content-Type header for mime type: ${contentType}`);
+				// Extract extension from content type
+				const ext = contentType.split('/')[1];
+				return {
+					buffer,
+					mimeType: contentType,
+					fileName: `file.${ext}`,
+					httpUrlUsed: httpUrlUsed || ''
+				};
+			}
+			
 			return {
 				httpUrlUsed: httpUrlUsed,
 				error: 'type_detection_error',
@@ -645,18 +711,34 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 
 		if (mimeType.startsWith('image/')) {
 			try {
+				console.log(`[MEDIA_DEBUG] Extracting image dimensions for ${fileName}`);
 				const metadata = await sharp(buffer).metadata();
 				if (metadata.width && metadata.height) {
 					dimensions = createDimensions(metadata.width, metadata.height);
+					console.log(`[MEDIA_DEBUG] Image dimensions: ${dimensions?.width}x${dimensions?.height}`);
+				} else {
+					console.log(`[MEDIA_DEBUG] Image dimensions could not be determined from metadata`);
+					dimensions = null;
 				}
-			} catch (sharpError: unknown) {}
+			} catch (sharpError: unknown) {
+				console.error(`[MEDIA_DEBUG] Error extracting image dimensions:`, sharpError);
+				dimensions = null;
+			}
 		} else if (mimeType.startsWith('video/')) {
 			try {
+				console.log(`[MEDIA_DEBUG] Extracting video dimensions for ${fileName}`);
 				const videoDimensions = await getVideoDimensions(buffer);
 				if (videoDimensions) {
 					dimensions = createDimensions(videoDimensions.width, videoDimensions.height);
+					console.log(`[MEDIA_DEBUG] Video dimensions: ${dimensions?.width}x${dimensions?.height}`);
+				} else {
+					console.log(`[MEDIA_DEBUG] Video dimensions could not be determined`);
+					dimensions = null;
 				}
-			} catch (videoError: unknown) {}
+			} catch (videoError: unknown) {
+				console.error(`[MEDIA_DEBUG] Error extracting video dimensions:`, videoError);
+				dimensions = null;
+			}
 		}
 
 		if (!httpUrlUsed) {
@@ -667,7 +749,6 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 			buffer,
 			mimeType,
 			fileName,
-			dimensions,
 			httpUrlUsed
 		};
 	} catch (error: unknown) {
@@ -721,22 +802,13 @@ export async function handleMediaUpload(
 		return null;
 	}
 
-	console.log(`[MEDIA_UPLOAD_DEBUG] Starting media upload for URI: ${mediaUri}`);
-	console.log(`[MEDIA_UPLOAD_DEBUG] Artwork info:`, {
-		name: artwork?.name,
-		tokenID: artwork?.tokenID,
-		collection: artwork?.collection?.name,
-		mime: artwork?.mime
-	});
-
 	// Retry configuration
 	const MAX_RETRIES = 3;
 	const RETRY_DELAY = 2000; // 2 seconds
 	let retryCount = 0;
 
-	// Special handling for fxhash URLs
+	// Special handling for fxhash URLs - these are HTML generators, not direct media
 	if (isFxHashUrl(mediaUri)) {
-		console.log(`[MEDIA_UPLOAD_DEBUG] Detected fxhash URL: ${mediaUri}`);
 		const dimensions = ensureDimensions(artwork.dimensions);
 		return {
 			url: mediaUri,
@@ -745,24 +817,21 @@ export async function handleMediaUpload(
 		};
 	}
 
-	// Special handling for Art Blocks URLs
+	// Special handling for Art Blocks URLs - these can be generators or images
 	if (isArtBlocksUrl(mediaUri)) {
-		console.log(`[MEDIA_UPLOAD_DEBUG] Detected Art Blocks URL: ${mediaUri}`);
 		const mediaType = getArtBlocksMediaType(mediaUri);
 
-		const defaultDimensions = artwork.aspect_ratio
-			? createDimensions(Math.round(1000 * artwork.aspect_ratio), 1000)
-			: DEFAULT_DIMENSIONS;
-
+		// For generator URLs, we don't upload to Cloudinary as they're HTML
 		if (mediaType === 'generator') {
-			console.log('[MEDIA_UPLOAD_DEBUG] Detected Art Blocks generator URL');
+			const dimensions = ensureDimensions(artwork.dimensions);
 			return {
 				url: mediaUri,
 				fileType: 'text/html',
-				dimensions: artwork.dimensions || defaultDimensions
+				dimensions
 			};
 		}
 
+		// For image URLs, always upload to Cloudinary
 		if (mediaType === 'image') {
 			while (retryCount < MAX_RETRIES) {
 				try {
@@ -791,11 +860,10 @@ export async function handleMediaUpload(
 						throw new Error('Cloudinary upload failed');
 					}
 
-					const finalDimensions = ensureDimensions(uploadResult.dimensions || mediaData.dimensions);
 					return {
 						url: uploadResult.url,
 						fileType: mediaData.mimeType,
-						dimensions: finalDimensions
+						dimensions: uploadResult.dimensions
 					};
 				} catch (error) {
 					console.error(`[MEDIA_UPLOAD_DEBUG] Attempt ${retryCount + 1} failed:`, error);
@@ -819,10 +887,11 @@ export async function handleMediaUpload(
 		return null;
 	}
 
+	// If we couldn't fetch the media or got an error, handle potential HTML/PDF content
 	if (!fetchedMediaResult || 'error' in fetchedMediaResult) {
 		const errorInfo = fetchedMediaResult as FetchedMediaError | null;
-		console.log(`[MEDIA_UPLOAD_DEBUG] Handling fetch error:`, errorInfo);
 
+		// For HTML/PDF content that can't be fetched normally, return the URL directly
 		if (errorInfo?.httpUrlUsed && typeof errorInfo.httpUrlUsed === 'string') {
 			const mediaType = getMediaType(
 				errorInfo.message?.includes('application/pdf') ? 'application/pdf' : 'text/html'
@@ -832,7 +901,7 @@ export async function handleMediaUpload(
 				return {
 					url: errorInfo.httpUrlUsed,
 					fileType: mediaType === 'document' ? 'application/pdf' : 'text/html',
-					dimensions: DEFAULT_DIMENSIONS
+					dimensions: null
 				};
 			}
 		}
@@ -843,6 +912,7 @@ export async function handleMediaUpload(
 		return null;
 	}
 
+	// Successfully fetched media - validate it
 	const fetchedMedia = fetchedMediaResult as FetchedMedia;
 	if (!isValidMimeType(fetchedMedia.mimeType)) {
 		console.error(`[MEDIA_UPLOAD_DEBUG] Invalid MIME type: ${fetchedMedia.mimeType}`);
@@ -855,6 +925,7 @@ export async function handleMediaUpload(
 		return null;
 	}
 
+	// Always upload valid media to Cloudinary
 	while (retryCount < MAX_RETRIES) {
 		try {
 			const uploadResult = await uploadToCloudinary(
@@ -876,7 +947,7 @@ export async function handleMediaUpload(
 			return {
 				url: uploadResult.url,
 				fileType: fetchedMedia.mimeType,
-				dimensions: uploadResult.dimensions || fetchedMedia.dimensions || DEFAULT_DIMENSIONS
+				dimensions: uploadResult.dimensions
 			};
 		} catch (error) {
 			console.error(`[MEDIA_UPLOAD_DEBUG] Upload attempt ${retryCount + 1} failed:`, error);
@@ -893,7 +964,7 @@ export async function handleMediaUpload(
 
 interface ResizeResult {
 	buffer: Buffer;
-	dimensions: Dimensions;
+	dimensions: Dimensions | null;
 }
 
 export async function resizeMedia(
@@ -902,19 +973,29 @@ export async function resizeMedia(
 	dimensions: Dimensions | null,
 	maxSizeMB = 25
 ): Promise<ResizeResult | null> {
-	// Check if dimensions are valid at the start
-	if (
-		!dimensions ||
-		typeof dimensions.width !== 'number' ||
-		typeof dimensions.height !== 'number' ||
-		dimensions.width <= 0 ||
-		dimensions.height <= 0
-	) {
-		// console.warn("[resizeMedia] Invalid or missing dimensions provided, skipping resize.", dimensions);
-		// Return original buffer and best-effort dimensions if skipping, but indicate potential issue by returning maybe null?
-		// Let's return null to indicate resize wasn't properly possible due to bad input
+	console.log('[RESIZE_MEDIA] Starting resizeMedia function');
+	console.log(
+		`[RESIZE_MEDIA] Input - MimeType: ${mimeType}, Dimensions: ${JSON.stringify(dimensions)}, MaxSizeMB: ${maxSizeMB}`
+	);
+
+	if (!buffer || buffer.length === 0) {
+		console.error('[RESIZE_MEDIA] Input buffer is null or empty.');
 		return null;
 	}
+
+	if (!dimensions || typeof dimensions.width !== 'number' || typeof dimensions.height !== 'number' || dimensions.width <= 0 || dimensions.height <= 0) {
+		console.warn('[RESIZE_MEDIA] Invalid or missing dimensions for resizing. Attempting to get from buffer.');
+		const currentDimensions = await getImageDimensionsFromBuffer(buffer);
+		if (!currentDimensions || typeof currentDimensions.width !== 'number' || typeof currentDimensions.height !== 'number' || currentDimensions.width <= 0 || currentDimensions.height <= 0) {
+			console.warn('[RESIZE_MEDIA] Could not determine valid dimensions from buffer. Cannot resize.');
+			return { buffer, dimensions: null };
+		}
+		dimensions = currentDimensions;
+		console.log('[RESIZE_MEDIA] Using dimensions from buffer for resize:', JSON.stringify(dimensions));
+	}
+
+	const MAX_DIMENSION = 4000; // Max width or height for Cloudinary
+	const MAX_FILE_SIZE_BYTES = maxSizeMB * 1024 * 1024;
 
 	try {
 		let sizeMB = Buffer.byteLength(buffer) / (1024 * 1024);
@@ -1171,6 +1252,8 @@ export async function uploadToCloudinary(
 	tagsToApply?: string
 ): Promise<UploadResult | null> {
 	try {
+		let dimensionsToReturn: Dimensions | null = null; // Declare at a higher scope
+
 		// First, check if we already have this file using the mediaHash tag
 		if (tagsToApply) {
 			const mediaHashTag = tagsToApply.split(',').find((tag) => tag.startsWith('mediaHash:'));
@@ -1178,15 +1261,34 @@ export async function uploadToCloudinary(
 				const existingResource = await searchCloudinaryByTag(mediaHashTag);
 				if (existingResource) {
 					console.log('[CLOUDINARY_DEBUG] Using existing resource:', existingResource.public_id);
+					// Extract dimensions from existing resource
+					let width = existingResource.width;
+					let height = existingResource.height;
+					
+					if (!width || !height) {
+						console.log('[CLOUDINARY_DEBUG] Missing dimensions from existing resource, attempting to get them or using null');
+						// Try to get dimensions using getCloudinaryImageDimensions, or fallback to null if not possible.
+						const liveDimensions = await getCloudinaryImageDimensions(existingResource.secure_url);
+						if (liveDimensions) {
+							console.log(`[CLOUDINARY_DEBUG] Fetched live dimensions for existing resource: ${liveDimensions.width}x${liveDimensions.height}`);
+							dimensionsToReturn = liveDimensions;
+						} else {
+							console.log('[CLOUDINARY_DEBUG] Could not fetch live dimensions for existing resource. Dimensions set to null.');
+						}
+					} else {
+						console.log(`[CLOUDINARY_DEBUG] Found dimensions from existing resource: ${width}x${height}`);
+						dimensionsToReturn = createDimensions(width, height);
+					}
+					
 					return {
 						url: existingResource.secure_url.split('?')[0],
 						fileType:
 							existingResource.resource_type === 'image'
-								? 'image'
+								? existingResource.format || 'image'
 								: existingResource.resource_type === 'video'
-									? 'video'
+									? existingResource.format || 'video'
 									: 'raw',
-						dimensions: createDimensions(existingResource.width, existingResource.height)
+						dimensions: dimensionsToReturn
 					};
 				}
 			}
@@ -1205,7 +1307,10 @@ export async function uploadToCloudinary(
 			resource_type: 'auto',
 			overwrite: false,
 			use_filename: false, // Changed to false since we're handling the full public_id
-			unique_filename: false // Changed to false since we're handling uniqueness with hash
+			unique_filename: false, // Changed to false since we're handling uniqueness with hash
+			quality: 100, // Set to maximum quality (no compression)
+			fetch_format: null, // Don't change the image format
+			transformation: [] // No transformations - keep original image
 		};
 
 		const uploadPromise = new Promise<UploadApiResponse | undefined>((resolve, reject) => {
@@ -1216,7 +1321,9 @@ export async function uploadToCloudinary(
 				} else {
 					console.log('[CLOUDINARY_DEBUG] Upload successful:', {
 						public_id: result?.public_id,
-						url: result?.secure_url
+						url: result?.secure_url,
+						width: result?.width,
+						height: result?.height
 					});
 					resolve(result);
 				}
@@ -1232,16 +1339,35 @@ export async function uploadToCloudinary(
 		const response = await uploadPromise;
 
 		if (response && response.secure_url) {
-			const dimensions = createDimensions(response.width, response.height);
+			// Extract dimensions directly from the Cloudinary response
+			let width = response.width;
+			let height = response.height;
+			let respDimensions: Dimensions | null = null;
+			
+			if (!width || !height) {
+				console.log('[CLOUDINARY_DEBUG] No dimensions returned from Cloudinary, attempting to fetch live or using null');
+				// Attempt to get live dimensions as a fallback
+				const liveDimensions = await getCloudinaryImageDimensions(response.secure_url);
+				respDimensions = liveDimensions; // This will be Dimensions | null
+				if (liveDimensions) {
+					console.log(`[CLOUDINARY_DEBUG] Fetched live dimensions after upload: ${liveDimensions.width}x${liveDimensions.height}`);
+				} else {
+					console.log('[CLOUDINARY_DEBUG] Could not fetch live dimensions after upload. Dimensions set to null.');
+				}
+			} else {
+				console.log(`[CLOUDINARY_DEBUG] Got dimensions from Cloudinary response: ${width}x${height}`);
+				respDimensions = createDimensions(width, height);
+			}
+			
 			return {
 				url: response.secure_url.split('?')[0],
 				fileType:
 					response.resource_type === 'image'
-						? 'image'
+						? response.format || 'image'
 						: response.resource_type === 'video'
-							? 'video'
+							? response.format || 'video'
 							: 'raw',
-				dimensions
+				dimensions: respDimensions
 			};
 		} else {
 			console.error(
@@ -1311,5 +1437,82 @@ async function fetchOpenSeaCollectionData(
 	} catch (error) {
 		console.error('[OPENSEA_DEBUG] Error fetching OpenSea collection data:', error);
 		return null;
+	}
+}
+
+/**
+ * Get the dimensions of an existing Cloudinary image by its URL
+ * @param imageUrl The URL of the Cloudinary image
+ * @returns The width and height of the image, or null if dimensions couldn't be retrieved
+ */
+export async function getCloudinaryImageDimensions(
+	imageUrl: string
+): Promise<Dimensions | null> {
+	if (!imageUrl || !imageUrl.includes('cloudinary.com')) {
+		console.error('[CLOUDINARY_DEBUG] Invalid Cloudinary URL:', imageUrl);
+		return null;
+	}
+
+	try {
+		// Extract the public ID from the URL
+		// Example URL: https://res.cloudinary.com/cloud-name/image/upload/v1234567890/compendium/image_name_12345678.jpg
+		const urlParts = imageUrl.split('/');
+		const uploadIndex = urlParts.indexOf('upload');
+		
+		if (uploadIndex === -1) {
+			console.error('[CLOUDINARY_DEBUG] Could not parse Cloudinary URL:', imageUrl);
+			return null;
+		}
+		
+		// Get everything after 'upload' excluding version (v1234567890)
+		let publicId = urlParts.slice(uploadIndex + 1).join('/');
+		
+		// Remove version if present
+		if (publicId.startsWith('v') && /^v\d+\//.test(publicId)) {
+			publicId = publicId.replace(/^v\d+\//, '');
+		}
+		
+		// Remove file extension if present
+		publicId = publicId.replace(/\.[^/.]+$/, '');
+		
+		console.log('[CLOUDINARY_DEBUG] Extracted public ID:', publicId);
+		
+		// Use the Cloudinary API to get resource details
+		const result = await new Promise<any>((resolve, reject) => {
+			cloudinary.api.resource(publicId, {
+				resource_type: 'image',
+				type: 'upload'
+			}, (error, result) => {
+				if (error) {
+					reject(error);
+				} else {
+					resolve(result);
+				}
+			});
+		});
+		
+		if (result && typeof result.width === 'number' && typeof result.height === 'number') {
+			console.log(`[CLOUDINARY_DEBUG] Found dimensions: ${result.width}x${result.height}`);
+			return createDimensions(result.width, result.height);
+		} else {
+			console.error('[CLOUDINARY_DEBUG] Resource found but no dimensions:', result);
+			return null;
+		}
+	} catch (error) {
+		console.error('[CLOUDINARY_DEBUG] Error getting image dimensions:', error);
+		return null;
+	}
+}
+
+async function getImageDimensionsFromBuffer(buffer: Buffer): Promise<Dimensions | null> {
+	try {
+		const metadata = await sharp(buffer).metadata();
+		if (metadata.width && metadata.height) {
+			return { width: metadata.width, height: metadata.height };
+		}
+		return null; // Fallback if no dimensions found
+	} catch (error) {
+		console.error('[DIMENSIONS_IMAGE_BUFFER] Error getting image dimensions from buffer:', error);
+		return null; // Fallback in case of error
 	}
 }

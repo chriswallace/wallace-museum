@@ -7,7 +7,7 @@
 	page.subscribe(($page) => {
 		currentPage = $page.url.pathname;
 	});
-	
+
 	import '../../../admin.css';
 </script>
 
@@ -26,9 +26,7 @@
 				<a href="/admin/artists" class={currentPage === '/admin/artists' ? 'selected' : ''}
 					>Artists</a
 				>
-				<a href="/admin/import" class={currentPage === '/admin/import' ? 'selected' : ''}
-					>Import</a
-				>
+				<a href="/admin/import" class={currentPage === '/admin/import' ? 'selected' : ''}>Import</a>
 			</div>
 
 			<form action="/logout" method="POST">
