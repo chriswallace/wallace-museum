@@ -76,7 +76,7 @@ model Artwork {
   tokenID        String?
   blockchain     String?
   curatorNotes   String?
-  totalSupply    Int?
+
   tokenStandard  String?
   animation_url  String?
   image_url      String?

@@ -338,12 +338,7 @@
 													<span>{data.artist.artworks[currentIndex].tokenStandard}</span>
 												</div>
 											{/if}
-											{#if data.artist.artworks[currentIndex].totalSupply}
-												<div class="metadata-item">
-													<strong>Total Supply</strong>
-													<span>{data.artist.artworks[currentIndex].totalSupply}</span>
-												</div>
-											{/if}
+
 											{#if data.artist.artworks[currentIndex].mintDate}
 												<div class="metadata-item">
 													<strong>Mint Date</strong>

@@ -30,7 +30,6 @@
 		curatorNotes: string;
 		contractAddr: string;
 		contractAlias: string;
-		totalSupply: string;
 		symbol: string;
 		blockchain: string;
 		tokenID: string;
@@ -50,7 +49,6 @@
 		curatorNotes: '',
 		contractAddr: '',
 		contractAlias: '',
-		totalSupply: '',
 		symbol: '',
 		blockchain: '',
 		tokenID: '',
@@ -196,23 +194,29 @@
 					</div>
 					<div>
 						<label for="image_url">Image URL</label>
-						<input 
-							type="url" 
-							id="image_url" 
-							bind:value={artwork.image_url} 
+						<input
+							type="url"
+							id="image_url"
+							bind:value={artwork.image_url}
 							placeholder="https://res.cloudinary.com/..."
 						/>
-						<small>Change the image URL to update the artwork image. Cloudinary URLs will have dimensions automatically detected.</small>
+						<small
+							>Change the image URL to update the artwork image. Cloudinary URLs will have
+							dimensions automatically detected.</small
+						>
 					</div>
 					<div>
 						<label for="animation_url">Animation URL</label>
-						<input 
-							type="url" 
-							id="animation_url" 
-							bind:value={artwork.animation_url} 
+						<input
+							type="url"
+							id="animation_url"
+							bind:value={artwork.animation_url}
 							placeholder="https://res.cloudinary.com/..."
 						/>
-						<small>URL for animation or interactive content. This will be prioritized over the image URL when present. MIME type will be auto-detected.</small>
+						<small
+							>URL for animation or interactive content. This will be prioritized over the image URL
+							when present. MIME type will be auto-detected.</small
+						>
 					</div>
 					<div>
 						<label for="artist">Artists</label>

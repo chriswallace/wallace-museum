@@ -24,7 +24,6 @@
 		dimensions?: { width: number; height: number };
 		contractAddr?: string;
 		contractAlias?: string;
-		totalSupply?: string | number;
 		tokenStandard?: string;
 		tokenID?: string;
 		mintDate?: string | Date;
@@ -156,12 +155,6 @@
 						{#if artworkDetails.tokenStandard}
 							<dt>Token Standard</dt>
 							<dd>{artworkDetails.tokenStandard}</dd>
-						{/if}
-						{#if artworkDetails.totalSupply}
-							<dt>Token Supply</dt>
-							<dd>
-								{#if artworkDetails.totalSupply == 1}1 of 1{:else}{artworkDetails.totalSupply}{/if}
-							</dd>
 						{/if}
 						{#if artworkDetails.contractAddr && artworkDetails.tokenID}
 							<dt>Contract</dt>

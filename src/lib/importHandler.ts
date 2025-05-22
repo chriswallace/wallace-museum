@@ -139,7 +139,7 @@ async function importNft(nft: ImportNft) {
 			name: nft.title || 'Untitled',
 			description: nft.description || '',
 			collection: {
-				name: nft.contractAlias || nft.collection?.name || 'Unknown Collection',
+				name: nft.collection,
 				contract: nft.contractAddr || nft.collection?.contract,
 				blockchain: source === 'tezos' ? 'Tezos' : 'Ethereum'
 			}

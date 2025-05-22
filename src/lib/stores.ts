@@ -22,7 +22,6 @@ export interface Artwork {
 	dimensions?: { width: number; height: number };
 	contractAddr?: string;
 	contractAlias?: string;
-	totalSupply?: string | number;
 	tokenStandard?: string;
 	tokenID?: string;
 	mintDate?: string | Date;

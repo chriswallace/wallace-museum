@@ -21,7 +21,6 @@ export async function load({ params }) {
 						dimensions: true, // Scalar field
 						contractAddr: true,
 						contractAlias: true,
-						totalSupply: true,
 						tokenStandard: true,
 						tokenID: true,
 						mintDate: true,

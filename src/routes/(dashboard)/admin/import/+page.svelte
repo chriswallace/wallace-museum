@@ -139,26 +139,23 @@
 
 					// Map API response to compatible Artwork objects
 					const mappedNfts = data.nfts.map((nft, idx) => {
-						// Compose a unique id for Svelte keyed each
+						// Create a simpler unique ID using contractAddress_tokenId format
 						let uniqueId = '';
-						if (nft.platform === 'Tezos' || nft.blockchain === 'tezos') {
-							uniqueId = `tezos/${nft.collection?.contract || 'unknown'}/${nft.tokenID || nft.token_id || nft.id}`;
-						} else if (nft.contract_address || nft.contractAddr) {
-							uniqueId = `eth/${nft.contract_address || nft.contractAddr || 'unknown'}/${nft.tokenID || nft.token_id || nft.id}`;
-						} else if (nft.id !== undefined && nft.id !== null) {
-							// Try to use more info if available
-							if (nft.contract || nft.contract_address || nft.collection?.contract) {
-								uniqueId = `generic/${nft.id}/${nft.contract || nft.contract_address || nft.collection?.contract}`;
-							} else if (nft.tokenID || nft.token_id) {
-								uniqueId = `generic/${nft.id}/${nft.tokenID || nft.token_id}`;
-							} else {
-								// Fallback: add index to ensure uniqueness
-								uniqueId = `generic/${nft.id}/${idx}`;
-							}
-						} else {
-							// Fallback: use index or a random string (should be rare)
-							uniqueId = `fallback/${idx}_${Math.random().toString(36).slice(2)}`;
-						}
+
+						// Get contract address (use fallbacks if not available)
+						const contractAddr =
+							nft.contract_address ||
+							nft.contractAddr ||
+							nft.collection?.contract ||
+							nft.contract ||
+							'unknown';
+
+						// Get token ID (use fallbacks if not available)
+						const tokenId = nft.tokenID || nft.token_id || nft.id || idx.toString();
+
+						// Create the unique ID in contractAddress_tokenId format
+						uniqueId = `${contractAddr}_${tokenId}`;
+
 						return {
 							...nft,
 							id: uniqueId,

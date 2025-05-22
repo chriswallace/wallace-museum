@@ -18,6 +18,7 @@ import { ipfsToHttpUrl } from './mediaUtils';
  * @property {string | null} [image_preview_url]
  * @property {string | null} [image_thumbnail_url]
  * @property {string | null} [image_original_url]
+ * @property {string | null} [metadata_url]
  * // Add other relevant properties if needed
  */
 
@@ -39,7 +40,25 @@ export async function fetchAccount(walletAddress) {
  * @param {string} slug
  */
 export async function fetchCollection(slug) {
+	// If the input looks like an Ethereum address, try to fetch by contract address first
+	if (slug.startsWith('0x') && slug.length >= 40) {
+		try {
+			console.log(
+				'[OPENSEA_HELPERS] Input appears to be a contract address, trying contract endpoint first'
+			);
+			return await fetchCollectionByContract(slug);
+		} catch (error) {
+			console.log(
+				'[OPENSEA_HELPERS] Failed to fetch by contract, falling back to collections endpoint'
+			);
+			// Fall back to the regular collection endpoint if contract fetch fails
+		}
+	}
+
+	// Standard collection endpoint approach
 	const url = `https://api.opensea.io/api/v2/collections/${slug}`;
+	console.log('[OPENSEA_HELPERS] Fetching collection using collections endpoint:', url);
+
 	const response = await fetch(url, {
 		headers: { 'X-API-KEY': env.OPENSEA_API_KEY }
 	});
@@ -59,6 +78,42 @@ export async function fetchCollection(slug) {
 		data.blockchain = data.contracts[0].blockchain;
 	}
 	return data || {};
+}
+
+/**
+ * Fetches collection data using the contract address endpoint
+ * @param {string} contractAddress - Ethereum contract address
+ * @returns {Promise<object>} Collection data
+ */
+export async function fetchCollectionByContract(contractAddress) {
+	// Using the contracts endpoint in the OpenSea API
+	const url = `https://api.opensea.io/api/v2/chain/ethereum/contract/${contractAddress}`;
+	console.log('[OPENSEA_HELPERS] Fetching collection using contract endpoint:', url);
+
+	const response = await fetch(url, {
+		headers: { 'X-API-KEY': env.OPENSEA_API_KEY }
+	});
+
+	if (!response.ok) {
+		throw new Error(`HTTP error fetching by contract! status: ${response.status}`);
+	}
+
+	const data = await response.json();
+
+	// Map the contract response to match the format expected from the collections endpoint
+	return {
+		collection: data.collection || contractAddress,
+		name: data.name || data.collection || 'Unknown Collection',
+		description: data.description || '',
+		contracts: [
+			{
+				address: contractAddress,
+				chain: data.chain || 'ethereum'
+			}
+		],
+		contract: contractAddress,
+		blockchain: data.chain || 'ethereum'
+	};
 }
 
 /**
@@ -296,5 +351,156 @@ function parseJsonFromDataUri(dataUri) {
 		return JSON.parse(Buffer.from(base64OrUtf8Data, 'base64').toString('utf8'));
 	} else {
 		return JSON.parse(decodeURIComponent(base64OrUtf8Data));
+	}
+}
+
+/**
+ * Fetches information about a creator/artist from OpenSea by address
+ * @param {string} creatorAddress - The Ethereum address of the creator
+ * @returns {Promise<object|null>} - Creator information or null if not found
+ */
+export async function fetchCreatorInfo(creatorAddress) {
+	// Clean up and validate the address
+	if (!creatorAddress) {
+		console.log('[OPENSEA_HELPERS] No creator address provided');
+		return null;
+	}
+
+	// Normalize the address format and check for invalid addresses
+	creatorAddress = creatorAddress.trim();
+	if (creatorAddress === '0x0000000000000000000000000000000000000000') {
+		console.log('[OPENSEA_HELPERS] Zero address provided, skipping creator lookup');
+		return null;
+	}
+
+	// Ensure proper Ethereum address format
+	if (!creatorAddress.startsWith('0x') || creatorAddress.length < 40) {
+		console.log(`[OPENSEA_HELPERS] Invalid Ethereum address format: ${creatorAddress}`);
+		return {
+			address: creatorAddress,
+			username: creatorAddress, // Use the value as username
+			bio: null,
+			avatarUrl: null,
+			social_links: {}
+		};
+	}
+
+	try {
+		console.log(`[OPENSEA_HELPERS] Fetching creator info for address: ${creatorAddress}`);
+		const url = `https://api.opensea.io/api/v2/accounts/${creatorAddress}`;
+
+		const response = await fetch(url, {
+			headers: { 'X-API-KEY': env.OPENSEA_API_KEY }
+		});
+
+		if (!response.ok) {
+			console.warn(
+				`[OPENSEA_HELPERS] Failed to fetch creator info for: ${creatorAddress}, Status: ${response.status}`
+			);
+			return {
+				address: creatorAddress,
+				username: null,
+				bio: null,
+				avatarUrl: null,
+				social_links: {}
+			};
+		}
+
+		const data = await response.json();
+
+		// Log the raw creator data for debugging
+		console.log(
+			`[OPENSEA_HELPERS] Raw creator data for ${creatorAddress}:`,
+			JSON.stringify(data, null, 2)
+		);
+
+		// Extract social media accounts from various possible sources
+		/** @type {{twitter?: string, instagram?: string, website?: string, discord?: string, github?: string, linkedin?: string}} */
+		let socialLinks = {};
+
+		// Twitter handle
+		if (data.twitter_username) {
+			socialLinks.twitter = `https://twitter.com/${data.twitter_username}`;
+		} else if (
+			data.social_links?.find((/** @type {string} */ link) => link.includes('twitter.com'))
+		) {
+			const twitterLink = data.social_links.find((/** @type {string} */ link) =>
+				link.includes('twitter.com')
+			);
+			socialLinks.twitter = twitterLink;
+		}
+
+		// Instagram handle
+		if (data.instagram_username) {
+			socialLinks.instagram = `https://instagram.com/${data.instagram_username}`;
+		} else if (
+			data.social_links?.find((/** @type {string} */ link) => link.includes('instagram.com'))
+		) {
+			const instagramLink = data.social_links.find((/** @type {string} */ link) =>
+				link.includes('instagram.com')
+			);
+			socialLinks.instagram = instagramLink;
+		}
+
+		// Website
+		if (data.website) {
+			socialLinks.website = data.website;
+		} else if (data.external_url) {
+			socialLinks.website = data.external_url;
+		}
+
+		// Check for additional social links in the array
+		if (Array.isArray(data.social_links)) {
+			// Extract Discord
+			const discordLink = data.social_links.find(
+				(/** @type {string} */ link) =>
+					typeof link === 'string' && (link.includes('discord.gg') || link.includes('discord.com'))
+			);
+			if (discordLink) {
+				socialLinks.discord = discordLink;
+			}
+
+			// Extract GitHub
+			const githubLink = data.social_links.find(
+				(/** @type {string} */ link) => typeof link === 'string' && link.includes('github.com')
+			);
+			if (githubLink) {
+				socialLinks.github = githubLink;
+			}
+
+			// Extract LinkedIn
+			const linkedinLink = data.social_links.find(
+				(/** @type {string} */ link) => typeof link === 'string' && link.includes('linkedin.com')
+			);
+			if (linkedinLink) {
+				socialLinks.linkedin = linkedinLink;
+			}
+		}
+
+		// Extract and normalize useful creator information
+		const creatorInfo = {
+			address: creatorAddress,
+			username: data.username || data.display_name || null,
+			displayName: data.display_name || data.username || null,
+			bio: data.bio || null,
+			avatarUrl: data.profile_img_url || null,
+			social_links: socialLinks
+		};
+
+		console.log(
+			`[OPENSEA_HELPERS] Processed creator info for ${creatorAddress}:`,
+			JSON.stringify(creatorInfo, null, 2)
+		);
+
+		return creatorInfo;
+	} catch (error) {
+		console.error(`[OPENSEA_HELPERS] Error fetching creator info: ${error}`);
+		return {
+			address: creatorAddress,
+			username: null,
+			bio: null,
+			avatarUrl: null,
+			social_links: {}
+		};
 	}
 }

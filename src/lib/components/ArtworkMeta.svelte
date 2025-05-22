@@ -26,10 +26,6 @@
 		<h3>Mint Date</h3>
 		<p>{formatDate(artwork.mintDate)}</p>
 	</div>
-	<div class="non-editable">
-		<h3>Total Supply</h3>
-		<p>{artwork.totalSupply}</p>
-	</div>
 </div>
 
 <style>

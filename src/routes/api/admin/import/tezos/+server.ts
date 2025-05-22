@@ -4,6 +4,7 @@ import { normalizeTezosMetadata, handleMediaUpload } from '$lib/mediaHelpers';
 import { fetchMetadata } from '$lib/objktHelpers';
 import { processArtist, saveArtwork } from '$lib/adminOperations';
 import { syncCollection } from '$lib/collectionSync';
+import { Prisma } from '@prisma/client';
 
 // Define default dimensions
 // const DEFAULT_DIMENSIONS = {
@@ -59,18 +60,135 @@ export const POST = async ({ request }) => {
 				console.log('[TEZOS_IMPORT] No valid artist found for NFT:', nft.tokenID);
 			}
 
-			// Sync collection from Objkt.com
-			const collection = await syncCollection(
-				nft.collection?.contract || nft.contractAddr,
-				'objkt'
-			);
+			// Log the NFT data before collection sync to help with debugging
+			console.log('[TEZOS_IMPORT] NFT collection data:', {
+				tokenID: nft.tokenID,
+				collection: nft.collection,
+				contractAddr: nft.contractAddr,
+				contract: nft.contract
+			});
+
+			// Ensure we have a valid collection identifier
+			let collectionIdentifier = '';
+
+			// Try to get the collection identifier in order of preference
+			if (nft.collection?.contract) {
+				collectionIdentifier = nft.collection.contract;
+				console.log('[TEZOS_IMPORT] Using collection.contract:', collectionIdentifier);
+			} else if (nft.contractAddr) {
+				collectionIdentifier = nft.contractAddr;
+				console.log('[TEZOS_IMPORT] Using contractAddr:', collectionIdentifier);
+			} else if (nft.contract) {
+				collectionIdentifier = nft.contract;
+				console.log('[TEZOS_IMPORT] Using contract:', collectionIdentifier);
+			}
+
+			// Validate the collection identifier
+			if (!collectionIdentifier) {
+				console.error('[TEZOS_IMPORT] No valid collection identifier found for NFT:', nft.tokenID);
+				skippedImports++;
+				continue; // Skip this NFT
+			}
+
+			// Check if collection already exists in the database
+			let collection;
+			try {
+				// First try to find the collection in our database by contractAddr or slug
+				const existingCollection = await prisma.collection.findFirst({
+					where: {
+						OR: [
+							{ slug: collectionIdentifier },
+							// Use a simpler condition that works with Prisma JSON queries
+							{ contractAddresses: { not: Prisma.JsonNull } }
+						]
+					}
+				});
+
+				// If we found collections with contractAddresses, double-check for the specific address
+				let matchedCollection = null;
+				if (existingCollection && existingCollection.contractAddresses) {
+					const addresses = existingCollection.contractAddresses as any;
+					// Check if the address exists in the collection's contract addresses
+					if (
+						Array.isArray(addresses) &&
+						addresses.some((addr: any) => addr.address && addr.address === collectionIdentifier)
+					) {
+						matchedCollection = existingCollection;
+					}
+				} else if (existingCollection) {
+					// If it matched by slug or doesn't have a contract address to check, use it
+					matchedCollection = existingCollection;
+				}
+
+				if (matchedCollection) {
+					console.log('[TEZOS_IMPORT] Found existing collection in database:', {
+						id: matchedCollection.id,
+						slug: matchedCollection.slug,
+						title: matchedCollection.title
+					});
+					collection = matchedCollection;
+				} else {
+					// If not found in database, sync from Objkt
+					collection = await syncCollection(collectionIdentifier, 'objkt');
+					console.log('[TEZOS_IMPORT] Collection synced successfully from API:', {
+						id: collection.id,
+						slug: collection.slug,
+						title: collection.title
+					});
+				}
+
+				// Ensure the collection has a valid ID
+				if (!collection || !collection.id) {
+					throw new Error('Collection sync failed to return a valid collection');
+				}
+			} catch (error) {
+				console.error('[TEZOS_IMPORT] Failed to sync collection:', error);
+				// Try to create a basic collection as fallback
+				try {
+					collection = await prisma.collection.upsert({
+						where: { slug: collectionIdentifier },
+						create: {
+							slug: collectionIdentifier,
+							title: nft.collection?.name || 'Unknown Tezos Collection',
+							description: nft.collection?.description || '',
+							enabled: true,
+							chainIdentifier: 'tezos',
+							contractAddresses: [
+								{
+									address: collectionIdentifier,
+									chain: 'tezos'
+								}
+							] as Prisma.InputJsonValue
+						},
+						update: {}
+					});
+					console.log('[TEZOS_IMPORT] Created fallback collection:', collection.slug);
+				} catch (fallbackError) {
+					console.error('[TEZOS_IMPORT] Failed to create fallback collection:', fallbackError);
+					skippedImports++;
+					continue; // Skip this NFT
+				}
+			}
+
+			// Ensure the NFT has collection information
+			if (!nft.collection) {
+				nft.collection = {
+					contract: collectionIdentifier,
+					name: collection.title,
+					blockchain: 'tezos'
+				};
+			} else if (!nft.collection.contract) {
+				nft.collection.contract = collectionIdentifier;
+			}
+
+			console.log('[TEZOS_IMPORT] Final NFT collection:', nft.collection);
 
 			let normalizedMetadata = await normalizeTezosMetadata(nft);
 
 			// Log metadata attributes for debugging
 			console.log(
 				`[TEZOS_IMPORT] Token: ${nft.tokenID} - Normalized attributes:`,
-				JSON.stringify(normalizedMetadata.attributes || [])
+				normalizedMetadata.attributes || []
 			);
 
 			// Store final URLs and details here

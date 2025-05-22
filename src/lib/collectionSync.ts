@@ -9,8 +9,8 @@ interface CollectionData {
 	title: string;
 	description?: string | null;
 	chainIdentifier?: string | null;
-	contractAddresses?: Prisma.JsonValue;
-	fees?: Prisma.JsonValue;
+	contractAddresses?: Prisma.InputJsonValue;
+	fees?: Prisma.InputJsonValue;
 	safelistStatus?: string | null;
 	websiteUrl?: string | null;
 	discordUrl?: string | null;
@@ -31,13 +31,25 @@ export async function syncCollection(
 
 		if (platform === 'opensea') {
 			const data = await fetchOpenSeaCollection(identifier);
+
+			// Extract the contract address to use as the slug for database storage
+			// This ensures we're storing the actual contract address
+			let contract = '';
+			if (data.contracts && data.contracts.length > 0) {
+				contract = data.contracts[0].address;
+			} else if (identifier.startsWith('0x')) {
+				contract = identifier; // If we don't have contracts data but identifier looks like a contract, use it
+			} else {
+				contract = data.collection || identifier; // Fallback to collection slug if no contract address is available
+			}
+
 			collectionData = {
-				slug: data.collection,
+				slug: contract, // Use the contract address as the slug
 				title: data.name,
 				description: data.description,
 				chainIdentifier: data.contracts?.[0]?.chain || 'ethereum',
-				contractAddresses: data.contracts as Prisma.JsonValue,
-				fees: data.fees as Prisma.JsonValue,
+				contractAddresses: data.contracts as unknown as Prisma.InputJsonValue,
+				fees: data.fees as unknown as Prisma.InputJsonValue,
 				safelistStatus: data.safelist_status,
 				discordUrl: data.discord_url,
 				telegramUrl: data.telegram_url,
@@ -57,7 +69,7 @@ export async function syncCollection(
 				chainIdentifier: 'tezos',
 				contractAddresses: [
 					{ address: collectionInfo.contract, chain: 'tezos' }
-				] as Prisma.JsonValue,
+				] as unknown as Prisma.InputJsonValue,
 				websiteUrl: collectionInfo.website,
 				projectUrl: collectionInfo.website,
 				// Convert social links to our format

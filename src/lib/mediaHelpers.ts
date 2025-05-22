@@ -182,7 +182,6 @@ interface NftData {
 	};
 	contract?: string; // OpenSea contract field
 	symbol?: string;
-	supply?: number;
 	attributes?: any[];
 	properties?: any;
 	contractAddress?: string;
@@ -327,7 +326,7 @@ export async function normalizeOpenSeaMetadata(nft: NftData): Promise<any> {
 	const contractAlias = metadata.contractAlias || nft.contractAlias;
 	const tokenStandard = metadata.token_standard || nft.token_standard;
 	const symbol = metadata.symbol || nft.symbol;
-	const totalSupply = metadata.supply || nft.supply;
+	const totalSupply = metadata.total_supply || nft.collection?.total_supply;
 	const platform = metadata.platform || nft.platform;
 
 	// Extract generator URL if available
@@ -431,7 +430,7 @@ export async function normalizeTezosMetadata(nft: NftData): Promise<any> {
 	const contractAlias = metadata.contractAlias || nft.contractAlias;
 	const tokenStandard = metadata.token_standard || nft.token_standard;
 	const symbol = metadata.symbol || nft.symbol;
-	const totalSupply = metadata.supply || nft.supply;
+	const totalSupply = metadata.total_supply || nft.collection?.total_supply;
 
 	// Extract creator information
 	const creator = {
@@ -489,7 +488,7 @@ export async function normalizeTezosMetadata(nft: NftData): Promise<any> {
 		animation_url,
 		tags: metadata.tags || nft.tags || [],
 		website: metadata.website || metadata.homepage || nft.website || '',
-		attributes: JSON.stringify(attributes),
+		attributes: attributes,
 		symbol,
 		token_standard: tokenStandard,
 		contractAlias,
@@ -499,11 +498,11 @@ export async function normalizeTezosMetadata(nft: NftData): Promise<any> {
 			blockchain: 'Tezos',
 			total_supply: totalSupply
 		},
-		raw_data: JSON.stringify({
+		raw_data: {
 			attributes: metadata.attributes || nft.attributes,
 			properties: metadata.properties || nft.properties,
 			traits: metadata.traits || nft.traits
-		})
+		}
 	};
 }
 
@@ -800,6 +799,129 @@ async function getVideoDimensions(buffer: Buffer): Promise<Dimensions | null> {
 	}
 }
 
+// Convert image buffer to WebP format to reduce file size
+async function convertToWebP(
+	buffer: Buffer,
+	dimensions: Dimensions | null,
+	quality = 80,
+	maxSizeMB = 8
+): Promise<{ buffer: Buffer; mimeType: string }> {
+	try {
+		console.log('[WEBP_CONVERT] Converting image to WebP format');
+		const maxSizeBytes = maxSizeMB * 1024 * 1024;
+		const originalSize = buffer.length;
+
+		// Initial conversion with specified quality
+		let webpBuffer = await sharp(buffer)
+			.webp({ quality }) // Use quality parameter (0-100)
+			.toBuffer();
+
+		// Progressively lower quality if file size is still too large
+		let currentQuality = quality;
+		let attempts = 0;
+		const maxAttempts = 5; // Prevent infinite loop
+
+		while (webpBuffer.length > maxSizeBytes && currentQuality > 40 && attempts < maxAttempts) {
+			// Reduce quality by 10% each time, but don't go below 40
+			currentQuality = Math.max(40, currentQuality - 10);
+			attempts++;
+
+			console.log(
+				`[WEBP_CONVERT] File still too large (${(webpBuffer.length / 1024 / 1024).toFixed(2)}MB), reducing quality to ${currentQuality}`
+			);
+
+			webpBuffer = await sharp(buffer).webp({ quality: currentQuality }).toBuffer();
+		}
+
+		// If still too large after quality reduction, try resizing
+		if (
+			webpBuffer.length > maxSizeBytes &&
+			dimensions &&
+			dimensions.width > 1000 &&
+			attempts < maxAttempts
+		) {
+			const aspectRatio = dimensions.width / dimensions.height;
+			let targetWidth = dimensions.width;
+
+			while (webpBuffer.length > maxSizeBytes && targetWidth > 800 && attempts < maxAttempts) {
+				// Reduce width by 20% each time, maintaining aspect ratio
+				targetWidth = Math.floor(targetWidth * 0.8);
+				const targetHeight = Math.floor(targetWidth / aspectRatio);
+				attempts++;
+
+				console.log(
+					`[WEBP_CONVERT] Still too large after quality reduction, resizing to ${targetWidth}x${targetHeight}`
+				);
+
+				webpBuffer = await sharp(buffer)
+					.resize(targetWidth, targetHeight)
+					.webp({ quality: currentQuality })
+					.toBuffer();
+			}
+		}
+
+		// Check if WebP conversion actually reduced the file size significantly
+		const sizeReductionPercent = 100 - Math.round((webpBuffer.length / originalSize) * 100);
+
+		// If WebP didn't reduce size by at least 10%, try JPEG conversion as a fallback
+		if (sizeReductionPercent < 10 && webpBuffer.length > originalSize * 0.9) {
+			console.log(
+				`[WEBP_CONVERT] WebP conversion only achieved ${sizeReductionPercent}% reduction, trying JPEG fallback`
+			);
+
+			// Try JPEG with progressive encoding for better compression
+			const jpegBuffer = await sharp(buffer)
+				.jpeg({ quality: currentQuality, progressive: true })
+				.toBuffer();
+
+			const jpegReductionPercent = 100 - Math.round((jpegBuffer.length / originalSize) * 100);
+
+			// Use JPEG if it's smaller than WebP
+			if (jpegBuffer.length < webpBuffer.length) {
+				console.log(
+					`[WEBP_CONVERT] JPEG is smaller (${jpegReductionPercent}% reduction), using JPEG instead of WebP`
+				);
+				return {
+					buffer: jpegBuffer,
+					mimeType: 'image/jpeg'
+				};
+			}
+		}
+
+		console.log(
+			`[WEBP_CONVERT] Conversion complete. Original: ${(originalSize / 1024 / 1024).toFixed(2)}MB, WebP: ${(
+				webpBuffer.length /
+				1024 /
+				1024
+			).toFixed(2)}MB (${sizeReductionPercent}% reduction)`
+		);
+
+		return {
+			buffer: webpBuffer,
+			mimeType: 'image/webp'
+		};
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		console.error(`[WEBP_CONVERT] Error converting to WebP: ${errorMessage}`);
+
+		// Try a simpler conversion as fallback with error handling
+		try {
+			console.log('[WEBP_CONVERT] Attempting simpler conversion as fallback');
+			// Simple conversion with lower quality as fallback
+			const fallbackBuffer = await sharp(buffer).jpeg({ quality: 70 }).toBuffer();
+
+			return {
+				buffer: fallbackBuffer,
+				mimeType: 'image/jpeg'
+			};
+		} catch (fallbackError) {
+			console.error('[WEBP_CONVERT] Fallback conversion also failed, returning original buffer');
+			// Return original buffer and mime type if all conversions fail
+			return { buffer, mimeType: 'image/jpeg' };
+		}
+	}
+}
+
 export async function handleMediaUpload(
 	mediaUri: string,
 	artwork: NftData
@@ -851,13 +973,29 @@ export async function handleMediaUpload(
 						throw new Error(`Invalid MIME type detected: ${mediaData.mimeType}`);
 					}
 
+					// Convert image to WebP if it's an image type
+					let uploadBuffer = mediaData.buffer;
+					let uploadMimeType = mediaData.mimeType;
+
+					// Convert to WebP only for non-SVG, non-GIF images
+					if (
+						mediaData.mimeType.startsWith('image/') &&
+						!mediaData.mimeType.includes('svg') &&
+						!mediaData.mimeType.includes('gif')
+					) {
+						const dimensions = await getImageDimensionsFromBuffer(mediaData.buffer);
+						const webpResult = await convertToWebP(mediaData.buffer, dimensions, 80, 8);
+						uploadBuffer = webpResult.buffer;
+						uploadMimeType = webpResult.mimeType;
+					}
+
 					const uploadResult = await uploadToCloudinary(
-						mediaData.buffer,
+						uploadBuffer,
 						artwork.name || 'artblocks_image',
-						mediaData.mimeType,
+						uploadMimeType,
 						generateTags(
 							artwork.name || 'artblocks_image',
-							mediaData.mimeType,
+							uploadMimeType,
 							artwork.collection?.contract,
 							artwork.tokenID
 						)
@@ -869,7 +1007,7 @@ export async function handleMediaUpload(
 
 					return {
 						url: uploadResult.url,
-						fileType: mediaData.mimeType,
+						fileType: uploadMimeType,
 						dimensions: uploadResult.dimensions
 					};
 				} catch (error) {
@@ -935,13 +1073,29 @@ export async function handleMediaUpload(
 	// Always upload valid media to Cloudinary
 	while (retryCount < MAX_RETRIES) {
 		try {
+			// Convert image to WebP if it's an image type (excluding SVGs and GIFs)
+			let uploadBuffer = fetchedMedia.buffer;
+			let uploadMimeType = fetchedMedia.mimeType;
+
+			// Convert to WebP only for non-SVG, non-GIF images
+			if (
+				fetchedMedia.mimeType.startsWith('image/') &&
+				!fetchedMedia.mimeType.includes('svg') &&
+				!fetchedMedia.mimeType.includes('gif')
+			) {
+				const dimensions = await getImageDimensionsFromBuffer(fetchedMedia.buffer);
+				const webpResult = await convertToWebP(fetchedMedia.buffer, dimensions, 80, 8);
+				uploadBuffer = webpResult.buffer;
+				uploadMimeType = webpResult.mimeType;
+			}
+
 			const uploadResult = await uploadToCloudinary(
-				fetchedMedia.buffer,
+				uploadBuffer,
 				artwork.name || fetchedMedia.fileName || 'artwork',
-				fetchedMedia.mimeType,
+				uploadMimeType,
 				generateTags(
 					artwork.name || fetchedMedia.fileName || 'artwork',
-					fetchedMedia.mimeType,
+					uploadMimeType,
 					artwork.collection?.contract,
 					artwork.tokenID
 				)
@@ -953,7 +1107,7 @@ export async function handleMediaUpload(
 
 			return {
 				url: uploadResult.url,
-				fileType: fetchedMedia.mimeType,
+				fileType: uploadMimeType,
 				dimensions: uploadResult.dimensions
 			};
 		} catch (error) {
@@ -1268,7 +1422,6 @@ async function searchCloudinaryByTag(tag: string): Promise<UploadApiResponse | n
 		}
 		return null;
 	} catch (error) {
-		console.error('[CLOUDINARY_DEBUG] Error searching Cloudinary:', error);
 		return null;
 	}
 }
