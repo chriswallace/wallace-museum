@@ -32,12 +32,12 @@ function extractPublicIdAndResourceType(url: string): {
 		}
 
 		const resourceType = urlParts[uploadIndex - 1];
-		// Join remaining parts after 'upload/' and remove potential format extension
-		const publicIdWithPotentialVersion = urlParts.slice(uploadIndex + 1).join('/');
+		// Join remaining parts after 'upload/'
+		const publicIdWithPotentialVersionAndFormat = urlParts.slice(uploadIndex + 1).join('/');
 		// Remove version prefix if present (e.g., v1234567890/)
-		const publicIdWithoutVersion = publicIdWithPotentialVersion.replace(/^v\d+\//, '');
-		// Remove format extension
-		const publicId = publicIdWithoutVersion.replace(/\.[^/.]+$/, '');
+		const publicIdWithFormat = publicIdWithPotentialVersionAndFormat.replace(/^v\d+\//, '');
+		// The publicId now correctly includes the format (extension)
+		const publicId = publicIdWithFormat;
 
 		if (!publicId || !resourceType) {
 			console.warn('[cloudinaryUtils] Could not extract publicId or resourceType:', url);
@@ -63,6 +63,16 @@ export function getCloudinaryTransformedUrl(
 ): string {
 	if (!baseUrl) return ''; // Return empty string if no base URL
 
+	// If the baseUrl is for a GIF or WebP, return it directly to bypass transformations
+	const lowerBaseUrl = baseUrl.toLowerCase();
+	if (lowerBaseUrl.endsWith('.gif') || lowerBaseUrl.endsWith('.webp')) {
+		console.log(
+			'[cloudinaryUtils] Bypassing transformations for GIF/WebP, serving raw URL:',
+			baseUrl
+		);
+		return baseUrl;
+	}
+
 	// Check if using the placeholder
 	if (
 		!PUBLIC_CLOUDINARY_CLOUD_NAME ||
@@ -83,6 +93,7 @@ export function getCloudinaryTransformedUrl(
 
 	// Construct the new URL
 	// Note: We explicitly don't include the version here, letting Cloudinary handle caching via transformations.
+	// The publicId used here will now correctly include its file extension.
 	return `https://res.cloudinary.com/${PUBLIC_CLOUDINARY_CLOUD_NAME}/${resourceType}/upload/${transformations}/${publicId}`;
 }
 

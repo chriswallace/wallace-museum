@@ -12,18 +12,18 @@ function guessMimeTypeFromUrl(url: string): string | null {
 	if (url.match(/\.(pdf)$/i)) return 'application/pdf';
 	if (url.match(/\.(html|htm)$/i)) return 'text/html';
 	if (url.match(/\.(js)$/i)) return 'application/javascript';
-	
+
 	// Check for common patterns
 	if (url.includes('cloudinary.com')) {
 		if (url.includes('/video/')) return 'video/mp4';
 		if (url.includes('/image/')) return 'image/jpeg';
 	}
-	
+
 	// For common interactive art platforms
 	if (url.includes('fxhash.xyz') || url.includes('generator.artblocks.io')) {
 		return 'application/javascript';
 	}
-	
+
 	return null;
 }
 
@@ -73,7 +73,9 @@ export async function PUT({ params, request }) {
 		if (image_url && image_url.includes('cloudinary.com')) {
 			dimensions = await getCloudinaryImageDimensions(image_url);
 			if (dimensions) {
-				console.log(`Retrieved dimensions for updated image: ${dimensions.width}x${dimensions.height}`);
+				console.log(
+					`Retrieved dimensions for updated image: ${dimensions.width}x${dimensions.height}`
+				);
 			}
 		}
 
@@ -104,25 +106,38 @@ export async function PUT({ params, request }) {
 				description: artworkData.description,
 				collectionId: artworkData.collectionId
 			};
-			
+
 			// Add image_url if provided
 			if (image_url) {
 				updateData.image_url = image_url;
+
+				// Set mime type for image if no animation_url is present
+				if (!animation_url && !mimeType) {
+					const guessedType = guessMimeTypeFromUrl(image_url);
+					if (guessedType && guessedType.startsWith('image/')) {
+						updateData.mime = guessedType;
+					}
+				}
 			}
-			
+
 			// Add animation_url if provided
 			if (animation_url !== undefined) {
 				updateData.animation_url = animation_url;
-				
-				// Only set mime type when we have animation_url
+
+				// Set mime type for animation content
 				if (mimeType) {
 					updateData.mime = mimeType;
+				} else {
+					const guessedType = guessMimeTypeFromUrl(animation_url);
+					if (guessedType) {
+						updateData.mime = guessedType;
+					}
 				}
-			} else if (image_url && !animation_url) {
-				// Clear mime type if we're removing animation_url and only have image_url
+			} else if (!image_url) {
+				// Only clear mime type if we have neither animation_url nor image_url
 				updateData.mime = undefined;
 			}
-			
+
 			// Add dimensions if retrieved
 			if (dimensions) {
 				updateData.dimensions = {

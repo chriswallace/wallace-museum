@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
 	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
+	import { linear } from 'svelte/easing';
 
 	export let data: { artist?: any; error?: string };
 
@@ -134,6 +135,23 @@
 		}
 	}
 
+	function parseAndJoinTags(tags: any): string {
+		if (typeof tags === 'string') {
+			try {
+				const parsedTags = JSON.parse(tags);
+				if (Array.isArray(parsedTags)) {
+					return parsedTags.join(', ');
+				}
+			} catch (e) {
+				console.error('Error parsing tags:', e);
+				return ''; // Or return the original string, or some error indicator
+			}
+		} else if (Array.isArray(tags)) {
+			return tags.join(', '); // Already an array
+		}
+		return ''; // Not a string or an array
+	}
+
 	$: currentArtwork = data.artist?.artworks?.[currentIndex];
 	$: currentDimensions = currentArtwork?.dimensions;
 	$: dimensionsObj = currentDimensions
@@ -244,133 +262,139 @@
 								{/if}
 							</div>
 
-							{#if data.artist.artworks[currentIndex].description}
-								<div class="museum-description">
-									{data.artist.artworks[currentIndex].description}
-								</div>
-							{/if}
-
-							<ul class="museum-meta">
-								<div class="metadata-grid">
-									{#if currentDimensions}
-										<li>
-											<strong>Dimensions</strong>
-											<span>{dimensionsObj.width} × {dimensionsObj.height}</span>
-										</li>
-									{/if}
-									{#if data.artist.artworks[currentIndex].contractAddr}
-										<li>
-											<strong>Contract</strong>
-											{#if getContractUrl(data.artist.artworks[currentIndex].contractAddr, data.artist.artworks[currentIndex].tokenID)}
-												<a
-													href={getContractUrl(
-														data.artist.artworks[currentIndex].contractAddr,
-														data.artist.artworks[currentIndex].tokenID
-													)}
-													target="_blank"
-													rel="noopener noreferrer"
-													class="contract-link"
-												>
-													{data.artist.artworks[currentIndex].contractAlias ||
-														data.artist.artworks[currentIndex].contractAddr}
-												</a>
-											{:else}
-												<span>
-													{data.artist.artworks[currentIndex].contractAlias ||
-														data.artist.artworks[currentIndex].contractAddr}
-												</span>
-											{/if}
-										</li>
-									{/if}
-									{#if data.artist.artworks[currentIndex].contractAlias && !data.artist.artworks[currentIndex].contractAddr}
-										<li>
-											<strong>Contract Alias</strong>
-											<span>{data.artist.artworks[currentIndex].contractAlias}</span>
-										</li>
-									{/if}
-									{#if data.artist.artworks[currentIndex].tokenID}
-										<li>
-											<strong>Token ID</strong>
-											<span>{data.artist.artworks[currentIndex].tokenID}</span>
-										</li>
-									{/if}
-									{#if data.artist.artworks[currentIndex].tokenStandard}
-										<li>
-											<strong>Token Standard</strong>
-											<span>{data.artist.artworks[currentIndex].tokenStandard}</span>
-										</li>
-									{/if}
-									{#if data.artist.artworks[currentIndex].totalSupply}
-										<li>
-											<strong>Total Supply</strong>
-											<span>{data.artist.artworks[currentIndex].totalSupply}</span>
-										</li>
-									{/if}
-									{#if data.artist.artworks[currentIndex].mintDate}
-										<li>
-											<strong>Mint Date</strong>
-											<span>{formatMintDate(data.artist.artworks[currentIndex].mintDate)}</span>
-										</li>
-									{/if}
-									{#if data.artist.artworks[currentIndex].mime}
-										<li>
-											<strong>Medium</strong>
-											<span>{formatMedium(data.artist.artworks[currentIndex].mime)}</span>
-										</li>
-									{/if}
-								</div>
-
-								{#if data.artist.artworks[currentIndex].tags && data.artist.artworks[currentIndex].tags.length}
-									<li class="full-width">
-										<strong>Tags</strong>
-										<span>{data.artist.artworks[currentIndex].tags.join(', ')}</span>
-									</li>
+							<div class="content-grid">
+								{#if data.artist.artworks[currentIndex].description}
+									<div class="description-col">
+										<div class="museum-description">
+											{data.artist.artworks[currentIndex].description}
+										</div>
+									</div>
 								{/if}
 
-								{#if data.artist.artworks[currentIndex].attributes && data.artist.artworks[currentIndex].attributes.length}
-									<li class="full-width">
-										<strong>Attributes</strong>
-										<dl class="attributes-list">
-											{#each parseAttributes(data.artist.artworks[currentIndex].attributes) as attribute}
-												<div class="attribute-item">
-													<dt>{attribute.trait_type}</dt>
-													<dd>{attribute.value}</dd>
+								<div class="metadata-col">
+									{#if data.artist.artworks[currentIndex].attributes && data.artist.artworks[currentIndex].attributes.length}
+										<div class="metadata-section">
+											<h3 class="metadata-heading">Attributes</h3>
+											<div class="metadata-grid">
+												{#each parseAttributes(data.artist.artworks[currentIndex].attributes) as attribute}
+													<div class="metadata-item">
+														<strong>{attribute.trait_type}</strong>
+														<span>{attribute.value}</span>
+													</div>
+												{/each}
+											</div>
+										</div>
+
+										<div class="divider" />
+									{/if}
+
+									<div class="metadata-section">
+										<div class="metadata-grid">
+											{#if currentDimensions}
+												<div class="metadata-item">
+													<strong>Dimensions</strong>
+													<span>{dimensionsObj.width} × {dimensionsObj.height}</span>
 												</div>
-											{/each}
-										</dl>
-									</li>
-								{/if}
-							</ul>
+											{/if}
+											{#if data.artist.artworks[currentIndex].contractAddr}
+												<div class="metadata-item">
+													<strong>Contract</strong>
+													{#if getContractUrl(data.artist.artworks[currentIndex].contractAddr, data.artist.artworks[currentIndex].tokenID)}
+														<a
+															href={getContractUrl(
+																data.artist.artworks[currentIndex].contractAddr,
+																data.artist.artworks[currentIndex].tokenID
+															)}
+															target="_blank"
+															rel="noopener noreferrer"
+															class="contract-link"
+														>
+															{data.artist.artworks[currentIndex].contractAlias ||
+																data.artist.artworks[currentIndex].contractAddr}
+														</a>
+													{:else}
+														<span>
+															{data.artist.artworks[currentIndex].contractAlias ||
+																data.artist.artworks[currentIndex].contractAddr}
+														</span>
+													{/if}
+												</div>
+											{/if}
+											{#if data.artist.artworks[currentIndex].contractAlias && !data.artist.artworks[currentIndex].contractAddr}
+												<div class="metadata-item">
+													<strong>Contract Alias</strong>
+													<span>{data.artist.artworks[currentIndex].contractAlias}</span>
+												</div>
+											{/if}
+											{#if data.artist.artworks[currentIndex].tokenID}
+												<div class="metadata-item">
+													<strong>Token ID</strong>
+													<span>{data.artist.artworks[currentIndex].tokenID}</span>
+												</div>
+											{/if}
+											{#if data.artist.artworks[currentIndex].tokenStandard}
+												<div class="metadata-item">
+													<strong>Token Standard</strong>
+													<span>{data.artist.artworks[currentIndex].tokenStandard}</span>
+												</div>
+											{/if}
+											{#if data.artist.artworks[currentIndex].totalSupply}
+												<div class="metadata-item">
+													<strong>Total Supply</strong>
+													<span>{data.artist.artworks[currentIndex].totalSupply}</span>
+												</div>
+											{/if}
+											{#if data.artist.artworks[currentIndex].mintDate}
+												<div class="metadata-item">
+													<strong>Mint Date</strong>
+													<span>{formatMintDate(data.artist.artworks[currentIndex].mintDate)}</span>
+												</div>
+											{/if}
+											{#if data.artist.artworks[currentIndex].mime}
+												<div class="metadata-item">
+													<strong>Medium</strong>
+													<span>{formatMedium(data.artist.artworks[currentIndex].mime)}</span>
+												</div>
+											{/if}
+											{#if data.artist.artworks[currentIndex].tags && data.artist.artworks[currentIndex].tags.length}
+												<div class="metadata-item">
+													<strong>Tags</strong>
+													<span>{parseAndJoinTags(data.artist.artworks[currentIndex].tags)}</span>
+												</div>
+											{/if}
+											{#if data.artist.addresses && data.artist.addresses.length > 0}
+												<div class="metadata-item">
+													<strong>Artist Addresses</strong>
+													<div class="flex flex-col gap-1 mt-1">
+														{#each data.artist.addresses as address}
+															<div class="flex items-center justify-between">
+																<span class="text-sm">
+																	{address.blockchain}:
+																	<span class="font-mono">{address.address}</span>
+																</span>
+																{#if getContractUrl(address.address)}
+																	<a
+																		href={getContractUrl(address.address)}
+																		target="_blank"
+																		rel="noopener noreferrer"
+																		class="text-blue-400 hover:text-blue-300 text-sm ml-2"
+																	>
+																		View
+																	</a>
+																{/if}
+															</div>
+														{/each}
+													</div>
+												</div>
+											{/if}
+										</div>
+									</div>
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>
 			{/key}
-		{/if}
-
-		{#if data.artist.addresses && data.artist.addresses.length > 0}
-			<div class="artist-addresses mb-4">
-				<h3 class="text-lg font-semibold mb-2">Verified Addresses</h3>
-				<div class="grid grid-cols-1 gap-2">
-					{#each data.artist.addresses as address}
-						<div class="flex items-center justify-between bg-gray-800 p-2 rounded">
-							<div class="flex items-center">
-								<span class="text-sm text-gray-400 mr-2">{address.blockchain}:</span>
-								<span class="font-mono text-sm">{address.address}</span>
-							</div>
-							{#if getContractUrl(address.address)}
-								<a
-									href={getContractUrl(address.address)}
-									target="_blank"
-									rel="noopener noreferrer"
-									class="text-blue-400 hover:text-blue-300 text-sm"
-								>
-									View
-								</a>
-							{/if}
-						</div>
-					{/each}
-				</div>
-			</div>
 		{/if}
 	</div>
 {/if}
@@ -419,21 +443,22 @@
 	}
 
 	.museum-details-wrapper {
-		@apply w-full px-4 md:px-6 max-w-4xl mx-auto;
+		@apply px-4 md:px-6 w-full mx-auto;
+		max-width: 1400px;
 		min-height: 300px;
 	}
 
 	.museum-details-overlay {
-		@apply flex flex-col gap-2 w-full px-4 py-3 mx-auto bg-black bg-opacity-50 rounded-lg relative mt-0;
+		@apply flex flex-col gap-6 w-full px-6 py-6 mx-auto bg-black bg-opacity-50 rounded-lg relative mt-0;
 	}
 
 	.museum-header {
-		@apply flex justify-between items-start mb-2;
+		@apply flex justify-between items-start mb-0;
 		height: 70px;
 	}
 
 	.museum-artist-title {
-		@apply flex-1;
+		@apply flex-1 pr-4;
 	}
 
 	.museum-artist {
@@ -441,7 +466,7 @@
 	}
 
 	.museum-title {
-		@apply text-2xl font-bold text-white leading-tight;
+		@apply text-2xl font-bold text-white leading-tight max-w-[900px];
 	}
 
 	.artwork-navigation {
@@ -452,52 +477,65 @@
 		@apply flex items-center justify-center w-10 h-10 text-white bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full border-none cursor-pointer;
 	}
 
+	.content-grid {
+		@apply grid grid-cols-1 gap-8;
+		@apply md:grid-cols-[minmax(600px,800px)_minmax(300px,400px)];
+	}
+
+	.description-col {
+		@apply md:pr-12 w-full;
+	}
+
+	.metadata-col {
+		@apply flex flex-col gap-8 w-full;
+	}
+
 	.museum-description {
-		@apply text-base text-gray-600 mb-2;
+		@apply text-base text-gray-300;
+		max-width: 65ch;
 	}
 
 	.museum-meta {
-		@apply text-sm text-gray-300 list-none p-6 m-0 flex flex-col gap-4 bg-black bg-opacity-40 rounded-lg;
+		@apply text-sm text-gray-400 list-none m-0 flex flex-col gap-4 rounded-lg;
 	}
 
 	.metadata-grid {
-		@apply grid gap-4;
-		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		@apply grid gap-6;
+		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 	}
 
-	.museum-meta li {
-		@apply m-0 p-0 flex flex-col gap-1;
+	.metadata-item {
+		@apply flex flex-col gap-1;
+		min-width: 0;
 
 		&.full-width {
-			@apply col-span-full;
+			grid-column: 1 / -1;
 		}
 
 		strong {
-			@apply text-xs uppercase tracking-wider text-gray-400 block mb-1;
+			@apply text-xs uppercase tracking-wider text-gray-400;
 		}
 
 		span,
 		a {
-			@apply text-sm text-gray-200;
+			@apply text-sm text-gray-100;
+			word-break: break-word;
 		}
 	}
 
 	.attributes-list {
-		@apply grid gap-4 mt-2;
-		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+		@apply gap-0.5 grid grid-cols-3 border border-gray-700 rounded-md p-4 w-full;
 	}
 
 	.attribute-item {
-		@apply bg-black bg-opacity-30 rounded-md p-2 grid items-center;
-		grid-template-columns: minmax(100px, auto) 1fr;
-		gap: 0.5rem;
+		@apply rounded-md p-0.5 flex flex-col items-start;
 
 		dt {
-			@apply text-xs uppercase tracking-wider text-gray-400;
+			@apply text-xs uppercase tracking-wider text-gray-400 min-w-[170px];
 		}
 
 		dd {
-			@apply text-sm text-gray-200 m-0 text-right;
+			@apply text-sm text-gray-200 m-0 text-left;
 		}
 	}
 
@@ -535,7 +573,15 @@
 		}
 	}
 
-	.artist-addresses {
-		@apply bg-gray-900 p-4 rounded-lg;
+	.metadata-section {
+		@apply flex flex-col gap-4;
+	}
+
+	.metadata-heading {
+		@apply text-lg font-semibold text-white;
+	}
+
+	.divider {
+		@apply w-full h-px bg-gray-700 my-6;
 	}
 </style>

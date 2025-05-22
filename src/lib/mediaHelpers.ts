@@ -7,7 +7,8 @@ import ffmpegPath from 'ffmpeg-static';
 import ffprobePath from '@ffprobe-installer/ffprobe';
 import { fileTypeFromBuffer, type FileTypeResult } from 'file-type';
 import { v2 as cloudinary, type UploadApiOptions, type UploadApiResponse } from 'cloudinary';
-import { env } from '$env/dynamic/private';
+import { env as privateEnv } from '$env/dynamic/private';
+import { env as publicEnv } from '$env/dynamic/public';
 
 // Import the moved utility functions
 import {
@@ -25,9 +26,9 @@ import {
 // Configure Cloudinary with environment variables
 const configureCloudinary = () => {
 	const config = {
-		cloud_name: env.PUBLIC_CLOUDINARY_CLOUD_NAME,
-		api_key: env.CLOUDINARY_API_KEY,
-		api_secret: env.CLOUDINARY_API_SECRET,
+		cloud_name: publicEnv.PUBLIC_CLOUDINARY_CLOUD_NAME,
+		api_key: privateEnv.CLOUDINARY_API_KEY,
+		api_secret: privateEnv.CLOUDINARY_API_SECRET,
 		secure: true
 	};
 
@@ -107,7 +108,10 @@ function ensureDimensions(dimensions: unknown): Dimensions | null {
 	return null;
 }
 
-function createDimensions(width: number | undefined, height: number | undefined): Dimensions | null {
+function createDimensions(
+	width: number | undefined,
+	height: number | undefined
+): Dimensions | null {
 	// return {
 	// 	width: typeof width === 'number' && width > 0 ? width : DEFAULT_DIMENSIONS.width,
 	// 	height: typeof height === 'number' && height > 0 ? height : DEFAULT_DIMENSIONS.height
@@ -540,23 +544,23 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 	try {
 		const sanitizedUri = removeQueryString(uri);
 		console.log(`[MEDIA_DEBUG] Processing URI: ${sanitizedUri}`);
-		
+
 		// Check if the URL is an Arweave URL with or without prefix
-		const isArweave = 
-			sanitizedUri.startsWith('ar://') || 
-			sanitizedUri.includes('arweave.net/') || 
+		const isArweave =
+			sanitizedUri.startsWith('ar://') ||
+			sanitizedUri.includes('arweave.net/') ||
 			(sanitizedUri.startsWith('https://') && sanitizedUri.includes('.arweave.net/')) ||
-			(sanitizedUri.match(/^[a-zA-Z0-9_-]{43}$/) !== null); // Raw Arweave transaction ID (43 chars)
+			sanitizedUri.match(/^[a-zA-Z0-9_-]{43}$/) !== null; // Raw Arweave transaction ID (43 chars)
 
 		if (isArweave) {
 			console.log(`[MEDIA_DEBUG] Detected Arweave URL: ${sanitizedUri}`);
 			let arweaveUrl = sanitizedUri;
-			
+
 			// Handle ar:// protocol
 			if (arweaveUrl.startsWith('ar://')) {
 				const txId = arweaveUrl.replace('ar://', '');
 				arweaveUrl = `https://arweave.net/${txId}`;
-			} 
+			}
 			// Handle raw transaction ID
 			else if (arweaveUrl.match(/^[a-zA-Z0-9_-]{43}$/)) {
 				arweaveUrl = `https://arweave.net/${arweaveUrl}`;
@@ -565,30 +569,33 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 			else if (arweaveUrl.endsWith('/')) {
 				arweaveUrl = arweaveUrl.slice(0, -1);
 			}
-			
+
 			console.log(`[MEDIA_DEBUG] Fetching from Arweave URL: ${arweaveUrl}`);
 			httpUrlUsed = arweaveUrl;
-			
+
 			try {
 				response = await fetch(arweaveUrl, {
 					method: 'GET',
 					headers: {
-						'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+						'User-Agent':
+							'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 					},
 					signal: AbortSignal.timeout(20000) // 20 second timeout for Arweave which can be slow
 				});
-				
+
 				if (!response.ok) {
 					throw new Error(`HTTP error ${response.status} fetching Arweave URL`);
 				}
-				
-				console.log(`[MEDIA_DEBUG] Successful Arweave response: ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
+
+				console.log(
+					`[MEDIA_DEBUG] Successful Arweave response: ${response.status}, Content-Type: ${response.headers.get('content-type')}`
+				);
 			} catch (arweaveError) {
 				console.error(`[MEDIA_DEBUG] Error fetching from Arweave: ${arweaveError}`);
 				// Fall back to regular IPFS/HTTP handling
 			}
 		}
-		
+
 		// If not an Arweave URL or Arweave fetch failed, continue with regular IPFS/HTTP handling
 		if (!response || !response.ok) {
 			// Assume convertIpfsToHttpsUrl returns IpfsUrlResult or string
@@ -675,7 +682,7 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 					httpUrlUsed: httpUrlUsed || ''
 				};
 			}
-			
+
 			return {
 				httpUrlUsed: httpUrlUsed,
 				error: 'type_detection_error',
@@ -983,15 +990,34 @@ export async function resizeMedia(
 		return null;
 	}
 
-	if (!dimensions || typeof dimensions.width !== 'number' || typeof dimensions.height !== 'number' || dimensions.width <= 0 || dimensions.height <= 0) {
-		console.warn('[RESIZE_MEDIA] Invalid or missing dimensions for resizing. Attempting to get from buffer.');
+	if (
+		!dimensions ||
+		typeof dimensions.width !== 'number' ||
+		typeof dimensions.height !== 'number' ||
+		dimensions.width <= 0 ||
+		dimensions.height <= 0
+	) {
+		console.warn(
+			'[RESIZE_MEDIA] Invalid or missing dimensions for resizing. Attempting to get from buffer.'
+		);
 		const currentDimensions = await getImageDimensionsFromBuffer(buffer);
-		if (!currentDimensions || typeof currentDimensions.width !== 'number' || typeof currentDimensions.height !== 'number' || currentDimensions.width <= 0 || currentDimensions.height <= 0) {
-			console.warn('[RESIZE_MEDIA] Could not determine valid dimensions from buffer. Cannot resize.');
+		if (
+			!currentDimensions ||
+			typeof currentDimensions.width !== 'number' ||
+			typeof currentDimensions.height !== 'number' ||
+			currentDimensions.width <= 0 ||
+			currentDimensions.height <= 0
+		) {
+			console.warn(
+				'[RESIZE_MEDIA] Could not determine valid dimensions from buffer. Cannot resize.'
+			);
 			return { buffer, dimensions: null };
 		}
 		dimensions = currentDimensions;
-		console.log('[RESIZE_MEDIA] Using dimensions from buffer for resize:', JSON.stringify(dimensions));
+		console.log(
+			'[RESIZE_MEDIA] Using dimensions from buffer for resize:',
+			JSON.stringify(dimensions)
+		);
 	}
 
 	const MAX_DIMENSION = 4000; // Max width or height for Cloudinary
@@ -1223,7 +1249,9 @@ function normalizeAttributes(
 }
 
 async function searchCloudinaryByTag(tag: string): Promise<UploadApiResponse | null> {
+	configureCloudinary(); // Configure Cloudinary on-demand
 	try {
+		console.log(`[CLOUDINARY_SEARCH] Searching for assets with tag: ${tag}`);
 		const searchResult = await new Promise<any>((resolve, reject) => {
 			cloudinary.search
 				.expression(`tags=${tag}`)
@@ -1251,6 +1279,10 @@ export async function uploadToCloudinary(
 	mimeType: string,
 	tagsToApply?: string
 ): Promise<UploadResult | null> {
+	configureCloudinary(); // Configure Cloudinary on-demand
+	const publicId = sanitizeCloudinaryPublicId(baseName);
+	const resourceType = mimeType.startsWith('video') ? 'video' : 'image';
+
 	try {
 		let dimensionsToReturn: Dimensions | null = null; // Declare at a higher scope
 
@@ -1264,22 +1296,30 @@ export async function uploadToCloudinary(
 					// Extract dimensions from existing resource
 					let width = existingResource.width;
 					let height = existingResource.height;
-					
+
 					if (!width || !height) {
-						console.log('[CLOUDINARY_DEBUG] Missing dimensions from existing resource, attempting to get them or using null');
+						console.log(
+							'[CLOUDINARY_DEBUG] Missing dimensions from existing resource, attempting to get them or using null'
+						);
 						// Try to get dimensions using getCloudinaryImageDimensions, or fallback to null if not possible.
 						const liveDimensions = await getCloudinaryImageDimensions(existingResource.secure_url);
 						if (liveDimensions) {
-							console.log(`[CLOUDINARY_DEBUG] Fetched live dimensions for existing resource: ${liveDimensions.width}x${liveDimensions.height}`);
+							console.log(
+								`[CLOUDINARY_DEBUG] Fetched live dimensions for existing resource: ${liveDimensions.width}x${liveDimensions.height}`
+							);
 							dimensionsToReturn = liveDimensions;
 						} else {
-							console.log('[CLOUDINARY_DEBUG] Could not fetch live dimensions for existing resource. Dimensions set to null.');
+							console.log(
+								'[CLOUDINARY_DEBUG] Could not fetch live dimensions for existing resource. Dimensions set to null.'
+							);
 						}
 					} else {
-						console.log(`[CLOUDINARY_DEBUG] Found dimensions from existing resource: ${width}x${height}`);
+						console.log(
+							`[CLOUDINARY_DEBUG] Found dimensions from existing resource: ${width}x${height}`
+						);
 						dimensionsToReturn = createDimensions(width, height);
 					}
-					
+
 					return {
 						url: existingResource.secure_url.split('?')[0],
 						fileType:
@@ -1295,16 +1335,15 @@ export async function uploadToCloudinary(
 		}
 
 		// If no existing resource found, proceed with upload
-		const sanitizedFileName = sanitizeCloudinaryPublicId(baseName);
 		const hash = createHashForString(baseName).substring(0, 8);
-		const fullPublicId = `compendium/${sanitizedFileName}_${hash}`;
+		const fullPublicId = `compendium/${publicId}_${hash}`;
 
 		console.log('[CLOUDINARY_DEBUG] Generated public_id:', fullPublicId);
 
 		const uploadOptions: UploadApiOptions = {
 			public_id: fullPublicId,
 			tags: tagsToApply ? tagsToApply.split(',') : undefined,
-			resource_type: 'auto',
+			resource_type: resourceType,
 			overwrite: false,
 			use_filename: false, // Changed to false since we're handling the full public_id
 			unique_filename: false, // Changed to false since we're handling uniqueness with hash
@@ -1343,22 +1382,30 @@ export async function uploadToCloudinary(
 			let width = response.width;
 			let height = response.height;
 			let respDimensions: Dimensions | null = null;
-			
+
 			if (!width || !height) {
-				console.log('[CLOUDINARY_DEBUG] No dimensions returned from Cloudinary, attempting to fetch live or using null');
+				console.log(
+					'[CLOUDINARY_DEBUG] No dimensions returned from Cloudinary, attempting to fetch live or using null'
+				);
 				// Attempt to get live dimensions as a fallback
 				const liveDimensions = await getCloudinaryImageDimensions(response.secure_url);
 				respDimensions = liveDimensions; // This will be Dimensions | null
 				if (liveDimensions) {
-					console.log(`[CLOUDINARY_DEBUG] Fetched live dimensions after upload: ${liveDimensions.width}x${liveDimensions.height}`);
+					console.log(
+						`[CLOUDINARY_DEBUG] Fetched live dimensions after upload: ${liveDimensions.width}x${liveDimensions.height}`
+					);
 				} else {
-					console.log('[CLOUDINARY_DEBUG] Could not fetch live dimensions after upload. Dimensions set to null.');
+					console.log(
+						'[CLOUDINARY_DEBUG] Could not fetch live dimensions after upload. Dimensions set to null.'
+					);
 				}
 			} else {
-				console.log(`[CLOUDINARY_DEBUG] Got dimensions from Cloudinary response: ${width}x${height}`);
+				console.log(
+					`[CLOUDINARY_DEBUG] Got dimensions from Cloudinary response: ${width}x${height}`
+				);
 				respDimensions = createDimensions(width, height);
 			}
-			
+
 			return {
 				url: response.secure_url.split('?')[0],
 				fileType:
@@ -1407,7 +1454,7 @@ async function fetchOpenSeaCollectionData(
 	if (!contractAddress) return null;
 
 	try {
-		const apiKey = env.OPENSEA_API_KEY;
+		const apiKey = privateEnv.OPENSEA_API_KEY;
 		if (!apiKey) {
 			console.warn('[OPENSEA_DEBUG] No OpenSea API key found in environment variables');
 			return null;
@@ -1445,9 +1492,8 @@ async function fetchOpenSeaCollectionData(
  * @param imageUrl The URL of the Cloudinary image
  * @returns The width and height of the image, or null if dimensions couldn't be retrieved
  */
-export async function getCloudinaryImageDimensions(
-	imageUrl: string
-): Promise<Dimensions | null> {
+export async function getCloudinaryImageDimensions(imageUrl: string): Promise<Dimensions | null> {
+	configureCloudinary(); // Configure Cloudinary on-demand
 	if (!imageUrl || !imageUrl.includes('cloudinary.com')) {
 		console.error('[CLOUDINARY_DEBUG] Invalid Cloudinary URL:', imageUrl);
 		return null;
@@ -1458,39 +1504,43 @@ export async function getCloudinaryImageDimensions(
 		// Example URL: https://res.cloudinary.com/cloud-name/image/upload/v1234567890/compendium/image_name_12345678.jpg
 		const urlParts = imageUrl.split('/');
 		const uploadIndex = urlParts.indexOf('upload');
-		
+
 		if (uploadIndex === -1) {
 			console.error('[CLOUDINARY_DEBUG] Could not parse Cloudinary URL:', imageUrl);
 			return null;
 		}
-		
+
 		// Get everything after 'upload' excluding version (v1234567890)
 		let publicId = urlParts.slice(uploadIndex + 1).join('/');
-		
+
 		// Remove version if present
 		if (publicId.startsWith('v') && /^v\d+\//.test(publicId)) {
 			publicId = publicId.replace(/^v\d+\//, '');
 		}
-		
+
 		// Remove file extension if present
 		publicId = publicId.replace(/\.[^/.]+$/, '');
-		
+
 		console.log('[CLOUDINARY_DEBUG] Extracted public ID:', publicId);
-		
+
 		// Use the Cloudinary API to get resource details
 		const result = await new Promise<any>((resolve, reject) => {
-			cloudinary.api.resource(publicId, {
-				resource_type: 'image',
-				type: 'upload'
-			}, (error, result) => {
-				if (error) {
-					reject(error);
-				} else {
-					resolve(result);
+			cloudinary.api.resource(
+				publicId,
+				{
+					resource_type: 'image',
+					type: 'upload'
+				},
+				(error, result) => {
+					if (error) {
+						reject(error);
+					} else {
+						resolve(result);
+					}
 				}
-			});
+			);
 		});
-		
+
 		if (result && typeof result.width === 'number' && typeof result.height === 'number') {
 			console.log(`[CLOUDINARY_DEBUG] Found dimensions: ${result.width}x${result.height}`);
 			return createDimensions(result.width, result.height);

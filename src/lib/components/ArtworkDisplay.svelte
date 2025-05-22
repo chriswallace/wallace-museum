@@ -22,11 +22,7 @@
 	}
 
 	function hasApplicationMime(): boolean {
-		return Boolean(
-			artwork.animation_url && 
-			artwork.mime && 
-			artwork.mime.startsWith('application')
-		);
+		return Boolean(artwork.animation_url && artwork.mime && artwork.mime.startsWith('application'));
 	}
 
 	function handleLoad(): void {

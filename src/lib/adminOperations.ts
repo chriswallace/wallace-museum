@@ -98,18 +98,19 @@ export async function processArtist(artistInfo: ArtistInfo) {
 			// Update existing artist if necessary (e.g. if username changed or new info available)
 			// We only update if the current artist name is the address itself, implying it might be a placeholder
 			if (artist.name === artistInfo.address && artistName !== artistInfo.address) {
-				artist = await prisma.artist.update({
+				artist = (await prisma.artist.update({
 					where: { id: artist.id },
 					data: artistData,
 					include: {
 						addresses: true
 					}
-				}) as Artist & { addresses: ArtistAddress[] };
+				})) as Artist & { addresses: ArtistAddress[] };
 				console.log('[ARTIST_PROCESS] Updated artist with new name:', artist.name);
 			}
 			// Ensure the specific address is linked if it wasn't the one found (e.g. artist has multiple addresses)
 			const addressExists = artist.addresses.find(
-				(a: ArtistAddress) => a.address === artistInfo.address && a.blockchain === (artistInfo.blockchain || 'ethereum')
+				(a: ArtistAddress) =>
+					a.address === artistInfo.address && a.blockchain === (artistInfo.blockchain || 'ethereum')
 			);
 			if (!addressExists) {
 				await prisma.artistAddress.create({
@@ -120,7 +121,10 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					}
 				});
 				// Re-fetch artist to include the new address
-				artist = await prisma.artist.findUnique({ where: { id: artist.id }, include: { addresses: true } }) as Artist & { addresses: ArtistAddress[] };
+				artist = (await prisma.artist.findUnique({
+					where: { id: artist.id },
+					include: { addresses: true }
+				})) as Artist & { addresses: ArtistAddress[] };
 			}
 			return artist;
 		}
@@ -142,7 +146,9 @@ export async function processArtist(artistInfo: ArtistInfo) {
 			// If an address is provided and not yet linked, link it
 			if (artistInfo.address && artistInfo.address !== zeroAddress) {
 				const addressExists = artist.addresses.find(
-					(a: ArtistAddress) => a.address === artistInfo.address && a.blockchain === (artistInfo.blockchain || 'ethereum')
+					(a: ArtistAddress) =>
+						a.address === artistInfo.address &&
+						a.blockchain === (artistInfo.blockchain || 'ethereum')
 				);
 				if (!addressExists) {
 					await prisma.artistAddress.create({
@@ -153,12 +159,14 @@ export async function processArtist(artistInfo: ArtistInfo) {
 						}
 					});
 					// Re-fetch artist to include the new address
-					artist = await prisma.artist.findUnique({ where: { id: artist.id }, include: { addresses: true } }) as Artist & { addresses: ArtistAddress[] };
+					artist = (await prisma.artist.findUnique({
+						where: { id: artist.id },
+						include: { addresses: true }
+					})) as Artist & { addresses: ArtistAddress[] };
 				}
 			}
 		}
 	}
-
 
 	// If still no artist, create a new one
 	if (!artist) {
@@ -166,7 +174,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 		if (artistName && artistName !== zeroAddress) {
 			console.log('[ARTIST_PROCESS] Creating new artist');
 			try {
-				artist = await prisma.artist.create({
+				artist = (await prisma.artist.create({
 					data: {
 						...artistData,
 						addresses:
@@ -184,13 +192,13 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					include: {
 						addresses: true
 					}
-				}) as Artist & { addresses: ArtistAddress[] };
+				})) as Artist & { addresses: ArtistAddress[] };
 			} catch (error: any) {
 				if (error?.code === 'P2002' && error?.meta?.target?.includes('name')) {
 					// If name conflict, append part of the address or timestamp to make it unique
 					console.log('[ARTIST_PROCESS] Name conflict detected, making name unique');
 					const timestamp = Date.now().toString().slice(-6);
-					artist = await prisma.artist.create({
+					artist = (await prisma.artist.create({
 						data: {
 							...artistData,
 							name: `${artistName}_${timestamp}`,
@@ -209,7 +217,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 						include: {
 							addresses: true
 						}
-					}) as Artist & { addresses: ArtistAddress[] };
+					})) as Artist & { addresses: ArtistAddress[] };
 				} else {
 					throw error;
 				}
@@ -245,7 +253,11 @@ export async function processCollection(collectionInfo: CollectionInfo) {
 	return await prisma.collection.upsert(upsertParams);
 }
 
-export async function saveArtwork(nft: NftInfo, artistId: number, collectionId: number | null) {
+export async function saveArtwork(
+	nft: NftInfo,
+	artistId: number | null,
+	collectionId: number | null
+) {
 	// Ensure attributes is treated as JSON, default to empty array if null/undefined
 	const attributes = nft.metadata.attributes || [];
 
@@ -257,106 +269,67 @@ export async function saveArtwork(nft: NftInfo, artistId: number, collectionId: 
 	}
 
 	// Ensure dimensions has proper width and height values
-	const normalizedDimensions = nft.dimensions && typeof nft.dimensions.width === 'number' && typeof nft.dimensions.height === 'number'
-		? { width: nft.dimensions.width, height: nft.dimensions.height }
-		: null;
-	
+	const normalizedDimensions =
+		nft.dimensions &&
+		typeof nft.dimensions.width === 'number' &&
+		typeof nft.dimensions.height === 'number'
+			? { width: nft.dimensions.width, height: nft.dimensions.height }
+			: null;
+
 	console.log(`Chris Dimensions:`, JSON.stringify(normalizedDimensions));
-	
+
 	// Convert to JSON for storage
 	const dimensions = JSON.stringify(normalizedDimensions);
 
-	try {
-		// Use a transaction to ensure both the artwork and artist relationship are created/updated atomically
-		return await prisma.$transaction(async (tx) => {
-			// First try to find the existing artwork
-			const existingArtwork = await tx.artwork.findUnique({
-				where: {
-					tokenID_contractAddr: {
-						tokenID: String(nft.tokenID),
-						contractAddr: nft.collection.contract
-					}
-				}
-			});
+	// Upsert artwork: create if it doesn't exist, update if it does
+	const artworkData = {
+		title: nft.name || 'Untitled',
+		description: nft.description || '',
+		curatorNotes: '',
+		enabled: true,
+		dimensions: dimensions,
+		collectionId: collectionId,
+		contractAddr: nft.collection.contract,
+		contractAlias: nft.collection.name || '',
+		tokenID: String(nft.tokenID),
+		blockchain: nft.collection.blockchain || 'ethereum',
+		totalSupply: nft.collection.total_supply || null,
+		tokenStandard: nft.token_standard || null,
+		animation_url: nft.metadata.animation_url || null,
+		image_url: nft.metadata.image_url || null,
+		mime: nft.mime || null,
+		symbol: nft.metadata.symbol || null,
+		attributes: JSON.stringify(attributes),
+		tags: JSON.stringify([])
+	};
 
-			// Prepare the base artwork data
-			const baseArtworkData = {
-				enabled: true,
-				title: nft.name ?? '',
-				description: nft.description ?? '',
-				image_url: nft.metadata.image_url ?? '',
-				animation_url: nft.metadata.animation_url ?? '',
-				attributes: attributes,
-				blockchain: nft.collection.blockchain ?? '',
-				dimensions: dimensions,
-				contractAddr: nft.collection.contract,
-				contractAlias: nft.contractAlias ?? '',
-				mime: nft.mime ?? '',
-				totalSupply: nft.collection.total_supply ?? null,
-				tokenStandard: nft.token_standard ?? '',
+	const artwork = await prisma.artwork.upsert({
+		where: {
+			tokenID_contractAddr: {
 				tokenID: String(nft.tokenID),
-				mintDate: new Date(nft.updated_at)
-			};
-
-			let savedArtwork;
-			if (existingArtwork) {
-				// Update existing artwork
-				savedArtwork = await tx.artwork.update({
-					where: { id: existingArtwork.id },
-					data: {
-						...baseArtworkData,
-						...(collectionId && {
-							collectionId: collectionId
-						})
-					}
-				});
-			} else {
-				// Create new artwork first
-				savedArtwork = await tx.artwork.create({
-					data: {
-						...baseArtworkData,
-						...(collectionId && {
-							collectionId: collectionId
-						})
-					} as any // Using type assertion as a temporary workaround
-				});
-
-				// Then create the artist relationship
-				await tx.artistArtworks.create({
-					data: {
-						artistId: artistId,
-						artworkId: savedArtwork.id
-					}
-				});
+				contractAddr: nft.collection.contract
 			}
+		},
+		update: artworkData,
+		create: artworkData
+	});
 
-			// If updating and the artist relationship doesn't exist, create it
-			if (existingArtwork) {
-				const existingRelation = await tx.artistArtworks.findUnique({
-					where: {
-						artistId_artworkId: {
-							artistId: artistId,
-							artworkId: savedArtwork.id
-						}
-					}
-				});
-
-				if (!existingRelation) {
-					await tx.artistArtworks.create({
-						data: {
-							artistId: artistId,
-							artworkId: savedArtwork.id
-						}
-					});
+	// Create artist-artwork relationship only if artist ID is provided
+	if (artistId !== null) {
+		await prisma.artistArtworks.upsert({
+			where: {
+				artistId_artworkId: {
+					artistId: artistId,
+					artworkId: artwork.id
 				}
+			},
+			update: {}, // No fields to update, just ensure it exists
+			create: {
+				artistId: artistId,
+				artworkId: artwork.id
 			}
-
-			return savedArtwork;
 		});
-	} catch (error) {
-		console.error('[SAVE_ARTWORK] Error:', error);
-		throw error;
 	}
+
+	return artwork;
 }
-
-

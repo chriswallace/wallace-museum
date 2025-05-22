@@ -27,18 +27,18 @@ function guessMimeTypeFromUrl(url: string): string | null {
 	if (url.match(/\.(pdf)$/i)) return 'application/pdf';
 	if (url.match(/\.(html|htm)$/i)) return 'text/html';
 	if (url.match(/\.(js)$/i)) return 'application/javascript';
-	
+
 	// Check for common patterns
 	if (url.includes('cloudinary.com')) {
 		if (url.includes('/video/')) return 'video/mp4';
 		if (url.includes('/image/')) return 'image/jpeg';
 	}
-	
+
 	// For common interactive art platforms
 	if (url.includes('fxhash.xyz') || url.includes('generator.artblocks.io')) {
 		return 'application/javascript';
 	}
-	
+
 	return null;
 }
 
@@ -91,7 +91,7 @@ export async function POST({ request }) {
 			const existingUrl = formData.get('imageUrl') as string | null;
 			if (existingUrl) {
 				imageOrVideoUrl = existingUrl;
-				
+
 				// Simple mime type detection for existing URL
 				const guessedType = guessMimeTypeFromUrl(existingUrl);
 				if (guessedType) {
@@ -137,28 +137,29 @@ export async function POST({ request }) {
 		// Prioritize animation_url if provided
 		if (animation_url) {
 			newArtworkData.animation_url = animation_url;
-			
-			// Only set mime type for animation_url content
+
+			// Set mime type for animation content
 			const animationMimeType = guessMimeTypeFromUrl(animation_url);
 			if (animationMimeType) {
 				newArtworkData.mime = animationMimeType;
 			}
-			
-			// If we have a file upload too, use it as the image_url (without setting mime)
+
+			// If we have a file upload too, use it as the image_url
 			if (imageOrVideoUrl) {
 				newArtworkData.image_url = imageOrVideoUrl;
 			}
 		} else if (imageOrVideoUrl) {
-			// Assign to the appropriate field based on file type
+			// If no animation_url, handle image/video content
 			if (isVideo) {
 				newArtworkData.animation_url = imageOrVideoUrl;
-				// Set mime type for video since it's in animation_url
 				if (mimeType && mimeType.startsWith('video/')) {
 					newArtworkData.mime = mimeType;
 				}
 			} else {
 				newArtworkData.image_url = imageOrVideoUrl;
-				// Don't set mime type for image_url
+				if (mimeType && mimeType.startsWith('image/')) {
+					newArtworkData.mime = mimeType;
+				}
 			}
 		}
 

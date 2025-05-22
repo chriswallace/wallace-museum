@@ -172,7 +172,7 @@
 	}
 
 	.artist-list .artist-row {
-		@apply opacity-30 duration-300;
+		@apply opacity-40 duration-300;
 	}
 
 	.artist-list:hover .artist-row:hover {
