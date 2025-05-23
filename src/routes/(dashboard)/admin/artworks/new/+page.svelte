@@ -79,7 +79,7 @@
 		formData.append('title', artwork.title);
 		formData.append('description', artwork.description);
 		formData.append('curatorNotes', artwork.curatorNotes);
-		
+
 		// Add animation_url and mime if provided
 		if (artwork.animation_url) {
 			formData.append('animation_url', artwork.animation_url);
@@ -136,19 +136,19 @@
 </script>
 
 <svelte:head>
-	<title>Add new artwork</title>
+	<title>Add New Artwork | Wallace Museum Admin</title>
 </svelte:head>
 
-<div class="container">
+<div class="max-w-7xl mx-auto">
 	{#if error}
 		<p class="error">{error}</p>
 	{:else}
 		<div>
 			<button class="back-btn" on:click={goBack}>&lt; Back</button>
 		</div>
-		<h1>Add new artwork</h1>
-		<div class="edit-form">
-			<div class="artwork">
+		<h1 class="mb-12">Add new artwork</h1>
+		<div class="pb-24 sm:grid sm:grid-cols-2 sm:gap-8">
+			<div>
 				<div class="file-uploader">
 					<input type="file" name="image" />
 					<label for="image">Upload media (JPG, PNG, GIF, MP4 under 25MB)</label>
@@ -157,20 +157,23 @@
 			<div>
 				<form on:submit|preventDefault={addArtwork}>
 					<!-- Artwork Fields -->
-					<div>
+					<div class="mb-4">
 						<label for="title">Title</label>
 						<input type="text" id="title" bind:value={artwork.title} />
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="description">Description</label>
 						<textarea id="description" bind:value={artwork.description}></textarea>
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="animation_url">Animation URL (Optional)</label>
 						<input type="url" id="animation_url" bind:value={artwork.animation_url} />
-						<small>URL for animation or interactive content. Will be used if no file is uploaded. MIME type will be auto-detected.</small>
+						<small class="text-gray-600 dark:text-gray-400 block mt-1"
+							>URL for animation or interactive content. Will be used if no file is uploaded. MIME
+							type will be auto-detected.</small
+						>
 					</div>
-					<fieldset>
+					<fieldset class="mb-4 border-0 p-0">
 						<label for="artist">Artist</label>
 						{#if addingNewArtist}
 							<input
@@ -190,14 +193,18 @@
 									</select>
 								</div>
 								<div style="flex: none;">
-									<button class="cta button primary" on:click={() => (addingNewArtist = true)}>
+									<button
+										type="button"
+										class="primary"
+										on:click|preventDefault={() => (addingNewArtist = true)}
+									>
 										Add New
 									</button>
 								</div>
 							</div>
 						{/if}
 					</fieldset>
-					<fieldset>
+					<fieldset class="mb-4 border-0 p-0">
 						<label for="collection">Collection</label>
 						{#if addingNewCollection}
 							<input
@@ -217,7 +224,11 @@
 									</select>
 								</div>
 								<div style="flex: none;">
-									<button class="cta button primary" on:click={() => (addingNewCollection = true)}>
+									<button
+										type="button"
+										class="primary"
+										on:click|preventDefault={() => (addingNewCollection = true)}
+									>
 										Add New
 									</button>
 								</div>
@@ -225,7 +236,7 @@
 						{/if}
 					</fieldset>
 
-					<button class="cta button primary w-full" type="submit">Add artwork</button>
+					<button class="primary w-full" type="submit">Add artwork</button>
 				</form>
 			</div>
 		</div>

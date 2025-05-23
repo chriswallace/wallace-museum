@@ -518,31 +518,6 @@ export const POST = async ({ request }) => {
 					}
 				}
 
-				// Fallback to display_image_url (often a thumbnail) if no full-resolution image was successfully processed.
-				if (!finalImageUrl && nft.display_image_url) {
-					const displayImageResult = await handleMediaUpload(nft.display_image_url, nft);
-					if (displayImageResult?.url) {
-						finalImageUrl = displayImageResult.url;
-						console.log(`[OS_IMPORT] Display image upload successful: ${finalImageUrl}`);
-
-						// Update mime type from display image only if current is generic or text/html.
-						if (displayImageResult.fileType?.startsWith('image/')) {
-							if (isMimeEffectivelyGeneric(finalMime) || finalMime === 'text/html') {
-								finalMime = displayImageResult.fileType;
-							}
-						} else if (displayImageResult.fileType && isMimeEffectivelyGeneric(finalMime)) {
-							finalMime = displayImageResult.fileType;
-						}
-
-						// Update dimensions from display image upload if no dimensions yet
-						if (displayImageResult.dimensions && !finalDimensions) {
-							finalDimensions = displayImageResult.dimensions;
-						}
-					} else {
-						console.warn(`[OS_IMPORT] Display image upload failed for: ${nft.display_image_url}`);
-					}
-				}
-
 				// If mime is still generic, but we have a generator or animation URL that hints at HTML/JS, set it.
 				if (isMimeEffectivelyGeneric(finalMime) || finalMime === 'application/octet-stream') {
 					const interactiveUrl = finalGeneratorUrl || finalAnimationUrl;

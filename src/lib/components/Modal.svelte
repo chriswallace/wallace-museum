@@ -1,10 +1,11 @@
-<script>
+<script lang="ts">
 	import { isLoading } from '$lib/stores';
-	export let title;
-	export let onClose; // Ensure this function is passed as a prop
+
+	export let title: string;
+	export let onClose: () => void; // Properly typed function
 	export let width = '500px'; // Default width
 
-	function handleBackdropClick(event) {
+	function handleBackdropClick(event: MouseEvent): void {
 		// Prevent modal content click from closing the modal
 		if (event.target === event.currentTarget) {
 			onClose(); // Use the onClose function passed as a prop
@@ -13,17 +14,24 @@
 </script>
 
 <div class="modal" on:click={handleBackdropClick}>
-	<div class="modal-container" style="width: {width};">
+	<div class="modal-container bg-white dark:bg-gray-800 rounded-lg" style="width: {width};">
 		{#if $isLoading}
-			<div class="loading">
-				<img src="/images/loading.png" alt="Loading" />
+			<div class="loading bg-white dark:bg-gray-900 flex justify-center items-center h-full">
+				<img src="/images/loading.png" alt="Loading" class="w-10 h-10 dark:invert" />
 			</div>
 		{:else}
-			<div class="modal-header">
-				<h2>{title}</h2>
-				<button class="close-button" on:click={onClose}>✖</button>
+			<div
+				class="modal-header bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-8 pt-16 pb-8 flex justify-between items-end relative"
+			>
+				<h2 class="text-2xl font-normal">{title}</h2>
+				<button
+					class="close-button bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 absolute top-0 right-0 border-none cursor-pointer text-xl h-12 w-12 leading-none z-10"
+					on:click={onClose}>✖</button
+				>
 			</div>
-			<div class="modal-content">
+			<div
+				class="modal-content bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-8 pb-16 max-h-screen overflow-y-auto flex"
+			>
 				<slot />
 			</div>
 		{/if}
@@ -42,55 +50,5 @@
 		align-items: center;
 		background-color: rgba(0, 0, 0, 0.5);
 		z-index: 100;
-	}
-	.modal-container {
-		@apply rounded-lg;
-	}
-	.loading {
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		height: 100%;
-		background-color: white;
-
-		img {
-			width: 40px;
-			height: 40px;
-		}
-	}
-	.modal-header {
-		padding: 4vh 2rem 2vh;
-		display: flex;
-		justify-content: space-between;
-		align-items: end;
-		background: #fff;
-		position: relative;
-
-		h2 {
-			font-size: 24px;
-			font-weight: normal;
-		}
-	}
-	.modal-content {
-		background: white;
-		padding: 0 2rem 4vh;
-		max-height: 100vh;
-		overflow-y: auto;
-		display: flex;
-	}
-	.close-button {
-		margin-top: 0;
-		position: absolute;
-		top: 0;
-		right: 0;
-		border: none;
-		background: none;
-		cursor: pointer;
-		font-size: 20px;
-		height: 48px;
-		width: 48px;
-		line-height: 0;
-		z-index: 100;
-		background: white;
 	}
 </style>

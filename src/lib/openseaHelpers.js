@@ -192,6 +192,7 @@ export async function fetchNFTsByAddress(
 		url += `&next=${nextCursor}`;
 	}
 
+	console.log(`[DEBUG] Fetching NFTs from: ${url}`);
 	const response = await fetch(url, { headers: { 'X-API-KEY': env.OPENSEA_API_KEY } });
 
 	if (!response.ok) {
@@ -202,6 +203,11 @@ export async function fetchNFTsByAddress(
 	}
 
 	const data = await response.json();
+	console.log(`[DEBUG] OpenSea API returned ${data.nfts?.length || 0} NFTs`);
+	if (data.nfts?.length > 0) {
+		console.log(`[DEBUG] First NFT:`, JSON.stringify(data.nfts[0], null, 2));
+	}
+
 	/** @type {Array<NftItem>} */
 	const fetchedNfts = [];
 
@@ -219,9 +225,11 @@ export async function fetchNFTsByAddress(
 		);
 
 		if (!currentNft.id && currentNft.identifier) {
+			console.log(`[DEBUG] Setting id from identifier: ${currentNft.identifier}`);
 			currentNft.id = currentNft.identifier;
 		}
 		if (!currentNft.id) {
+			console.log(`[DEBUG] Skipping NFT with no id`);
 			continue;
 		}
 
@@ -269,6 +277,7 @@ export async function fetchNFTsByAddress(
 
 	// Ensure fetchedNfts contains items with valid 'id' before filtering
 	let validNfts = fetchedNfts.filter((nft) => nft && nft.id !== undefined && nft.id !== null);
+	console.log(`[DEBUG] Valid NFTs after filtering: ${validNfts.length}`);
 
 	// Log metadata_url before normalization
 	validNfts.forEach((nft) => {
@@ -297,6 +306,9 @@ export async function fetchNFTsByAddress(
 		);
 	});
 
+	console.log(
+		`[DEBUG] Final NFTs count: ${filteredNfts.length}, nextCursor: ${data.next || 'null'}`
+	);
 	return { nfts: filteredNfts, nextCursor: data.next };
 }
 

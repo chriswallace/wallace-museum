@@ -84,6 +84,7 @@ model Artwork {
   symbol         String?
   ArtistArtworks ArtistArtworks[]
   collection     Collection?      @relation(fields: [collectionId], references: [id])
+  indexData      ArtworkIndex?
 
   @@unique([tokenID, contractAddr], name: "tokenID_contractAddr")
 }
@@ -126,4 +127,24 @@ model Session {
   user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
+}
+
+model Settings {
+  id            Int       @id @default(autoincrement())
+  key           String    @unique
+  value         Json
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model ArtworkIndex {
+  id            Int       @id @default(autoincrement())
+  artworkId     Int?      // Optional to allow storing NFTs without creating Artwork records
+  artwork       Artwork?  @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  indexedData   Json      // Normalized JSON data for efficient querying
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([artworkId])  // Maintain unique constraint but allow null values
+  @@index([artworkId])
 }

@@ -50,7 +50,7 @@
 </script>
 
 <svelte:head>
-	<title>Collections</title>
+	<title>Collections | Wallace Museum Admin</title>
 </svelte:head>
 
 <h1>Collections <button class="ghost" on:click={addNew}>+ Add new</button></h1>
@@ -86,9 +86,9 @@
 								/>
 							{:else}
 								<img
-									src="{image}?tr=w-250,h-250,c_fill,q-70,dpr-auto"
+									src="{image}?tr=w-250,h-250,c_fit,q-70,dpr-auto"
 									alt=""
-									class="aspect-square object-cover"
+									class="aspect-square object-contain"
 								/>
 							{/if}
 						{/each}
@@ -113,7 +113,7 @@
 		@apply w-full grid grid-cols-3 gap-4;
 	}
 	.card {
-		@apply cursor-pointer bg-white rounded-md shadow-md overflow-hidden p-0;
+		@apply cursor-pointer rounded-md shadow-md overflow-hidden p-0;
 	}
 	.cover-image-wrap {
 		@apply overflow-hidden;

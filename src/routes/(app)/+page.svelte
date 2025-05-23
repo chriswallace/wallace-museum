@@ -6,7 +6,8 @@
 	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
 	import { fade, fly } from 'svelte/transition';
 	import { goto } from '$app/navigation';
-	import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
+	import LoaderWrapper from '$lib/components/LoaderWrapper.svelte';
+	import { onMount } from 'svelte';
 
 	let hoveredArtist: Artist | null = null;
 	let mouseX = 0;
@@ -15,6 +16,17 @@
 	let previewWidth = 320;
 	let previewHeight = 220;
 	let loadingStates: Record<string, boolean> = {};
+	let isLargeScreen = false;
+
+	onMount(() => {
+		updateScreenSize();
+		window.addEventListener('resize', updateScreenSize);
+		return () => window.removeEventListener('resize', updateScreenSize);
+	});
+
+	function updateScreenSize() {
+		isLargeScreen = window.innerWidth >= 1024;
+	}
 
 	// Preload all artwork images for all artists
 	function preloadAllArtworkImages() {
@@ -57,69 +69,85 @@
 	);
 </script>
 
+<svelte:head>
+	<title>Wallace Museum | Digital Art Collection</title>
+	<meta
+		name="description"
+		content="The Wallace Museum showcases pioneering works from bleeding-edge artists pushing the boundaries of computational aesthetics and algorithmic expression."
+	/>
+</svelte:head>
+
 <div class="homepage-container">
 	<div class="homepage-intro">
-		<h1 class="collection-title">Wallace Museum</h1>
-		<p class="collection-description">
-			The Wallace Museum showcases pioneering works from bleeding-edge artists pushing the
-			boundaries of computational aesthetics and algorithmic expression. Each piece in the
-			collection represents an evolving dialogue between human imagination and digital
-			innovation—where mathematics becomes poetry and algorithms transform into art.
-		</p>
+		<div class="intro-content">
+			<h1 class="collection-title">Wallace Museum</h1>
+			<p class="collection-description">
+				The Wallace Museum showcases pioneering works from bleeding-edge artists pushing the
+				boundaries of computational aesthetics and algorithmic expression. Each piece in the
+				collection represents an evolving dialogue between human imagination and digital
+				innovation—where mathematics becomes poetry and algorithms transform into art.
+			</p>
+		</div>
 	</div>
 
-	<h2 class="artist-title">Featuring</h2>
-	{#if data.artists && data.artists.length > 0}
-		<ul class="artist-list" on:mousemove={handleMouseMove}>
-			{#each data.artists as artist (artist.id)}
-				<li>
-					<button
-						type="button"
-						tabindex="0"
-						class="artist-row"
-						on:mouseenter={() => handleArtistHover(artist)}
-						on:mouseleave={clearArtistHover}
-						on:focus={() => handleArtistHover(artist)}
-						on:blur={clearArtistHover}
-						on:click={() => goto(`/artist/${artist.id}`)}
-						aria-label={`View artworks by ${artist.name}`}
-					>
-						<span class="artist-name">{artist.name}</span>
-						<span class="artwork-count"
-							>{artist.artworks.length}
-							{artist.artworks.length === 1 ? 'artwork' : 'artworks'}</span
+	<div class="artists-section">
+		<h2 class="artist-title">Featuring</h2>
+		{#if data.artists && data.artists.length > 0}
+			<ul class="artist-list" on:mousemove={handleMouseMove}>
+				{#each data.artists as artist (artist.id)}
+					<li>
+						<button
+							type="button"
+							tabindex="0"
+							class="artist-row"
+							on:mouseenter={() => handleArtistHover(artist)}
+							on:mouseleave={clearArtistHover}
+							on:focus={() => handleArtistHover(artist)}
+							on:blur={clearArtistHover}
+							on:click={() => goto(`/artist/${artist.id}`)}
+							aria-label={`View artworks by ${artist.name}`}
 						>
-					</button>
-				</li>
-			{/each}
-		</ul>
-	{:else}
-		<p>No artists found.</p>
-	{/if}
+							<span class="artist-name">{artist.name}</span>
+							<span class="artwork-count"
+								>{artist.artworks.length}
+								{artist.artworks.length === 1 ? 'artwork' : 'artworks'}</span
+							>
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<p>No artists found.</p>
+		{/if}
+	</div>
 
-	{#if hoveredArtist && hoveredArtist.artworks.length > 0}
+	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && hoveredArtist.artworks[0]?.image_url}
 		<div
 			class="floating-artwork-preview"
 			style="left: {safeLeft}px; top: {safeTop}px; width: {previewWidth}px; height: {previewHeight}px;"
 		>
-			{#if hoveredArtist.artworks[0]?.image_url}
-				{#if loadingStates[hoveredArtist.artworks[0].image_url]}
-					<SkeletonLoader width="100%" height="100%" />
-				{/if}
-				<img
-					src={getCloudinaryTransformedUrl(
-						hoveredArtist.artworks[0].image_url,
-						'w_320,h_220,c_fit,q_70,f_auto'
-					)}
-					alt={hoveredArtist.artworks[0].title}
-					class="preview-image"
-					class:hidden={loadingStates[hoveredArtist.artworks[0].image_url]}
-					on:load={() => {
-						loadingStates[hoveredArtist.artworks[0].image_url] = false;
-						loadingStates = loadingStates;
-					}}
-				/>
+			{#if hoveredArtist.artworks[0].image_url && loadingStates[hoveredArtist.artworks[0].image_url]}
+				<div class="preview-loader">
+					<LoaderWrapper width="100%" height="100%" aspectRatio="320/220" />
+				</div>
 			{/if}
+			<img
+				src={getCloudinaryTransformedUrl(
+					hoveredArtist.artworks[0].image_url,
+					'w_320,h_220,c_fit,q_70,f_auto'
+				)}
+				alt={hoveredArtist.artworks[0].title || ''}
+				class="preview-image"
+				class:hidden={hoveredArtist.artworks[0].image_url &&
+					loadingStates[hoveredArtist.artworks[0].image_url]}
+				on:load={() => {
+					const imageUrl = hoveredArtist?.artworks[0]?.image_url;
+					if (imageUrl) {
+						loadingStates[imageUrl] = false;
+						loadingStates = loadingStates;
+					}
+				}}
+			/>
 		</div>
 	{/if}
 </div>
@@ -130,29 +158,66 @@
 	}
 
 	.homepage-container {
-		@apply pt-10 text-left max-w-[840px] mx-auto px-4 box-border;
+		@apply w-full min-h-screen;
+
+		@media (min-width: 1024px) {
+			@apply grid grid-cols-[40vw_1fr] min-h-screen;
+		}
 	}
 
 	.homepage-intro {
-		@apply mb-[3.5rem] text-left;
+		@apply relative w-full p-4 bg-black;
+
+		@media (min-width: 1024px) {
+			@apply fixed top-0 left-0 bottom-0 w-[40vw] flex flex-col justify-center overflow-y-auto;
+		}
+	}
+
+	.intro-content {
+		@apply py-10;
+
+		@media (min-width: 1024px) {
+			@apply px-8 max-w-xl mx-auto w-full;
+		}
+	}
+
+	.artists-section {
+		@apply w-full p-4;
+
+		@media (min-width: 1024px) {
+			@apply ml-[40vw] p-12 pt-16 w-full;
+		}
 	}
 
 	.collection-title {
-		@apply text-xl font-bold text-yellow-500 inline-block tracking-tight;
+		@apply text-2xl font-bold text-yellow-500 inline-block tracking-tight;
+
+		@media (min-width: 1024px) {
+			@apply text-3xl;
+		}
 	}
 
 	.collection-description {
-		@apply mt-24 mb-12 pb-12 border-b border-gray-800 text-[1.3rem] max-w-full text-gray-100 font-semibold m-0 leading-normal tracking-tight;
+		@apply mt-8 mb-8 pb-8 border-b border-gray-800 text-xl max-w-full text-gray-100 font-semibold m-0 leading-normal tracking-tight;
 		overflow-wrap: break-word;
 		word-wrap: break-word;
+
+		@media (min-width: 768px) {
+			@apply text-[1.3rem] mt-12 mb-10 pb-10;
+		}
+
+		@media (min-width: 1024px) {
+			@apply border-b-0 pb-0 mb-0;
+		}
 	}
 
 	.artist-title {
-		@apply text-sm font-normal uppercase tracking-widest mb-3 text-gray-100;
+		@apply text-sm font-normal uppercase tracking-widest mb-10 text-gray-100;
 	}
 
 	.artist-list {
-		@apply list-none p-0 flex flex-col items-stretch gap-0 m-0 pb-24 w-full;
+		@apply list-none p-0 flex flex-col items-stretch gap-2 m-0 pb-24 w-full;
+		max-width: min(800px, 55vw);
 	}
 
 	.artist-list > li {
@@ -160,11 +225,12 @@
 	}
 
 	.artist-row {
-		display: grid;
-		grid-template-columns: 1fr auto;
-		align-items: center;
-		@apply w-full text-[2rem] text-white font-semibold no-underline bg-none border-none p-0 py-1.5 cursor-pointer outline-none leading-[1.4] hover:text-white opacity-100 rounded-md;
+		@apply w-full text-xl text-white font-semibold no-underline bg-none border-none p-0 cursor-pointer outline-none leading-[1.4] hover:text-white opacity-100 rounded-md flex justify-between items-center;
 		overflow: hidden;
+
+		@media (min-width: 768px) {
+			@apply text-[1.75rem];
+		}
 	}
 
 	.artist-row:focus-visible {
@@ -172,7 +238,7 @@
 	}
 
 	.artist-list .artist-row {
-		@apply opacity-40 duration-300;
+		@apply opacity-60 duration-300 text-gray-600;
 	}
 
 	.artist-list:hover .artist-row:hover {
@@ -180,35 +246,30 @@
 	}
 
 	.artist-name {
-		@apply text-left overflow-hidden text-ellipsis;
+		@apply text-left overflow-hidden text-ellipsis whitespace-nowrap;
+		max-width: calc(100% - 120px);
 	}
 
 	.artwork-count {
-		@apply text-[1.1rem] font-medium ml-4 whitespace-nowrap;
+		@apply text-base font-medium whitespace-nowrap text-right;
+
+		@media (min-width: 768px) {
+			@apply text-base;
+		}
 	}
 
 	.floating-artwork-preview {
-		@apply fixed pointer-events-none z-[9999] p-0 flex gap-0 items-center overflow-hidden bg-none border-none shadow-none;
+		@apply fixed pointer-events-none z-[9999] p-0 flex gap-0 items-center overflow-hidden bg-none border-none shadow-xl rounded-lg;
 		max-width: 320px;
 		max-height: 220px;
 	}
 
-	.preview-image {
-		@apply h-auto w-auto max-h-[220px] max-w-full rounded-none bg-none object-contain shadow-none m-0;
+	.preview-loader {
+		@apply w-full h-full overflow-hidden;
 	}
 
-	@media (max-width: 768px) {
-		.collection-description {
-			@apply text-xl mt-12 mb-8;
-		}
-
-		.artist-row {
-			@apply text-xl;
-		}
-
-		.artwork-count {
-			@apply text-sm;
-		}
+	.preview-image {
+		@apply h-auto w-auto max-h-[220px] max-w-full rounded-lg bg-black object-contain shadow-lg m-0;
 	}
 
 	@media (max-width: 600px) {
@@ -220,15 +281,23 @@
 		.preview-image {
 			max-height: 180px;
 		}
-
-		.collection-description {
-			@apply text-lg mt-8 mb-6;
-		}
 	}
 
 	@media (max-width: 480px) {
 		.homepage-container {
-			@apply pt-5;
+			@apply pt-0;
+		}
+
+		.homepage-intro {
+			@apply p-0;
+		}
+
+		.intro-content {
+			@apply py-5 px-4;
+		}
+
+		.artists-section {
+			@apply px-4;
 		}
 
 		.collection-title {
@@ -236,7 +305,7 @@
 		}
 
 		.collection-description {
-			@apply text-base mt-6 mb-4;
+			@apply text-lg mt-6 mb-6 pb-6;
 		}
 
 		.artist-row {

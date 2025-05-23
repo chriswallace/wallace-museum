@@ -1,493 +1,843 @@
 <script lang="ts">
-	import {
-		nfts,
-		isLoading,
-		walletAddress,
-		nftType,
-		selectedNfts,
-		updatedNfts,
-		reviewData,
-		selectAllChecked,
-		currentStep,
-		isModalOpen,
-		type Artwork
-	} from '$lib/stores';
+	import { nfts, isLoading, walletAddress, isModalOpen, type Artwork } from '$lib/stores';
 
-	import { closeModal } from '$lib/modal';
-	import EditableCollectionTable from '$lib/components/EditableCollectionTable.svelte';
-	import FinalImportStep from '$lib/components/FinalImportStep.svelte';
-
-	import {
-		finalizeImport,
-		nextStep,
-		openReviewModal,
-		handleCollectionSave
-	} from '$lib/importHandler';
-
-	import { intersectionObserver } from '$lib/intersectionObserver';
+	import WalletAddressManager from '$lib/components/WalletAddressManager.svelte';
+	import { finalizeImport } from '$lib/importHandler';
 	import { get } from 'svelte/store';
+	import { onMount } from 'svelte';
+	import { toast } from '@zerodevx/svelte-toast';
+	import { extractCidsFromArtwork } from '$lib/pinataClientHelpers';
+	import { writable } from 'svelte/store';
 
-	// Define a type that's compatible with the Artwork type in the store
-	// but has additional properties we need for the NFT importer
-	interface ImportNft {
-		id: number;
-		title: string; // corresponds to name in API response
-		description: string;
-		image_url?: string; // no null in Artwork
-		animation_url?: string; // no null in Artwork
-		mime?: string; // no null in Artwork
-		// Other Artwork properties...
-
-		// NFT-specific fields not in Artwork
-		name?: string; // for backward compatibility
-		tokenID?: string;
-		platform?: string;
-		artist?: {
-			address: string;
-			username: string;
-		};
-		tags?: string[];
-		website?: string;
-		attributes?: any[];
-		collection?: {
-			name: string;
-			contract?: string;
-			blockchain: string;
-		};
-		symbol?: string;
-		updated_at?: string;
-		is_disabled?: boolean;
-		is_nsfw?: boolean;
+	// Function to handle image loading errors
+	function handleImageError(event: Event) {
+		const img = event.currentTarget as HTMLImageElement;
+		img.src = '/images/wallace-museum.png';
 	}
 
-	let loadingImageUrl = '/images/medici-image.png';
+	// Get saved wallet addresses from the page data
+	export let data;
+	let savedWalletAddresses = data.walletAddresses || [];
+	let showAddressManager = false;
 
-	// Explicitly type nextCursor
-	let nextCursor: string | null = null;
-	const limit: number = 200;
-	let previousWallet: string = '';
-	let searchTerm: string = ''; // Add state for search term
-	let currentOffset: number = 0; // Add state for Tezos offset
-	let hasMorePages: boolean = false; // Track if more pages exist (for Tezos)
+	// State for search
+	let searchResults: Artwork[] = [];
+	let searchTerm = '';
+	let isSearching = false;
+	let hasMore = false;
+	let currentOffset = 0;
+	let totalResults = 0;
+	let viewMode = 'grid'; // 'grid' or 'list'
+	let selectAll = false;
+	let isPinning = false;
 
-	// Add types for handleLazyLoad parameters
-	function handleLazyLoad(node: HTMLImageElement, { src }: { src: string }) {
-		node.src = loadingImageUrl;
+	// NEW: Use reactive stores for selection
+	const selectedIdsStore = writable<number[]>([]);
+	const selectedArtworksStore = writable<Artwork[]>([]);
 
-		const onEnter = () => {
-			const img = new Image();
-			img.src = src;
-			img.onload = () => {
-				node.src = src;
-			};
-		};
+	// Local variables for easier access
+	let selectedIds: number[] = [];
+	let selectedArtworks: Artwork[] = [];
 
-		// Add empty onLeave function
-		intersectionObserver(node, { onEnter, onLeave: () => {} });
-	}
+	// Subscribe to the stores
+	selectedIdsStore.subscribe((value) => {
+		selectedIds = value;
+	});
 
-	async function fetchNfts(loadMore: boolean = false) {
-		isLoading.set(true);
-		const wallet = $walletAddress;
-		let blockchain = 'opensea';
-		const currentSearchTerm = searchTerm; // Capture search term at start of fetch
+	selectedArtworksStore.subscribe((value) => {
+		selectedArtworks = value;
+	});
 
-		if (wallet.length > 0) {
-			const type = $nftType;
-			if (wallet.startsWith('tz')) {
-				blockchain = 'tezos';
-			}
+	// Force a UI update when needed
+	let selectionUpdateCounter = 0;
 
-			// Reset if not loading more OR if starting a new search
-			if (!loadMore) {
-				// Reset fully only if not loading more
-				nextCursor = null;
-				currentOffset = 0;
-				hasMorePages = false;
-				nfts.set([]);
-				selectAllChecked.set(false);
-				selectedNfts.set(new Set<number>());
-			}
+	// Intersection observer
+	let loadMoreTrigger: HTMLElement;
+	let observer: IntersectionObserver;
 
-			// Build API endpoint based on blockchain
-			let apiEndpoint = `/api/admin/import/${blockchain}/${wallet}/?type=${type}&limit=${limit}`;
-			if (blockchain === 'tezos') {
-				apiEndpoint += `&offset=${currentOffset}`;
+	// Add a state for showing settings panel
+	let showSettingsPanel = false;
+
+	// Add wallet address using API
+	async function handleAddWalletAddress(address: string, alias: string, blockchain: string) {
+		try {
+			const response = await fetch('/api/admin/wallets', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ address, blockchain, alias })
+			});
+
+			const data = await response.json();
+
+			if (data.success) {
+				savedWalletAddresses = data.walletAddresses;
+				showAddressManager = false;
 			} else {
-				// opensea (or default)
-				if (nextCursor && loadMore) {
-					apiEndpoint += `&next=${nextCursor}`;
-				}
+				console.error('Error adding wallet address:', data.error);
 			}
-			// Add search term if present
-			if (currentSearchTerm) {
-				apiEndpoint += `&search=${encodeURIComponent(currentSearchTerm)}`;
+		} catch (error) {
+			console.error('Error adding wallet address:', error);
+		}
+	}
+
+	// Remove wallet address using API
+	async function handleRemoveWalletAddress(address: string, blockchain: string) {
+		try {
+			const response = await fetch('/api/admin/wallets', {
+				method: 'DELETE',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ address, blockchain })
+			});
+
+			const data = await response.json();
+
+			if (data.success) {
+				savedWalletAddresses = data.walletAddresses;
+			} else {
+				console.error('Error removing wallet address:', data.error);
+			}
+		} catch (error) {
+			console.error('Error removing wallet address:', error);
+		}
+	}
+
+	// Search indexed artworks
+	async function searchArtworks(resetOffset = true) {
+		if (resetOffset) {
+			currentOffset = 0;
+			// Clear previous results if starting a new search
+			searchResults = [];
+			// Clear selection when starting a new search
+			selectedIdsStore.set([]);
+			selectedArtworksStore.set([]);
+			selectionUpdateCounter += 1;
+		}
+
+		isSearching = true;
+
+		try {
+			// Build the URL with query parameters
+			let url = `/api/admin/search?offset=${currentOffset}&limit=48`;
+
+			// Only add search term if it's not empty
+			if (searchTerm) {
+				url += `&q=${encodeURIComponent(searchTerm)}`;
 			}
 
-			try {
-				const response = await fetch(apiEndpoint);
-				if (response.ok) {
-					// Type the expected API response structure
-					const data: {
-						success: boolean;
-						nfts: any[]; // Use any[] for API response
-						next?: string | null; // Optional for OpenSea
-						limit?: number; // Optional for Tezos
-						offset?: number; // Optional for Tezos
-						hasMore?: boolean; // New field from server for Tezos
-					} = await response.json();
+			const response = await fetch(url);
+			const data = await response.json();
 
-					// Map API response to compatible Artwork objects
-					const mappedNfts = data.nfts.map((nft, idx) => {
-						// Create a simpler unique ID using contractAddress_tokenId format
-						let uniqueId = '';
-
-						// Get contract address (use fallbacks if not available)
-						const contractAddr =
-							nft.contract_address ||
-							nft.contractAddr ||
-							nft.collection?.contract ||
-							nft.contract ||
-							'unknown';
-
-						// Get token ID (use fallbacks if not available)
-						const tokenId = nft.tokenID || nft.token_id || nft.id || idx.toString();
-
-						// Create the unique ID in contractAddress_tokenId format
-						uniqueId = `${contractAddr}_${tokenId}`;
-
-						return {
-							...nft,
-							id: uniqueId,
-							title: nft.name || 'Untitled',
-							description: nft.description || '',
-							image_url: nft.image_url || undefined,
-							animation_url: nft.animation_url || undefined
-						} as Artwork;
-					});
-
-					// Update the store
-					nfts.update((current) => {
-						const existingIds = new Set(current.map((item) => item.id));
-						const newNfts = mappedNfts.filter((nft) => !existingIds.has(nft.id));
-						return loadMore ? [...current, ...newNfts] : newNfts;
-					});
-
-					// Update pagination state based on blockchain
-					if (blockchain === 'tezos') {
-						const returnedCount = data.nfts?.length || 0;
-						const responseLimit = data.limit || limit; // Use response limit or default
-
-						// Use hasMore flag from server if available, otherwise calculate it
-						hasMorePages =
-							data.hasMore !== undefined ? data.hasMore : returnedCount >= responseLimit;
-
-						currentOffset = (data.offset ?? currentOffset) + returnedCount;
-						nextCursor = null; // Ensure cursor is null for Tezos
-					} else {
-						// Use nullish coalescing to handle potential undefined
-						nextCursor = data.next ?? null;
-						hasMorePages = !!nextCursor; // Or simply check if cursor exists
-					}
+			if (data.success) {
+				if (resetOffset) {
+					searchResults = data.results;
 				} else {
-					console.error('Failed to fetch NFTs');
-					nextCursor = null;
-					hasMorePages = false;
+					// For pagination, keep existing results and add new ones
+					searchResults = [...searchResults, ...data.results];
 				}
-			} catch (error) {
-				console.error('Error fetching NFTs:', error);
-				nextCursor = null;
-				hasMorePages = false;
-			} finally {
-				isLoading.set(false);
-			}
-		}
-	}
 
-	function handleWalletChange() {
-		if ($walletAddress !== previousWallet) {
-			nfts.set([]);
-			nextCursor = null;
-			previousWallet = $walletAddress;
-			selectAllChecked.set(false);
-			selectedNfts.set(new Set<number>());
-			searchTerm = ''; // Clear search term on wallet change
-			currentOffset = 0; // Reset offset on wallet change
-			hasMorePages = false;
-		}
-	}
+				// If we already have selected items, filter out any that are no longer in the search results
+				if (selectedIds.length > 0) {
+					// Get all current result IDs
+					const resultIds = searchResults.map((art) => art.id);
 
-	// Add type for toggleSelection index
-	function toggleSelection(index: number) {
-		selectedNfts.update((current) => {
-			const newSet = new Set(current);
-			if (newSet.has(index)) {
-				newSet.delete(index);
+					// Filter selected items to only include those still in the results
+					selectedIdsStore.update((ids) => ids.filter((id) => resultIds.includes(id)));
+					selectedArtworksStore.update((artworks) =>
+						artworks.filter((art) => resultIds.includes(art.id))
+					);
+					selectionUpdateCounter += 1;
+				}
+
+				hasMore = data.pagination.hasMore;
+				currentOffset = currentOffset + data.results.length;
+				totalResults = data.pagination.total;
 			} else {
-				newSet.add(index);
+				console.error('Search failed:', data.error);
 			}
-			// Ensure get(nfts) returns Artwork[] before accessing length
-			selectAllChecked.set(newSet.size === get(nfts).length);
-			return newSet;
-		});
-	}
-
-	// Add type for toggleSelectAll event
-	function toggleSelectAll(event: Event) {
-		// Type cast target to HTMLInputElement
-		const isChecked = (event.target as HTMLInputElement).checked;
-		selectAllChecked.set(isChecked);
-		if (isChecked) {
-			// Ensure get(nfts) returns Artwork[] before mapping
-			selectedNfts.set(new Set(get(nfts).map((_, index) => index)));
-		} else {
-			selectedNfts.set(new Set<number>()); // Type the Set
+		} catch (error) {
+			console.error('Error searching artworks:', error);
+		} finally {
+			isSearching = false;
 		}
 	}
 
-	// Separate handler for select change
-	function handleTypeChange() {
-		searchTerm = ''; // Clear search on type change
-		fetchNfts(false);
+	// Load more results
+	function loadMore() {
+		if (!isSearching && hasMore) {
+			searchArtworks(false);
+		}
 	}
 
-	function handleFetchClick() {
-		// Explicitly trigger fetch, resetting pagination/results
-		fetchNfts(false);
+	// NEW: Simple selection functions
+	function toggleSelection(artwork: Artwork) {
+		const index = selectedIds.indexOf(artwork.id);
+		if (index === -1) {
+			// Add to selection
+			selectedIdsStore.update((ids) => [...ids, artwork.id]);
+			selectedArtworksStore.update((artworks) => [...artworks, artwork]);
+		} else {
+			// Remove from selection
+			selectedIdsStore.update((ids) => ids.filter((id) => id !== artwork.id));
+			selectedArtworksStore.update((artworks) => artworks.filter((a) => a.id !== artwork.id));
+		}
+		// Force UI update
+		selectionUpdateCounter += 1;
 	}
 
+	function toggleSelectAll() {
+		if (selectedIds.length === searchResults.length) {
+			// Deselect all
+			selectedIdsStore.set([]);
+			selectedArtworksStore.set([]);
+		} else {
+			// Select all
+			selectedIdsStore.set(searchResults.map((a) => a.id));
+			selectedArtworksStore.set([...searchResults]);
+		}
+		// Force UI update
+		selectionUpdateCounter += 1;
+	}
+
+	function isSelected(artwork: Artwork) {
+		return selectedIds.includes(artwork.id);
+	}
+
+	// Handle import of selected NFTs
 	async function handleImportSelected() {
-		const allNfts = get(nfts);
-		const selectedIndices = Array.from(get(selectedNfts));
+		if (selectedArtworks.length === 0) return;
 
-		// Map selected NFTs to the format needed for import
-		const selectedNftsForImport = selectedIndices.map((index) => {
-			const nft = allNfts[index];
-			return {
-				...nft,
-				contractAddr: nft.collection?.contract || nft.contractAddr,
-				contractAlias: nft.collection?.name || nft.contractAlias
-			};
-		});
+		try {
+			// Store imported IDs to remove from selection later
+			const importedIds = selectedArtworks.map((art) => art.id);
 
-		// Set the NFTs to be imported
-		updatedNfts.set(selectedNftsForImport);
+			await finalizeImport(selectedArtworks);
 
-		// Start the import process directly
-		await finalizeImport();
+			// Clear selection after import
+			selectedIdsStore.set([]);
+			selectedArtworksStore.set([]);
+			selectionUpdateCounter += 1;
+
+			// Refresh the search results to remove imported items
+			await searchArtworks(true);
+		} catch (error) {
+			console.error('Error importing NFTs:', error);
+			toast.push(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	// Pin selected NFTs to Pinata
+	async function handlePinSelected() {
+		if (selectedArtworks.length === 0) return;
+
+		isPinning = true;
+		toast.push(`Pinning IPFS content for ${selectedArtworks.length} selected NFTs...`);
+
+		try {
+			const formData = new FormData();
+			formData.append('artworks', JSON.stringify(selectedArtworks));
+
+			const response = await fetch('?/pinArtworks', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				const { total, successful, failed, duplicates } = result.summary;
+				toast.push(
+					`Successfully processed ${total} CIDs (${successful} pinned, ${duplicates} already pinned, ${failed} failed)`
+				);
+			} else {
+				toast.push(`Error: ${result.error || 'Failed to pin content'}`);
+			}
+		} catch (error) {
+			console.error('Error pinning NFTs:', error);
+			toast.push(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		} finally {
+			isPinning = false;
+		}
+	}
+
+	// Setup intersection observer for infinite scroll
+	function setupIntersectionObserver() {
+		if (observer) observer.disconnect();
+
+		observer = new IntersectionObserver(
+			(entries) => {
+				const [entry] = entries;
+				if (entry.isIntersecting && hasMore && !isSearching) {
+					loadMore();
+				}
+			},
+			{
+				root: null,
+				rootMargin: '200px', // Load more when within 200px of the bottom
+				threshold: 0.1
+			}
+		);
+
+		if (loadMoreTrigger) {
+			observer.observe(loadMoreTrigger);
+		}
+	}
+
+	// Initial search on mount
+	onMount(() => {
+		searchArtworks();
+		return () => {
+			if (observer) observer.disconnect();
+		};
+	});
+
+	// Update observer when results or hasMore changes
+	$: if (loadMoreTrigger && hasMore) {
+		setupIntersectionObserver();
+	}
+
+	// Update selectAll status when selection changes
+	$: selectAll = searchResults.length > 0 && selectedIds.length === searchResults.length;
+
+	// Function to run the indexer
+	async function runIndexer(forceRefresh: boolean) {
+		try {
+			toast.push('Starting indexer...');
+
+			const url = `/api/admin/run-indexer${forceRefresh ? '?force=true' : ''}`;
+			const response = await fetch(url);
+			const result = await response.json();
+
+			if (result.success) {
+				toast.push('Indexer completed successfully!');
+
+				// Calculate summary stats
+				let totalIndexed = 0;
+				let totalCached = 0;
+				let totalNew = 0;
+
+				result.results?.forEach((wallet: any) => {
+					totalIndexed += wallet.indexed || 0;
+					totalCached += wallet.cached || 0;
+					totalNew += wallet.new || 0;
+				});
+
+				toast.push(`Indexed ${totalIndexed} NFTs (${totalNew} new, ${totalCached} cached)`);
+
+				// Refresh the search results
+				await searchArtworks(true);
+			} else {
+				toast.push(`Error: ${result.error || 'Unknown error'}`);
+			}
+		} catch (error) {
+			console.error('Error running indexer:', error);
+			toast.push(`Error: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
+	// Check if an artwork has IPFS content
+	function hasIpfsContent(artwork: Artwork): boolean {
+		const cids = extractCidsFromArtwork(artwork);
+		return cids.length > 0;
 	}
 </script>
 
-<svelte:head>
-	<title>Import NFTs</title>
-</svelte:head>
+<div class="px-4 py-6 pb-20">
+	<div class="flex justify-between items-center mb-6">
+		<div>
+			<h1 class="text-2xl font-bold mb-2">Import NFTs</h1>
+			<p class="text-gray-600 dark:text-gray-400">
+				Import NFTs from indexed wallets into your Compendium.
+			</p>
+		</div>
 
-<h1>Import NFTs</h1>
-
-<p class="subheading">Enter your wallet address to fetch and import NFTs into your Compendium.</p>
-
-<div>
-	<div class="flex mb-8 gap-2">
-		<select class="flex-shrink w-auto mb-0 px-4" bind:value={$nftType} on:change={handleTypeChange}>
-			<option value="collected">Collected</option>
-			<option value="created">Created</option>
-		</select>
-
-		<input
-			class="search flex-grow"
-			type="text"
-			bind:value={$walletAddress}
-			placeholder="Wallet Address"
-			on:input={handleWalletChange}
-		/>
-		<input
-			class="search flex-grow"
-			type="text"
-			bind:value={searchTerm}
-			placeholder="Search by name..."
-		/>
-		<button class="primary button flex-shrink mt-0" on:click={handleFetchClick}>Fetch NFTs</button>
+		<div class="flex items-center gap-3">
+			<!-- Settings button -->
+			<button
+				class="secondary button py-2 px-3"
+				on:click={() => (showSettingsPanel = !showSettingsPanel)}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					class="inline-block mr-1"
+				>
+					<circle cx="12" cy="12" r="3"></circle>
+					<path
+						d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+					></path>
+				</svg>
+				Settings
+			</button>
+		</div>
 	</div>
 
-	<div class="relative">
-		{#if $isLoading}
-			<img class="loading" src="/images/loading.png" alt="Loading" />
-		{:else if $nfts.length > 0}
-			<div class="selection-header">
-				<div class="number-found">
-					<div>
-						{$nfts.length} NFTs found
-					</div>
-					<label>
-						<input
-							class="inline w-auto"
-							type="checkbox"
-							bind:checked={$selectAllChecked}
-							on:click={toggleSelectAll}
-						/>
-						Select all
-					</label>
+	<!-- Settings panel (collapsible) -->
+	{#if showSettingsPanel}
+		<div
+			class="bg-white dark:bg-gray-800 p-4 rounded-md shadow-sm mb-6 transition-all duration-200"
+		>
+			<div class="mb-4">
+				<h3 class="font-medium text-lg mb-2">Indexer Controls</h3>
+				<div class="flex gap-3">
+					<button class="secondary button py-2 px-4" on:click={() => runIndexer(false)}>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5 mr-1 inline-block"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+							/>
+						</svg>
+						Normal Refresh
+					</button>
+					<button class="secondary button py-2 px-4" on:click={() => runIndexer(true)}>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5 mr-1 inline-block"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+							/>
+						</svg>
+						Force Refresh All
+					</button>
 				</div>
-				<button
-					class="primary button"
-					on:click={handleImportSelected}
-					disabled={$selectedNfts.size === 0}
+			</div>
+
+			<div>
+				<h3 class="font-medium text-lg mb-2">Wallet Management</h3>
+				<button class="secondary button py-2 px-4" on:click={() => (showAddressManager = true)}>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-5 w-5 mr-1 inline-block"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+						/>
+					</svg>
+					Edit Wallet Addresses
+					<span class="ml-1 text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">
+						{savedWalletAddresses.length}
+					</span>
+				</button>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Search and Filters -->
+	<div class="bg-white dark:bg-gray-800 p-4 rounded-md shadow-sm mb-6">
+		<div class="flex gap-4 items-end flex-wrap md:flex-nowrap">
+			<!-- Search input -->
+			<div class="w-full md:flex-grow">
+				<label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+					>Search</label
 				>
-					Import {$selectedNfts.size} Selected
+				<div class="relative">
+					<input
+						id="search"
+						type="text"
+						class="w-full p-2 pl-9 border dark:border-gray-700 rounded-md dark:bg-gray-700 dark:text-gray-100"
+						placeholder="Search by name, description, token ID, blockchain..."
+						bind:value={searchTerm}
+						on:keydown={(e) => e.key === 'Enter' && searchArtworks()}
+					/>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-5 w-5 absolute left-2 top-2.5 text-gray-400"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+						/>
+					</svg>
+				</div>
+			</div>
+
+			<!-- Select all button -->
+			<div class="flex-shrink-0">
+				<button class="secondary button py-2 px-4" on:click={toggleSelectAll}>
+					{selectAll ? 'Deselect All' : 'Select All'}
 				</button>
 			</div>
 
-			<div class="nft-gallery">
-				{#each $nfts as nft, index (nft.id)}
-					<button
-						class="nft-card {$selectedNfts.has(index) ? 'selected' : ''}"
-						on:click={() => toggleSelection(index)}
-					>
-						{#if nft.image_url && nft.image_url.endsWith('.mp4')}
-							<video autoplay playsinline muted loop>
-								<source src={nft.image_url} type="video/mp4" />
-							</video>
-						{:else if nft.animation_url && nft.animation_url.endsWith('mp4')}
-							<video autoplay playsinline muted loop>
-								<source src={nft.animation_url} type="video/mp4" />
-							</video>
-						{:else if nft.image_url}
-							<img
-								use:handleLazyLoad={{ src: nft.image_url }}
-								alt={nft.title}
-								class="nft-image"
-								on:error={(e) => {
-									e.target.src = loadingImageUrl;
-								}}
-							/>
-						{:else if nft.animation_url}
-							<img
-								use:handleLazyLoad={{ src: nft.animation_url }}
-								alt={nft.title}
-								class="nft-image"
-								on:error={(e) => {
-									e.target.src = loadingImageUrl;
-								}}
-							/>
-						{:else}
-							<div
-								class="nft-image bg-gray-200 aspect-square flex items-center text-center justify-center"
-							>
-								No Image
-							</div>
-						{/if}
-						<div class="inner-container">
-							<h3>{nft.title}</h3>
-						</div>
-					</button>
-				{/each}
+			<!-- Search button -->
+			<div class="flex-shrink-0">
+				<button
+					class="primary button py-2 px-6"
+					on:click={() => searchArtworks()}
+					disabled={isSearching}
+				>
+					{isSearching ? 'Searching...' : 'Search'}
+				</button>
 			</div>
-
-			<div class="load-more-container">
-				{#if nextCursor || hasMorePages}
-					<button class="secondary button" on:click={() => fetchNfts(true)} disabled={$isLoading}>
-						{#if $isLoading}Loading...{:else}Load More{/if}
-					</button>
-				{/if}
-			</div>
-		{/if}
+		</div>
 	</div>
 
-	{#if $isModalOpen}
-		{#if $currentStep === 1}
-			<EditableCollectionTable
-				title="Review/edit {$reviewData.collections.length} collections to be imported"
-				items={$reviewData.collections}
-				onSave={handleCollectionSave}
-				onNext={nextStep}
-				onClose={closeModal}
-			/>
-		{:else if $currentStep === 2}
-			<FinalImportStep
-				title="Review and finalize import"
-				nfts={$updatedNfts}
-				onCompleteImport={finalizeImport}
-				onClose={closeModal}
-			/>
+	<!-- Results -->
+	<div>
+		{#if searchResults.length === 0}
+			<div class="bg-white dark:bg-gray-800 p-8 rounded-md shadow-sm text-center">
+				{#if isSearching}
+					<p class="text-gray-600 dark:text-gray-400">Searching...</p>
+				{:else}
+					<p class="text-gray-600 dark:text-gray-400">No results found. Try a different search.</p>
+				{/if}
+			</div>
+		{:else}
+			<!-- Result count and view toggle -->
+			<div class="mb-4 flex justify-between items-center">
+				<div class="text-gray-600 dark:text-gray-400">
+					Found {totalResults} result{totalResults !== 1 ? 's' : ''}
+				</div>
+
+				<!-- Radix-inspired view toggle -->
+				<div class="flex rounded-md overflow-hidden border border-gray-200 dark:border-gray-700">
+					<button
+						class="flex items-center justify-center px-3 py-1.5 h-9 w-9 transition-colors relative {viewMode ===
+						'grid'
+							? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+							: 'bg-white text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}"
+						on:click={() => (viewMode = 'grid')}
+						title="Grid View"
+						aria-label="Grid View"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<rect x="3" y="3" width="7" height="7"></rect>
+							<rect x="14" y="3" width="7" height="7"></rect>
+							<rect x="14" y="14" width="7" height="7"></rect>
+							<rect x="3" y="14" width="7" height="7"></rect>
+						</svg>
+					</button>
+					<button
+						class="flex items-center justify-center px-3 py-1.5 h-9 w-9 transition-colors relative {viewMode ===
+						'list'
+							? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
+							: 'bg-white text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}"
+						on:click={() => (viewMode = 'list')}
+						title="List View"
+						aria-label="List View"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<line x1="8" y1="6" x2="21" y2="6"></line>
+							<line x1="8" y1="12" x2="21" y2="12"></line>
+							<line x1="8" y1="18" x2="21" y2="18"></line>
+							<line x1="3" y1="6" x2="3.01" y2="6"></line>
+							<line x1="3" y1="12" x2="3.01" y2="12"></line>
+							<line x1="3" y1="18" x2="3.01" y2="18"></line>
+						</svg>
+					</button>
+				</div>
+			</div>
+
+			<!-- Grid View -->
+			{#if viewMode === 'grid'}
+				<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+					{#each searchResults as artwork (artwork.id + '-' + selectionUpdateCounter)}
+						<!-- svelte-ignore a11y-click-events-have-key-events -->
+						<div
+							class="bg-white dark:bg-gray-800 rounded-md shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow {isSelected(
+								artwork
+							)
+								? 'ring-2 ring-blue-500'
+								: ''}"
+							on:click={() => toggleSelection(artwork)}
+							role="button"
+							tabindex="0"
+						>
+							<div class="relative pb-[100%]">
+								<img
+									src={artwork.image_url || '/images/wallace-museum.png'}
+									alt={artwork.title}
+									class="absolute inset-0 w-full h-full object-cover"
+									on:error={handleImageError}
+								/>
+
+								<!-- Selection indicator -->
+								{#if isSelected(artwork)}
+									<div
+										class="absolute top-2 right-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="16"
+											height="16"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="20 6 9 17 4 12"></polyline>
+										</svg>
+									</div>
+								{/if}
+
+								<!-- IPFS indicator if artwork has IPFS content -->
+								{#if hasIpfsContent(artwork)}
+									<div
+										class="absolute bottom-2 right-2 bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
+										title="Contains IPFS content"
+									>
+										<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+											<path
+												d="M12 2L4 6V12C4 15.31 7.58 18.5 12 20C16.42 18.5 20 15.31 20 12V6L12 2Z"
+											/>
+										</svg>
+									</div>
+								{/if}
+							</div>
+							<div class="p-3">
+								<h3 class="font-medium truncate dark:text-gray-100" title={artwork.title}>
+									{artwork.title}
+								</h3>
+								<div class="text-xs text-gray-500 dark:text-gray-400 truncate">
+									{artwork.contractAlias || artwork.contractAddr?.substring(0, 10) + '...'}
+								</div>
+								{#if artwork.blockchain}
+									<div class="mt-1">
+										<span
+											class="blockchain-badge px-2 py-1 text-xs font-semibold rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+										>
+											{artwork.blockchain}
+										</span>
+									</div>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
+			{:else}
+				<!-- List View -->
+				<div class="overflow-x-auto">
+					<table class="w-full border-collapse bg-white dark:bg-gray-800 rounded-md shadow-sm">
+						<thead>
+							<tr class="bg-gray-50 dark:bg-gray-700">
+								<th class="p-3 text-left dark:text-gray-300 w-10">
+									<input
+										type="checkbox"
+										checked={selectAll}
+										on:change={toggleSelectAll}
+										class="checkbox"
+									/>
+								</th>
+								<th class="p-3 text-left dark:text-gray-300">Image</th>
+								<th class="p-3 text-left dark:text-gray-300">Title</th>
+								<th class="p-3 text-left dark:text-gray-300">Contract</th>
+								<th class="p-3 text-left dark:text-gray-300">Blockchain</th>
+								<th class="p-3 text-left dark:text-gray-300">Storage</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+							{#each searchResults as artwork (artwork.id + '-' + selectionUpdateCounter)}
+								<tr
+									class="{isSelected(artwork)
+										? 'bg-blue-50 dark:bg-blue-900/30'
+										: 'dark:bg-gray-800'} cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+									on:click={() => toggleSelection(artwork)}
+								>
+									<td class="p-3">
+										<input
+											type="checkbox"
+											checked={isSelected(artwork)}
+											class="checkbox"
+											on:change={(e) => {
+												e.stopPropagation();
+												toggleSelection(artwork);
+											}}
+											on:click={(e) => e.stopPropagation()}
+										/>
+									</td>
+									<td class="p-3 w-16">
+										<div class="w-12 h-12 overflow-hidden rounded-md">
+											<img
+												src={artwork.image_url || '/images/wallace-museum.png'}
+												alt={artwork.title}
+												class="w-full h-full object-cover"
+												on:error={handleImageError}
+											/>
+										</div>
+									</td>
+									<td class="p-3">
+										<div class="font-medium dark:text-gray-100">{artwork.title}</div>
+										<div class="text-xs text-gray-500 dark:text-gray-400">
+											ID: {artwork.tokenID}
+										</div>
+									</td>
+									<td class="p-3 dark:text-gray-300">
+										{artwork.contractAlias || artwork.contractAddr?.substring(0, 10) + '...'}
+									</td>
+									<td class="p-3">
+										{#if artwork.blockchain}
+											<span
+												class="blockchain-badge px-2 py-1 text-xs font-semibold rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+											>
+												{artwork.blockchain}
+											</span>
+										{/if}
+									</td>
+									<td class="p-3">
+										{#if hasIpfsContent(artwork)}
+											<span
+												class="blockchain-badge px-2 py-1 text-xs font-semibold rounded-md bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+											>
+												IPFS
+											</span>
+										{/if}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
+
+			<!-- Intersection observer trigger element -->
+			<div bind:this={loadMoreTrigger} class="h-10 mt-4"></div>
+
+			<!-- Loading indicator (only shown when actively loading more) -->
+			{#if isSearching && currentOffset > 0}
+				<div class="mt-4 text-center">
+					<div
+						class="inline-block animate-spin h-6 w-6 border-2 border-gray-500 border-t-transparent rounded-full"
+					></div>
+					<p class="text-gray-600 dark:text-gray-400 mt-2">Loading more...</p>
+				</div>
+			{/if}
 		{/if}
-	{/if}
+	</div>
 </div>
 
-<style lang="scss">
-	.loading {
-		@apply mx-auto w-[40px] h-[40px] my-16;
-	}
-	.nft-gallery {
-		@apply grid gap-4 grid-cols-6 p-6 border-l border-r border-b border-gray-200 bg-white rounded-b-sm;
-	}
+<!-- Fixed Action Shelf -->
+{#if selectedIds.length > 0}
+	<div
+		class="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-50 transition-all transform translate-y-0 duration-200 ease-in-out"
+	>
+		<div class="container mx-auto px-4 py-3 flex items-center justify-between">
+			<div class="flex items-center">
+				<div class="text-blue-600 dark:text-blue-400 font-semibold">
+					{selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
+				</div>
+			</div>
 
-	.load-more-container {
-		@apply text-center mt-4;
+			<div class="flex items-center gap-4">
+				<!-- Pin to IPFS button -->
+				<button
+					class="secondary button py-2 px-4 flex items-center"
+					on:click={handlePinSelected}
+					disabled={selectedIds.length === 0 || isPinning}
+				>
+					{#if isPinning}
+						<div
+							class="inline-block animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2"
+						></div>
+						Pinning...
+					{:else}
+						<svg
+							class="h-5 w-5 mr-1"
+							viewBox="0 0 24 24"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<path
+								d="M12 2L4 6V12C4 15.31 7.58 18.5 12 20C16.42 18.5 20 15.31 20 12V6L12 2Z"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+						</svg>
+						Pin to IPFS
+					{/if}
+				</button>
 
-		.button {
-			@apply py-2 px-4 bg-blue-500 text-white rounded-md;
-		}
-	}
+				<!-- Import button -->
+				<button
+					class="primary button py-2 px-6 text-lg"
+					on:click={handleImportSelected}
+					disabled={selectedIds.length === 0}
+				>
+					Import Selected ({selectedIds.length})
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
 
-	.nft-card {
-		@apply relative outline outline-gray-200 outline-2 outline-offset-0 rounded-sm cursor-pointer transition-all relative p-0;
+<!-- Modal for Wallet Address Management -->
+{#if showAddressManager}
+	<WalletAddressManager
+		addresses={savedWalletAddresses}
+		onClose={() => (showAddressManager = false)}
+		onAdd={handleAddWalletAddress}
+		onRemove={handleRemoveWalletAddress}
+	/>
+{/if}
 
-		&:after {
-			@apply absolute top-4 right-4 w-[24px] h-[24px] z-10 bg-white rounded-full text-center text-sm;
-			content: '';
-		}
-
-		&.selected {
-			@apply outline outline-primary outline-2 outline-offset-0;
-
-			&:after {
-				@apply bg-green-500 text-white;
-				content: '\2713';
-			}
-		}
-
-		&:after {
-			@apply absolute top-3 right-3 w-[24px] h-[24px] z-10 bg-white border-transparent border rounded-full;
-			content: '';
-		}
-
-		.inner-container {
-			@apply p-3 pt-2;
-		}
-
-		img,
-		video {
-			@apply w-full rounded-t-sm mb-1 aspect-square object-contain text-center bg-gray-200;
-		}
-
-		h3 {
-			@apply text-[15px] truncate max-w-full font-normal my-0 leading-normal;
-		}
-	}
-
-	.selection-header {
-		@apply flex sticky top-0 bg-white py-2 items-center justify-between z-20 px-4 mb-0 rounded-t-md border border-gray-200;
-
-		.number-found {
-			div {
-				@apply inline pr-3 mr-3 h-full whitespace-nowrap border-r border-gray-400;
-			}
-		}
-
-		label {
-			@apply font-normal inline;
-		}
-
-		input[type='checkbox'] {
-			@apply mb-0 mr-2;
-		}
-
-		button {
-			@apply py-2 px-4;
-		}
+<style>
+	.icon-button {
+		@apply transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-600;
 	}
 
-	.search {
-		@apply mb-0;
+	.blockchain-badge {
+		display: inline-block;
+	}
+
+	.checkbox {
+		@apply w-5 h-5 border-2 border-gray-300 dark:border-gray-600 rounded-md checked:bg-blue-500 checked:border-blue-500;
 	}
 </style>

@@ -15,6 +15,14 @@
 		artwork: Artwork;
 	}
 
+	interface ArtistAddress {
+		id: number;
+		address: string;
+		blockchain: string;
+		createdAt: Date;
+		updatedAt: Date;
+	}
+
 	interface Artist {
 		id: number;
 		name: string;
@@ -24,6 +32,7 @@
 		twitterHandle: string | null;
 		instagramHandle: string | null;
 		ArtistArtworks: ArtistArtwork[];
+		addresses: ArtistAddress[];
 	}
 
 	interface Collection {
@@ -43,12 +52,18 @@
 		websiteUrl: null,
 		twitterHandle: null,
 		instagramHandle: null,
-		ArtistArtworks: []
+		ArtistArtworks: [],
+		addresses: []
 	};
 
 	let collections: Collection[] = [];
 	let error = '';
 	let isLoading = true;
+
+	// Create a reactive title variable
+	$: pageTitle = artist.name
+		? `Edit ${artist.name} | Wallace Museum Admin`
+		: 'Edit Artist | Wallace Museum Admin';
 
 	function goBack() {
 		history.back();
@@ -85,7 +100,7 @@
 </script>
 
 <svelte:head>
-	<title>Edit Artist</title>
+	<title>{pageTitle}</title>
 </svelte:head>
 
 <div class="container">

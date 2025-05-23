@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getCloudinaryImageUrl } from '$lib/cloudinaryUtils';
-	import SkeletonLoader from './SkeletonLoader.svelte';
+	import LoaderWrapper from './LoaderWrapper.svelte';
 
 	interface Artwork {
 		animation_url?: string;
@@ -32,10 +32,15 @@
 
 <div class="artwork">
 	{#if isLoading}
-		<SkeletonLoader
-			height={artwork.dimensions ? `${artwork.dimensions.height}px` : '100%'}
-			width={artwork.dimensions ? `${artwork.dimensions.width}px` : '100%'}
-		/>
+		<div class="loader-container">
+			<LoaderWrapper
+				height={artwork.dimensions ? `${artwork.dimensions.height}px` : '100%'}
+				width={artwork.dimensions ? `${artwork.dimensions.width}px` : '100%'}
+				aspectRatio={artwork.dimensions
+					? `${artwork.dimensions.width} / ${artwork.dimensions.height}`
+					: '1 / 1'}
+			/>
+		</div>
 	{/if}
 
 	{#if artwork.animation_url}
@@ -79,6 +84,9 @@
 <style lang="scss">
 	.artwork {
 		@apply w-full relative;
+	}
+	.loader-container {
+		@apply w-full max-w-full overflow-hidden;
 	}
 	.live-code {
 		@apply w-full h-full aspect-square;

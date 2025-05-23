@@ -51,6 +51,27 @@
 	--toastContainerLeft: auto;
 }
 
+/* Dark mode colors using Tailwind's media query */
+@media (prefers-color-scheme: dark) {
+	:root {
+		--heading-color: #e0e0e0;
+		--text-color: #f5f5f5;
+		--background-without-opacity: #1c1c1c;
+		--logo-color: #f5f5f5;
+
+		--color-primary: hsl(99, 63%, 45%);
+		--color-secondary: #f5f5f5;
+
+		--button-color-background-primary: var(--color-primary);
+		--button-color-text-primary: #000000;
+		--button-color-background-primary-hover: hsl(99, 84%, 55%);
+		--button-color-text-primary-hover: #000000;
+
+		--input-color-background: #303030;
+		--input-color-text: #f5f5f5;
+	}
+}
+
 @layer base {
 	html {
 		@apply font-sans leading-6;
@@ -68,7 +89,7 @@
 	}
 
 	h1 a {
-		@apply text-black;
+		@apply text-black dark:text-white;
 	}
 
 	h2 {
@@ -80,7 +101,7 @@
 	}
 
 	h4 {
-		@apply text-base font-normal mb-8 text-gray-600;
+		@apply text-base font-normal mb-8 text-gray-600 dark:text-gray-300;
 	}
 
 	h1,
@@ -89,7 +110,7 @@
 	h4,
 	h5,
 	h6 {
-		@apply font-display;
+		@apply font-display dark:text-gray-100;
 		letter-spacing: 0;
 	}
 
@@ -100,15 +121,16 @@
 	body {
 		background-color: var(--background-without-opacity);
 		color: #1e1e1e;
+		@apply dark:text-gray-100;
 		font-family: var(--font-family);
 	}
 
 	.subheading {
-		@apply max-w-3xl mb-6 text-gray-500 text-lg;
+		@apply max-w-3xl mb-6 text-gray-500 dark:text-gray-400 text-lg;
 	}
 
 	.medici {
-		@apply font-semibold tracking-tight text-2xl mr-6 justify-self-start text-[#21401F];
+		@apply font-semibold tracking-tight text-2xl mr-6 justify-self-start text-[#21401F] dark:text-primary;
 	}
 
 	.content {
@@ -124,7 +146,7 @@
 	}
 
 	.primary {
-		@apply rounded-sm bg-primary whitespace-nowrap text-white font-semibold;
+		@apply rounded-sm bg-primary whitespace-nowrap text-white dark:text-black font-semibold;
 	}
 
 	.primary:hover {
@@ -132,7 +154,7 @@
 	}
 
 	.destructive {
-		@apply rounded-sm bg-red-500 border-red-500 whitespace-nowrap text-white font-semibold;
+		@apply rounded-sm bg-red-500 dark:bg-red-700 border-red-500 dark:border-red-700 whitespace-nowrap text-white font-semibold;
 	}
 
 	.link {
@@ -144,7 +166,11 @@
 	}
 
 	.ghost {
-		@apply bg-transparent text-gray-500 border border-gray-500;
+		@apply bg-transparent text-gray-500 dark:text-gray-300 border border-gray-500 dark:border-gray-600;
+	}
+
+	.ghost:hover {
+		@apply dark:bg-gray-700;
 	}
 
 	.edit {
@@ -152,11 +178,11 @@
 	}
 
 	.edit:hover {
-		@apply bg-primary text-white;
+		@apply bg-primary text-white dark:text-black;
 	}
 
 	button[disabled] {
-		@apply bg-gray-200 text-gray-400 cursor-not-allowed;
+		@apply bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed;
 	}
 
 	.subtitle {
@@ -164,7 +190,7 @@
 	}
 
 	.content .prose {
-		@apply max-w-full mb-12 text-lg text-stone-800 leading-loose;
+		@apply max-w-full mb-12 text-lg text-stone-800 dark:text-gray-300 leading-loose;
 	}
 
 	.large {
@@ -185,11 +211,11 @@
 	}
 
 	dt {
-		@apply font-bold col-span-2 pr-2;
+		@apply font-bold col-span-2 pr-2 dark:text-gray-300;
 	}
 
 	dd {
-		@apply col-span-3;
+		@apply col-span-3 dark:text-gray-400;
 	}
 }
 
@@ -209,7 +235,7 @@
 }
 
 .icon-button {
-	@apply inline-block p-0 align-baseline;
+	@apply inline-block p-0 align-baseline dark:invert;
 	width: 22px;
 	height: 22px;
 	background-size: 22px;
@@ -334,4 +360,231 @@
 			-10px -10px 0 5px,
 			-10px -10px 0 5px;
 	}
+}
+
+/* Form field structural styles */
+label,
+input,
+select,
+textarea {
+	@apply block w-full mb-2;
+}
+
+label {
+	@apply font-medium text-gray-700 dark:text-gray-300 mb-1;
+}
+
+input,
+select,
+textarea {
+	@apply mb-4;
+}
+
+textarea {
+	@apply h-32;
+}
+
+/* Form field color scheme styles */
+input,
+select,
+textarea,
+.form-field {
+	@apply bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:border-primary dark:focus:border-primary focus:outline-none;
+}
+
+/* Exception for checkboxes */
+input[type='checkbox'],
+input[type='radio'] {
+	@apply inline-block w-auto mr-2;
+}
+
+input[type='checkbox'] + label,
+input[type='radio'] + label {
+	@apply inline-block w-auto;
+}
+
+/* Form field size and padding styles */
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='number'],
+input[type='search'],
+input[type='tel'],
+input[type='url'],
+input[type='date'],
+textarea,
+select:not([multiple]) {
+	@apply px-3 py-2 rounded-sm;
+}
+
+select[multiple] {
+	@apply px-3 py-2 rounded-sm min-h-[150px];
+}
+
+input::placeholder,
+textarea::placeholder,
+select::placeholder {
+	@apply text-gray-500 dark:text-gray-400;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+	@apply border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-900;
+}
+
+input[type='checkbox']:checked,
+input[type='radio']:checked {
+	@apply bg-primary border-primary;
+}
+
+/* Small descriptive text under inputs */
+small {
+	@apply text-gray-600 dark:text-gray-400 text-sm block mt-1;
+}
+
+/* Additional styling for specific components in global styles */
+.additional-meta {
+	@apply py-4 px-8 bg-gray-200 dark:bg-gray-800 border dark:border-gray-700 dark:text-gray-300 rounded-md text-sm;
+}
+
+.filter-controls {
+	@apply bg-gray-100 dark:bg-gray-800 border dark:border-gray-700 dark:text-gray-300;
+}
+
+.filter-controls label {
+	@apply dark:text-gray-300;
+}
+
+.filter-controls input,
+.filter-controls select {
+	@apply bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 dark:text-gray-100;
+}
+
+.filter-controls .filter-group {
+	@apply border-gray-300 dark:border-gray-700;
+}
+
+.selected-indicator {
+	@apply bg-primary dark:text-black;
+}
+
+/* Non-editable content style */
+.non-editable {
+	@apply my-3;
+}
+
+.non-editable label {
+	@apply m-0 p-0 font-bold dark:text-gray-300;
+}
+
+.non-editable p {
+	@apply m-0 dark:text-gray-400;
+}
+
+/* Empty state styling */
+.empty {
+	@apply text-center pt-12 border-t-2 border-gray-200 dark:border-gray-700;
+}
+
+.empty p {
+	@apply text-center mx-auto dark:text-gray-400;
+}
+
+/* File uploader styling */
+.file-uploader {
+	@apply grid grid-cols-1 content-center justify-center bg-gray-200 dark:bg-gray-900 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-sm p-6 aspect-square;
+}
+
+.file-uploader input {
+	@apply w-auto align-middle mx-auto border border-gray-500 dark:border-gray-400 border-dashed;
+}
+
+.file-uploader label {
+	@apply text-center text-gray-500 dark:text-gray-300 italic text-sm;
+}
+
+/* Error and validation styles */
+.error,
+.validation-error {
+	@apply text-red-600 dark:text-red-400 text-sm mt-1;
+}
+
+.valid {
+	@apply text-green-600 dark:text-green-400;
+}
+
+/* Scrollbar styling for dark mode */
+@media (prefers-color-scheme: dark) {
+	.search-grid {
+		scrollbar-color: #444 #333;
+	}
+
+	.search-grid::-webkit-scrollbar-track {
+		background: #333;
+	}
+
+	.search-grid::-webkit-scrollbar-thumb {
+		background-color: #444;
+		border-color: #333;
+	}
+}
+
+/* Global card styling */
+.card,
+button.card {
+	@apply bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 dark:text-gray-200 shadow-sm dark:shadow-md;
+}
+
+.card:hover,
+button.card:hover {
+	@apply dark:bg-gray-700;
+}
+
+.card .title {
+	@apply dark:text-gray-100;
+}
+
+.card.active {
+	@apply dark:border-primary;
+}
+
+.card p {
+	@apply dark:text-gray-300;
+}
+
+/* Global panel styling */
+.panel {
+	@apply bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 dark:text-gray-200;
+}
+
+/* Collections and artwork grid styling */
+.collection-grid {
+	@apply dark:bg-transparent;
+}
+
+.cover-image-wrap {
+	@apply bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700;
+}
+
+.cover-image-grid {
+	@apply dark:bg-gray-900;
+}
+
+.card-header {
+	@apply bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 dark:text-gray-200;
+}
+
+.card-body {
+	@apply bg-white dark:bg-gray-800 dark:text-gray-200;
+}
+
+.card-footer {
+	@apply bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 dark:text-gray-200;
+}
+
+/* Toast styling */
+.svelte-toast {
+	--toastBackground: var(--background-without-opacity);
+	--toastColor: var(--text-color);
+	--toastBarBackground: var(--color-primary);
 }

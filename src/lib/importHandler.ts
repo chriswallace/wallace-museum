@@ -16,6 +16,7 @@ import ImportStatus from '$lib/components/ImportStatus.svelte';
 import { tick } from 'svelte';
 import { browser } from '$app/environment';
 import { openModal, closeModal } from '$lib/modal';
+import { indexArtwork } from './artworkIndexer';
 
 const totalSteps = 3;
 
@@ -33,6 +34,7 @@ interface ImportNft {
 	description: string;
 	image_url?: string;
 	animation_url?: string;
+	mime?: string;
 	contractAddr?: string;
 	contractAlias?: string;
 	tokenID?: string;
@@ -99,8 +101,9 @@ export function updateProgress(status: string, index: number) {
 	});
 }
 
-export async function finalizeImport() {
-	const updatedNftsArray = get(updatedNfts);
+export async function finalizeImport(artworksToImport?: Artwork[]) {
+	// Use provided artworks or get from store
+	const updatedNftsArray = artworksToImport || get(updatedNfts);
 
 	nftImportQueue.set(updatedNftsArray);
 	if (browser) {
@@ -123,6 +126,32 @@ export async function finalizeImport() {
 	await startImportProcess();
 }
 
+// Add a utility function to detect MIME type from URL pattern
+function detectMimeType(url: string): string | null {
+	// Check file extensions
+	if (url.match(/\.(mp4|webm|mov)$/i)) return 'video/mp4';
+	if (url.match(/\.(jpg|jpeg)$/i)) return 'image/jpeg';
+	if (url.match(/\.(png)$/i)) return 'image/png';
+	if (url.match(/\.(gif)$/i)) return 'image/gif';
+	if (url.match(/\.(webp)$/i)) return 'image/webp';
+	if (url.match(/\.(pdf)$/i)) return 'application/pdf';
+	if (url.match(/\.(html|htm)$/i)) return 'text/html';
+	if (url.match(/\.(js)$/i)) return 'application/javascript';
+
+	// Check for common interactive art platforms
+	if (url.includes('fxhash.xyz') || url.includes('generator.artblocks.io')) {
+		return 'text/html';
+	}
+
+	// Check for Cloudinary patterns
+	if (url.includes('cloudinary.com')) {
+		if (url.includes('/video/')) return 'video/mp4';
+		if (url.includes('/image/')) return 'image/jpeg';
+	}
+
+	return null;
+}
+
 async function importNft(nft: ImportNft) {
 	try {
 		let source = 'opensea';
@@ -132,12 +161,22 @@ async function importNft(nft: ImportNft) {
 			source = 'tezos';
 		}
 
+		// Ensure we have a MIME type for animation_url content
+		let mimeType = nft.mime;
+		if (!mimeType && nft.animation_url) {
+			const detectedMime = detectMimeType(nft.animation_url);
+			if (detectedMime) {
+				mimeType = detectedMime;
+			}
+		}
+
 		// Ensure NFT has the required fields
 		const nftToImport = {
 			...nft,
 			tokenID: nft.tokenID || nft.token_id || nft.id?.toString(),
 			name: nft.title || 'Untitled',
 			description: nft.description || '',
+			mime: mimeType,
 			collection: {
 				name: nft.collection,
 				contract: nft.contractAddr || nft.collection?.contract,
@@ -157,6 +196,18 @@ async function importNft(nft: ImportNft) {
 		}
 
 		const result = await response.json();
+
+		// Index the artwork if it was successfully imported
+		if (result?.artwork?.id) {
+			try {
+				await indexArtwork(result.artwork.id);
+				console.log(`Indexed artwork ${result.artwork.id}`);
+			} catch (indexError) {
+				console.error(`Failed to index artwork: ${indexError}`);
+				// Don't throw here - we don't want to fail the import just because indexing failed
+			}
+		}
+
 		return result;
 	} catch (error) {
 		console.error('Error importing NFT:', error);
@@ -190,7 +241,7 @@ export async function startImportProcess() {
 	}
 
 	hideImportToast();
-	selectedNfts.set(new Set());
+	selectedNfts.set(new Map());
 }
 
 export function handleCollectionSave(editedCollection: Collection, index: number) {
@@ -221,18 +272,21 @@ export async function openReviewModal() {
 
 export async function setTezReviewData() {
 	const allNfts = get(nfts);
-	const selectedIndices = Array.from(get(selectedNfts));
+	const selectedArtworks = Array.from(get(selectedNfts).values());
 	try {
 		let collectionsSet = new Set<string>();
 
-		selectedIndices.forEach((index) => {
-			const nft = allNfts[index];
-
+		selectedArtworks.forEach((nft) => {
 			if (nft?.contractAddr) {
+				const contractAliasName =
+					typeof nft.contractAlias === 'object' && nft.contractAlias !== null
+						? (nft.contractAlias as { name: string }).name
+						: nft.contractAlias;
+
 				collectionsSet.add(
 					JSON.stringify({
 						contract: nft.contractAddr,
-						name: nft.contractAlias,
+						name: contractAliasName,
 						description: ''
 					})
 				);
@@ -250,11 +304,11 @@ export async function setTezReviewData() {
 
 export async function setEthReviewData() {
 	const allNfts = get(nfts);
-	const selectedIndices = Array.from(get(selectedNfts));
+	const selectedArtworks = Array.from(get(selectedNfts).values());
 	const fetchUri = '/api/admin/nft-data/opensea/';
 
 	try {
-		const collectionIds = selectedIndices.map((index) => allNfts[index].contractAddr);
+		const collectionIds = selectedArtworks.map((nft) => nft.contractAddr).filter(Boolean);
 		const dataRequest = { collections: collectionIds };
 
 		if (!fetchUri) throw new Error('Invalid wallet address');
@@ -270,8 +324,7 @@ export async function setEthReviewData() {
 		const { data } = await response.json();
 		let collections: Collection[] = [];
 
-		selectedIndices.forEach((index) => {
-			const nft = allNfts[index];
+		selectedArtworks.forEach((nft) => {
 			const item = data.find((item: ApiResponse) => {
 				return (
 					item.collection?.contract === nft.contractAddr ||

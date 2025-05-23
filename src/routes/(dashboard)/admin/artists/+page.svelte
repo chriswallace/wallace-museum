@@ -76,7 +76,7 @@
 </script>
 
 <svelte:head>
-	<title>Artists</title>
+	<title>Artists | Wallace Museum Admin</title>
 </svelte:head>
 
 <h1>Artists <button class="ghost" on:click={addNew}>+ Add new</button></h1>
@@ -106,12 +106,8 @@
 {/if}
 
 <style lang="scss">
-	.avatar {
-		@apply border-2 border-white;
-	}
-
 	.card {
-		@apply p-4 bg-white shadow-md rounded-lg flex justify-between text-center items-center flex-col text-sm hover:scale-105 transition-transform;
+		@apply p-4 shadow-md rounded-lg flex justify-between text-center items-center flex-col text-sm hover:scale-105 transition-transform;
 	}
 
 	.empty {

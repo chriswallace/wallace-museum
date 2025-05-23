@@ -198,23 +198,23 @@
 		{/if}
 	</div>
 	<div class="md:col-span-2 space-y-4">
-		<div>
+		<div class="mb-4">
 			<label for="name">Name</label>
 			<input type="text" id="name" bind:value={artist.name} />
 		</div>
-		<div>
+		<div class="mb-4">
 			<label for="bio">Bio</label>
 			<textarea id="bio" bind:value={artist.bio}></textarea>
 		</div>
-		<div>
+		<div class="mb-4">
 			<label for="websiteUrl">Website</label>
 			<input type="url" id="websiteUrl" bind:value={artist.websiteUrl} />
 		</div>
-		<div>
+		<div class="mb-4">
 			<label for="twitterHandle">Twitter Handle</label>
 			<input type="text" id="twitterHandle" bind:value={artist.twitterHandle} />
 		</div>
-		<div>
+		<div class="mb-4">
 			<label for="instagramHandle">Instagram Handle</label>
 			<input type="text" id="instagramHandle" bind:value={artist.instagramHandle} />
 		</div>
@@ -225,14 +225,16 @@
 			{#if artist.addresses && artist.addresses.length > 0}
 				<div class="grid grid-cols-1 gap-4">
 					{#each artist.addresses as address}
-						<div class="flex items-center justify-between bg-gray-100 p-4 rounded-lg">
+						<div
+							class="flex items-center justify-between bg-gray-100 dark:bg-gray-700 p-4 rounded-lg"
+						>
 							<div>
 								<p class="font-mono">{address.address}</p>
-								<p class="text-sm text-gray-600">{address.blockchain}</p>
+								<p class="text-sm text-gray-600 dark:text-gray-300">{address.blockchain}</p>
 							</div>
 							<button
 								type="button"
-								class="text-red-500 hover:text-red-700"
+								class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
 								on:click={() => removeAddress(address.id)}
 							>
 								Remove
@@ -241,15 +243,15 @@
 					{/each}
 				</div>
 			{:else}
-				<p class="text-gray-500">No addresses added yet.</p>
+				<p class="text-gray-500 dark:text-gray-400">No addresses added yet.</p>
 			{/if}
 
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-				<div>
+				<div class="mb-4">
 					<label for="newAddress">New Address</label>
 					<input type="text" id="newAddress" bind:value={newAddress.address} placeholder="0x..." />
 				</div>
-				<div>
+				<div class="mb-4">
 					<label for="blockchain">Blockchain</label>
 					<select id="blockchain" bind:value={newAddress.blockchain}>
 						<option value="ethereum">Ethereum</option>
@@ -279,7 +281,7 @@
 						<img
 							src={aa.artwork.image_url}
 							alt={aa.artwork.title}
-							class="w-full h-full object-cover rounded-lg"
+							class="w-full h-full object-contain rounded-lg"
 						/>
 						{#if !aa.artwork.enabled}
 							<div class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
@@ -292,7 +294,7 @@
 			{/each}
 		</div>
 	{:else}
-		<div class="text-gray-500 text-center py-8">
+		<div class="text-gray-500 dark:text-gray-400 text-center py-8">
 			<p>No artworks found for this artist.</p>
 			<a
 				href="/admin/artworks/new"
@@ -309,29 +311,7 @@
 		pointer-events: none;
 	}
 
-	label {
-		display: block;
-		font-weight: bold;
-		margin-bottom: 0.5rem;
-	}
-
-	input[type='text'],
-	input[type='url'],
-	textarea {
-		width: 100%;
-		padding: 0.5rem;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-	}
-
 	.artwork-card {
 		@apply block transition-transform hover:scale-105;
-	}
-
-	select {
-		width: 100%;
-		padding: 0.5rem;
-		border: 1px solid #ccc;
-		border-radius: 4px;
 	}
 </style>

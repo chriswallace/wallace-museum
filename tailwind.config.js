@@ -1,5 +1,6 @@
 module.exports = {
 	content: ['./src/**/*.{html,js,svelte,ts}', './static/collection/*.html'],
+	darkMode: 'media',
 	theme: {
 		borderRadius: {
 			none: 0,

@@ -12,6 +12,11 @@
 
 	$: $page, (artworkId = $page.params.id);
 
+	// Create a reactive title variable
+	$: pageTitle = artwork.title
+		? `Edit ${artwork.title} | Wallace Museum Admin`
+		: 'Edit Artwork | Wallace Museum Admin';
+
 	interface Artist {
 		id: number;
 		name: string;
@@ -166,10 +171,10 @@
 </script>
 
 <svelte:head>
-	<title>Edit artwork</title>
+	<title>{pageTitle}</title>
 </svelte:head>
 
-<div class="container">
+<div class="max-w-7xl mx-auto">
 	{#if isLoading}
 		<p>Loading...</p>
 	{:else if error}
@@ -177,22 +182,22 @@
 	{:else}
 		<button class="back-btn" on:click={goBack}>&lt; Back</button>
 		<h1>Edit artwork</h1>
-		<div class="grid grid-cols-2 gap-12">
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 			<div>
 				<ArtworkDisplay {artwork} />
 				<ArtworkMeta {artwork} />
 			</div>
 			<div>
 				<form on:submit|preventDefault={updateArtwork}>
-					<div>
+					<div class="mb-4">
 						<label for="title">Title</label>
 						<input type="text" id="title" bind:value={artwork.title} />
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="description">Description</label>
 						<textarea id="description" bind:value={artwork.description}></textarea>
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="image_url">Image URL</label>
 						<input
 							type="url"
@@ -200,12 +205,12 @@
 							bind:value={artwork.image_url}
 							placeholder="https://res.cloudinary.com/..."
 						/>
-						<small
+						<small class="text-gray-600 dark:text-gray-400 block mt-1"
 							>Change the image URL to update the artwork image. Cloudinary URLs will have
 							dimensions automatically detected.</small
 						>
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="animation_url">Animation URL</label>
 						<input
 							type="url"
@@ -213,21 +218,23 @@
 							bind:value={artwork.animation_url}
 							placeholder="https://res.cloudinary.com/..."
 						/>
-						<small
+						<small class="text-gray-600 dark:text-gray-400 block mt-1"
 							>URL for animation or interactive content. This will be prioritized over the image URL
 							when present. MIME type will be auto-detected.</small
 						>
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="artist">Artists</label>
 						<select id="artist" multiple bind:value={selectedArtistIds} class="multi-select">
 							{#each allArtists as artist}
 								<option value={artist.id}>{artist.name}</option>
 							{/each}
 						</select>
-						<small>Hold Command/Ctrl to select multiple.</small>
+						<small class="text-gray-600 dark:text-gray-400 block mt-1"
+							>Hold Command/Ctrl to select multiple.</small
+						>
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="collection">Collection</label>
 						<select id="collection" bind:value={artwork.collectionId}>
 							<option value={null}>-- No Collection --</option>
@@ -236,7 +243,7 @@
 							{/each}
 						</select>
 					</div>
-					<div class="flex justify-between">
+					<div class="flex justify-between mt-8">
 						<button class="destructive" on:click={confirmDeleteArtwork} type="button"
 							>Delete Artwork</button
 						>
@@ -249,44 +256,8 @@
 </div>
 
 <style>
-	h1 {
-		margin-bottom: 3rem;
-	}
-
-	.container {
-		max-width: 1200px;
-		margin: auto;
-	}
-
-	.error {
-		color: red;
-	}
-
 	.multi-select {
-		min-height: 100px;
-		width: 100%;
-		padding: 0.5rem;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-	}
-
-	form > div {
-		margin-bottom: 1rem;
-	}
-
-	label {
-		display: block;
-		font-weight: bold;
-		margin-bottom: 0.5rem;
-	}
-
-	input[type='text'],
-	input[type='url'],
-	textarea,
-	select {
-		width: 100%;
-		padding: 0.5rem;
-		border: 1px solid #ccc;
-		border-radius: 4px;
+		height: auto;
+		min-height: 150px;
 	}
 </style>

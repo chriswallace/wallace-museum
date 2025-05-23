@@ -56,7 +56,7 @@
 </script>
 
 <svelte:head>
-	<title>Add Artist</title>
+	<title>Add Artist | Wallace Museum Admin</title>
 </svelte:head>
 
 <div class="max-w-full mx-auto">
@@ -74,23 +74,23 @@
 			</div>
 			<div>
 				<form on:submit|preventDefault={addArtist}>
-					<div>
+					<div class="mb-4">
 						<label for="name">Name</label>
 						<input type="text" id="name" name="name" bind:value={name} />
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="bio">Bio</label>
 						<textarea id="bio" name="bio" bind:value={bio}></textarea>
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="website">Website</label>
 						<input type="url" id="website" name="website" bind:value={websiteUrl} />
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="twitterHandle">Twitter Handle</label>
 						<input type="text" id="twitterHandle" name="twitterHandle" bind:value={twitterHandle} />
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="instagramHandle">Instagram Handle</label>
 						<input
 							type="text"
@@ -110,29 +110,6 @@
 
 <style>
 	h1 {
-		margin-bottom: 3rem; /* Example styling */
-	}
-
-	.error {
-		color: red;
-	}
-
-	form > div {
-		margin-bottom: 1rem;
-	}
-
-	label {
-		display: block;
-		font-weight: bold;
-		margin-bottom: 0.5rem;
-	}
-
-	input[type='text'],
-	input[type='url'],
-	textarea {
-		width: 100%;
-		padding: 0.5rem;
-		border: 1px solid #ccc;
-		border-radius: 4px;
+		margin-bottom: 3rem;
 	}
 </style>

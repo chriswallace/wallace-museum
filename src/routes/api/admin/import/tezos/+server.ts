@@ -238,23 +238,8 @@ export const POST = async ({ request }) => {
 				}
 			}
 
-			// Priority 2: nft.dimensions.display.dimensions (if it provides a more specific image mime)
-			if (nft.dimensions?.display?.dimensions) {
-				const { width, height } = nft.dimensions.display.dimensions;
-				const displayMime = nft.dimensions.display.mime;
-				if (typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0) {
-					if (!finalDimensions) finalDimensions = { width, height };
-					if (
-						displayMime?.startsWith('image/') &&
-						(isMimeEffectivelyGeneric(finalMime) || isMimeTextBasedInteractive(finalMime))
-					) {
-						finalMime = displayMime;
-						console.log(`[TEZOS_IMPORT] MIME updated from nft.dimensions.display: ${finalMime}`);
-					}
-				}
-			}
-
-			// Priority 3: nft.dimensions.artifact.dimensions (if it provides a more specific image mime for an image artifact)
+			// Priority 2: nft.dimensions.artifact.dimensions (if it provides a more specific image mime for an image artifact)
+			// Skip display dimensions (thumbnails) and only use artifact dimensions (full-size)
 			if (nft.dimensions?.artifact?.dimensions) {
 				const { width, height } = nft.dimensions.artifact.dimensions;
 				const artifactMimeOnDimensions = nft.dimensions.artifact.mime; // Renamed to avoid conflict
@@ -434,7 +419,11 @@ export const POST = async ({ request }) => {
 					...nft,
 					metadata: finalMetadata,
 					mime: finalMime,
-					dimensions: finalDimensions
+					dimensions: finalDimensions,
+					contractAlias:
+						typeof nft.contractAlias === 'object' && nft.contractAlias !== null
+							? (nft.contractAlias as { name: string }).name
+							: nft.collection?.name || nft.contractAlias || 'Tezos NFT'
 				},
 				artist?.id || null,
 				collection.id

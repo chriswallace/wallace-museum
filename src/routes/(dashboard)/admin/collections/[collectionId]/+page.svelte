@@ -210,10 +210,15 @@
 		// Type tab
 		activeTab = tab;
 	}
+
+	// Create a reactive title variable
+	$: pageTitle = collection.title
+		? `Edit ${collection.title} | Wallace Museum Admin`
+		: 'Edit Collection | Wallace Museum Admin';
 </script>
 
 <svelte:head>
-	<title>Edit {collection.title}</title>
+	<title>{pageTitle}</title>
 </svelte:head>
 
 {#if confirmationModalOpen}
@@ -250,7 +255,7 @@
 					bind:value={searchQuery}
 					on:keypress={(e) => e.key === 'Enter' && searchExistingArtworks()}
 				/>
-				<button class="primary cta mt-0" on:click={searchExistingArtworks}>Search</button>
+				<button class="primary mt-0" on:click={searchExistingArtworks}>Search</button>
 			</div>
 			<div class="search-grid">
 				{#each searchResults as artwork}
@@ -281,7 +286,7 @@
 			</div>
 			<div class="well">
 				{#if selectedArtworks.size > 0}
-					<button class="primary button" on:click={addSelectedArtworksToCollection}>
+					<button class="primary" on:click={addSelectedArtworksToCollection}>
 						Add Selected Artworks
 					</button>
 				{/if}
@@ -290,7 +295,7 @@
 	</Modal>
 {/if}
 
-<div class="container">
+<div class="max-w-7xl mx-auto">
 	{#if isLoading}
 		<p>Loading...</p>
 	{:else}
@@ -322,7 +327,7 @@
 								<img
 									src={getCloudinaryTransformedUrl(
 										artwork.image_url,
-										'w_204,h_204,c_thumb,q_auto,f_auto'
+										'w_204,h_204,c_fit,q_auto,f_auto'
 									)}
 									alt={artwork.title || 'Artwork thumbnail'}
 								/>
@@ -347,10 +352,8 @@
 					{/each}
 					<div class="fieldset add-artwork">
 						<div class="add-artwork-buttons">
-							<button class="button primary w-full mb-4" on:click={navigateToAddArtwork}
-								>Add new</button
-							>
-							<button class="button secondary w-full" on:click={openAddExistingArtworkModal}
+							<button class="primary w-full mb-4" on:click={navigateToAddArtwork}>Add new</button>
+							<button class="secondary w-full" on:click={openAddExistingArtworkModal}
 								>Add existing</button
 							>
 						</div>
@@ -360,23 +363,28 @@
 		{:else if activeTab === 'details'}
 			<div class="details-tab">
 				<form on:submit|preventDefault={updateCollection}>
-					<div>
+					<div class="mb-4">
 						<label for="title">Title</label>
 						<input type="text" id="title" bind:value={collection.title} />
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="description">Description</label>
 						<textarea id="description" bind:value={collection.description}></textarea>
 					</div>
-					<div>
+					<div class="mb-4">
 						<label for="curator-notes">Curator notes</label>
 						<textarea id="curator-notes" bind:value={collection.curatorNotes}></textarea>
 					</div>
-					<div>
-						<input type="checkbox" id="enabled" bind:checked={collection.enabled} />
-						<label for="enabled">Enabled</label>
+					<div class="mb-4">
+						<input
+							type="checkbox"
+							id="enabled"
+							class="mr-2 inline w-auto"
+							bind:checked={collection.enabled}
+						/>
+						<label for="enabled" class="inline">Enabled</label>
 					</div>
-					<div class="flex justify-between">
+					<div class="flex justify-between mt-8">
 						<button class="destructive" type="button" on:click={deleteCollection}>Delete</button>
 						<button class="primary" type="submit">Save</button>
 					</div>
@@ -387,20 +395,8 @@
 </div>
 
 <style lang="scss">
-	.container {
-		@apply max-w-7xl mx-auto;
-	}
-
 	h3 {
 		@apply text-lg font-semibold mb-3;
-	}
-
-	input[type='checkbox'] {
-		@apply mr-2 inline w-auto;
-	}
-
-	input[type='checkbox'] + label {
-		@apply inline;
 	}
 
 	.button-split {
@@ -412,7 +408,7 @@
 	}
 
 	.add-artwork {
-		@apply grid grid-cols-1 content-center text-center border-2 border-dashed border-gray-300 rounded-sm p-8 aspect-square;
+		@apply grid grid-cols-1 content-center text-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-sm p-8 aspect-square;
 	}
 
 	.search-grid {
@@ -423,7 +419,7 @@
 
 			img,
 			video {
-				@apply w-full aspect-square object-cover rounded-t-[8px];
+				@apply w-full aspect-square object-contain rounded-t-[8px];
 			}
 		}
 
@@ -432,7 +428,7 @@
 		}
 
 		.active {
-			@apply border-2 border-blue-500 relative;
+			@apply border-2 border-primary relative;
 
 			p {
 				@apply p-3;
@@ -444,16 +440,12 @@
 		@apply mt-8 text-right;
 	}
 
-	.selected-indicator {
-		@apply bg-blue-500 rounded-tr-[6px] rounded-bl-[6px] text-xs uppercase font-bold absolute top-0 right-0 text-white px-3 py-2;
-	}
-
 	.delete {
-		@apply bg-red-500;
+		@apply bg-red-500 text-white;
 	}
 
 	.artwork-grid {
-		@apply grid grid-cols-3 gap-4;
+		@apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4;
 
 		& > div {
 			@apply mb-8 relative;

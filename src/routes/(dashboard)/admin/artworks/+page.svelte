@@ -81,7 +81,7 @@
 </script>
 
 <svelte:head>
-	<title>Artworks</title>
+	<title>Artworks | Wallace Museum Admin</title>
 </svelte:head>
 
 <h1>Artworks <button class="ghost" on:click={() => addNew()}>+ Add new</button></h1>
@@ -138,10 +138,7 @@
 					<td>
 						<button class="image" on:click={() => editArtwork(artwork.id)}>
 							<img
-								src={getCloudinaryTransformedUrl(
-									artwork.image_url,
-									'w_120,h_120,c_fill,g_center,q_70'
-								)}
+								src={getCloudinaryTransformedUrl(artwork.image_url, 'w_120,h_120,c_fit,q_70')}
 								alt=""
 							/>
 						</button>

@@ -91,6 +91,19 @@ export function getCloudinaryTransformedUrl(
 		return baseUrl; // Return original URL if extraction failed
 	}
 
+	// If no transformations contain c_fill or c_crop, ensure we're using c_limit to preserve aspect ratio
+	if (
+		!transformations.includes('c_fill') &&
+		!transformations.includes('c_crop') &&
+		!transformations.includes('c_fit') &&
+		!transformations.includes('c_limit')
+	) {
+		// Add c_limit to preserve aspect ratio if a width or height is specified
+		if (transformations.includes('w_') || transformations.includes('h_')) {
+			transformations = `c_limit,${transformations}`;
+		}
+	}
+
 	// Construct the new URL
 	// Note: We explicitly don't include the version here, letting Cloudinary handle caching via transformations.
 	// The publicId used here will now correctly include its file extension.

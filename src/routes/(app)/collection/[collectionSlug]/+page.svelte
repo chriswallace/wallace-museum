@@ -8,7 +8,7 @@
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
-	import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
+	import LoaderWrapper from '$lib/components/LoaderWrapper.svelte';
 
 	export let data: { title: string; artworks: Artwork[] };
 
@@ -180,7 +180,11 @@
 </script>
 
 <svelte:head>
-	<title>{data.title}</title>
+	<title>{data.title} | Wallace Museum</title>
+	<meta
+		name="description"
+		content="Explore the {data.title} digital art collection at Wallace Museum."
+	/>
 </svelte:head>
 
 <div class="h-[100vh] gap-8 relative">
@@ -211,10 +215,15 @@
 						: '1/1'};"
 				>
 					{#if loadingStates[String(artwork.id)]}
-						<SkeletonLoader
-							height={artwork.dimensions ? `${artwork.dimensions.height}px` : '100%'}
-							width={artwork.dimensions ? `${artwork.dimensions.width}px` : '100%'}
-						/>
+						<div class="loader-wrapper">
+							<LoaderWrapper
+								height={artwork.dimensions ? `${artwork.dimensions.height}px` : '100%'}
+								width={artwork.dimensions ? `${artwork.dimensions.width}px` : '100%'}
+								aspectRatio={artwork.dimensions
+									? `${artwork.dimensions.width}/${artwork.dimensions.height}`
+									: '1/1'}
+							/>
+						</div>
 					{/if}
 
 					{#if artwork.animation_url}
@@ -244,22 +253,20 @@
 							></iframe>
 						{:else if artwork.image_url}
 							<img
-								bind:this={artworkRefs[index]}
-								src={artwork.image_url}
-								alt={artwork.title}
+								src={artwork.src || artwork.image_url}
 								srcset={artwork.srcset}
 								sizes={artwork.sizes}
+								alt={artwork.title}
 								on:load={() => handleMediaLoad(artwork.id)}
 								class:hidden={loadingStates[String(artwork.id)]}
 							/>
 						{/if}
 					{:else if artwork.image_url}
 						<img
-							bind:this={artworkRefs[index]}
-							src={artwork.image_url}
-							alt={artwork.title}
+							src={artwork.src || artwork.image_url}
 							srcset={artwork.srcset}
 							sizes={artwork.sizes}
+							alt={artwork.title}
 							on:load={() => handleMediaLoad(artwork.id)}
 							class:hidden={loadingStates[String(artwork.id)]}
 						/>
@@ -278,140 +285,189 @@
 			</div>
 		{/each}
 	</div>
+
+	{#if artworkDetails}
+		<div
+			class="artwork-details"
+			class:maximized={$isMaximized}
+			class:live-code-visible={$isLiveCodeVisible}
+		>
+			<div class="artwork-title-bar">
+				<h1 in:fade={{ duration: 300, delay: 300 }}>{artworkDetails.title}</h1>
+				<div class="detail-actions">
+					{#if artworkDetails.animation_url && artworkDetails.mime?.startsWith('application')}
+						<button
+							class="icon-button maximize"
+							on:click={() => toggleMaximize(artworkDetails.id)}
+							aria-label="Toggle fullscreen">Fullscreen</button
+						>
+					{/if}
+				</div>
+			</div>
+			<div class="artwork-info">
+				<div class="artist" in:fade={{ duration: 300, delay: 300 }}>
+					<h2>{artworkDetails.creator || artworkDetails.artist_display_name || 'Artist'}</h2>
+				</div>
+				{#if artworkDetails.description}
+					<div class="description" in:fade={{ duration: 300, delay: 300 }}>
+						<p>{artworkDetails.description}</p>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style lang="scss">
+	.h-\\[100vh\\] {
+		height: 100vh;
+	}
+
 	.artwork-container {
-		@apply h-screen flex overflow-x-auto justify-items-center items-center;
-		scroll-snap-type: x mandatory;
-		-webkit-overflow-scrolling: touch; /* For smooth scrolling on touch devices */
+		@apply flex flex-row overflow-x-auto overflow-y-hidden snap-x snap-mandatory h-full;
+		height: calc(100vh - 60px);
+		width: 100%;
+		min-height: 200px;
+		-webkit-overflow-scrolling: touch;
+		scrollbar-width: auto;
+		-ms-overflow-style: auto;
+
+		&::-webkit-scrollbar {
+			height: 8px;
+		}
+
+		&::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		&::-webkit-scrollbar-thumb {
+			background-color: rgba(200, 200, 200, 0.5);
+			border-radius: 20px;
+			border: transparent;
+		}
+	}
+
+	.loader-wrapper {
+		@apply w-full h-full overflow-hidden;
 	}
 
 	.artwork-item {
-		@apply h-screen mx-4 flex justify-items-center items-center max-h-[85vh] max-w-[calc(100vw-560px)] lg:max-w-[calc(100vw-640px)] z-10 relative;
-		flex: 0 0 auto; /* Adjust this as needed, depending on your layout */
-		scroll-snap-align: center; /* Align the start edge of the element with the container's snapport */
-		transition:
-			transform 0.3s ease,
-			opacity 0.3s ease;
+		@apply flex items-center justify-center snap-center shrink-0 px-8;
+		height: 100%;
+		min-width: 100%;
+		scroll-snap-align: center;
+		position: relative;
+		transition: all 0.3s ease;
 
-		&:first-child {
-			@apply ml-[25%];
+		&.loaded .media-container img,
+		&.loaded .media-container video,
+		&.loaded .media-container iframe {
+			opacity: 1;
 		}
 
-		&:last-child {
-			@apply mr-[25%];
-		}
-
-		&:first-child:last-child {
-			@apply mx-auto;
-		}
-
-		&:before {
-			content: '';
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			transform: translate(-50%, -50%);
-			z-index: 20;
-			height: 5px;
-			width: 5px;
-			color: #000;
-			box-shadow:
-				-10px -10px 0 5px,
-				-10px -10px 0 5px,
-				-10px -10px 0 5px,
-				-10px -10px 0 5px;
-			animation: loader-38 6s infinite;
-			transition: opacity 0.125s linear;
-		}
-
-		.media-container {
-			@apply mx-auto w-full relative;
-		}
-
-		img,
-		video,
-		iframe {
-			@apply h-full w-full opacity-0;
-			transition: opacity 0.125s linear;
+		&.highlighted {
+			.media-container {
+				transform: scale(1.02);
+			}
 		}
 
 		&.maximized {
-			@apply flex flex-col justify-center items-center bg-white;
-
 			.media-container {
-				@apply max-h-[85vh] max-w-[85vw] h-full w-auto;
+				z-index: 1000;
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100vw;
+				height: 100vh;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background-color: rgba(0, 0, 0, 0.9);
+				transform: none;
+
+				iframe {
+					width: 80vw;
+					height: 80vh;
+					max-width: 1200px;
+					max-height: 800px;
+				}
 			}
 
-			img,
-			video,
-			iframe {
-				@apply max-h-full max-w-full object-contain;
-			}
-		}
-
-		&.loaded {
-			&:before {
-				content: none;
-			}
-
-			img,
-			video,
-			iframe {
-				opacity: 0.6;
-			}
-		}
-
-		&.loaded.highlighted {
-			img,
-			video,
-			iframe {
-				opacity: 1;
+			.close {
+				display: block;
+				z-index: 1001;
+				position: fixed;
+				top: 20px;
+				right: 20px;
 			}
 		}
 	}
 
-	.close {
-		@apply absolute hidden overflow-hidden bg-white;
-		background-image: url('/images/close.svg');
-		position: absolute;
-		top: 16px;
-		right: 16px;
-		width: 36px;
-		height: 36px;
-		background-size: 36px;
-		cursor: pointer;
-		font-size: 1.5rem;
-		z-index: 1010;
-		text-indent: 100%;
-		border-radius: 9px;
+	.media-container {
+		@apply flex items-center justify-center relative;
+		height: 100%;
+		width: 100%;
+		transition: transform 0.3s ease;
 	}
 
-	.maximized .close {
-		@apply block;
+	.artwork-item .close {
+		display: none;
 	}
 
-	.maximize {
-		@apply left-[50%] transform translate-x-[-50%] absolute -bottom-10;
+	img,
+	video,
+	iframe {
+		@apply max-h-full max-w-full;
+		height: auto;
+		width: auto;
+		opacity: 0;
+		transition: opacity 0.3s ease;
+	}
 
-		.maximized & {
-			@apply hidden;
+	.live-code {
+		@apply w-full h-full;
+		width: 100%;
+		height: 100%;
+		border: none;
+	}
+
+	.artwork-details {
+		@apply fixed bottom-0 left-0 right-0 p-6 bg-white/90 dark:bg-black/90 text-black dark:text-white backdrop-blur-md;
+		transition: all 0.3s ease;
+		z-index: 10;
+		max-height: 30vh;
+		overflow-y: auto;
+
+		&.maximized {
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		&.live-code-visible {
+			opacity: 0;
+			pointer-events: none;
 		}
 	}
 
-	@media (prefers-color-scheme: dark) {
-		.artwork-item:before {
-			color: #fff;
-		}
-		.artwork-item.maximized {
-			@apply bg-black;
-		}
+	.artwork-title-bar {
+		@apply flex justify-between items-center mb-2;
 
-		.close {
-			@apply bg-black;
-			background-image: url('/images/close-dark-mode.svg');
+		h1 {
+			@apply text-xl font-bold m-0;
 		}
+	}
+
+	.detail-actions {
+		@apply flex gap-2;
+	}
+
+	.artist h2 {
+		@apply font-normal text-sm text-gray-700 dark:text-gray-300 my-1;
+	}
+
+	.description {
+		@apply mt-2 text-sm text-gray-600 dark:text-gray-400;
+		max-width: 40em;
 	}
 
 	.hidden {

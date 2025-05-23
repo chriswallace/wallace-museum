@@ -68,12 +68,12 @@
 	}
 
 	.site-footer {
-		@apply py-8 mt-16 border-t border-gray-900/20 relative z-10;
+		@apply py-4 px-8 mt-16 border-t border-gray-800 relative z-10;
 		background: rgba(0, 0, 0, 0.95);
 	}
 
 	.footer-content {
-		@apply max-w-[840px] mx-auto px-4 text-sm;
+		@apply max-w-full mx-auto px-4 text-sm flex	justify-between;
 	}
 
 	.copyright {
@@ -93,6 +93,6 @@
 	}
 
 	.social-link {
-		@apply font-bold text-yellow-500 no-underline hover:underline transition-colors first:mr-4;
+		@apply font-bold text-gray-600 no-underline hover:underline transition-colors first:mr-4;
 	}
 </style>

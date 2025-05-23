@@ -32,6 +32,7 @@ export interface Artwork {
 	src?: string;
 	srcset?: string;
 	sizes?: string;
+	blockchain?: string;
 }
 
 // Define the NFT type (consistent with +page.svelte)
@@ -174,7 +175,7 @@ export const nfts = writable<Artwork[]>([]); // Assuming NftItem is similar to A
 
 export const isLoading = writable<boolean>(false);
 export const isModalOpen = writable<boolean>(false);
-export const selectedNfts = writable<Set<number>>(new Set()); // Assuming IDs are numbers
+export const selectedNfts = writable<Map<number, Artwork>>(new Map()); // Store both ID and artwork object
 export const selectAllChecked = writable<boolean>(false);
 export const reviewData = writable<{ collections: any[] }>({ collections: [] });
 export const updatedNfts = writable<Artwork[]>([]);

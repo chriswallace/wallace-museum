@@ -169,7 +169,23 @@
 					.map((a) => `${a.trait_type}: ${a.value}`)
 					.join(', ')
 			: '';
+
+	$: pageTitle = data.artist
+		? `${data.artist.name} | Wallace Museum`
+		: data.error
+			? 'Artist Not Found | Wallace Museum'
+			: 'Loading Artist | Wallace Museum';
 </script>
+
+<svelte:head>
+	<title>{pageTitle}</title>
+	<meta
+		name="description"
+		content={data.artist
+			? `Explore artworks by ${data.artist.name} at the Wallace Museum`
+			: 'Artist gallery at the Wallace Museum'}
+	/>
+</svelte:head>
 
 {#if !data.artist && data.error}
 	<div class="artist-page" transition:fade>

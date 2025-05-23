@@ -450,11 +450,8 @@ export async function normalizeTezosMetadata(nft: NftData): Promise<any> {
 		metadata.image_url ||
 		metadata.image ||
 		metadata.artifactUri ||
-		metadata.displayUri ||
-		metadata.thumbnailUri ||
 		nft.image_url ||
-		nft.artifactUri ||
-		nft.displayUri;
+		nft.artifactUri;
 
 	const animation_url =
 		metadata.animation_url || metadata.animationUri || nft.animation_url || nft.animationUri;
@@ -811,19 +808,40 @@ async function convertToWebP(
 		const maxSizeBytes = maxSizeMB * 1024 * 1024;
 		const originalSize = buffer.length;
 
-		// Initial conversion with specified quality
+		// Don't do any conversion if the image is already small enough
+		if (buffer.length <= maxSizeBytes) {
+			console.log('[WEBP_CONVERT] Image already small enough, skipping conversion');
+			// Still convert format to webp but without size reduction
+			const webpBuffer = await sharp(buffer).webp({ quality: 80 }).toBuffer();
+
+			return {
+				buffer: webpBuffer,
+				mimeType: 'image/webp'
+			};
+		}
+
+		// Initial conversion with specified quality, preserving aspect ratio
 		let webpBuffer = await sharp(buffer)
 			.webp({ quality }) // Use quality parameter (0-100)
 			.toBuffer();
 
-		// Progressively lower quality if file size is still too large
+		// Check if we need to reduce size
+		if (webpBuffer.length <= maxSizeBytes) {
+			console.log('[WEBP_CONVERT] Initial conversion successful, no further reduction needed');
+			return {
+				buffer: webpBuffer,
+				mimeType: 'image/webp'
+			};
+		}
+
+		// Only reduce quality to 60% as minimum
 		let currentQuality = quality;
 		let attempts = 0;
-		const maxAttempts = 5; // Prevent infinite loop
+		const maxAttempts = 3; // Limit quality reduction attempts
 
-		while (webpBuffer.length > maxSizeBytes && currentQuality > 40 && attempts < maxAttempts) {
-			// Reduce quality by 10% each time, but don't go below 40
-			currentQuality = Math.max(40, currentQuality - 10);
+		while (webpBuffer.length > maxSizeBytes && currentQuality > 60 && attempts < maxAttempts) {
+			// Reduce quality by 10% each time, but don't go below 60
+			currentQuality = Math.max(60, currentQuality - 10);
 			attempts++;
 
 			console.log(
@@ -831,69 +849,55 @@ async function convertToWebP(
 			);
 
 			webpBuffer = await sharp(buffer).webp({ quality: currentQuality }).toBuffer();
+
+			if (webpBuffer.length <= maxSizeBytes) {
+				console.log('[WEBP_CONVERT] Quality reduction sufficient');
+				return {
+					buffer: webpBuffer,
+					mimeType: 'image/webp'
+				};
+			}
 		}
 
-		// If still too large after quality reduction, try resizing
-		if (
-			webpBuffer.length > maxSizeBytes &&
-			dimensions &&
-			dimensions.width > 1000 &&
-			attempts < maxAttempts
-		) {
+		// If still too large, resize the image but maintain aspect ratio
+		if (webpBuffer.length > maxSizeBytes && dimensions) {
+			console.log(
+				'[WEBP_CONVERT] Quality reduction insufficient, resizing image while maintaining aspect ratio'
+			);
+
 			const aspectRatio = dimensions.width / dimensions.height;
 			let targetWidth = dimensions.width;
+			let targetHeight = dimensions.height;
+			attempts = 0;
 
-			while (webpBuffer.length > maxSizeBytes && targetWidth > 800 && attempts < maxAttempts) {
-				// Reduce width by 20% each time, maintaining aspect ratio
-				targetWidth = Math.floor(targetWidth * 0.8);
-				const targetHeight = Math.floor(targetWidth / aspectRatio);
+			// Use a more gradual scale factor
+			while (webpBuffer.length > maxSizeBytes && attempts < 5) {
+				// Scale down by 10% each time
+				targetWidth = Math.floor(targetWidth * 0.9);
+				targetHeight = Math.floor(targetHeight * 0.9);
 				attempts++;
 
 				console.log(
-					`[WEBP_CONVERT] Still too large after quality reduction, resizing to ${targetWidth}x${targetHeight}`
+					`[WEBP_CONVERT] Resizing to ${targetWidth}x${targetHeight} (maintaining aspect ratio)`
 				);
 
 				webpBuffer = await sharp(buffer)
-					.resize(targetWidth, targetHeight)
+					.resize(targetWidth, targetHeight, {
+						fit: 'inside', // Always use 'inside' to preserve aspect ratio
+						withoutEnlargement: true
+					})
 					.webp({ quality: currentQuality })
 					.toBuffer();
 			}
 		}
 
-		// Check if WebP conversion actually reduced the file size significantly
-		const sizeReductionPercent = 100 - Math.round((webpBuffer.length / originalSize) * 100);
-
-		// If WebP didn't reduce size by at least 10%, try JPEG conversion as a fallback
-		if (sizeReductionPercent < 10 && webpBuffer.length > originalSize * 0.9) {
-			console.log(
-				`[WEBP_CONVERT] WebP conversion only achieved ${sizeReductionPercent}% reduction, trying JPEG fallback`
-			);
-
-			// Try JPEG with progressive encoding for better compression
-			const jpegBuffer = await sharp(buffer)
-				.jpeg({ quality: currentQuality, progressive: true })
-				.toBuffer();
-
-			const jpegReductionPercent = 100 - Math.round((jpegBuffer.length / originalSize) * 100);
-
-			// Use JPEG if it's smaller than WebP
-			if (jpegBuffer.length < webpBuffer.length) {
-				console.log(
-					`[WEBP_CONVERT] JPEG is smaller (${jpegReductionPercent}% reduction), using JPEG instead of WebP`
-				);
-				return {
-					buffer: jpegBuffer,
-					mimeType: 'image/jpeg'
-				};
-			}
-		}
-
+		// Log final result
 		console.log(
 			`[WEBP_CONVERT] Conversion complete. Original: ${(originalSize / 1024 / 1024).toFixed(2)}MB, WebP: ${(
 				webpBuffer.length /
 				1024 /
 				1024
-			).toFixed(2)}MB (${sizeReductionPercent}% reduction)`
+			).toFixed(2)}MB (${Math.round((1 - webpBuffer.length / originalSize) * 100)}% reduction)`
 		);
 
 		return {
@@ -904,20 +908,42 @@ async function convertToWebP(
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		console.error(`[WEBP_CONVERT] Error converting to WebP: ${errorMessage}`);
 
-		// Try a simpler conversion as fallback with error handling
-		try {
-			console.log('[WEBP_CONVERT] Attempting simpler conversion as fallback');
-			// Simple conversion with lower quality as fallback
-			const fallbackBuffer = await sharp(buffer).jpeg({ quality: 70 }).toBuffer();
+		// Return original buffer on error
+		return {
+			buffer,
+			mimeType: buffer.length > 0 ? 'image/jpeg' : 'application/octet-stream'
+		};
+	}
+}
 
-			return {
-				buffer: fallbackBuffer,
-				mimeType: 'image/jpeg'
-			};
-		} catch (fallbackError) {
-			console.error('[WEBP_CONVERT] Fallback conversion also failed, returning original buffer');
-			// Return original buffer and mime type if all conversions fail
-			return { buffer, mimeType: 'image/jpeg' };
+/**
+ * Helper function to verify and log aspect ratio preservation
+ */
+function verifyAspectRatioPreservation(
+	originalDimensions: Dimensions | null,
+	uploadedDimensions: Dimensions | null
+): void {
+	if (originalDimensions && uploadedDimensions) {
+		const originalAspectRatio = originalDimensions.width / originalDimensions.height;
+		const uploadedAspectRatio = uploadedDimensions.width / uploadedDimensions.height;
+		const aspectRatioPercentDiff = Math.abs(1 - uploadedAspectRatio / originalAspectRatio) * 100;
+
+		console.log(
+			`[MEDIA_UPLOAD_DEBUG] Original aspect ratio: ${originalAspectRatio.toFixed(4)} (${originalDimensions.width}x${originalDimensions.height})`
+		);
+		console.log(
+			`[MEDIA_UPLOAD_DEBUG] Uploaded aspect ratio: ${uploadedAspectRatio.toFixed(4)} (${uploadedDimensions.width}x${uploadedDimensions.height})`
+		);
+		console.log(
+			`[MEDIA_UPLOAD_DEBUG] Aspect ratio difference: ${aspectRatioPercentDiff.toFixed(2)}%`
+		);
+
+		if (aspectRatioPercentDiff > 1) {
+			console.warn(
+				`[MEDIA_UPLOAD_DEBUG] WARNING: Aspect ratio changed by ${aspectRatioPercentDiff.toFixed(2)}% during upload!`
+			);
+		} else {
+			console.log('[MEDIA_UPLOAD_DEBUG] Aspect ratio successfully preserved ✓');
 		}
 	}
 }
@@ -929,6 +955,16 @@ export async function handleMediaUpload(
 	if (!mediaUri || typeof mediaUri !== 'string') {
 		console.error('[MEDIA_UPLOAD_DEBUG] Invalid media URI provided:', mediaUri);
 		return null;
+	}
+
+	// Store the original dimensions for later use
+	let originalDimensions: Dimensions | null = artwork.dimensions || null;
+
+	// Log artwork dimensions if available
+	if (originalDimensions) {
+		console.log(
+			`[MEDIA_UPLOAD_DEBUG] Original artwork dimensions from metadata: ${originalDimensions.width}x${originalDimensions.height}`
+		);
 	}
 
 	// Retry configuration
@@ -984,17 +1020,43 @@ export async function handleMediaUpload(
 						!mediaData.mimeType.includes('gif')
 					) {
 						const dimensions = await getImageDimensionsFromBuffer(mediaData.buffer);
+						console.log(
+							`[MEDIA_UPLOAD_DEBUG] Original image dimensions: ${dimensions?.width}x${dimensions?.height}`
+						);
+
+						// Store dimensions for proper aspect ratio preservation
+						originalDimensions = dimensions || originalDimensions;
+
 						const webpResult = await convertToWebP(mediaData.buffer, dimensions, 80, 8);
 						uploadBuffer = webpResult.buffer;
 						uploadMimeType = webpResult.mimeType;
+
+						// Get dimensions after WebP conversion
+						const webpDimensions = await getImageDimensionsFromBuffer(uploadBuffer);
+						console.log(
+							`[MEDIA_UPLOAD_DEBUG] WebP converted dimensions: ${webpDimensions?.width}x${webpDimensions?.height}`
+						);
 					}
 
+					// Get the original dimensions to track aspect ratio preservation
+					const originalImageDimensions = await getImageDimensionsFromBuffer(uploadBuffer);
+
+					// Log dimensions but not aspect ratio since that's handled by the verification function
+					if (originalImageDimensions) {
+						console.log(
+							`[MEDIA_UPLOAD_DEBUG] Original image dimensions before upload: ${originalImageDimensions.width}x${originalImageDimensions.height}`
+						);
+					}
+
+					console.log(
+						`[MEDIA_UPLOAD_DEBUG] Uploading to Cloudinary with mime type: ${uploadMimeType}`
+					);
 					const uploadResult = await uploadToCloudinary(
 						uploadBuffer,
-						artwork.name || 'artblocks_image',
+						artwork.name || mediaData.fileName || 'artwork',
 						uploadMimeType,
 						generateTags(
-							artwork.name || 'artblocks_image',
+							artwork.name || mediaData.fileName || 'artwork',
 							uploadMimeType,
 							artwork.collection?.contract,
 							artwork.tokenID
@@ -1004,6 +1066,13 @@ export async function handleMediaUpload(
 					if (!uploadResult) {
 						throw new Error('Cloudinary upload failed');
 					}
+
+					// Verify aspect ratio was preserved
+					verifyAspectRatioPreservation(originalImageDimensions, uploadResult.dimensions);
+
+					console.log(
+						`[MEDIA_UPLOAD_DEBUG] Cloudinary upload successful. Dimensions from result: ${uploadResult.dimensions?.width}x${uploadResult.dimensions?.height}`
+					);
 
 					return {
 						url: uploadResult.url,
@@ -1084,11 +1153,35 @@ export async function handleMediaUpload(
 				!fetchedMedia.mimeType.includes('gif')
 			) {
 				const dimensions = await getImageDimensionsFromBuffer(fetchedMedia.buffer);
+				console.log(
+					`[MEDIA_UPLOAD_DEBUG] Original image dimensions: ${dimensions?.width}x${dimensions?.height}`
+				);
+
+				// Store dimensions for proper aspect ratio preservation
+				originalDimensions = dimensions || originalDimensions;
+
 				const webpResult = await convertToWebP(fetchedMedia.buffer, dimensions, 80, 8);
 				uploadBuffer = webpResult.buffer;
 				uploadMimeType = webpResult.mimeType;
+
+				// Get dimensions after WebP conversion
+				const webpDimensions = await getImageDimensionsFromBuffer(uploadBuffer);
+				console.log(
+					`[MEDIA_UPLOAD_DEBUG] WebP converted dimensions: ${webpDimensions?.width}x${webpDimensions?.height}`
+				);
 			}
 
+			// Get the original dimensions to track aspect ratio preservation
+			const originalImageDimensions = await getImageDimensionsFromBuffer(uploadBuffer);
+
+			// Log dimensions but not aspect ratio since that's handled by the verification function
+			if (originalImageDimensions) {
+				console.log(
+					`[MEDIA_UPLOAD_DEBUG] Original image dimensions before upload: ${originalImageDimensions.width}x${originalImageDimensions.height}`
+				);
+			}
+
+			console.log(`[MEDIA_UPLOAD_DEBUG] Uploading to Cloudinary with mime type: ${uploadMimeType}`);
 			const uploadResult = await uploadToCloudinary(
 				uploadBuffer,
 				artwork.name || fetchedMedia.fileName || 'artwork',
@@ -1104,6 +1197,13 @@ export async function handleMediaUpload(
 			if (!uploadResult) {
 				throw new Error('Cloudinary upload failed');
 			}
+
+			// Verify aspect ratio was preserved
+			verifyAspectRatioPreservation(originalImageDimensions, uploadResult.dimensions);
+
+			console.log(
+				`[MEDIA_UPLOAD_DEBUG] Cloudinary upload successful. Dimensions from result: ${uploadResult.dimensions?.width}x${uploadResult.dimensions?.height}`
+			);
 
 			return {
 				url: uploadResult.url,
@@ -1498,11 +1598,17 @@ export async function uploadToCloudinary(
 			tags: tagsToApply ? tagsToApply.split(',') : undefined,
 			resource_type: resourceType,
 			overwrite: false,
-			use_filename: false, // Changed to false since we're handling the full public_id
-			unique_filename: false, // Changed to false since we're handling uniqueness with hash
-			quality: 100, // Set to maximum quality (no compression)
+			use_filename: false,
+			unique_filename: false,
+			quality: 'auto', // Use Cloudinary's auto quality instead of fixed 100
 			fetch_format: null, // Don't change the image format
-			transformation: [] // No transformations - keep original image
+			transformation: [
+				{
+					crop: 'limit', // Use 'limit' to ensure aspect ratio is preserved
+					width: null, // Let the original dimensions be preserved
+					height: null // Let the original dimensions be preserved
+				}
+			]
 		};
 
 		const uploadPromise = new Promise<UploadApiResponse | undefined>((resolve, reject) => {
@@ -1709,13 +1815,31 @@ export async function getCloudinaryImageDimensions(imageUrl: string): Promise<Di
 
 async function getImageDimensionsFromBuffer(buffer: Buffer): Promise<Dimensions | null> {
 	try {
+		if (!buffer || buffer.length === 0) {
+			console.error('[DIMENSIONS_IMAGE_BUFFER] Empty buffer provided');
+			return null;
+		}
+
+		console.log(
+			`[DIMENSIONS_IMAGE_BUFFER] Getting dimensions from buffer of size: ${(buffer.length / 1024 / 1024).toFixed(2)}MB`
+		);
+
 		const metadata = await sharp(buffer).metadata();
 		if (metadata.width && metadata.height) {
+			console.log(
+				`[DIMENSIONS_IMAGE_BUFFER] Successfully got dimensions: ${metadata.width}x${metadata.height}`
+			);
 			return { width: metadata.width, height: metadata.height };
 		}
+
+		console.warn('[DIMENSIONS_IMAGE_BUFFER] Could not extract width or height from metadata');
+		console.log('[DIMENSIONS_IMAGE_BUFFER] Available metadata:', metadata);
 		return null; // Fallback if no dimensions found
 	} catch (error) {
-		console.error('[DIMENSIONS_IMAGE_BUFFER] Error getting image dimensions from buffer:', error);
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		console.error(
+			`[DIMENSIONS_IMAGE_BUFFER] Error getting image dimensions from buffer: ${errorMessage}`
+		);
 		return null; // Fallback in case of error
 	}
 }

@@ -77,8 +77,8 @@ export const GET: RequestHandler = async ({ params, url }) => {
 
 		// Process tokens into normalized NFTs with unique IDs
 		let normalizedNfts = tokens.map(({ token }: { token: any }) => {
-			// Prioritize display_uri for image, artifact_uri for animation
-			let displayUriResult = convertIpfsToHttpsUrl(token.display_uri);
+			// Prioritize artifact_uri for both image and animation
+			// Never use display_uri (thumbnails)
 			let artifactUriResult = convertIpfsToHttpsUrl(token.artifact_uri);
 
 			// Function to prepend gateway if needed
@@ -89,14 +89,12 @@ export const GET: RequestHandler = async ({ params, url }) => {
 				return typeof uri === 'string' ? uri : ''; // Return string or empty string
 			};
 
-			// Ensure both are valid URLs
-			const finalDisplayUri = ensureHttpsUrl(displayUriResult);
+			// Ensure it's a valid URL
 			const finalArtifactUri = ensureHttpsUrl(artifactUriResult);
 
-			// Assign image_url from display_uri (thumbnail)
-			// Assign animation_url from artifact_uri (main media)
-			const imageUrl = finalDisplayUri;
-			const animationUrl = finalArtifactUri; // Always use artifact_uri if it exists
+			// Always use artifact_uri for both image_url and animation_url
+			const imageUrl = finalArtifactUri;
+			const animationUrl = finalArtifactUri;
 
 			// Create a consistent unique ID for this NFT
 			const uniqueId = `tezos/${token.fa?.contract}/${token.token_id}`;

@@ -1,5 +1,6 @@
 import prisma from '$lib/prisma';
 import type { Artist, ArtistAddress, Collection } from '@prisma/client';
+import { indexArtwork } from './artworkIndexer';
 
 // Define interfaces for expected data structures
 interface SocialMediaAccounts {
@@ -473,10 +474,12 @@ export async function saveArtwork(
 
 	// Determine the contract alias more effectively
 	const contractAlias =
-		nft.collection.name ||
-		nft.contractAlias ||
-		nft.metadata.collection_name ||
-		nft.collection.contract;
+		typeof nft.contractAlias === 'object' && nft.contractAlias !== null
+			? (nft.contractAlias as { name: string }).name
+			: nft.collection.name ||
+				nft.contractAlias ||
+				nft.metadata.collection_name ||
+				nft.collection.contract;
 
 	// Determine the mint date
 	const mintDate = nft.updated_at ? new Date(nft.updated_at) : null;
@@ -532,6 +535,16 @@ export async function saveArtwork(
 				artworkId: artwork.id
 			}
 		});
+	}
+
+	// If successful, index the artwork
+	try {
+		if (artwork) {
+			await indexArtwork(artwork.id);
+		}
+	} catch (indexError) {
+		console.error(`Error indexing artwork: ${indexError}`);
+		// Don't throw here, as we want to return the artwork even if indexing fails
 	}
 
 	return artwork;

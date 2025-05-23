@@ -1,34 +1,105 @@
-# Medici by Compendium
+# Wallace Museum - NFT Management System
 
-The official repository for the Medici web application.
+This application provides tools for managing and displaying NFT collections for the Wallace Museum.
 
-## App Requirements
+## Key Features
 
-To run this app, you will need to connect it up with a database. I use a PostgreSQL database, but you can use any database supported by Prisma. The connection string should be stored in a `.env` file in the root of the project. The `.env` file should look like this (replace with your own database connection string):
+### 1. Wallet Management
 
-```env
-DATABASE_URL=postgres://user:password@host:port/database
-```
+The wallet management system allows you to:
 
-## Cloning this project
+- Add multiple blockchain wallet addresses (Ethereum, Tezos, Polygon, Solana)
+- Assign aliases to wallet addresses for easy identification
+- Delete wallet addresses when no longer needed
+- View all registered wallet addresses in one place
 
-To set this project up locally, clone the repository and install the dependencies with `npm install` (or `pnpm install` or `yarn`), then start a development server:
+### 2. Automated NFT Indexing
 
-```bash
-npm run dev
+The indexing system automatically:
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+- Fetches NFTs from registered wallet addresses
+- Normalizes data across different blockchains
+- Stores metadata in a searchable index
+- Updates the index daily via a scheduled cron job
 
-## Building
+#### Setting up the Indexer
 
-To create a production version of your app:
+1. Set the `INDEXER_API_KEY` environment variable in your `.env` file:
 
-```bash
-npm run build
-```
+   ```
+   INDEXER_API_KEY=your_secure_key_here
+   ```
 
-You can preview the production build with `npm run preview`.
+2. Set up a cron job to run the indexer daily:
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment. I use Vercel, so I use the Vercel adapter.
+   ```
+   0 2 * * * curl https://your-domain.com/api/admin/index-wallets?key=your_secure_key_here
+   ```
+
+3. You can also run the indexer manually from the admin interface.
+
+### 3. NFT Import System
+
+The import system allows you to:
+
+- Search indexed NFTs by name, description, token ID, etc.
+- Filter by blockchain, artist, or collection
+- Select multiple NFTs to import at once
+- Import NFTs into your official collection
+
+## Getting Started
+
+1. Install dependencies:
+
+   ```
+   npm install
+   ```
+
+2. Set up environment variables in `.env`:
+
+   ```
+   DATABASE_URL=your_database_connection_string
+   OPENSEA_API_KEY=your_opensea_api_key
+   INDEXER_API_KEY=your_secure_key_here
+   ```
+
+3. Run the development server:
+
+   ```
+   npm run dev
+   ```
+
+4. Access the admin interface at `http://localhost:5173/admin`
+
+## API Endpoints
+
+### Wallet Management
+
+- `GET /api/admin/index-wallets?key=[INDEXER_API_KEY]` - Run the indexer to fetch NFTs from all registered wallets
+
+### Search
+
+- `GET /api/admin/search` - Search indexed NFTs with various filters
+  - Parameters:
+    - `q` - Search term
+    - `blockchain` - Filter by blockchain
+    - `artist` - Filter by artist ID
+    - `collection` - Filter by collection ID
+    - `limit` - Number of results per page (default: 50)
+    - `offset` - Pagination offset (default: 0)
+
+## Database Schema
+
+The system uses the following key tables:
+
+- `Artwork` - Stores imported NFTs
+- `ArtworkIndex` - Stores indexed NFT data for search
+- `Artist` - Stores artist information
+- `Collection` - Stores collection information
+- `Settings` - Stores system settings, including wallet addresses
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
