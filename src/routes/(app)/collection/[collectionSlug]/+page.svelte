@@ -319,10 +319,6 @@
 </div>
 
 <style lang="scss">
-	.h-\\[100vh\\] {
-		height: 100vh;
-	}
-
 	.artwork-container {
 		@apply flex flex-row overflow-x-auto overflow-y-hidden snap-x snap-mandatory h-full;
 		height: calc(100vh - 60px);
