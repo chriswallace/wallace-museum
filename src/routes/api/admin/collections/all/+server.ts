@@ -1,6 +1,6 @@
 import prisma from '$lib/prisma';
 
-export async function GET() {
+export async function GET(): Promise<Response> {
 	try {
 		const collections = await prisma.collection.findMany({
 			orderBy: {
@@ -19,8 +19,8 @@ export async function GET() {
 				}
 			}
 		);
-	} catch (error) {
-		console.error('Error in GET request:', (error as Error).message);
+	} catch (error: any) {
+		console.error('Error in GET request:', error.message);
 		return new Response(JSON.stringify({ error: 'An error occurred' }), {
 			status: 500,
 			headers: {

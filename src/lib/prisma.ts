@@ -1,131 +1,144 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { dev } from '$app/environment'; // Import dev environment check from SvelteKit
+import { browser } from '$app/environment';
 
-// Extend PrismaClient to include any custom types needed
-// This helps TypeScript recognize models that might not be in the generated types yet
-class ExtendedPrismaClient extends PrismaClient {
-	constructor() {
-		super();
-	}
-
-	// Add settings model if it doesn't exist in generated types
-	get settings() {
-		return this._settings();
-	}
-
-	_settings() {
-		return {
-			findUnique: (args: any) =>
-				this.$queryRaw`SELECT * FROM "Settings" WHERE key = ${args.where.key} LIMIT 1`,
-			upsert: (args: any) => {
-				const { where, update, create } = args;
-				return this.$executeRaw`
-					INSERT INTO "Settings" (key, value, "createdAt", "updatedAt") 
-					VALUES (${create.key}, ${JSON.stringify(create.value)}, NOW(), NOW())
-					ON CONFLICT (key) 
-					DO UPDATE SET value = ${JSON.stringify(update.value)}, "updatedAt" = NOW()
-					RETURNING *;
-				`;
-			},
-			update: (args: any) => {
-				const { where, data } = args;
-				return this.$executeRaw`
-					UPDATE "Settings" 
-					SET value = ${JSON.stringify(data.value)}, "updatedAt" = NOW()
-					WHERE key = ${where.key}
-					RETURNING *;
-				`;
-			}
-		};
-	}
-
-	// Add artworkIndex model if it doesn't exist in generated types
-	get artworkIndex() {
-		return this._artworkIndex();
-	}
-
-	_artworkIndex() {
-		return {
-			findUnique: (args: any) => {
-				const { where } = args;
-				if (where.id) {
-					return this.$queryRaw`SELECT * FROM "ArtworkIndex" WHERE id = ${where.id} LIMIT 1`;
-				} else if (where.artworkId) {
-					return this
-						.$queryRaw`SELECT * FROM "ArtworkIndex" WHERE "artworkId" = ${where.artworkId} LIMIT 1`;
-				}
-				return null;
-			},
-			create: (args: any) => {
-				const { data } = args;
-				return this.$executeRaw`
-					INSERT INTO "ArtworkIndex" ("artworkId", "indexedData", "createdAt", "updatedAt") 
-					VALUES (${data.artworkId}, ${JSON.stringify(data.indexedData)}, NOW(), NOW())
-					RETURNING *;
-				`;
-			},
-			update: (args: any) => {
-				const { where, data } = args;
-				if (where.id) {
-					return this.$executeRaw`
-						UPDATE "ArtworkIndex" 
-						SET "indexedData" = ${JSON.stringify(data.indexedData)}, "updatedAt" = ${data.updatedAt || 'NOW()'}
-						WHERE id = ${where.id}
-						RETURNING *;
-					`;
-				} else if (where.artworkId) {
-					return this.$executeRaw`
-						UPDATE "ArtworkIndex" 
-						SET "indexedData" = ${JSON.stringify(data.indexedData)}, "updatedAt" = ${data.updatedAt || 'NOW()'}
-						WHERE "artworkId" = ${where.artworkId}
-						RETURNING *;
-					`;
-				}
-			},
-			upsert: (args: any) => {
-				// Use create if not exists, update if exists
-				const { where, create, update } = args;
-				return this.$executeRaw`
-					INSERT INTO "ArtworkIndex" ("artworkId", "indexedData", "createdAt", "updatedAt") 
-					VALUES (${create.artworkId}, ${JSON.stringify(create.indexedData)}, NOW(), NOW())
-					ON CONFLICT (id) 
-					DO UPDATE SET "indexedData" = ${JSON.stringify(update.indexedData)}, "updatedAt" = ${update.updatedAt || 'NOW()'}
-					RETURNING *;
-				`;
-			},
-			count: (args: any) => {
-				// Simplified count query
-				return this.$queryRaw`SELECT COUNT(*) FROM "ArtworkIndex"`.then((result: any) =>
-					Number(result[0].count)
-				);
-			},
-			findMany: (args: any) => {
-				// Simplified findMany (doesn't implement all filtering logic)
-				const { skip = 0, take = 100 } = args;
-				return this.$queryRaw`
-					SELECT * FROM "ArtworkIndex" 
-					LIMIT ${take} OFFSET ${skip}
-				`;
-			}
-		};
-	}
+// Ensure we're not trying to use Prisma in the browser
+if (browser) {
+	throw new Error('Prisma client cannot be used in the browser');
 }
 
-// Use globalThis to store the client in development, preventing multiple instances due to hot-reloading
-const prismaClientSingleton = () => {
-	return new ExtendedPrismaClient();
+declare global {
+	var prisma: PrismaClient | undefined;
+}
+
+// Configure logging based on environment
+const logLevels: Prisma.LogLevel[] = dev 
+	? ['error', 'warn'] 
+	: ['error'];
+
+const prismaOptions: Prisma.PrismaClientOptions = {
+	log: logLevels,
+	datasources: {
+		db: {
+			url: process.env.DATABASE_URL
+		}
+	},
+	// Error formatting for better debugging
+	errorFormat: dev ? 'pretty' : 'minimal'
 };
 
-type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
+// Connection pool configuration notes:
+// Connection pool settings should be configured in the DATABASE_URL
+// Example: postgresql://user:password@host:port/db?connection_limit=20&pool_timeout=30&connect_timeout=30
+// 
+// Recommended settings for production:
+// - connection_limit: 20-30 (depending on your database plan)
+// - pool_timeout: 30 (seconds to wait for a connection)
+// - connect_timeout: 30 (seconds to wait for initial connection)
+// - statement_timeout: 30000 (30 seconds for query timeout)
+// - idle_in_transaction_session_timeout: 60000 (60 seconds)
 
-const globalForPrisma = globalThis as unknown as {
-	prisma: PrismaClientSingleton | undefined;
+// Create a singleton instance
+const createPrismaClient = () => {
+	const client = new PrismaClient(prismaOptions);
+	
+	// Query timing middleware disabled to reduce logging
+	// if (dev) {
+	// 	client.$use(async (params, next) => {
+	// 		const before = Date.now();
+	// 		const result = await next(params);
+	// 		const after = Date.now();
+	// 		console.log(`Query ${params.model}.${params.action} took ${after - before}ms`);
+	// 		return result;
+	// 	});
+	// }
+	
+	return client;
 };
 
-const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
-
-export default prisma;
+// Use global variable in development to prevent multiple instances
+const prisma = global.prisma || createPrismaClient();
 
 if (dev) {
-	globalForPrisma.prisma = prisma;
+	global.prisma = prisma;
 }
+
+// Connection health check function
+export async function checkDatabaseConnection(): Promise<boolean> {
+	try {
+		await prisma.$queryRaw`SELECT 1`;
+		return true;
+	} catch (error) {
+		console.error('[Prisma] Database connection check failed:', error);
+		return false;
+	}
+}
+
+// Get connection pool metrics (if available)
+export async function getConnectionPoolMetrics() {
+	try {
+		// Check current connections (PostgreSQL specific)
+		const poolInfo = await prisma.$queryRaw<Array<{ count: bigint }>>`
+			SELECT count(*) 
+			FROM pg_stat_activity 
+			WHERE datname = current_database()
+		`;
+		
+		const activeConnections = Number(poolInfo[0]?.count || 0);
+		
+		// Get max connections setting
+		const maxConnInfo = await prisma.$queryRaw<Array<{ setting: string }>>`
+			SELECT setting 
+			FROM pg_settings 
+			WHERE name = 'max_connections'
+		`;
+		
+		const maxConnections = parseInt(maxConnInfo[0]?.setting || '100');
+		
+		return {
+			active: activeConnections,
+			max: maxConnections,
+			utilization: Math.round((activeConnections / maxConnections) * 100)
+		};
+	} catch (error) {
+		console.error('[Prisma] Failed to get pool metrics:', error);
+		return null;
+	}
+}
+
+// Connection pool monitoring (only in development)
+if (dev && process.env.ENABLE_POOL_MONITORING === 'true') {
+	setInterval(async () => {
+		const metrics = await getConnectionPoolMetrics();
+		if (metrics) {
+			console.log(`[Prisma] Connection pool: ${metrics.active}/${metrics.max} (${metrics.utilization}% utilization)`);
+		}
+	}, 60000); // Check every minute
+}
+
+// Graceful shutdown handling
+const gracefulShutdown = async () => {
+	console.log('[Prisma] Disconnecting from database...');
+	await prisma.$disconnect();
+	console.log('[Prisma] Disconnected from database');
+};
+
+// Register shutdown handlers
+process.on('beforeExit', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
+// Handle uncaught errors
+process.on('uncaughtException', async (error) => {
+	console.error('[Prisma] Uncaught exception:', error);
+	await gracefulShutdown();
+	process.exit(1);
+});
+
+process.on('unhandledRejection', async (reason, promise) => {
+	console.error('[Prisma] Unhandled rejection at:', promise, 'reason:', reason);
+	await gracefulShutdown();
+	process.exit(1);
+});
+
+export default prisma;

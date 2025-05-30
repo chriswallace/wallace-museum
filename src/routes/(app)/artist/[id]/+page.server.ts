@@ -6,53 +6,30 @@ export const load: PageServerLoad = async ({ params }) => {
 	const artist = await prisma.artist.findUnique({
 		where: { id: artistId },
 		include: {
-			addresses: true,
-			ArtistArtworks: {
-				include: {
-					artwork: {
-						select: {
-							id: true,
-							title: true,
-							description: true,
-							image_url: true,
-							animation_url: true,
-							dimensions: true,
-							contractAddr: true,
-							contractAlias: true,
-							tokenStandard: true,
-							tokenID: true,
-							mintDate: true,
-							mime: true,
-							tags: true,
-							attributes: true
-						}
-					}
-				}
-			}
+			artworks: true
 		}
-	});
+	} as any);
 
 	if (!artist) {
 		return { status: 404, error: 'Artist not found' };
 	}
 
-	const artworks = artist.ArtistArtworks.map((aa) => {
-		const a = aa.artwork;
+	const artworks = (artist.artworks || []).map((artwork: any) => {
 		return {
-			id: String(a.id),
-			title: a.title,
-			description: a.description,
-			image_url: a.image_url,
-			animation_url: a.animation_url,
-			dimensions: a.dimensions,
-			contractAddr: a.contractAddr,
-			contractAlias: a.contractAlias,
-			tokenStandard: a.tokenStandard,
-			tokenID: a.tokenID,
-			mintDate: a.mintDate,
-			mime: a.mime,
-			tags: a.tags,
-			attributes: a.attributes
+			id: String(artwork.id),
+			title: artwork.title,
+			description: artwork.description,
+			image_url: artwork.imageUrl,
+			animation_url: artwork.animationUrl,
+			dimensions: artwork.dimensions,
+			contractAddr: artwork.contractAddress,
+			contractAlias: null,
+			tokenStandard: artwork.tokenStandard,
+			tokenID: artwork.tokenId,
+			mintDate: artwork.mintDate,
+			mime: artwork.mime,
+			tags: null,
+			attributes: artwork.attributes
 		};
 	});
 
@@ -60,7 +37,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		artist: {
 			id: artist.id,
 			name: artist.name,
-			addresses: artist.addresses,
+			addresses: artist.walletAddresses,
 			artworks
 		}
 	};

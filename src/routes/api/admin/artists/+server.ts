@@ -22,8 +22,8 @@ export const GET: RequestHandler = async () => {
 				'Content-Type': 'application/json'
 			}
 		});
-	} catch (error) {
-		console.error('Error in /api/collections:', error.message);
+	} catch (error: any) {
+		console.error('Error in /api/artists:', error.message);
 		return new Response(JSON.stringify({ error: 'A server error occurred' }), {
 			status: 500,
 			headers: {

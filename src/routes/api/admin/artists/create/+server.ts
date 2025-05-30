@@ -1,5 +1,5 @@
 import prisma from '$lib/prisma';
-import { uploadToCloudinary } from '$lib/mediaHelpers';
+import { uploadToPinata } from '$lib/pinataHelpers';
 
 export async function POST({ request }) {
 	try {
@@ -15,7 +15,7 @@ export async function POST({ request }) {
 		if (file && file instanceof File) {
 			const buffer = Buffer.from(await file.arrayBuffer());
 			const mimeType = file.type;
-			const uploadResponse = await uploadToCloudinary(buffer, file.name, mimeType);
+			const uploadResponse = await uploadToPinata(buffer, file.name, mimeType);
 			if (uploadResponse) {
 				avatarUrl = uploadResponse.url;
 			}

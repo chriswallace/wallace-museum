@@ -1,6 +1,8 @@
 import prisma from '$lib/prisma';
-import type { Artist, ArtistAddress, Collection } from '@prisma/client';
+import { Artist, WalletAddress, Prisma } from '@prisma/client';
 import { indexArtwork } from './artworkIndexer';
+import { convertToIpfsUrl } from '$lib/pinataHelpers';
+import { detectBlockchainFromContract } from '$lib/utils/walletUtils.js';
 
 // Define interfaces for expected data structures
 interface SocialMediaAccounts {
@@ -13,14 +15,14 @@ interface SocialMediaAccounts {
 }
 
 interface ArtistInfo {
-	username?: string; // Optional as address can be fallback
 	address: string;
-	blockchain?: string; // Added to specify which blockchain the address belongs to
+	blockchain?: string;
 	bio?: string;
 	avatarUrl?: string;
 	website?: string;
-	displayName?: string; // Added to support displayName from OpenSea
+	displayName?: string;
 	social_media_accounts?: SocialMediaAccounts;
+	verified?: boolean;
 }
 
 interface CollectionInfo {
@@ -35,10 +37,42 @@ interface CollectionInfo {
 interface NftMetadata {
 	image_url?: string;
 	animation_url?: string;
+	generator_url?: string; // Add generator_url support
 	attributes?: any[]; // Keep attributes flexible for now
 	symbol?: string;
 	tags?: string[] | string; // Add tags field that can be string or array
 	collection_name?: string; // Add collection_name field
+	supply?: number; // Add supply field
+	features?: any; // Add features field
+
+	// Additional OpenSea metadata fields
+	image?: string; // Alternative image field name
+	image_details?: {
+		width?: number;
+		height?: number;
+		size?: number;
+	};
+	animation_details?: {
+		width?: number;
+		height?: number;
+		size?: number;
+	};
+
+	// Tezos-specific metadata fields
+	thumbnail_uri?: string;
+	artifact_uri?: string;
+	display_uri?: string;
+
+	// Date fields
+	mint_date?: string;
+	timestamp?: string;
+
+	// Creator/artist
+	creator?: string;
+
+	// Additional media metadata
+	file_size?: number;
+	duration?: number;
 }
 
 interface NftInfo {
@@ -54,11 +88,36 @@ interface NftInfo {
 	contractAlias?: string;
 	symbol?: string;
 	creator?: string; // Add creator field from OpenSea API
+
+	// OpenSea-specific fields at top level
+	display_image_url?: string;
+	display_animation_url?: string;
+	metadata_url?: string;
+	metadataUrl?: string; // Alternative casing
+	opensea_url?: string;
+	external_url?: string;
+	image_url?: string; // Top-level image URL
+	image_original_url?: string;
+	is_disabled?: boolean;
+	is_nsfw?: boolean;
+	is_suspicious?: boolean;
+
+	// Tezos-specific fields at top level
+	thumbnail_uri?: string;
+	artifact_uri?: string;
+	display_uri?: string;
+	supply?: number;
+	owners?: any[];
+
+	// Additional fields
+	generator_url?: string;
 }
+
+const zeroAddress = '0x0000000000000000000000000000000000000000';
 
 export async function processArtist(artistInfo: ArtistInfo) {
 	const zeroAddress = '0x0000000000000000000000000000000000000000';
-	let artistName = artistInfo.username;
+	let artistName = artistInfo.displayName;
 
 	console.log('[ARTIST_PROCESS] Processing artist with info:', JSON.stringify(artistInfo, null, 2));
 
@@ -106,11 +165,11 @@ export async function processArtist(artistInfo: ArtistInfo) {
 		// linkedinUrl: artistInfo.social_media_accounts?.linkedin || ''
 	};
 
-	let artist: (Artist & { addresses: ArtistAddress[] }) | null = null;
+	let artist: (Artist & { walletAddresses: WalletAddress[] }) | null = null;
 
 	// Try to find an existing artist by address first
 	if (artistInfo.address && artistInfo.address !== zeroAddress) {
-		const existingArtistAddress = await prisma.artistAddress.findUnique({
+		const existingWalletAddress = await prisma.walletAddress.findUnique({
 			where: {
 				address_blockchain: {
 					address: artistInfo.address,
@@ -120,14 +179,14 @@ export async function processArtist(artistInfo: ArtistInfo) {
 			include: {
 				artist: {
 					include: {
-						addresses: true
+						walletAddresses: true
 					}
 				}
 			}
 		});
 
-		if (existingArtistAddress && existingArtistAddress.artist) {
-			artist = existingArtistAddress.artist as Artist & { addresses: ArtistAddress[] };
+		if (existingWalletAddress && existingWalletAddress.artist) {
+			artist = existingWalletAddress.artist as Artist & { walletAddresses: WalletAddress[] };
 			console.log('[ARTIST_PROCESS] Found existing artist by address:', artist.name);
 
 			// Update existing artist data with new information if available
@@ -193,21 +252,19 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					artist = (await prisma.artist.update({
 						where: { id: artist.id },
 						data: updateData,
-						include: {
-							addresses: true
-						}
-					})) as Artist & { addresses: ArtistAddress[] };
+						include: { walletAddresses: true }
+					})) as Artist & { walletAddresses: WalletAddress[] };
 					console.log('[ARTIST_PROCESS] Updated artist record:', artist.name);
 				}
 			}
 
 			// Ensure the specific address is linked if it wasn't the one found (e.g. artist has multiple addresses)
-			const addressExists = artist.addresses.find(
-				(a: ArtistAddress) =>
+			const addressExists = artist.walletAddresses.find(
+				(a: WalletAddress) =>
 					a.address === artistInfo.address && a.blockchain === (artistInfo.blockchain || 'ethereum')
 			);
 			if (!addressExists) {
-				await prisma.artistAddress.create({
+				await prisma.walletAddress.create({
 					data: {
 						artistId: artist.id,
 						address: artistInfo.address,
@@ -217,9 +274,10 @@ export async function processArtist(artistInfo: ArtistInfo) {
 				// Re-fetch artist to include the new address
 				artist = (await prisma.artist.findUnique({
 					where: { id: artist.id },
-					include: { addresses: true }
-				})) as Artist & { addresses: ArtistAddress[] };
+					include: { walletAddresses: true }
+				})) as Artist & { walletAddresses: WalletAddress[] };
 			}
+
 			return artist;
 		}
 	}
@@ -231,24 +289,24 @@ export async function processArtist(artistInfo: ArtistInfo) {
 				OR: [{ name: artistName }, { name: { contains: artistName, mode: 'insensitive' } }]
 			},
 			include: {
-				addresses: true
+				walletAddresses: true
 			}
 		});
 
 		if (existingArtistByEns) {
-			artist = existingArtistByEns as Artist & { addresses: ArtistAddress[] };
+			artist = existingArtistByEns as Artist & { walletAddresses: WalletAddress[] };
 			console.log('[ARTIST_PROCESS] Found existing artist by ENS name:', artist.name);
 
 			// If an address is provided and not yet linked, link it
 			if (artistInfo.address && artistInfo.address !== zeroAddress) {
-				const addressExists = artist.addresses.find(
-					(a: ArtistAddress) =>
+				const addressExists = artist.walletAddresses.find(
+					(a: WalletAddress) =>
 						a.address === artistInfo.address &&
 						a.blockchain === (artistInfo.blockchain || 'ethereum')
 				);
 
 				if (!addressExists) {
-					await prisma.artistAddress.create({
+					await prisma.walletAddress.create({
 						data: {
 							artistId: artist.id,
 							address: artistInfo.address,
@@ -258,8 +316,8 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					// Re-fetch artist to include the new address
 					artist = (await prisma.artist.findUnique({
 						where: { id: artist.id },
-						include: { addresses: true }
-					})) as Artist & { addresses: ArtistAddress[] };
+						include: { walletAddresses: true }
+					})) as Artist & { walletAddresses: WalletAddress[] };
 				}
 			}
 
@@ -273,22 +331,22 @@ export async function processArtist(artistInfo: ArtistInfo) {
 		const existingArtistByName = await prisma.artist.findUnique({
 			where: { name: artistName },
 			include: {
-				addresses: true
+				walletAddresses: true
 			}
 		});
 
 		if (existingArtistByName) {
-			artist = existingArtistByName as Artist & { addresses: ArtistAddress[] };
+			artist = existingArtistByName as Artist & { walletAddresses: WalletAddress[] };
 			console.log('[ARTIST_PROCESS] Found existing artist by name:', artist.name);
 			// If an address is provided and not yet linked, link it
 			if (artistInfo.address && artistInfo.address !== zeroAddress) {
-				const addressExists = artist.addresses.find(
-					(a: ArtistAddress) =>
+				const addressExists = artist.walletAddresses.find(
+					(a: WalletAddress) =>
 						a.address === artistInfo.address &&
 						a.blockchain === (artistInfo.blockchain || 'ethereum')
 				);
 				if (!addressExists) {
-					await prisma.artistAddress.create({
+					await prisma.walletAddress.create({
 						data: {
 							artistId: artist.id,
 							address: artistInfo.address,
@@ -298,8 +356,8 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					// Re-fetch artist to include the new address
 					artist = (await prisma.artist.findUnique({
 						where: { id: artist.id },
-						include: { addresses: true }
-					})) as Artist & { addresses: ArtistAddress[] };
+						include: { walletAddresses: true }
+					})) as Artist & { walletAddresses: WalletAddress[] };
 				}
 			}
 		}
@@ -311,35 +369,49 @@ export async function processArtist(artistInfo: ArtistInfo) {
 		if (artistName && artistName !== zeroAddress) {
 			console.log('[ARTIST_PROCESS] Creating new artist with data:', artistData);
 			try {
-				artist = (await prisma.artist.create({
-					data: {
-						...artistData,
-						addresses:
-							artistInfo.address && artistInfo.address !== zeroAddress
-								? {
-										create: [
-											{
-												address: artistInfo.address,
-												blockchain: artistInfo.blockchain || 'ethereum'
-											}
-										]
-									}
-								: undefined
-					},
-					include: {
-						addresses: true
+				// First check if the wallet address already exists
+				let existingWalletAddress = null;
+				if (artistInfo.address && artistInfo.address !== zeroAddress) {
+					existingWalletAddress = await prisma.walletAddress.findUnique({
+						where: {
+							address_blockchain: {
+								address: artistInfo.address,
+								blockchain: artistInfo.blockchain || 'ethereum'
+							}
+						}
+					});
+				}
+
+				if (existingWalletAddress) {
+					// If wallet address exists but has no artist, create artist and link it
+					if (!existingWalletAddress.artistId) {
+						artist = (await prisma.artist.create({
+							data: artistData,
+							include: { walletAddresses: true }
+						})) as Artist & { walletAddresses: WalletAddress[] };
+
+						// Link the existing wallet address to the new artist
+						await prisma.walletAddress.update({
+							where: { id: existingWalletAddress.id },
+							data: { artistId: artist.id }
+						});
+
+						// Re-fetch artist to include the linked address
+						artist = (await prisma.artist.findUnique({
+							where: { id: artist.id },
+							include: { walletAddresses: true }
+						})) as Artist & { walletAddresses: WalletAddress[] };
+					} else {
+						// Wallet address already has an artist - this shouldn't happen if our logic above is correct
+						console.warn('[ARTIST_PROCESS] Wallet address already linked to another artist');
+						return null;
 					}
-				})) as Artist & { addresses: ArtistAddress[] };
-			} catch (error: any) {
-				if (error?.code === 'P2002' && error?.meta?.target?.includes('name')) {
-					// If name conflict, append part of the address or timestamp to make it unique
-					console.log('[ARTIST_PROCESS] Name conflict detected, making name unique');
-					const timestamp = Date.now().toString().slice(-6);
+				} else {
+					// Create new artist with new wallet address
 					artist = (await prisma.artist.create({
 						data: {
 							...artistData,
-							name: `${artistName}_${timestamp}`,
-							addresses:
+							walletAddresses:
 								artistInfo.address && artistInfo.address !== zeroAddress
 									? {
 											create: [
@@ -351,10 +423,70 @@ export async function processArtist(artistInfo: ArtistInfo) {
 										}
 									: undefined
 						},
-						include: {
-							addresses: true
-						}
-					})) as Artist & { addresses: ArtistAddress[] };
+						include: { walletAddresses: true }
+					})) as Artist & { walletAddresses: WalletAddress[] };
+				}
+			} catch (error: any) {
+				if (error?.code === 'P2002' && error?.meta?.target?.includes('name')) {
+					// If name conflict, append part of the address or timestamp to make it unique
+					console.log('[ARTIST_PROCESS] Name conflict detected, making name unique');
+					const timestamp = Date.now().toString().slice(-6);
+					
+					// Check again for existing wallet address for the retry
+					let existingWalletAddress = null;
+					if (artistInfo.address && artistInfo.address !== zeroAddress) {
+						existingWalletAddress = await prisma.walletAddress.findUnique({
+							where: {
+								address_blockchain: {
+									address: artistInfo.address,
+									blockchain: artistInfo.blockchain || 'ethereum'
+								}
+							}
+						});
+					}
+
+					if (existingWalletAddress && !existingWalletAddress.artistId) {
+						// Create artist with unique name and link existing wallet
+						artist = (await prisma.artist.create({
+							data: {
+								...artistData,
+								name: `${artistName}_${timestamp}`
+							},
+							include: { walletAddresses: true }
+						})) as Artist & { walletAddresses: WalletAddress[] };
+
+						// Link the existing wallet address to the new artist
+						await prisma.walletAddress.update({
+							where: { id: existingWalletAddress.id },
+							data: { artistId: artist.id }
+						});
+
+						// Re-fetch artist to include the linked address
+						artist = (await prisma.artist.findUnique({
+							where: { id: artist.id },
+							include: { walletAddresses: true }
+						})) as Artist & { walletAddresses: WalletAddress[] };
+					} else {
+						// Create artist with unique name and new wallet address
+						artist = (await prisma.artist.create({
+							data: {
+								...artistData,
+								name: `${artistName}_${timestamp}`,
+								walletAddresses:
+									artistInfo.address && artistInfo.address !== zeroAddress
+										? {
+												create: [
+													{
+														address: artistInfo.address,
+														blockchain: artistInfo.blockchain || 'ethereum'
+													}
+												]
+											}
+										: undefined
+							},
+							include: { walletAddresses: true }
+						})) as Artist & { walletAddresses: WalletAddress[] };
+					}
 				} else {
 					throw error;
 				}
@@ -391,14 +523,10 @@ export async function processCollection(collectionInfo: CollectionInfo) {
 }
 
 export async function saveArtwork(
-	nft: NftInfo,
-	artistId: number | null,
-	collectionId: number | null
+	nft: NftInfo, // Input NftInfo might contain various raw URLs from APIs
+	collectionId: number | null // This is Collection.id, still relevant
 ) {
-	// Ensure attributes is treated as JSON, default to empty array if null/undefined
 	let attributes = nft.metadata.attributes || [];
-
-	// If attributes is a string, try to parse it (in case it's already stringified JSON)
 	if (typeof attributes === 'string') {
 		try {
 			attributes = JSON.parse(attributes);
@@ -408,133 +536,402 @@ export async function saveArtwork(
 		}
 	}
 
-	// Validate that collection contract exists
 	if (!nft.collection || !nft.collection.contract) {
 		throw new Error(`Missing contract address for NFT ${nft.tokenID}`);
 	}
 
-	// Ensure dimensions has proper width and height values
-	let normalizedDimensions = null;
+	// Attempt to get primary image dimensions from various possible locations in NftInfo
+	let primaryImageDimensions: { width: number; height: number } | null = null;
 	if (nft.dimensions) {
-		// Handle case where dimensions might be a stringified JSON object
 		if (typeof nft.dimensions === 'string') {
 			try {
-				const parsedDimensions = JSON.parse(nft.dimensions);
-				if (
-					parsedDimensions &&
-					typeof parsedDimensions.width === 'number' &&
-					typeof parsedDimensions.height === 'number'
-				) {
-					normalizedDimensions = parsedDimensions;
+				const parsed = JSON.parse(nft.dimensions);
+				if (parsed && typeof parsed.width === 'number' && typeof parsed.height === 'number') {
+					primaryImageDimensions = parsed;
 				}
-			} catch (e) {
-				console.warn(`Failed to parse dimensions string: ${e}`);
-			}
+			} catch {}
 		} else if (
 			typeof nft.dimensions === 'object' &&
 			nft.dimensions !== null &&
 			typeof nft.dimensions.width === 'number' &&
 			typeof nft.dimensions.height === 'number'
 		) {
-			normalizedDimensions = {
-				width: nft.dimensions.width,
-				height: nft.dimensions.height
-			};
+			primaryImageDimensions = nft.dimensions as { width: number; height: number };
 		}
+	} else if (nft.metadata?.image_details && nft.metadata.image_details.width && nft.metadata.image_details.height) {
+		primaryImageDimensions = {
+			width: nft.metadata.image_details.width,
+			height: nft.metadata.image_details.height
+		};
 	}
 
-	console.log(`Normalized Dimensions:`, normalizedDimensions);
-
-	// Generate tags from attributes
 	let tags: string[] = [];
-	if (Array.isArray(attributes) && attributes.length > 0) {
-		// Extract meaningful values from attributes to use as tags
+	if (nft.metadata.tags && Array.isArray(nft.metadata.tags)) {
+		tags = nft.metadata.tags;
+	} else if (typeof nft.metadata.tags === 'string') {
+		tags = nft.metadata.tags
+			.split(',')
+			.map((t) => t.trim())
+			.filter((t) => t);
+	} else if (attributes && Array.isArray(attributes) && attributes.length > 0) {
 		tags = attributes
-			.filter(
-				(attr) => attr && typeof attr === 'object' && attr.value && String(attr.value).trim() !== ''
-			)
-			.map((attr) => String(attr.value).trim())
-			// Remove duplicates
-			.filter((value, index, self) => self.indexOf(value) === index);
+			.filter((attr) => attr && attr.value)
+			.map((attr) => String(attr.value))
+			.slice(0, 5);
 	}
 
-	// Ensure we have tags if they're provided directly
-	if (nft.metadata.tags && Array.isArray(nft.metadata.tags)) {
-		tags = [...tags, ...nft.metadata.tags];
-	} else if (typeof nft.metadata.tags === 'string') {
+	let contractAlias = nft.collection?.name || '';
+
+	let mintDate = null;
+	if (nft.metadata.mint_date || nft.metadata.timestamp) {
+		const dateString = nft.metadata.mint_date || nft.metadata.timestamp;
 		try {
-			const parsedTags = JSON.parse(nft.metadata.tags);
-			if (Array.isArray(parsedTags)) {
-				tags = [...tags, ...parsedTags];
-			}
+			mintDate = new Date(dateString as string);
+			if (isNaN(mintDate.getTime())) mintDate = null;
 		} catch (e) {
-			console.warn(`Failed to parse tags string: ${e}`);
+			console.warn(`Failed to parse mint date: ${dateString}`);
+			mintDate = null;
 		}
 	}
 
-	// Determine the contract alias more effectively
-	const contractAlias =
-		typeof nft.contractAlias === 'object' && nft.contractAlias !== null
-			? (nft.contractAlias as { name: string }).name
-			: nft.collection.name ||
-				nft.contractAlias ||
-				nft.metadata.collection_name ||
-				nft.collection.contract;
+	// --- Prepare media URLs and mime types ---
+	// This function does not call handleMediaUpload; it assumes URLs in NftInfo are what we want to save.
+	// Prioritization for image_url (primary display image)
+	const final_image_url =
+		nft.metadata?.image_url ||
+		nft.metadata?.image ||
+		nft.image_url ||
+		nft.image_original_url ||
+		nft.metadata?.display_uri ||
+		null;
 
-	// Determine the mint date
-	const mintDate = nft.updated_at ? new Date(nft.updated_at) : null;
+	// Prioritization for animation_url (video, gif, interactive)
+	let final_animation_url =
+		nft.metadata?.animation_url || nft.metadata?.artifact_uri || nft.generator_url || null;
 
-	// Upsert artwork: create if it doesn't exist, update if it does
-	const artworkData = {
+	// Fix #1: Only import gifs, videos, and code-powered artworks into animation_url
+	if (final_animation_url) {
+		const animationMime = guessMimeTypeFromUrl(final_animation_url);
+		
+		// Only keep animation_url for:
+		// 1. Videos (mp4, webm, mov, etc.)
+		// 2. GIFs
+		// 3. Interactive/code-powered content (html, js, or known platforms)
+		// 4. IPFS URLs (which often don't have extensions but may be valid media)
+		// 5. URLs that look like they might be generators or interactive content
+		if (animationMime) {
+			const isValidAnimationType = 
+				animationMime.startsWith('video/') || 
+				animationMime === 'image/gif' ||
+				animationMime === 'text/html' ||
+				animationMime === 'application/javascript' ||
+				isInteractivePlatform(final_animation_url);
+			
+			if (!isValidAnimationType) {
+				final_animation_url = null; // Don't use animation_url for static images
+			}
+		} else {
+			// If we can't determine the MIME type, be more permissive
+			// Keep the URL if it's:
+			// 1. From a known interactive platform
+			// 2. An IPFS URL (which often don't have extensions)
+			// 3. Contains keywords suggesting it might be interactive/generative content
+			// 4. Has query parameters or fragments (suggesting dynamic content)
+			const isIpfsUrl = final_animation_url.startsWith('ipfs://') || final_animation_url.includes('/ipfs/');
+			const hasInteractiveKeywords = /(?:generator|interactive|live|render|viewer|player|embed|animation|video|gif)/i.test(final_animation_url);
+			const hasDynamicParams = final_animation_url.includes('?') || final_animation_url.includes('#');
+			
+			if (!isInteractivePlatform(final_animation_url) && !isIpfsUrl && !hasInteractiveKeywords && !hasDynamicParams) {
+				final_animation_url = null;
+			}
+		}
+	}
+
+	// If image_url is a video/gif and no separate animation_url, use image_url for animation_url too.
+	// This is a heuristic; handleMediaUpload is more robust.
+	const imageMimeType =
+		nft.mime || (final_image_url ? guessMimeTypeFromUrl(final_image_url) : null);
+	if (
+		final_image_url &&
+		!final_animation_url &&
+		imageMimeType &&
+		(imageMimeType.startsWith('video/') || imageMimeType === 'image/gif')
+	) {
+		final_animation_url = final_image_url;
+	}
+
+	// Determine mime type for the primary image_url
+	const primary_mime = imageMimeType;
+
+	// --- Construct mediaMetadata JSON object ---
+	const mediaMetadata: any = {};
+	if (primaryImageDimensions) {
+		mediaMetadata.image_dimensions = primaryImageDimensions;
+	}
+	if (final_image_url) {
+		mediaMetadata.source_image_uri = final_image_url; // Store the chosen one as source for now
+	}
+
+	if (final_animation_url) {
+		mediaMetadata.source_animation_uri = final_animation_url;
+		const animationMime =
+			(nft.metadata?.artifact_uri &&
+				(nft.metadata as any).formats?.find((f: any) => f.uri === nft.metadata.artifact_uri)
+					?.mimeType) ||
+			(nft.generator_url ? 'text/html' : null) ||
+			(final_animation_url ? guessMimeTypeFromUrl(final_animation_url) : null);
+		if (animationMime) {
+			mediaMetadata.animation_mime_type = animationMime;
+		}
+		if (nft.metadata?.animation_details) {
+			mediaMetadata.animation_dimensions = {
+				width: nft.metadata.animation_details.width,
+				height: nft.metadata.animation_details.height
+			};
+		} else if (final_animation_url === final_image_url && primaryImageDimensions) {
+			mediaMetadata.animation_dimensions = primaryImageDimensions;
+		}
+	}
+
+	if (nft.metadata?.file_size) {
+		mediaMetadata.file_size_bytes = nft.metadata.file_size;
+	}
+	if (nft.metadata?.duration) {
+		mediaMetadata.duration_seconds = nft.metadata.duration;
+	}
+	if (nft.generator_url) {
+		// Explicitly add generator_url if present at top or metadata
+		mediaMetadata.generator_url = nft.generator_url;
+	} else if (nft.metadata?.generator_url) {
+		mediaMetadata.generator_url = nft.metadata.generator_url;
+	}
+
+	// --- Artist and WalletAddress Linking ---
+	let artistId: number | undefined;
+	const rawCreatorAddress = nft.creator || nft.metadata?.creator || null;
+	const contractAddress = nft.collection?.contract;
+	const artworkBlockchain = contractAddress ? detectBlockchainFromContract(contractAddress) : 'ethereum'; // Use contract-based detection
+
+	if (rawCreatorAddress) {
+		try {
+			// Create or find artist using the new schema with JSON wallet addresses
+			const creatorAddress = rawCreatorAddress.toLowerCase();
+			const artistName = `Artist_${creatorAddress.slice(-8)}`;
+			
+			// First, search all artists to find one with this wallet address
+			let artist: any = null;
+			const allArtists: any[] = await prisma.artist.findMany();
+
+			// Check if any artist has this wallet address
+			artist = allArtists.find(a => {
+				if (!a.walletAddresses || !Array.isArray(a.walletAddresses)) return false;
+				return (a.walletAddresses as any[]).some((w: any) => 
+					w.address?.toLowerCase() === creatorAddress
+				);
+			}) || null;
+
+			if (!artist) {
+				// Try to find by exact name match as fallback
+				try {
+					artist = await prisma.artist.findUnique({
+						where: { name: artistName }
+					});
+				} catch (error) {
+					// Ignore errors from name lookup
+				}
+			}
+
+			if (!artist) {
+				// Create new artist with wallet address
+				const walletAddresses = [{
+					address: creatorAddress,
+					blockchain: artworkBlockchain,
+					lastIndexed: new Date().toISOString()
+				}];
+
+				// Try to create with the base name first, handle conflicts
+				let finalArtistName = artistName;
+				let createAttempts = 0;
+				const maxAttempts = 5;
+
+				while (createAttempts < maxAttempts) {
+					try {
+						artist = await prisma.artist.create({
+							data: {
+								name: finalArtistName,
+								walletAddresses: walletAddresses as any
+							}
+						});
+						break; // Success, exit the loop
+					} catch (error: any) {
+						if (error?.code === 'P2002' && error?.meta?.target?.includes('name')) {
+							// Name conflict, try with a unique suffix
+							createAttempts++;
+							const timestamp = Date.now().toString().slice(-6);
+							finalArtistName = `${artistName}_${timestamp}`;
+							console.log(`[ARTIST_IMPORT] Name conflict for "${artistName}", trying "${finalArtistName}"`);
+						} else {
+							throw error; // Re-throw non-name-conflict errors
+						}
+					}
+				}
+
+				if (!artist) {
+					throw new Error(`Failed to create artist after ${maxAttempts} attempts due to name conflicts`);
+				}
+			} else {
+				// Update existing artist and merge wallet addresses if needed
+				const existingWallets = Array.isArray(artist.walletAddresses) ? artist.walletAddresses as any[] : [];
+				const addressExists = existingWallets.some((w: any) => 
+					w.address?.toLowerCase() === creatorAddress
+				);
+				
+				if (!addressExists) {
+					const updatedWallets = [...existingWallets, {
+						address: creatorAddress,
+						blockchain: artworkBlockchain,
+						lastIndexed: new Date().toISOString()
+					}];
+
+					artist = await prisma.artist.update({
+						where: { id: artist.id },
+						data: {
+							updatedAt: new Date(),
+							walletAddresses: updatedWallets as any
+						}
+					});
+				}
+			}
+
+			artistId = artist.id;
+		} catch (e) {
+			console.error(
+				`Error creating/updating Artist for ${rawCreatorAddress} on ${artworkBlockchain}:`,
+				e
+			);
+		}
+	}
+
+	// Compute UID for upsert (hash of contractAddress:tokenId)
+	const uid = `${nft.collection.contract}:${nft.tokenID}`;
+
+	let dimensionsValue: { width: number; height: number } | undefined = undefined;
+	if (
+		primaryImageDimensions &&
+		typeof primaryImageDimensions.width === 'number' &&
+		typeof primaryImageDimensions.height === 'number' &&
+		primaryImageDimensions.width !== undefined &&
+		primaryImageDimensions.height !== undefined
+	) {
+		dimensionsValue = {
+			width: primaryImageDimensions.width,
+			height: primaryImageDimensions.height
+		};
+	}
+
+	const artworkData: Prisma.ArtworkUpdateInput | Prisma.ArtworkCreateInput = {
 		title: nft.name || 'Untitled',
 		description: nft.description || '',
-		curatorNotes: '',
-		enabled: true,
-		// Important: Store dimensions as a JSON object, not a string
-		dimensions: normalizedDimensions,
-		collectionId: collectionId,
-		contractAddr: nft.collection.contract,
-		contractAlias: contractAlias,
-		tokenID: String(nft.tokenID),
-		blockchain: nft.collection.blockchain || 'ethereum',
-		tokenStandard: nft.token_standard || null,
-		animation_url: nft.metadata.animation_url || null,
-		image_url: nft.metadata.image_url || null,
-		mime: nft.mime || null,
-		symbol: nft.metadata.symbol || null,
-		// Important: Store attributes as a JSON array, not a string
-		attributes: attributes,
-		// Important: Store tags as a JSON array, not a string
-		tags: tags,
-		mintDate: mintDate
+		collection: collectionId ? { connect: { id: collectionId } } : undefined,
+		contractAddress: nft.collection.contract,
+		tokenId: String(nft.tokenID),
+		blockchain: artworkBlockchain,
+		tokenStandard: nft.token_standard || (artworkBlockchain === 'ethereum' ? 'ERC721' : 'FA2'),
+		imageUrl: final_image_url ? convertToIpfsUrl(final_image_url) : final_image_url,
+		animationUrl: final_animation_url ? convertToIpfsUrl(final_animation_url) : final_animation_url,
+		// Add thumbnailUrl from various sources - prioritize based on blockchain
+		thumbnailUrl: (() => {
+			// Check for generic circle thumbnail from Tezos
+			const GENERIC_CIRCLE_IPFS = 'ipfs://QmNrhZHUaEqxhyLfqoq1mtHSipkWHeT31LNHb1QEbDHgnc';
+			
+			let thumbnailUrl = artworkBlockchain?.toLowerCase() === 'tezos' 
+				? (nft.metadata?.thumbnail_uri || nft.thumbnail_uri || nft.metadata?.display_uri || nft.display_uri || null)
+				: (nft.metadata?.display_uri || nft.display_uri || nft.metadata?.thumbnail_uri || nft.thumbnail_uri || null);
+			
+			// If we have the generic circle thumbnail, use the main image instead
+			if (thumbnailUrl === GENERIC_CIRCLE_IPFS) {
+				console.log(`[saveArtwork] Detected generic circle thumbnail for ${nft.collection.contract}:${nft.tokenID}, using display/artifact image instead`);
+				thumbnailUrl = final_image_url;
+			}
+			
+			// Don't store thumbnail URL if it's the same as the main image URL
+			if (thumbnailUrl && final_image_url && thumbnailUrl === final_image_url) {
+				console.log(`[saveArtwork] Thumbnail URL is same as image URL for ${nft.collection.contract}:${nft.tokenID}, storing null to avoid duplication`);
+				thumbnailUrl = null;
+			}
+			
+			return thumbnailUrl ? convertToIpfsUrl(thumbnailUrl) : thumbnailUrl;
+		})(),
+		mime: primary_mime,
+		dimensions: dimensionsValue,
+		// Add supply field
+		supply: nft.supply || nft.metadata?.supply || null,
+		metadataUrl: (() => {
+			const metadataUrl = nft.metadata_url || (nft as any).metadataUrl || null;
+			return metadataUrl ? convertToIpfsUrl(metadataUrl) : metadataUrl;
+		})(),
+		attributes: attributes.length > 0 ? attributes : Prisma.JsonNull,
+		// Add features field if available
+		features: nft.metadata?.features ? nft.metadata.features : Prisma.JsonNull,
+		mintDate: mintDate,
+		uid: uid
 	};
 
 	const artwork = await prisma.artwork.upsert({
-		where: {
-			tokenID_contractAddr: {
-				tokenID: String(nft.tokenID),
-				contractAddr: nft.collection.contract
-			}
-		},
-		update: artworkData,
-		create: artworkData
+		where: { uid },
+		update: artworkData as Prisma.ArtworkUpdateInput, // Cast to make TS happy with shared object
+		create: artworkData as Prisma.ArtworkCreateInput
 	});
 
-	// Create artist-artwork relationship only if artist ID is provided
-	if (artistId !== null) {
-		await prisma.artistArtworks.upsert({
-			where: {
-				artistId_artworkId: {
-					artistId: artistId,
-					artworkId: artwork.id
+	// Create artwork-artist relationship if we have a creator
+	if (artistId && artwork) {
+		try {
+			// Connect the artwork directly to the artist using the many-to-many relationship
+			await prisma.artwork.update({
+				where: { id: artwork.id },
+				data: {
+					artists: {
+						connect: { id: artistId }
+					}
+				} as any
+			});
+		} catch (e) {
+			console.error(
+				`Error linking artwork ${artwork.id} to artist ${artistId}:`,
+				e
+			);
+		}
+	}
+
+	// Pin artwork URLs to Pinata
+	try {
+		const artworkForPinning = {
+			title: artwork.title,
+			imageUrl: artwork.imageUrl,
+			thumbnailUrl: artwork.thumbnailUrl,
+			animationUrl: artwork.animationUrl,
+			metadataUrl: artwork.metadataUrl
+		};
+		
+		const { extractCidsFromArtwork, pinCidToPinata } = await import('$lib/pinataHelpers');
+		const cids = extractCidsFromArtwork(artworkForPinning);
+		if (cids.length > 0) {
+			console.log(`Pinning ${cids.length} IPFS URLs for artwork: ${artwork.title}`);
+			
+			for (const cid of cids) {
+				try {
+					const pinName = `${artwork.title} - ${cid}`;
+					await pinCidToPinata(cid, pinName);
+					console.log(`Successfully pinned CID: ${cid} for artwork: ${artwork.title}`);
+				} catch (pinError) {
+					console.error(`Failed to pin CID ${cid} for artwork ${artwork.title}:`, pinError);
+					// Continue with other CIDs even if one fails
 				}
-			},
-			update: {}, // No fields to update, just ensure it exists
-			create: {
-				artistId: artistId,
-				artworkId: artwork.id
 			}
-		});
+		}
+	} catch (pinningError) {
+		console.error(`Error during Pinata pinning for artwork ${artwork.title}:`, pinningError);
+		// Don't fail the import if pinning fails
 	}
 
 	// If successful, index the artwork
@@ -543,9 +940,75 @@ export async function saveArtwork(
 			await indexArtwork(artwork.id);
 		}
 	} catch (indexError) {
-		console.error(`Error indexing artwork: ${indexError}`);
+		console.error(`Error indexing artwork ${artwork.id}: ${indexError}`);
 		// Don't throw here, as we want to return the artwork even if indexing fails
 	}
 
 	return artwork;
+}
+
+// Helper function (consider moving to a utility file if used elsewhere)
+function guessMimeTypeFromUrl(url: string): string | null {
+	if (!url) return null;
+	const extension = url.split('.').pop()?.toLowerCase();
+	if (!extension) return null;
+
+	const commonTypes: Record<string, string> = {
+		// Images
+		jpg: 'image/jpeg',
+		jpeg: 'image/jpeg',
+		png: 'image/png',
+		gif: 'image/gif',
+		webp: 'image/webp',
+		svg: 'image/svg+xml',
+		// Videos
+		mp4: 'video/mp4',
+		webm: 'video/webm',
+		mov: 'video/quicktime',
+		avi: 'video/x-msvideo',
+		// Interactive content
+		html: 'text/html',
+		htm: 'text/html',
+		js: 'application/javascript'
+	};
+
+	return commonTypes[extension] || null;
+}
+
+// Helper function to check if URL is from a known interactive/generative art platform
+function isInteractivePlatform(url: string): boolean {
+	if (!url) return false;
+	
+	const interactivePlatforms = [
+		'fxhash.xyz',
+		'generator.artblocks.io',
+		'artblocks.io',
+		'async.art',
+		'foundation.app',
+		'superrare.com',
+		'alba.art',
+		'gmstudio.art',
+		'highlight.xyz',
+		'prohibition.art',
+		'verse.works',
+		'plottables.io',
+		'tender.art',
+		'objkt.com',
+		'hicetnunc.art',
+		'teia.art',
+		'versum.xyz',
+		'kalamint.io',
+		'rarible.com',
+		'opensea.io',
+		'looksrare.org',
+		'x2y2.io',
+		'blur.io',
+		'niftygateway.com',
+		'makersplace.com',
+		'knownorigin.io',
+		'asyncart.com',
+		'zora.co'
+	];
+	
+	return interactivePlatforms.some(platform => url.includes(platform));
 }

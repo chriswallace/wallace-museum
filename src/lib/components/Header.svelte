@@ -4,6 +4,7 @@
 	import { selectedArtwork, isLiveCodeVisible } from '$lib/stores';
 	import { get } from 'svelte/store';
 	import { onMount } from 'svelte';
+	import { getContractUrl, getContractName } from '$lib/utils';
 
 	interface Artist {
 		id: number;
@@ -31,6 +32,7 @@
 		tags?: string[];
 		attributes?: { trait_type: string; value: string }[];
 		ArtistArtworks?: ArtistArtwork[];
+		blockchain?: string;
 	}
 
 	let artworkDetails: Artwork | null = null;
@@ -38,15 +40,6 @@
 
 	$: artworkDetails = $selectedArtwork as Artwork | null;
 	$: artworkSuffix = $page.data.artworks && $page.data.artworks.length > 1 ? 's' : '';
-
-	function getAddressURI(contractAddr: string, tokenID: string): string | undefined {
-		// if contract address starts with KT1 or KT2, it's a Tezos contract
-		if (contractAddr.startsWith('KT1') || contractAddr.startsWith('KT2')) {
-			return `https://tzkt.io/${contractAddr}/tokens/${tokenID}`;
-		} else if (contractAddr.startsWith('0x')) {
-			return `https://etherscan.io/token/${contractAddr}?a=${tokenID}`;
-		}
-	}
 
 	function toggleLiveCode(): void {
 		isLiveCodeVisible.set(!get(isLiveCodeVisible));
@@ -161,8 +154,11 @@
 							<dd>
 								<a
 									target="_blank"
-									href={getAddressURI(artworkDetails.contractAddr, artworkDetails.tokenID)}
-									>{artworkDetails.contractAlias}</a
+									href={getContractUrl(
+										artworkDetails.contractAddr,
+										artworkDetails.blockchain,
+										artworkDetails.tokenID
+									)}>{getContractName(artworkDetails.contractAddr, artworkDetails.contractAlias)}</a
 								>
 							</dd>
 						{/if}

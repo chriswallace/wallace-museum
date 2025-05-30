@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy, afterUpdate } from 'svelte';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import OptimizedImage from './OptimizedImage.svelte';
 
 	export let artistId: number;
 	export let artistName: string;
@@ -9,7 +11,8 @@
 	interface Artwork {
 		id: string;
 		title: string;
-		imageUrl: string;
+		imageUrl: string; // Original URL that needs transformation
+		animationUrl?: string; // Optional animation URL
 		description?: string;
 		year?: number;
 		artistId: string;
@@ -23,6 +26,11 @@
 	let artworkDetailsSectionElement: HTMLElement;
 	let detailsAreVisible = false; // Used to add/remove a class for reveal styling
 	let observer: IntersectionObserver | null = null;
+
+	// Transform URL for display
+	$: currentArtwork = artworks[currentArtworkIndex];
+	$: displayImageUrl = currentArtwork?.imageUrl || '';
+	$: displayAnimationUrl = currentArtwork?.animationUrl ? ipfsToHttpUrl(currentArtwork.animationUrl) : '';
 
 	async function fetchArtworks() {
 		isLoading = true;
@@ -111,8 +119,6 @@
 		}
 	}
 
-	$: currentArtwork = artworks.length > 0 ? artworks[currentArtworkIndex] : null;
-
 	// When artistId changes, re-fetch artworks
 	$: if (artistId && artworks.length > 0 && String(artworks[0]?.artistId) !== String(artistId)) {
 		fetchArtworks();
@@ -145,10 +151,17 @@
 				&lt;
 			</button>
 			<div class="artwork-image-container">
-				<img
-					src={currentArtwork.imageUrl}
-					alt={currentArtwork.title}
-					class="current-artwork-image"
+				<OptimizedImage 
+					src={displayImageUrl} 
+					alt={currentArtwork.title} 
+					className="current-artwork-image"
+					width={800}
+					responsive={true}
+					responsiveSizes={[400, 800, 1200]}
+					sizes="(max-width: 768px) 100vw, 80vw"
+					fit="contain"
+					format="webp"
+					quality={90}
 				/>
 			</div>
 			<button

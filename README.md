@@ -61,6 +61,7 @@ The import system allows you to:
    DATABASE_URL=your_database_connection_string
    OPENSEA_API_KEY=your_opensea_api_key
    INDEXER_API_KEY=your_secure_key_here
+   IPFS_API_KEY=your_ipfs_api_key
    ```
 
 3. Run the development server:
@@ -103,3 +104,21 @@ The system uses the following key tables:
 1. Fork the repository
 2. Create a feature branch
 3. Submit a pull request
+
+## Environment Variables
+
+### IPFS Configuration
+
+This app uses the Wallace Museum IPFS microservice for IPFS content delivery with authentication. You'll need to set up the following environment variable:
+
+```env
+# IPFS Microservice Configuration
+IPFS_API_KEY=your_api_key              # Your IPFS microservice API key
+```
+
+### How It Works:
+
+- All IPFS URLs in your app will be automatically routed through `https://ipfs.wallacemuseum.com`
+- The microservice uses your API key for authentication
+- Supports path-based IPFS URLs (e.g., `ipfs://Qm.../metadata.json`)
+- Falls back to public IPFS gateways if the microservice is unavailable

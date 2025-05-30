@@ -1,7 +1,11 @@
 import prisma from '$lib/prisma';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ params }): Promise<Response> => {
+export const POST: RequestHandler = async ({
+	params
+}: {
+	params: { id: string };
+}): Promise<Response> => {
 	const artistId = parseInt(params.id);
 
 	try {
@@ -29,7 +33,7 @@ export const POST: RequestHandler = async ({ params }): Promise<Response> => {
 				'Content-Type': 'application/json'
 			}
 		});
-	} catch (error) {
+	} catch (error: any) {
 		return new Response(JSON.stringify({ error: 'An error occurred while updating the artist' }), {
 			status: 500,
 			headers: {

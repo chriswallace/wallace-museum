@@ -1,9 +1,23 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
+	import { getCloudinaryTransformedUrl } from '$lib/pinataUtils.client';
+	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 
-	let collections = [];
+	interface Artist {
+		id: number;
+		name: string;
+		avatarUrl?: string;
+	}
+
+	interface Collection {
+		id: number;
+		title: string;
+		coverImages: string[];
+		artists?: Artist[];
+	}
+
+	let collections: Collection[] = [];
 	let page = 1;
 	let totalPages = 0;
 	let searchQuery = '';
@@ -27,18 +41,19 @@
 		fetchCollections(page);
 	});
 
-	function editCollection(id) {
+	function editCollection(id: number) {
 		goto(`/admin/collections/${id}`);
 	}
 
-	function handleSearchInput(event) {
-		searchQuery = event.target.value;
+	function handleSearchInput(event: Event) {
+		const target = event.target as HTMLInputElement;
+		searchQuery = target.value;
 		if (searchQuery.length >= 3 || searchQuery.length === 0) {
 			fetchCollections(page);
 		}
 	}
 
-	function changePage(newPage) {
+	function changePage(newPage: number) {
 		page = newPage;
 		fetchCollections(page);
 		window.scrollTo(0, 0);
@@ -85,16 +100,42 @@
 									height="250"
 								/>
 							{:else}
-								<img
-									src="{image}?tr=w-250,h-250,c_fit,q-70,dpr-auto"
+								<OptimizedImage
+									src={image}
 									alt=""
-									class="aspect-square object-contain"
+									width={250}
+									height={250}
+									fit="cover"
+									format="webp"
+									quality={80}
+									className="aspect-square object-cover"
 								/>
 							{/if}
 						{/each}
 					</div>
 				</div>
 				<div class="title">{collection.title}</div>
+				{#if collection.artists && collection.artists.length > 0}
+					<div class="artists-list">
+						{#each collection.artists as artist}
+							<span class="artist-name">
+								{#if artist.avatarUrl}
+									<OptimizedImage
+										src={artist.avatarUrl}
+										alt={artist.name}
+										width={20}
+										height={20}
+										fit="cover"
+										format="webp"
+										quality={85}
+										className="artist-avatar"
+									/>
+								{/if}
+								{artist.name}
+							</span>
+						{/each}
+					</div>
+				{/if}
 			</button>
 		{/each}
 	</div>
@@ -126,5 +167,14 @@
 	}
 	.pagination {
 		@apply flex justify-center items-center space-x-2 my-4;
+	}
+	.artists-list {
+		@apply flex flex-wrap gap-2 px-4 pb-2;
+	}
+	.artist-name {
+		@apply flex items-center gap-1 text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1;
+	}
+	.artist-avatar {
+		@apply w-5 h-5 rounded-full object-cover mr-1;
 	}
 </style>

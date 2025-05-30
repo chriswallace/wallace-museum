@@ -7,6 +7,10 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Ignore specific path for Chrome DevTools
+	if (event.url.pathname === '/.well-known/appspecific/com.chrome.devtools.json') {
+		return new Response(null, { status: 200 });
+	}
 	// Process the request
 	const response = await resolve(event);
 	return response;

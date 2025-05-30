@@ -1,73 +1,110 @@
 import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
+import type { RequestHandler } from '@sveltejs/kit';
+import { UnifiedIndexer } from '$lib/indexing/unified-indexer';
 import prisma from '$lib/prisma';
 
-/**
- * API endpoint to manually trigger the indexer
- * This endpoint requires authentication and will redirect to the indexer endpoint
- */
-export const GET: RequestHandler = async ({ url, request, cookies, locals }) => {
+export const POST: RequestHandler = async ({ request }) => {
 	try {
-		// Check for user authentication
-		const cookieHeader = request.headers.get('cookie') || '';
-		const sessionCookie = cookieHeader.split(';').find((c) => c.trim().startsWith('session='));
-		const sessionId = sessionCookie ? sessionCookie.split('=')[1] : '';
+		const body = await request.json();
+		const { status = 'pending', limit = 50 } = body;
 
-		if (!sessionId) {
-			return json(
-				{ success: false, error: 'Unauthorized. Please log in to run the indexer.' },
-				{ status: 401 }
-			);
-		}
+		const indexer = new UnifiedIndexer(prisma);
+		
+		// Process the import queue for the specified status
+		const results = await indexer.processQueue(status, limit);
+		
+		// Count successes and failures
+		const successful = results.filter(r => r.success).length;
+		const failed = results.filter(r => !r.success).length;
+		const errors = results
+			.filter(r => !r.success && r.errors)
+			.flatMap(r => r.errors || []);
 
-		const session = await prisma.session.findUnique({
-			where: { sessionId },
-			include: { user: true }
+		return json({
+			success: true,
+			processed: results.length,
+			successful,
+			failed,
+			errors: errors.length > 0 ? errors : undefined
 		});
-
-		// Check if the session is valid and not expired
-		if (!session || new Date(session.expiresAt) <= new Date()) {
-			return json(
-				{ success: false, error: 'Unauthorized. Session expired or invalid.' },
-				{ status: 401 }
-			);
-		}
-
-		// Check if user is admin (based on username for now - you may want to add an isAdmin field to User model)
-		// Assuming admin users have specific usernames like 'admin'
-		const isAdmin = session.user.username === 'admin';
-		if (!isAdmin) {
-			return json(
-				{ success: false, error: 'Unauthorized. Admin access required.' },
-				{ status: 401 }
-			);
-		}
-
-		// Get force refresh parameter
-		const forceRefresh = url.searchParams.get('force') === 'true';
-
-		// Call the indexer endpoint
-		const baseUrl = request.url.split('/api/admin/run-indexer')[0];
-		const indexerUrl = `${baseUrl}/api/admin/index-wallets${forceRefresh ? '?force=true' : ''}`;
-
-		// Call the indexer endpoint
-		const response = await fetch(indexerUrl, {
-			headers: {
-				cookie: cookieHeader
-			}
-		});
-
-		const result = await response.json();
-
-		return json(result);
 	} catch (error) {
-		console.error('Error in run-indexer endpoint:', error);
-		return json(
-			{
-				success: false,
-				error: error instanceof Error ? error.message : String(error)
-			},
-			{ status: 500 }
-		);
+		console.error('Failed to run indexer:', error);
+		return json({
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error'
+		}, { status: 500 });
 	}
 };
+
+export const GET: RequestHandler = async ({ url }) => {
+	try {
+		const status = url.searchParams.get('status') || undefined;
+		
+		// Get queue statistics
+		const pendingCount = await prisma.artworkIndex.count({
+			where: { importStatus: 'pending' }
+		});
+		
+		const normalizedCount = await prisma.artworkIndex.count({
+			where: { importStatus: 'normalized' }
+		});
+		
+		const referencedCount = await prisma.artworkIndex.count({
+			where: { importStatus: 'referenced' }
+		});
+		
+		const importedCount = await prisma.artworkIndex.count({
+			where: { importStatus: 'imported' }
+		});
+		
+		const failedCount = await prisma.artworkIndex.count({
+			where: { importStatus: 'failed' }
+		});
+		
+		const totalCount = await prisma.artworkIndex.count();
+		
+		// Get recent errors if requested
+		let recentErrors: Array<{
+			id: number;
+			nftUid: string;
+			errorMessage: string | null;
+			lastAttempt: Date;
+		}> = [];
+		if (status === 'failed' || !status) {
+			const failedRecords = await prisma.artworkIndex.findMany({
+				where: { 
+					importStatus: 'failed',
+					errorMessage: { not: null }
+				},
+				select: {
+					id: true,
+					nftUid: true,
+					errorMessage: true,
+					lastAttempt: true
+				},
+				orderBy: { lastAttempt: 'desc' },
+				take: 10
+			});
+			recentErrors = failedRecords;
+		}
+
+		return json({
+			success: true,
+			stats: {
+				total: totalCount,
+				pending: pendingCount,
+				normalized: normalizedCount,
+				referenced: referencedCount,
+				imported: importedCount,
+				failed: failedCount
+			},
+			recentErrors
+		});
+	} catch (error) {
+		console.error('Failed to get indexer stats:', error);
+		return json({
+			success: false,
+			error: error instanceof Error ? error.message : 'Unknown error'
+		}, { status: 500 });
+	}
+}; 

@@ -6,8 +6,6 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobePath from '@ffprobe-installer/ffprobe';
 import { fileTypeFromBuffer, type FileTypeResult } from 'file-type';
-import { v2 as cloudinary, type UploadApiOptions, type UploadApiResponse } from 'cloudinary';
-import { env as privateEnv } from '$env/dynamic/private';
 import { env as publicEnv } from '$env/dynamic/public';
 
 // Import the moved utility functions
@@ -20,42 +18,11 @@ import {
 	convertIpfsToHttpsUrl,
 	isValidMimeType,
 	getMediaType,
-	sanitizeCloudinaryPublicId
+	sanitizePinataFileName
 } from './mediaUtils';
 
-// Configure Cloudinary with environment variables
-const configureCloudinary = () => {
-	const config = {
-		cloud_name: publicEnv.PUBLIC_CLOUDINARY_CLOUD_NAME,
-		api_key: privateEnv.CLOUDINARY_API_KEY,
-		api_secret: privateEnv.CLOUDINARY_API_SECRET,
-		secure: true
-	};
-
-	// Validate required configuration
-	if (!config.cloud_name || !config.api_key || !config.api_secret) {
-		console.error('[CLOUDINARY_CONFIG] Missing required Cloudinary configuration:', {
-			hasCloudName: !!config.cloud_name,
-			hasApiKey: !!config.api_key,
-			hasApiSecret: !!config.api_secret
-		});
-		throw new Error('Missing required Cloudinary configuration');
-	}
-
-	try {
-		cloudinary.config(config);
-		console.log(
-			'[CLOUDINARY_CONFIG] Successfully configured Cloudinary with cloud name:',
-			config.cloud_name
-		);
-	} catch (error) {
-		console.error('[CLOUDINARY_CONFIG] Failed to configure Cloudinary:', error);
-		throw error;
-	}
-};
-
-// Configure Cloudinary immediately
-configureCloudinary();
+// Import Pinata helpers
+import { uploadToPinata as pinataUpload, getPinataTransformedUrl } from './pinataHelpers';
 
 // Set the paths to the static binaries
 if (typeof ffmpegPath === 'string') {
@@ -127,15 +94,34 @@ function createDimensions(
 // 	heigh: DEFAULT_DIMENSIONS.height
 // });
 
-// Define return type for uploadToCloudinary
+// Define return type for uploadToPinata
 interface UploadResult {
 	url: string;
 	fileType: string;
 	dimensions: Dimensions | null;
+	animated_url?: string;
+	animation_fileType?: string;
 }
 
 // Define basic structure for NFT and Metadata for normalization functions
-// Use 'any' for now, but ideally define more specific interfaces based on actual data structure
+interface TezosHolder {
+	address: string;
+	alias?: string;
+	tzdomain?: string;
+	logo?: string;
+	twitter?: string;
+	farcaster?: string;
+	website?: string;
+	instagram?: string;
+	description?: string;
+	__typename?: string;
+}
+
+interface TezosCreator {
+	holder: TezosHolder;
+	__typename?: string;
+}
+
 interface NftCreator {
 	holder?: {
 		alias?: string;
@@ -146,14 +132,19 @@ interface NftCreator {
 		instagram?: string;
 	};
 	creator_address?: string;
+	address?: string; // Add address field for objkt API
 }
 
-interface NftData {
+export interface NftData {
+	// Added export here
 	metadata?: any; // Keep any for flexibility or define a strict metadata type
 	name?: string;
+	title?: string; // Add title field for Tezos NFTs
 	description?: string;
 	creator?: any; // Could be string or object depending on source
 	creator_address?: string; // Add this field
+	creators?: TezosCreator[]; // Use the proper GraphQL structure
+	token_creators?: string[]; // Keep as fallback
 	image_url?: string;
 	display_image_url?: string;
 	animation_url?: string;
@@ -167,7 +158,6 @@ interface NftData {
 	tokenID?: string | number;
 	tokenId?: string | number;
 	identifier?: string | number;
-	creators?: NftCreator[];
 	mime?: string;
 	fa?: {
 		name?: string;
@@ -263,33 +253,9 @@ const getArtBlocksMediaType = (url: string): 'generator' | 'image' | 'unknown' =
 	return 'unknown';
 };
 
-const isFxHashUrl = (url: string): boolean => {
-	const fxhashDomains = ['onchfs.fxhash2.xyz', 'fxhash.xyz'];
-	try {
-		const urlObj = new URL(url);
-		return (
-			fxhashDomains.some((domain) => urlObj.hostname.endsWith(domain)) ||
-			url.startsWith('onchfs://')
-		);
-	} catch {
-		return url.startsWith('onchfs://');
-	}
-};
 
-function constructFxHashGeneratorUrl(metadata: any): string | null {
-	// Check for fxhash display_animation_url
-	if (metadata?.display_animation_url?.includes('onchfs.fxhash2.xyz')) {
-		return metadata.display_animation_url;
-	}
-	return null;
-}
 
 function detectGenerativeArtPlatform(metadata: any, contractAddress?: string): string | null {
-	// Check for fxhash
-	if (metadata?.display_animation_url?.includes('onchfs.fxhash2.xyz')) {
-		return 'fxhash';
-	}
-
 	// Check for Alba.art
 	if (metadata?.collectionId && metadata?.seed) {
 		return 'alba';
@@ -315,193 +281,7 @@ function detectGenerativeArtPlatform(metadata: any, contractAddress?: string): s
 
 import { isArtBlocksContract, getArtBlocksContractAlias } from './constants/artBlocks';
 
-export async function normalizeOpenSeaMetadata(nft: NftData): Promise<any> {
-	const metadata = nft.metadata || {};
 
-	// Extract platform-specific metadata
-	const platformMetadata = metadata.platform_metadata || {};
-
-	// Extract contract details
-	const contractAddress = nft.contractAddress || nft.contract || metadata.contractAddress;
-	const contractAlias = metadata.contractAlias || nft.contractAlias;
-	const tokenStandard = metadata.token_standard || nft.token_standard;
-	const symbol = metadata.symbol || nft.symbol;
-	const totalSupply = metadata.total_supply || nft.collection?.total_supply;
-	const platform = metadata.platform || nft.platform;
-
-	// Extract generator URL if available
-	const generator_url = metadata.generator_url || '';
-
-	// Process artist information
-	const artist = {
-		name:
-			metadata.artist ||
-			nft.creator?.name ||
-			nft.creator ||
-			metadata.creator?.name ||
-			metadata.creator ||
-			'',
-		address: metadata.creator?.address || nft.creator?.address || nft.creator_address || '',
-		bio: metadata.creator?.bio || metadata.creator?.description || nft.creator?.bio || '',
-		avatarUrl: metadata.creator?.image || metadata.creator?.avatar || nft.creator?.image || '',
-		website:
-			metadata.creator?.website || metadata.creator?.external_url || nft.creator?.website || '',
-		social_media_accounts: {
-			twitter: metadata.creator?.twitter || nft.creator?.twitter || '',
-			instagram: metadata.creator?.instagram || nft.creator?.instagram || ''
-		}
-	};
-
-	console.log('[METADATA_DEBUG] Processed artist info:', artist);
-
-	// Normalize attributes
-	const attributes = normalizeAttributes(nft, {
-		metadata,
-		platformMetadata,
-		includeNullValues: false
-	});
-
-	// Prioritize image fields
-	const image_url =
-		nft.image_url ||
-		nft.display_image_url || // Add display_image_url from fxhash
-		metadata.image ||
-		metadata.image_url ||
-		nft.image_original_url ||
-		nft.image_preview_url ||
-		nft.image_thumbnail_url;
-
-	// Prioritize animation fields with fxhash support
-	const animation_url =
-		nft.display_animation_url || // Prioritize fxhash display_animation_url
-		nft.animation_url ||
-		metadata.animation_url;
-
-	// Ensure collection contract is properly set
-	const collection = {
-		name: contractAlias,
-		contract: contractAddress,
-		blockchain: 'Ethereum',
-		platform: platform || 'Ethereum',
-		total_supply: totalSupply
-	};
-
-	const result = {
-		name: metadata.name || nft.name || 'Unknown Name',
-		tokenID: nft.identifier || nft.tokenId || nft.tokenID || metadata.tokenId || metadata.tokenID,
-		description: metadata.description || nft.description || '',
-		artist: artist.name || '',
-		artist_info: artist,
-		blockchain: 'Ethereum',
-		image_url,
-		animation_url,
-		generator_url,
-		tags: nft.tags || metadata.tags || [],
-		website: nft.website || metadata.external_url || '',
-		attributes: attributes,
-		collection,
-		contractAlias,
-		symbol,
-		token_standard: tokenStandard,
-		raw_data: {
-			attributes: metadata.attributes || nft.attributes,
-			traits: metadata.traits || nft.traits,
-			features: metadata.features || nft.features,
-			seed: metadata.seed,
-			collectionId: metadata.collectionId
-		}
-	};
-
-	console.log('[METADATA_DEBUG] Final normalized result:', {
-		name: result.name,
-		tokenID: result.tokenID,
-		artist: result.artist,
-		artist_info: result.artist_info
-	});
-
-	return result;
-}
-
-export async function normalizeTezosMetadata(nft: NftData): Promise<any> {
-	const metadata = nft.metadata || {};
-
-	// Extract contract details
-	const contractAddress = nft.contractAddress || nft.contract || metadata.contractAddress;
-	const contractAlias = metadata.contractAlias || nft.contractAlias;
-	const tokenStandard = metadata.token_standard || nft.token_standard;
-	const symbol = metadata.symbol || nft.symbol;
-	const totalSupply = metadata.total_supply || nft.collection?.total_supply;
-
-	// Extract creator information
-	const creator = {
-		creator_address: metadata.creator_address || nft.creator_address || '',
-		holder: metadata.creator?.holder || nft.creator?.holder || {}
-	};
-
-	// Extract social media accounts
-	const social_media_accounts = {
-		twitter: creator.holder?.twitter || metadata.creator?.twitter || nft.creator?.twitter || '',
-		instagram:
-			creator.holder?.instagram || metadata.creator?.instagram || nft.creator?.instagram || ''
-	};
-
-	// Process image and animation URLs
-	const image_url =
-		metadata.image_url ||
-		metadata.image ||
-		metadata.artifactUri ||
-		nft.image_url ||
-		nft.artifactUri;
-
-	const animation_url =
-		metadata.animation_url || metadata.animationUri || nft.animation_url || nft.animationUri;
-
-	// Process attributes
-	const attributes = normalizeAttributes(nft, {
-		metadata,
-		platformMetadata: {
-			Platform: 'Tezos',
-			'Token Standard': tokenStandard
-		},
-		includeNullValues: false
-	});
-
-	return {
-		name: metadata.name || nft.name || 'Unknown Name',
-		tokenID:
-			nft.tokenId || nft.tokenID || metadata.tokenId || metadata.tokenID || 'Unknown Token ID',
-		description: metadata.description || nft.description || 'No Description Available',
-		artist: {
-			address: creator.creator_address || '',
-			username: creator.holder?.alias || '',
-			bio: creator.holder?.description || '',
-			avatarUrl: creator.holder?.logo || '',
-			website: creator.holder?.website || '',
-			social_media_accounts: JSON.stringify(social_media_accounts)
-		},
-		platform: 'Tezos',
-		mime: metadata.mimeType || metadata.mime || nft.mime || '',
-		image_url,
-		animation_url,
-		tags: metadata.tags || nft.tags || [],
-		website: metadata.website || metadata.homepage || nft.website || '',
-		attributes: attributes,
-		symbol,
-		token_standard: tokenStandard,
-		contractAlias,
-		collection: {
-			name: nft.fa?.name || metadata.collection_name || nft.collection_name || '',
-			contract: contractAddress,
-			blockchain: 'Tezos',
-			total_supply: totalSupply
-		},
-		raw_data: {
-			attributes: metadata.attributes || nft.attributes,
-			properties: metadata.properties || nft.properties,
-			traits: metadata.traits || nft.traits
-		}
-	};
-}
 
 export async function fetchWithRetry(url: string, retries = 3, delay = 1000): Promise<Response> {
 	for (let i = 0; i < retries; i++) {
@@ -532,14 +312,17 @@ export async function fetchWithRetry(url: string, retries = 3, delay = 1000): Pr
 	throw new Error(`Failed to fetch ${url} after ${retries} retries.`);
 }
 
-export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMediaError | null> {
+export async function fetchMedia(
+	uri: string,
+	skipIpfsProcessing: boolean = false
+): Promise<FetchedMedia | FetchedMediaError | null> {
 	let response: Response | null = null;
 	let buffer: Buffer;
 	let httpUrlUsed: string | undefined = undefined; // Track the URL used for fetching
 
 	try {
 		const sanitizedUri = removeQueryString(uri);
-		console.log(`[MEDIA_DEBUG] Processing URI: ${sanitizedUri}`);
+		//console.log(`[MEDIA_DEBUG] Processing URI: ${sanitizedUri}`);
 
 		// Check if the URL is an Arweave URL with or without prefix
 		const isArweave =
@@ -549,7 +332,7 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 			sanitizedUri.match(/^[a-zA-Z0-9_-]{43}$/) !== null; // Raw Arweave transaction ID (43 chars)
 
 		if (isArweave) {
-			console.log(`[MEDIA_DEBUG] Detected Arweave URL: ${sanitizedUri}`);
+			//console.log(`[MEDIA_DEBUG] Detected Arweave URL: ${sanitizedUri}`);
 			let arweaveUrl = sanitizedUri;
 
 			// Handle ar:// protocol
@@ -566,7 +349,7 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 				arweaveUrl = arweaveUrl.slice(0, -1);
 			}
 
-			console.log(`[MEDIA_DEBUG] Fetching from Arweave URL: ${arweaveUrl}`);
+			//console.log(`[MEDIA_DEBUG] Fetching from Arweave URL: ${arweaveUrl}`);
 			httpUrlUsed = arweaveUrl;
 
 			try {
@@ -583,9 +366,9 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 					throw new Error(`HTTP error ${response.status} fetching Arweave URL`);
 				}
 
-				console.log(
+				/*console.log(
 					`[MEDIA_DEBUG] Successful Arweave response: ${response.status}, Content-Type: ${response.headers.get('content-type')}`
-				);
+				);*/
 			} catch (arweaveError) {
 				console.error(`[MEDIA_DEBUG] Error fetching from Arweave: ${arweaveError}`);
 				// Fall back to regular IPFS/HTTP handling
@@ -594,20 +377,35 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 
 		// If not an Arweave URL or Arweave fetch failed, continue with regular IPFS/HTTP handling
 		if (!response || !response.ok) {
-			// Assume convertIpfsToHttpsUrl returns IpfsUrlResult or string
-			const ipfsResourceResult = convertIpfsToHttpsUrl(sanitizedUri) as IpfsUrlResult | string;
-
 			let ipfsResource: string | null = null;
-			if (typeof ipfsResourceResult === 'string') {
-				ipfsResource = ipfsResourceResult;
-			} else if (ipfsResourceResult && typeof ipfsResourceResult === 'object') {
-				if (ipfsResourceResult.type === 'ipfs' || ipfsResourceResult.type === 'http') {
-					ipfsResource = ipfsResourceResult.value;
+
+			if (skipIpfsProcessing) {
+				// For import process, convert IPFS protocol URLs to gateway URLs but don't use proxy
+				if (sanitizedUri.startsWith('ipfs://')) {
+					// Convert ipfs:// to gateway URL
+					const hash = sanitizedUri.replace('ipfs://', '');
+					ipfsResource = `https://ipfs.io/ipfs/${hash}`;
+					//console.log(`[MEDIA_DEBUG] Converted IPFS protocol URL to gateway: ${ipfsResource}`);
+				} else {
+					// Use other URLs as-is
+					ipfsResource = sanitizedUri;
+					//console.log(`[MEDIA_DEBUG] Using URL as-is (skipIpfsProcessing): ${ipfsResource}`);
+				}
+			} else {
+				// Normal processing for display/other uses
+				const ipfsResourceResult = convertIpfsToHttpsUrl(sanitizedUri) as IpfsUrlResult | string;
+
+				if (typeof ipfsResourceResult === 'string') {
+					ipfsResource = ipfsResourceResult;
+				} else if (ipfsResourceResult && typeof ipfsResourceResult === 'object') {
+					if (ipfsResourceResult.type === 'ipfs' || ipfsResourceResult.type === 'http') {
+						ipfsResource = ipfsResourceResult.value;
+					}
 				}
 			}
 
 			if (!ipfsResource) {
-				console.log(`[MEDIA_DEBUG] Could not resolve URI to a fetchable resource: ${uri}`);
+				//console.log(`[MEDIA_DEBUG] Could not resolve URI to a fetchable resource: ${uri}`);
 				throw new Error(`Could not resolve URI to a fetchable resource: ${uri}`);
 			}
 
@@ -622,21 +420,22 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 
 			if (ipfsResource.startsWith('http://') || ipfsResource.startsWith('https://')) {
 				httpUrlUsed = ipfsResource;
-				console.log(`[MEDIA_DEBUG] Fetching HTTP(S) URL: ${httpUrlUsed}`);
+				//console.log(`[MEDIA_DEBUG] Fetching HTTP(S) URL: ${httpUrlUsed}`);
 				response = await fetch(httpUrlUsed, fetchOptions);
-				console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
-				console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
+				//console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
+				//console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
 				if (!response.ok) {
 					throw new Error(`HTTP error ${response.status} fetching direct URL`);
 				}
-			} else if (ipfsResource) {
+			} else if (ipfsResource && !skipIpfsProcessing) {
+				// Only try IPFS gateways if not skipping processing
 				for (const gateway of IPFS_GATEWAYS) {
 					httpUrlUsed = `${gateway}${ipfsResource}`;
-					console.log(`[MEDIA_DEBUG] Trying IPFS gateway: ${httpUrlUsed}`);
+					//console.log(`[MEDIA_DEBUG] Trying IPFS gateway: ${httpUrlUsed}`);
 					try {
 						response = await fetch(httpUrlUsed, fetchOptions);
-						console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
-						console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
+						//console.log(`[MEDIA_DEBUG] Response status: ${response.status}`);
+						//console.log(`[MEDIA_DEBUG] Content-Type: ${response.headers.get('content-type')}`);
 						if (response.ok) {
 							break;
 						} else {
@@ -647,13 +446,13 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 					}
 				}
 				if (!response || !response.ok) {
-					console.log(
+					/*console.log(
 						`[MEDIA_DEBUG] Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`
-					);
+					);*/
 					throw new Error(`Failed to fetch from all IPFS gateways for resource: ${ipfsResource}`);
 				}
 			} else {
-				console.log(`[MEDIA_DEBUG] Invalid or empty URI provided: ${uri}`);
+				//console.log(`[MEDIA_DEBUG] Invalid or empty URI provided: ${uri}`);
 				throw new Error(`Invalid or empty URI provided: ${uri}`);
 			}
 		}
@@ -661,14 +460,14 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 		const arrayBuffer = await response.arrayBuffer();
 		buffer = Buffer.from(arrayBuffer);
 		const fileTypeResult: FileTypeResult | undefined = await fileTypeFromBuffer(buffer);
-		console.log(
+		/*console.log(
 			`[MEDIA_DEBUG] Detected file type: ${fileTypeResult ? fileTypeResult.mime : 'undefined'}`
-		);
+		);*/
 		if (!fileTypeResult) {
 			// For files with no detectable type, check the Content-Type header
 			const contentType = response.headers.get('content-type');
 			if (contentType && (contentType.startsWith('image/') || contentType.startsWith('video/'))) {
-				console.log(`[MEDIA_DEBUG] Using Content-Type header for mime type: ${contentType}`);
+				//console.log(`[MEDIA_DEBUG] Using Content-Type header for mime type: ${contentType}`);
 				// Extract extension from content type
 				const ext = contentType.split('/')[1];
 				return {
@@ -714,13 +513,13 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 
 		if (mimeType.startsWith('image/')) {
 			try {
-				console.log(`[MEDIA_DEBUG] Extracting image dimensions for ${fileName}`);
+				//console.log(`[MEDIA_DEBUG] Extracting image dimensions for ${fileName}`);
 				const metadata = await sharp(buffer).metadata();
 				if (metadata.width && metadata.height) {
 					dimensions = createDimensions(metadata.width, metadata.height);
-					console.log(`[MEDIA_DEBUG] Image dimensions: ${dimensions?.width}x${dimensions?.height}`);
+					//console.log(`[MEDIA_DEBUG] Image dimensions: ${dimensions?.width}x${dimensions?.height}`);
 				} else {
-					console.log(`[MEDIA_DEBUG] Image dimensions could not be determined from metadata`);
+					//console.log(`[MEDIA_DEBUG] Image dimensions could not be determined from metadata`);
 					dimensions = null;
 				}
 			} catch (sharpError: unknown) {
@@ -729,13 +528,13 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 			}
 		} else if (mimeType.startsWith('video/')) {
 			try {
-				console.log(`[MEDIA_DEBUG] Extracting video dimensions for ${fileName}`);
+				//console.log(`[MEDIA_DEBUG] Extracting video dimensions for ${fileName}`);
 				const videoDimensions = await getVideoDimensions(buffer);
 				if (videoDimensions) {
 					dimensions = createDimensions(videoDimensions.width, videoDimensions.height);
-					console.log(`[MEDIA_DEBUG] Video dimensions: ${dimensions?.width}x${dimensions?.height}`);
+					//console.log(`[MEDIA_DEBUG] Video dimensions: ${dimensions?.width}x${dimensions?.height}`);
 				} else {
-					console.log(`[MEDIA_DEBUG] Video dimensions could not be determined`);
+					//console.log(`[MEDIA_DEBUG] Video dimensions could not be determined`);
 					dimensions = null;
 				}
 			} catch (videoError: unknown) {
@@ -756,7 +555,7 @@ export async function fetchMedia(uri: string): Promise<FetchedMedia | FetchedMed
 		};
 	} catch (error: unknown) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		console.log(`[MEDIA_DEBUG] Error fetching media for URI "${uri}": ${errorMessage}`);
+		//console.log(`[MEDIA_DEBUG] Error fetching media for URI "${uri}": ${errorMessage}`);
 		return { httpUrlUsed: httpUrlUsed, error: 'fetch_error', message: errorMessage };
 	}
 }
@@ -804,13 +603,13 @@ async function convertToWebP(
 	maxSizeMB = 8
 ): Promise<{ buffer: Buffer; mimeType: string }> {
 	try {
-		console.log('[WEBP_CONVERT] Converting image to WebP format');
+		//console.log('[WEBP_CONVERT] Converting image to WebP format');
 		const maxSizeBytes = maxSizeMB * 1024 * 1024;
 		const originalSize = buffer.length;
 
 		// Don't do any conversion if the image is already small enough
 		if (buffer.length <= maxSizeBytes) {
-			console.log('[WEBP_CONVERT] Image already small enough, skipping conversion');
+			//console.log('[WEBP_CONVERT] Image already small enough, skipping conversion');
 			// Still convert format to webp but without size reduction
 			const webpBuffer = await sharp(buffer).webp({ quality: 80 }).toBuffer();
 
@@ -834,14 +633,14 @@ async function convertToWebP(
 			};
 		}
 
-		// Only reduce quality to 60% as minimum
+		// Only reduce quality to 40% as minimum (was 60%)
 		let currentQuality = quality;
 		let attempts = 0;
-		const maxAttempts = 3; // Limit quality reduction attempts
+		const maxAttempts = 5; // Increased from 3
 
-		while (webpBuffer.length > maxSizeBytes && currentQuality > 60 && attempts < maxAttempts) {
-			// Reduce quality by 10% each time, but don't go below 60
-			currentQuality = Math.max(60, currentQuality - 10);
+		while (webpBuffer.length > maxSizeBytes && currentQuality > 40 && attempts < maxAttempts) {
+			// Reduce quality by 10% each time, but don't go below 40
+			currentQuality = Math.max(40, currentQuality - 10);
 			attempts++;
 
 			console.log(
@@ -851,7 +650,7 @@ async function convertToWebP(
 			webpBuffer = await sharp(buffer).webp({ quality: currentQuality }).toBuffer();
 
 			if (webpBuffer.length <= maxSizeBytes) {
-				console.log('[WEBP_CONVERT] Quality reduction sufficient');
+				//console.log('[WEBP_CONVERT] Quality reduction sufficient');
 				return {
 					buffer: webpBuffer,
 					mimeType: 'image/webp'
@@ -871,7 +670,7 @@ async function convertToWebP(
 			attempts = 0;
 
 			// Use a more gradual scale factor
-			while (webpBuffer.length > maxSizeBytes && attempts < 5) {
+			while (webpBuffer.length > maxSizeBytes && attempts < 8) { // Increased from 5
 				// Scale down by 10% each time
 				targetWidth = Math.floor(targetWidth * 0.9);
 				targetHeight = Math.floor(targetHeight * 0.9);
@@ -928,7 +727,7 @@ function verifyAspectRatioPreservation(
 		const uploadedAspectRatio = uploadedDimensions.width / uploadedDimensions.height;
 		const aspectRatioPercentDiff = Math.abs(1 - uploadedAspectRatio / originalAspectRatio) * 100;
 
-		console.log(
+		/*console.log(
 			`[MEDIA_UPLOAD_DEBUG] Original aspect ratio: ${originalAspectRatio.toFixed(4)} (${originalDimensions.width}x${originalDimensions.height})`
 		);
 		console.log(
@@ -936,24 +735,24 @@ function verifyAspectRatioPreservation(
 		);
 		console.log(
 			`[MEDIA_UPLOAD_DEBUG] Aspect ratio difference: ${aspectRatioPercentDiff.toFixed(2)}%`
-		);
+		);*/
 
 		if (aspectRatioPercentDiff > 1) {
 			console.warn(
 				`[MEDIA_UPLOAD_DEBUG] WARNING: Aspect ratio changed by ${aspectRatioPercentDiff.toFixed(2)}% during upload!`
 			);
 		} else {
-			console.log('[MEDIA_UPLOAD_DEBUG] Aspect ratio successfully preserved ✓');
+			//console.log('[MEDIA_UPLOAD_DEBUG] Aspect ratio successfully preserved ✓');
 		}
 	}
 }
 
 export async function handleMediaUpload(
 	mediaUri: string,
-	artwork: NftData
+	artwork: NftData,
+	skipIpfsProcessing: boolean = false
 ): Promise<UploadResult | null> {
 	if (!mediaUri || typeof mediaUri !== 'string') {
-		console.error('[MEDIA_UPLOAD_DEBUG] Invalid media URI provided:', mediaUri);
 		return null;
 	}
 
@@ -962,9 +761,9 @@ export async function handleMediaUpload(
 
 	// Log artwork dimensions if available
 	if (originalDimensions) {
-		console.log(
+		/*console.log(
 			`[MEDIA_UPLOAD_DEBUG] Original artwork dimensions from metadata: ${originalDimensions.width}x${originalDimensions.height}`
-		);
+		);*/
 	}
 
 	// Retry configuration
@@ -972,255 +771,411 @@ export async function handleMediaUpload(
 	const RETRY_DELAY = 2000; // 2 seconds
 	let retryCount = 0;
 
-	// Special handling for fxhash URLs - these are HTML generators, not direct media
-	if (isFxHashUrl(mediaUri)) {
-		const dimensions = ensureDimensions(artwork.dimensions);
-		return {
-			url: mediaUri,
-			fileType: 'text/html',
-			dimensions
-		};
-	}
+	// Initialize return object fields for animated media
+	let animated_url: string | undefined = undefined;
+	let animation_fileType: string | undefined = undefined;
+
 
 	// Special handling for Art Blocks URLs - these can be generators or images
 	if (isArtBlocksUrl(mediaUri)) {
-		const mediaType = getArtBlocksMediaType(mediaUri);
+		const mediaTypeResult = getArtBlocksMediaType(mediaUri);
 
-		// For generator URLs, we don't upload to Cloudinary as they're HTML
-		if (mediaType === 'generator') {
+		// For generator URLs, we don't upload to Pinata as they're HTML
+		if (mediaTypeResult === 'generator') {
 			const dimensions = ensureDimensions(artwork.dimensions);
 			return {
-				url: mediaUri,
+				url: mediaUri, // Primary URL will be the generator itself
 				fileType: 'text/html',
-				dimensions
+				dimensions,
+				animated_url: mediaUri, // Animated URL is also the generator
+				animation_fileType: 'text/html'
 			};
 		}
 
-		// For image URLs, always upload to Cloudinary
-		if (mediaType === 'image') {
+		// For Art Blocks "image" type (never GIF, always a static image like PNG/JPG)
+		if (mediaTypeResult === 'image') {
+			retryCount = 0; // Reset retry count for this path
 			while (retryCount < MAX_RETRIES) {
 				try {
-					const mediaData = await fetchMedia(mediaUri);
+					const mediaData = await fetchMedia(mediaUri, skipIpfsProcessing);
 					if (!mediaData || 'error' in mediaData) {
 						throw new Error(`Failed to fetch Art Blocks image: ${mediaUri}`);
 					}
 
 					if (!isValidMimeType(mediaData.mimeType)) {
-						throw new Error(`Invalid MIME type detected: ${mediaData.mimeType}`);
+						throw new Error(
+							`Invalid MIME type detected for Art Blocks image: ${mediaData.mimeType}`
+						);
 					}
-
-					// Convert image to WebP if it's an image type
+					// Art Blocks images are static; no special animated handling needed here.
+					// Convert to WebP if it's a non-SVG static image.
 					let uploadBuffer = mediaData.buffer;
 					let uploadMimeType = mediaData.mimeType;
 
-					// Convert to WebP only for non-SVG, non-GIF images
-					if (
-						mediaData.mimeType.startsWith('image/') &&
-						!mediaData.mimeType.includes('svg') &&
-						!mediaData.mimeType.includes('gif')
-					) {
+					if (mediaData.mimeType.startsWith('image/') && !mediaData.mimeType.includes('svg')) {
 						const dimensions = await getImageDimensionsFromBuffer(mediaData.buffer);
-						console.log(
-							`[MEDIA_UPLOAD_DEBUG] Original image dimensions: ${dimensions?.width}x${dimensions?.height}`
-						);
-
-						// Store dimensions for proper aspect ratio preservation
 						originalDimensions = dimensions || originalDimensions;
-
 						const webpResult = await convertToWebP(mediaData.buffer, dimensions, 80, 8);
 						uploadBuffer = webpResult.buffer;
 						uploadMimeType = webpResult.mimeType;
-
-						// Get dimensions after WebP conversion
-						const webpDimensions = await getImageDimensionsFromBuffer(uploadBuffer);
-						console.log(
-							`[MEDIA_UPLOAD_DEBUG] WebP converted dimensions: ${webpDimensions?.width}x${webpDimensions?.height}`
-						);
 					}
 
-					// Get the original dimensions to track aspect ratio preservation
-					const originalImageDimensions = await getImageDimensionsFromBuffer(uploadBuffer);
-
-					// Log dimensions but not aspect ratio since that's handled by the verification function
-					if (originalImageDimensions) {
-						console.log(
-							`[MEDIA_UPLOAD_DEBUG] Original image dimensions before upload: ${originalImageDimensions.width}x${originalImageDimensions.height}`
-						);
-					}
-
-					console.log(
-						`[MEDIA_UPLOAD_DEBUG] Uploading to Cloudinary with mime type: ${uploadMimeType}`
-					);
-					const uploadResult = await uploadToCloudinary(
+					const imageDimensions = await getImageDimensionsFromBuffer(uploadBuffer);
+					const uploadResult = await pinataUpload(
 						uploadBuffer,
 						artwork.name || mediaData.fileName || 'artwork',
 						uploadMimeType,
-						generateTags(
-							artwork.name || mediaData.fileName || 'artwork',
-							uploadMimeType,
-							artwork.collection?.contract,
-							artwork.tokenID
-						)
+						{
+							tags: generateTags(
+								artwork.name || mediaData.fileName || 'artwork',
+								uploadMimeType,
+								artwork.collection?.contract,
+								artwork.tokenID
+							)
+						}
 					);
 
 					if (!uploadResult) {
-						throw new Error('Cloudinary upload failed');
+						throw new Error('Pinata upload failed for Art Blocks image');
 					}
+					verifyAspectRatioPreservation(imageDimensions, uploadResult.dimensions);
 
-					// Verify aspect ratio was preserved
-					verifyAspectRatioPreservation(originalImageDimensions, uploadResult.dimensions);
-
-					console.log(
-						`[MEDIA_UPLOAD_DEBUG] Cloudinary upload successful. Dimensions from result: ${uploadResult.dimensions?.width}x${uploadResult.dimensions?.height}`
-					);
-
+					// For a static Art Blocks image, animated_url is not set.
 					return {
 						url: uploadResult.url,
 						fileType: uploadMimeType,
-						dimensions: uploadResult.dimensions
+						dimensions: uploadResult.dimensions,
+						animated_url: undefined, // Explicitly undefined
+						animation_fileType: undefined // Explicitly undefined
 					};
 				} catch (error) {
-					console.error(`[MEDIA_UPLOAD_DEBUG] Attempt ${retryCount + 1} failed:`, error);
+					console.error(
+						`[MEDIA_UPLOAD_DEBUG] Art Blocks Image Attempt ${retryCount + 1} failed:`,
+						error
+					);
 					retryCount++;
 					if (retryCount < MAX_RETRIES) {
 						await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+					} else {
+						console.error(
+							'[MEDIA_UPLOAD_DEBUG] All retry attempts failed for Art Blocks image. Using original URI.'
+						);
+						const mediaData = await fetchMedia(mediaUri, skipIpfsProcessing);
+						if (mediaData && !('error' in mediaData)) {
+							const dims = await getImageDimensionsFromBuffer(mediaData.buffer);
+							return {
+								url: mediaData.httpUrlUsed,
+								fileType: mediaData.mimeType,
+								dimensions: dims,
+								animated_url: undefined,
+								animation_fileType: undefined
+							};
+						}
+						return { url: mediaUri, fileType: 'unknown', dimensions: null }; // Minimal fallback
 					}
 				}
 			}
-			console.error('[MEDIA_UPLOAD_DEBUG] All retry attempts failed for Art Blocks image');
-			return null;
 		}
 	}
 
 	// Regular media handling
 	let fetchedMediaResult: FetchedMedia | FetchedMediaError | null;
 	try {
-		fetchedMediaResult = await fetchMedia(mediaUri);
+		fetchedMediaResult = await fetchMedia(mediaUri, skipIpfsProcessing);
 	} catch (error) {
-		console.error('[MEDIA_UPLOAD_DEBUG] Error fetching media:', error);
 		return null;
 	}
 
-	// If we couldn't fetch the media or got an error, handle potential HTML/PDF content
 	if (!fetchedMediaResult || 'error' in fetchedMediaResult) {
 		const errorInfo = fetchedMediaResult as FetchedMediaError | null;
-
 		// For HTML/PDF content that can't be fetched normally, return the URL directly
+		// This could be considered "animated" or "interactive"
 		if (errorInfo?.httpUrlUsed && typeof errorInfo.httpUrlUsed === 'string') {
-			const mediaType = getMediaType(
+			const detectedMediaType = getMediaType(
 				errorInfo.message?.includes('application/pdf') ? 'application/pdf' : 'text/html'
 			);
 
-			if (mediaType === 'interactive' || mediaType === 'document') {
+			if (detectedMediaType === 'interactive' || detectedMediaType === 'document') {
+				const fileType = detectedMediaType === 'document' ? 'application/pdf' : 'text/html';
 				return {
-					url: errorInfo.httpUrlUsed,
-					fileType: mediaType === 'document' ? 'application/pdf' : 'text/html',
-					dimensions: null
+					url: errorInfo.httpUrlUsed, // Or placeholder?
+					fileType: fileType,
+					dimensions: null,
+					animated_url: errorInfo.httpUrlUsed,
+					animation_fileType: fileType
 				};
 			}
 		}
-
 		console.error(
 			`[MEDIA_UPLOAD_DEBUG] Media fetch failed: ${errorInfo?.error}: ${errorInfo?.message}`
 		);
 		return null;
 	}
 
-	// Successfully fetched media - validate it
 	const fetchedMedia = fetchedMediaResult as FetchedMedia;
 	if (!isValidMimeType(fetchedMedia.mimeType)) {
-		console.error(`[MEDIA_UPLOAD_DEBUG] Invalid MIME type: ${fetchedMedia.mimeType}`);
 		return null;
 	}
 
-	const mediaType = getMediaType(fetchedMedia.mimeType);
-	if (mediaType === 'unknown') {
-		console.error(`[MEDIA_UPLOAD_DEBUG] Unsupported media type: ${fetchedMedia.mimeType}`);
-		return null;
-	}
+	const primaryMediaType = getMediaType(fetchedMedia.mimeType); // image, video, document, interactive, unknown
+	let isPrimaryAnimated = primaryMediaType === 'video' || fetchedMedia.mimeType === 'image/gif';
 
-	// Always upload valid media to Cloudinary
+	// Main media upload attempt (could be static image, video, or GIF)
+	retryCount = 0; // Reset retry count for this new attempt
+	let mainPinataUrl: string | null = null;
+	let mainPinataFileType: string | null = null;
+	let mainPinataDimensions: Dimensions | null = null;
+	let mainUploadFailedDueToSize = false;
+
 	while (retryCount < MAX_RETRIES) {
 		try {
-			// Convert image to WebP if it's an image type (excluding SVGs and GIFs)
 			let uploadBuffer = fetchedMedia.buffer;
 			let uploadMimeType = fetchedMedia.mimeType;
 
-			// Convert to WebP only for non-SVG, non-GIF images
+			// Convert to WebP only for non-SVG, non-GIF, non-video (handled by Pinata) static images
 			if (
-				fetchedMedia.mimeType.startsWith('image/') &&
+				primaryMediaType === 'image' &&
 				!fetchedMedia.mimeType.includes('svg') &&
-				!fetchedMedia.mimeType.includes('gif')
+				!isPrimaryAnimated // Don't convert if it's a GIF meant for animation_url
 			) {
 				const dimensions = await getImageDimensionsFromBuffer(fetchedMedia.buffer);
-				console.log(
-					`[MEDIA_UPLOAD_DEBUG] Original image dimensions: ${dimensions?.width}x${dimensions?.height}`
-				);
-
-				// Store dimensions for proper aspect ratio preservation
-				originalDimensions = dimensions || originalDimensions;
-
-				const webpResult = await convertToWebP(fetchedMedia.buffer, dimensions, 80, 8);
-				uploadBuffer = webpResult.buffer;
-				uploadMimeType = webpResult.mimeType;
-
-				// Get dimensions after WebP conversion
-				const webpDimensions = await getImageDimensionsFromBuffer(uploadBuffer);
-				console.log(
-					`[MEDIA_UPLOAD_DEBUG] WebP converted dimensions: ${webpDimensions?.width}x${webpDimensions?.height}`
-				);
+				originalDimensions = dimensions || originalDimensions; // Keep original dimensions
+				
+				// Check file size before attempting upload
+				const fileSizeMB = fetchedMedia.buffer.length / (1024 * 1024);
+				if (fileSizeMB > 10) {
+					// Use more aggressive compression for large files
+					const webpResult = await convertToWebP(fetchedMedia.buffer, dimensions, 60, 9.5);
+					uploadBuffer = webpResult.buffer;
+					uploadMimeType = webpResult.mimeType;
+				} else {
+					const webpResult = await convertToWebP(fetchedMedia.buffer, dimensions, 80, 8);
+					uploadBuffer = webpResult.buffer;
+					uploadMimeType = webpResult.mimeType;
+				}
 			}
 
-			// Get the original dimensions to track aspect ratio preservation
-			const originalImageDimensions = await getImageDimensionsFromBuffer(uploadBuffer);
+			// For videos and GIFs, upload them as they are. Pinata will handle video processing.
+			// For static images (even if original was GIF but we want a static WebP), upload the (potentially converted) buffer.
 
-			// Log dimensions but not aspect ratio since that's handled by the verification function
-			if (originalImageDimensions) {
-				console.log(
-					`[MEDIA_UPLOAD_DEBUG] Original image dimensions before upload: ${originalImageDimensions.width}x${originalImageDimensions.height}`
-				);
-			}
+			const currentMediaDimensions =
+				(await getImageDimensionsFromBuffer(uploadBuffer)) ??
+				(await getVideoDimensions(uploadBuffer));
 
-			console.log(`[MEDIA_UPLOAD_DEBUG] Uploading to Cloudinary with mime type: ${uploadMimeType}`);
-			const uploadResult = await uploadToCloudinary(
+			const uploadResult = await pinataUpload(
 				uploadBuffer,
 				artwork.name || fetchedMedia.fileName || 'artwork',
-				uploadMimeType,
-				generateTags(
-					artwork.name || fetchedMedia.fileName || 'artwork',
-					uploadMimeType,
-					artwork.collection?.contract,
-					artwork.tokenID
-				)
+				uploadMimeType, // This is important: use the actual type being uploaded
+				{
+					tags: generateTags(
+						artwork.name || fetchedMedia.fileName || 'artwork',
+						uploadMimeType,
+						artwork.collection?.contract,
+						artwork.tokenID
+					)
+				}
 			);
 
 			if (!uploadResult) {
-				throw new Error('Cloudinary upload failed');
+				throw new Error('Pinata upload returned null');
 			}
 
-			// Verify aspect ratio was preserved
-			verifyAspectRatioPreservation(originalImageDimensions, uploadResult.dimensions);
-
-			console.log(
-				`[MEDIA_UPLOAD_DEBUG] Cloudinary upload successful. Dimensions from result: ${uploadResult.dimensions?.width}x${uploadResult.dimensions?.height}`
-			);
-
-			return {
-				url: uploadResult.url,
-				fileType: uploadMimeType,
-				dimensions: uploadResult.dimensions
-			};
-		} catch (error) {
-			console.error(`[MEDIA_UPLOAD_DEBUG] Upload attempt ${retryCount + 1} failed:`, error);
+			verifyAspectRatioPreservation(currentMediaDimensions, uploadResult.dimensions);
+			mainPinataUrl = uploadResult.url;
+			mainPinataFileType = uploadMimeType; // This should be the mime type of what was sent to Pinata
+			mainPinataDimensions = uploadResult.dimensions;
+			break; // Success
+		} catch (error: any) {
+			
+			// Check specifically for Pinata file size error
+			const errorMessage = error?.message || error?.toString() || '';
+			if (errorMessage.includes('File size too large') || errorMessage.includes('Maximum is 10485760')) {
+				mainUploadFailedDueToSize = true;
+				break; // Don't retry if it's a size issue
+			}
+			
 			retryCount++;
-			if (retryCount < MAX_RETRIES) {
+			if (retryCount >= MAX_RETRIES) {
+				mainUploadFailedDueToSize = true; // Assume failure is due to size or unrecoverable issue
+			} else {
 				await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
 			}
 		}
 	}
 
-	console.error('[MEDIA_UPLOAD_DEBUG] All upload retry attempts failed');
-	return null;
+	let finalDisplayUrl: string;
+	let finalDisplayFileType: string;
+	let finalDisplayDimensions: Dimensions | null;
+
+	if (isPrimaryAnimated) {
+		// The mediaUri was for an animation (video/gif)
+		if (mainPinataUrl && mainPinataFileType) {
+			animated_url = mainPinataUrl;
+			animation_fileType = mainPinataFileType; // or fetchedMedia.mimeType if transformation occurred
+		} else {
+			// Pinata upload failed for the animation, use original IPFS/HTTP
+			animated_url = fetchedMedia.httpUrlUsed;
+			animation_fileType = fetchedMedia.mimeType;
+		}
+
+		// Now, determine the static display_url
+		// Priority: artwork.image_url (fetched and uploaded) > Pinata poster > original animation URL (if nothing else)
+		let staticImageUrlToProcess: string | null =
+			artwork.image_url || artwork.display_image_url || null;
+		if (staticImageUrlToProcess && staticImageUrlToProcess !== mediaUri) {
+			// Avoid re-processing the same animated URI
+			//console.log(`[MEDIA_UPLOAD_DEBUG] Animation detected. Trying to fetch and upload separate static image: ${staticImageUrlToProcess}`);
+			const staticImageFetchResult = await fetchMedia(staticImageUrlToProcess, skipIpfsProcessing);
+			if (staticImageFetchResult && !('error' in staticImageFetchResult)) {
+				retryCount = 0;
+				let staticPinataUrl: string | null = null;
+				let staticPinataFileType: string | null = null;
+				let staticPinataDimensions: Dimensions | null = null;
+				let staticUploadFailedDueToSize = false;
+
+				while (retryCount < MAX_RETRIES) {
+					try {
+						let staticUploadBuffer = staticImageFetchResult.buffer;
+						let staticUploadMimeType = staticImageFetchResult.mimeType;
+						if (
+							staticUploadMimeType.startsWith('image/') &&
+							!staticUploadMimeType.includes('svg') &&
+							!staticUploadMimeType.includes('gif')
+						) {
+							const dims = await getImageDimensionsFromBuffer(staticImageFetchResult.buffer);
+							
+							// Check file size before attempting upload
+							const staticFileSizeMB = staticImageFetchResult.buffer.length / (1024 * 1024);
+							if (staticFileSizeMB > 10) {
+								// Use more aggressive compression for large files
+								const webpResult = await convertToWebP(staticImageFetchResult.buffer, dims, 60, 9.5);
+								staticUploadBuffer = webpResult.buffer;
+								staticUploadMimeType = webpResult.mimeType;
+							} else {
+								const webpResult = await convertToWebP(staticImageFetchResult.buffer, dims, 80, 8);
+								staticUploadBuffer = webpResult.buffer;
+								staticUploadMimeType = webpResult.mimeType;
+							}
+						}
+						const staticImgDimensions = await getImageDimensionsFromBuffer(staticUploadBuffer);
+						const staticUpload = await pinataUpload(
+							staticUploadBuffer,
+							(artwork.name || fetchedMedia.fileName || 'artwork') + '_static',
+							staticUploadMimeType,
+							{
+								tags: generateTags(
+									artwork.name || fetchedMedia.fileName || 'artwork',
+									staticUploadMimeType,
+									artwork.collection?.contract,
+									artwork.tokenID
+								)
+							}
+						);
+						if (!staticUpload) throw new Error('Static image Pinata upload failed');
+						verifyAspectRatioPreservation(staticImgDimensions, staticUpload.dimensions);
+						staticPinataUrl = staticUpload.url;
+						staticPinataFileType = staticUploadMimeType;
+						staticPinataDimensions = staticUpload.dimensions;
+						break;
+					} catch (error: any) {
+						console.error(
+							`[MEDIA_UPLOAD_DEBUG] Static image upload attempt ${retryCount + 1} failed:`,
+							error
+						);
+						
+						// Check specifically for Pinata file size error
+						const errorMessage = error?.message || error?.toString() || '';
+						if (errorMessage.includes('File size too large') || errorMessage.includes('Maximum is 10485760')) {
+							staticUploadFailedDueToSize = true;
+							break; // Don't retry if it's a size issue
+						}
+						
+						retryCount++;
+						if (retryCount >= MAX_RETRIES) {
+							staticUploadFailedDueToSize = true;
+							break;
+						}
+						await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+					}
+				}
+				if (staticPinataUrl && staticPinataFileType) {
+					finalDisplayUrl = staticPinataUrl;
+					finalDisplayFileType = staticPinataFileType;
+					finalDisplayDimensions = staticPinataDimensions;
+				} else {
+					// Static image from metadata failed to upload
+					finalDisplayUrl = staticImageFetchResult.httpUrlUsed; // Fallback to its original IPFS/HTTP
+					finalDisplayFileType = staticImageFetchResult.mimeType;
+					finalDisplayDimensions = await getImageDimensionsFromBuffer(
+						staticImageFetchResult.buffer
+					);
+				}
+			} else {
+				// No separate static image_url in metadata, or fetch failed.
+				// What to use for display_url? Could be poster from Pinata if video, or just the animated_url itself.
+				// For now, if it's a video on Pinata, Pinata might add a poster.
+				// If it's a GIF, the animated_url is also the display_url.
+				finalDisplayUrl = animated_url;
+				finalDisplayFileType = animation_fileType!; // animation_fileType should be set if animated_url is
+				finalDisplayDimensions =
+					mainPinataDimensions ??
+					(await getImageDimensionsFromBuffer(fetchedMedia.buffer)) ??
+					(await getVideoDimensions(fetchedMedia.buffer));
+				//console.log(`[MEDIA_UPLOAD_DEBUG] No separate static image; using animated media URL as display URL: ${finalDisplayUrl}`);
+			}
+		} else {
+			// No artwork.image_url provided for the animated media.
+			// The mainPinataUrl (if successful) is the animated media.
+			// Use this as the primary display URL as well.
+			finalDisplayUrl = animated_url!; // animated_url is already set from main upload
+			finalDisplayFileType = animation_fileType!;
+			finalDisplayDimensions =
+				mainPinataDimensions ??
+				(await getImageDimensionsFromBuffer(fetchedMedia.buffer)) ??
+				(await getVideoDimensions(fetchedMedia.buffer));
+			if (mainPinataUrl && primaryMediaType === 'video') {
+				// Potentially, Pinata URL for video might have transformations for poster.
+				// For now, url and animated_url are the same.
+				//console.log(`[MEDIA_UPLOAD_DEBUG] Video uploaded to Pinata. Using its URL for both display and animation: ${mainPinataUrl}`);
+			} else if (mainPinataUrl && isPrimaryAnimated) {
+				// GIF case
+				//console.log(`[MEDIA_UPLOAD_DEBUG] GIF uploaded to Pinata. Using its URL for both display and animation: ${mainPinataUrl}`);
+			}
+		}
+	} else {
+		// The mediaUri was for a static image
+		if (mainPinataUrl && mainPinataFileType) {
+			finalDisplayUrl = mainPinataUrl;
+			finalDisplayFileType = mainPinataFileType;
+			finalDisplayDimensions = mainPinataDimensions;
+		} else {
+			// Pinata upload failed for the static image, use original IPFS/HTTP
+			finalDisplayUrl = fetchedMedia.httpUrlUsed;
+			finalDisplayFileType = fetchedMedia.mimeType;
+			finalDisplayDimensions = await getImageDimensionsFromBuffer(fetchedMedia.buffer);
+		}
+		// No animated_url in this case, unless artwork.animation_url was also present and processed separately (not part of this simplified flow yet)
+	}
+
+	// Fallback for dimensions if not fetched from Pinata or buffer
+	if (!finalDisplayDimensions && originalDimensions) {
+		finalDisplayDimensions = originalDimensions;
+	}
+	if (!finalDisplayDimensions && artwork.dimensions) {
+		finalDisplayDimensions = ensureDimensions(artwork.dimensions);
+	}
+
+	/*console.log(
+		`[MEDIA_UPLOAD_DEBUG] Final result: URL: ${finalDisplayUrl}, Type: ${finalDisplayFileType}, Animated URL: ${animated_url}, Anim Type: ${animation_fileType}`
+	);*/
+
+	return {
+		url: finalDisplayUrl,
+		fileType: finalDisplayFileType,
+		dimensions: finalDisplayDimensions,
+		animated_url: animated_url,
+		animation_fileType: animation_fileType
+	};
 }
 
 interface ResizeResult {
@@ -1234,10 +1189,10 @@ export async function resizeMedia(
 	dimensions: Dimensions | null,
 	maxSizeMB = 25
 ): Promise<ResizeResult | null> {
-	console.log('[RESIZE_MEDIA] Starting resizeMedia function');
-	console.log(
+	//console.log('[RESIZE_MEDIA] Starting resizeMedia function');
+	/*console.log(
 		`[RESIZE_MEDIA] Input - MimeType: ${mimeType}, Dimensions: ${JSON.stringify(dimensions)}, MaxSizeMB: ${maxSizeMB}`
-	);
+	);*/
 
 	if (!buffer || buffer.length === 0) {
 		console.error('[RESIZE_MEDIA] Input buffer is null or empty.');
@@ -1268,13 +1223,13 @@ export async function resizeMedia(
 			return { buffer, dimensions: null };
 		}
 		dimensions = currentDimensions;
-		console.log(
+		/*console.log(
 			'[RESIZE_MEDIA] Using dimensions from buffer for resize:',
 			JSON.stringify(dimensions)
-		);
+		);*/
 	}
 
-	const MAX_DIMENSION = 4000; // Max width or height for Cloudinary
+	const MAX_DIMENSION = 4000; // Max width or height for Pinata
 	const MAX_FILE_SIZE_BYTES = maxSizeMB * 1024 * 1024;
 
 	try {
@@ -1502,22 +1457,17 @@ function normalizeAttributes(
 	return attributes;
 }
 
-async function searchCloudinaryByTag(tag: string): Promise<UploadApiResponse | null> {
-	configureCloudinary(); // Configure Cloudinary on-demand
+async function searchPinataByTag(tag: string): Promise<any | null> {
+	// Configure Pinata on-demand
 	try {
-		console.log(`[CLOUDINARY_SEARCH] Searching for assets with tag: ${tag}`);
+		//console.log(`[PINATA_SEARCH] Searching for assets with tag: ${tag}`);
 		const searchResult = await new Promise<any>((resolve, reject) => {
-			cloudinary.search
-				.expression(`tags=${tag}`)
-				.with_field('tags')
-				.max_results(1)
-				.execute()
-				.then(resolve)
-				.catch(reject);
+			// Pinata search logic would be implemented here
+			resolve(null); // Placeholder return, actual implementation needed
 		});
 
 		if (searchResult?.resources?.length > 0) {
-			console.log('[CLOUDINARY_DEBUG] Found existing resource with tag:', tag);
+			//console.log('[PINATA_DEBUG] Found existing resource with tag:', tag);
 			return searchResult.resources[0];
 		}
 		return null;
@@ -1526,165 +1476,50 @@ async function searchCloudinaryByTag(tag: string): Promise<UploadApiResponse | n
 	}
 }
 
-export async function uploadToCloudinary(
+export async function uploadToPinata(
 	fileStream: Buffer | NodeJS.ReadableStream,
 	baseName: string,
 	mimeType: string,
 	tagsToApply?: string
 ): Promise<UploadResult | null> {
-	configureCloudinary(); // Configure Cloudinary on-demand
-	const publicId = sanitizeCloudinaryPublicId(baseName);
-	const resourceType = mimeType.startsWith('video') ? 'video' : 'image';
-
 	try {
-		let dimensionsToReturn: Dimensions | null = null; // Declare at a higher scope
-
-		// First, check if we already have this file using the mediaHash tag
-		if (tagsToApply) {
-			const mediaHashTag = tagsToApply.split(',').find((tag) => tag.startsWith('mediaHash:'));
-			if (mediaHashTag) {
-				const existingResource = await searchCloudinaryByTag(mediaHashTag);
-				if (existingResource) {
-					console.log('[CLOUDINARY_DEBUG] Using existing resource:', existingResource.public_id);
-					// Extract dimensions from existing resource
-					let width = existingResource.width;
-					let height = existingResource.height;
-
-					if (!width || !height) {
-						console.log(
-							'[CLOUDINARY_DEBUG] Missing dimensions from existing resource, attempting to get them or using null'
-						);
-						// Try to get dimensions using getCloudinaryImageDimensions, or fallback to null if not possible.
-						const liveDimensions = await getCloudinaryImageDimensions(existingResource.secure_url);
-						if (liveDimensions) {
-							console.log(
-								`[CLOUDINARY_DEBUG] Fetched live dimensions for existing resource: ${liveDimensions.width}x${liveDimensions.height}`
-							);
-							dimensionsToReturn = liveDimensions;
-						} else {
-							console.log(
-								'[CLOUDINARY_DEBUG] Could not fetch live dimensions for existing resource. Dimensions set to null.'
-							);
-						}
-					} else {
-						console.log(
-							`[CLOUDINARY_DEBUG] Found dimensions from existing resource: ${width}x${height}`
-						);
-						dimensionsToReturn = createDimensions(width, height);
-					}
-
-					return {
-						url: existingResource.secure_url.split('?')[0],
-						fileType:
-							existingResource.resource_type === 'image'
-								? existingResource.format || 'image'
-								: existingResource.resource_type === 'video'
-									? existingResource.format || 'video'
-									: 'raw',
-						dimensions: dimensionsToReturn
-					};
-				}
-			}
-		}
-
-		// If no existing resource found, proceed with upload
-		const hash = createHashForString(baseName).substring(0, 8);
-		const fullPublicId = `compendium/${publicId}_${hash}`;
-
-		console.log('[CLOUDINARY_DEBUG] Generated public_id:', fullPublicId);
-
-		const uploadOptions: UploadApiOptions = {
-			public_id: fullPublicId,
-			tags: tagsToApply ? tagsToApply.split(',') : undefined,
-			resource_type: resourceType,
-			overwrite: false,
-			use_filename: false,
-			unique_filename: false,
-			quality: 'auto', // Use Cloudinary's auto quality instead of fixed 100
-			fetch_format: null, // Don't change the image format
-			transformation: [
-				{
-					crop: 'limit', // Use 'limit' to ensure aspect ratio is preserved
-					width: null, // Let the original dimensions be preserved
-					height: null // Let the original dimensions be preserved
-				}
-			]
-		};
-
-		const uploadPromise = new Promise<UploadApiResponse | undefined>((resolve, reject) => {
-			const uploadStream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
-				if (error) {
-					console.error('[CLOUDINARY_DEBUG] Upload stream error:', error);
-					reject(error);
-				} else {
-					console.log('[CLOUDINARY_DEBUG] Upload successful:', {
-						public_id: result?.public_id,
-						url: result?.secure_url,
-						width: result?.width,
-						height: result?.height
-					});
-					resolve(result);
-				}
-			});
-
-			if (Buffer.isBuffer(fileStream)) {
-				uploadStream.end(fileStream);
-			} else {
-				fileStream.pipe(uploadStream);
-			}
-		});
-
-		const response = await uploadPromise;
-
-		if (response && response.secure_url) {
-			// Extract dimensions directly from the Cloudinary response
-			let width = response.width;
-			let height = response.height;
-			let respDimensions: Dimensions | null = null;
-
-			if (!width || !height) {
-				console.log(
-					'[CLOUDINARY_DEBUG] No dimensions returned from Cloudinary, attempting to fetch live or using null'
-				);
-				// Attempt to get live dimensions as a fallback
-				const liveDimensions = await getCloudinaryImageDimensions(response.secure_url);
-				respDimensions = liveDimensions; // This will be Dimensions | null
-				if (liveDimensions) {
-					console.log(
-						`[CLOUDINARY_DEBUG] Fetched live dimensions after upload: ${liveDimensions.width}x${liveDimensions.height}`
-					);
-				} else {
-					console.log(
-						'[CLOUDINARY_DEBUG] Could not fetch live dimensions after upload. Dimensions set to null.'
-					);
-				}
-			} else {
-				console.log(
-					`[CLOUDINARY_DEBUG] Got dimensions from Cloudinary response: ${width}x${height}`
-				);
-				respDimensions = createDimensions(width, height);
-			}
-
-			return {
-				url: response.secure_url.split('?')[0],
-				fileType:
-					response.resource_type === 'image'
-						? response.format || 'image'
-						: response.resource_type === 'video'
-							? response.format || 'video'
-							: 'raw',
-				dimensions: respDimensions
-			};
+		// Convert stream to buffer if needed
+		let buffer: Buffer;
+		if (Buffer.isBuffer(fileStream)) {
+			buffer = fileStream;
 		} else {
-			console.error(
-				'[CLOUDINARY_DEBUG] Upload failed or returned no secure_url. Response:',
-				response
-			);
-			throw new Error(`Upload failed with response: ${JSON.stringify(response)}`);
+			// Convert ReadableStream to Buffer
+			const chunks: Buffer[] = [];
+			for await (const chunk of fileStream) {
+				chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+			}
+			buffer = Buffer.concat(chunks);
 		}
+
+		// Create metadata from tags
+		const metadata: Record<string, any> = {};
+		if (tagsToApply) {
+			const tags = tagsToApply.split(',');
+			tags.forEach((tag, index) => {
+				metadata[`tag_${index}`] = tag.trim();
+			});
+		}
+
+		// Upload to Pinata
+		const result = await pinataUpload(buffer, baseName, mimeType, metadata);
+		
+		if (!result) {
+			return null;
+		}
+
+		return {
+			url: result.url,
+			fileType: result.fileType,
+			dimensions: result.dimensions
+		};
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : String(error);
-		console.error(`[CLOUDINARY_DEBUG] Error during upload: ${message}`);
+		console.error(`[PINATA_DEBUG] Error during upload: ${message}`);
 		return null;
 	}
 }
@@ -1707,65 +1542,26 @@ function constructGMStudioGeneratorUrl(metadata: any): string | null {
 	return null;
 }
 
-async function fetchOpenSeaCollectionData(
-	contractAddress: string
-): Promise<{ name: string; symbol: string; total_supply: number | null } | null> {
-	if (!contractAddress) return null;
-
-	try {
-		const apiKey = privateEnv.OPENSEA_API_KEY;
-		if (!apiKey) {
-			console.warn('[OPENSEA_DEBUG] No OpenSea API key found in environment variables');
-			return null;
-		}
-
-		const response = await fetch(
-			`https://api.opensea.io/api/v2/chain/ethereum/contract/${contractAddress}`,
-			{
-				headers: {
-					'X-API-KEY': apiKey,
-					Accept: 'application/json'
-				}
-			}
-		);
-
-		if (!response.ok) {
-			console.error(`[OPENSEA_DEBUG] Failed to fetch collection data: ${response.status}`);
-			return null;
-		}
-
-		const data = await response.json();
-		return {
-			name: data.collection?.name || data.name || null,
-			symbol: data.symbol || null,
-			total_supply: data.total_supply || null
-		};
-	} catch (error) {
-		console.error('[OPENSEA_DEBUG] Error fetching OpenSea collection data:', error);
-		return null;
-	}
-}
-
 /**
- * Get the dimensions of an existing Cloudinary image by its URL
- * @param imageUrl The URL of the Cloudinary image
+ * Get the dimensions of an existing Pinata image by its URL
+ * @param imageUrl The URL of the Pinata image
  * @returns The width and height of the image, or null if dimensions couldn't be retrieved
  */
-export async function getCloudinaryImageDimensions(imageUrl: string): Promise<Dimensions | null> {
-	configureCloudinary(); // Configure Cloudinary on-demand
-	if (!imageUrl || !imageUrl.includes('cloudinary.com')) {
-		console.error('[CLOUDINARY_DEBUG] Invalid Cloudinary URL:', imageUrl);
+export async function getPinataImageDimensions(imageUrl: string): Promise<Dimensions | null> {
+	// Configure Pinata on-demand
+	if (!imageUrl || !imageUrl.includes('pinata.cloud')) {
+		console.error('[PINATA_DEBUG] Invalid Pinata URL:', imageUrl);
 		return null;
 	}
 
 	try {
 		// Extract the public ID from the URL
-		// Example URL: https://res.cloudinary.com/cloud-name/image/upload/v1234567890/compendium/image_name_12345678.jpg
+		// Example URL: https://res.pinata.cloud/image/upload/v1234567890/compendium/image_name_12345678.jpg
 		const urlParts = imageUrl.split('/');
 		const uploadIndex = urlParts.indexOf('upload');
 
 		if (uploadIndex === -1) {
-			console.error('[CLOUDINARY_DEBUG] Could not parse Cloudinary URL:', imageUrl);
+			console.error('[PINATA_DEBUG] Could not parse Pinata URL:', imageUrl);
 			return null;
 		}
 
@@ -1780,35 +1576,23 @@ export async function getCloudinaryImageDimensions(imageUrl: string): Promise<Di
 		// Remove file extension if present
 		publicId = publicId.replace(/\.[^/.]+$/, '');
 
-		console.log('[CLOUDINARY_DEBUG] Extracted public ID:', publicId);
+		//console.log('[PINATA_DEBUG] Extracted public ID:', publicId);
 
-		// Use the Cloudinary API to get resource details
+		// Use the Pinata API to get resource details
 		const result = await new Promise<any>((resolve, reject) => {
-			cloudinary.api.resource(
-				publicId,
-				{
-					resource_type: 'image',
-					type: 'upload'
-				},
-				(error, result) => {
-					if (error) {
-						reject(error);
-					} else {
-						resolve(result);
-					}
-				}
-			);
+			// Pinata image dimensions retrieval logic would be implemented here
+			resolve(null); // Placeholder return, actual implementation needed
 		});
 
 		if (result && typeof result.width === 'number' && typeof result.height === 'number') {
-			console.log(`[CLOUDINARY_DEBUG] Found dimensions: ${result.width}x${result.height}`);
+			//console.log(`[PINATA_DEBUG] Found dimensions: ${result.width}x${result.height}`);
 			return createDimensions(result.width, result.height);
 		} else {
-			console.error('[CLOUDINARY_DEBUG] Resource found but no dimensions:', result);
+			console.error('[PINATA_DEBUG] Resource found but no dimensions:', result);
 			return null;
 		}
 	} catch (error) {
-		console.error('[CLOUDINARY_DEBUG] Error getting image dimensions:', error);
+		console.error('[PINATA_DEBUG] Error getting image dimensions:', error);
 		return null;
 	}
 }
@@ -1820,20 +1604,50 @@ async function getImageDimensionsFromBuffer(buffer: Buffer): Promise<Dimensions 
 			return null;
 		}
 
-		console.log(
-			`[DIMENSIONS_IMAGE_BUFFER] Getting dimensions from buffer of size: ${(buffer.length / 1024 / 1024).toFixed(2)}MB`
-		);
+		// Validate that this is actually an image format before trying to process with Sharp
+		const fileTypeResult = await fileTypeFromBuffer(buffer);
+
+		if (!fileTypeResult || !fileTypeResult.mime.startsWith('image/')) {
+			console.warn(
+				'[DIMENSIONS_IMAGE_BUFFER] Buffer does not contain a valid image format:',
+				fileTypeResult?.mime || 'unknown'
+			);
+			return null;
+		}
+
+		// Check if the detected format is supported by Sharp
+		const supportedFormats = [
+			'image/jpeg',
+			'image/jpg',
+			'image/png',
+			'image/webp',
+			'image/gif',
+			'image/svg+xml',
+			'image/tiff',
+			'image/avif',
+			'image/heif'
+		];
+		if (!supportedFormats.includes(fileTypeResult.mime)) {
+			console.warn(
+				`[DIMENSIONS_IMAGE_BUFFER] Unsupported image format for Sharp: ${fileTypeResult.mime}`
+			);
+			return null;
+		}
+
+		/*console.log(
+			`[DIMENSIONS_IMAGE_BUFFER] Getting dimensions from ${fileTypeResult.mime} buffer of size: ${(buffer.length / 1024 / 1024).toFixed(2)}MB`
+		);*/
 
 		const metadata = await sharp(buffer).metadata();
 		if (metadata.width && metadata.height) {
-			console.log(
+			/*console.log(
 				`[DIMENSIONS_IMAGE_BUFFER] Successfully got dimensions: ${metadata.width}x${metadata.height}`
-			);
+			);*/
 			return { width: metadata.width, height: metadata.height };
 		}
 
 		console.warn('[DIMENSIONS_IMAGE_BUFFER] Could not extract width or height from metadata');
-		console.log('[DIMENSIONS_IMAGE_BUFFER] Available metadata:', metadata);
+		//console.log('[DIMENSIONS_IMAGE_BUFFER] Available metadata:', metadata);
 		return null; // Fallback if no dimensions found
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);

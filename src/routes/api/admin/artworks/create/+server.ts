@@ -1,45 +1,32 @@
 import prisma from '$lib/prisma';
-import { uploadToCloudinary, getCloudinaryImageDimensions } from '$lib/mediaHelpers';
+import { uploadToPinata } from '$lib/pinataHelpers';
+import { convertToIpfsUrl } from '$lib/pinataHelpers';
 import slugify from 'slugify';
-import { fileTypeFromBuffer } from 'file-type';
-
-interface ArtworkData {
-	title: string;
-	description: string;
-	curatorNotes: string;
-	enabled: boolean;
-	artistId: number | null;
-	collectionId: number | null;
-	animation_url?: string | null;
-	image_url?: string | null;
-	dimensions?: any; // Changed to any to be compatible with Prisma's JSON type
-	mime?: string;
-}
+import { Prisma } from '@prisma/client';
 
 // Simple function to guess mime type from URL
 function guessMimeTypeFromUrl(url: string): string | null {
-	// Check extensions
-	if (url.match(/\.(mp4|webm|mov)$/i)) return 'video/mp4';
-	if (url.match(/\.(jpg|jpeg)$/i)) return 'image/jpeg';
-	if (url.match(/\.(png)$/i)) return 'image/png';
-	if (url.match(/\.(gif)$/i)) return 'image/gif';
-	if (url.match(/\.(webp)$/i)) return 'image/webp';
-	if (url.match(/\.(pdf)$/i)) return 'application/pdf';
-	if (url.match(/\.(html|htm)$/i)) return 'text/html';
-	if (url.match(/\.(js)$/i)) return 'application/javascript';
-
-	// Check for common patterns
-	if (url.includes('cloudinary.com')) {
-		if (url.includes('/video/')) return 'video/mp4';
-		if (url.includes('/image/')) return 'image/jpeg';
-	}
-
-	// For common interactive art platforms
-	if (url.includes('fxhash.xyz') || url.includes('generator.artblocks.io')) {
-		return 'application/javascript';
-	}
-
-	return null;
+	if (!url) return null;
+	const extension = url.split('.').pop()?.toLowerCase();
+	if (!extension) return null;
+	const commonTypes: Record<string, string> = {
+		jpg: 'image/jpeg',
+		jpeg: 'image/jpeg',
+		png: 'image/png',
+		gif: 'image/gif',
+		webp: 'image/webp',
+		svg: 'image/svg+xml',
+		mp4: 'video/mp4',
+		webm: 'video/webm',
+		mov: 'video/quicktime',
+		ogv: 'video/ogg',
+		gltf: 'model/gltf+json',
+		glb: 'model/gltf-binary',
+		html: 'text/html',
+		htm: 'text/html',
+		pdf: 'application/pdf'
+	};
+	return commonTypes[extension] || null;
 }
 
 export async function POST({ request }) {
@@ -49,141 +36,287 @@ export async function POST({ request }) {
 		const title = formData.get('title') as string;
 		const description = formData.get('description') as string;
 		const curatorNotes = formData.get('curatorNotes') as string;
-		const animation_url = formData.get('animation_url') as string | null;
 
-		let artistId = formData.get('artistId') as string | null;
+		// Media URLs from form
+		const form_image_url = formData.get('image_url') as string | null;
+		const form_animation_url = formData.get('animation_url') as string | null;
+
+		// Creator related form fields
+		const creatorAddress = formData.get('creatorAddress') as string | null;
+		const creatorBlockchain = (formData.get('creatorBlockchain') as string) || 'ethereum';
 		const newArtistName = formData.get('newArtistName') as string | null;
-		let collectionId = formData.get('collectionId') as string | null;
+
+		// Collection related form fields
+		let collectionIdStr = formData.get('collectionId') as string | null;
 		const newCollectionTitle = formData.get('newCollectionTitle') as string | null;
 
-		let imageOrVideoUrl = null;
-		let isVideo = false;
-		let dimensions = null;
-		let mimeType = null;
+		let final_image_url: string | null = null;
+		let image_mime_type: string | null = null;
+		let image_dimensions: { width: number; height: number } | null = null;
+		let final_animation_url: string | null = form_animation_url;
+		let animation_mime_type: string | null = null;
+		let fileSize: number | null = null;
 
-		// Handle file upload
 		if (file && file instanceof File) {
-			const arrayBuffer = await file.arrayBuffer();
-			const buffer = Buffer.from(arrayBuffer); // Convert ArrayBuffer to Buffer
-
-			// Only proceed if the mime type is a supported image or video format
 			if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-				console.error(`Unsupported media type: ${file.type}`);
 				return new Response(JSON.stringify({ error: `Unsupported media type: ${file.type}` }), {
 					status: 400
 				});
 			}
+			const arrayBuffer = await file.arrayBuffer();
+			const buffer = Buffer.from(arrayBuffer);
+			fileSize = buffer.length;
 
-			const uploadResponse = await uploadToCloudinary(buffer, file.name, file.type);
+			const uploadResponse = await uploadToPinata(buffer, file.name, file.type);
 			if (!uploadResponse) {
-				console.error('Failed to upload to Cloudinary.');
-				return new Response(JSON.stringify({ error: 'Failed to upload to Cloudinary.' }), {
+				return new Response(JSON.stringify({ error: 'Failed to upload to Pinata.' }), {
 					status: 500
 				});
 			}
-			imageOrVideoUrl = uploadResponse.url;
-			isVideo = file.type.startsWith('video/');
-			dimensions = uploadResponse.dimensions;
-			mimeType = file.type; // Get MIME type directly from file
-			console.log(`Uploaded file with mime type: ${mimeType}`);
-		} else {
-			// If we have an image URL from a previous upload
-			const existingUrl = formData.get('imageUrl') as string | null;
-			if (existingUrl) {
-				imageOrVideoUrl = existingUrl;
+			final_image_url = uploadResponse.url;
+			image_mime_type = uploadResponse.fileType;
+			image_dimensions = uploadResponse.dimensions;
 
-				// Simple mime type detection for existing URL
-				const guessedType = guessMimeTypeFromUrl(existingUrl);
-				if (guessedType) {
-					mimeType = guessedType;
-					isVideo = guessedType.startsWith('video/');
+			if (
+				(image_mime_type.startsWith('video/') || image_mime_type === 'image/gif') &&
+				!final_animation_url
+			) {
+				final_animation_url = final_image_url;
+				animation_mime_type = image_mime_type;
+			}
+		} else if (form_image_url) {
+			final_image_url = form_image_url;
+			image_mime_type = guessMimeTypeFromUrl(final_image_url);
+		}
+
+		if (final_animation_url && !animation_mime_type) {
+			animation_mime_type = guessMimeTypeFromUrl(final_animation_url);
+		}
+
+		let artistId: number | undefined;
+		if (creatorAddress) {
+			if (newArtistName) {
+				// Create new artist with the provided name and wallet address
+				const walletAddresses = [{
+					address: creatorAddress.toLowerCase(),
+					blockchain: creatorBlockchain,
+					lastIndexed: new Date().toISOString()
+				}];
+
+				const newArtist = await prisma.artist.create({ 
+					data: { 
+						name: newArtistName,
+						walletAddresses: walletAddresses as any
+					} 
+				});
+				artistId = newArtist.id;
+			} else {
+				// Find or create artist using wallet address
+				const creatorAddressLower = creatorAddress.toLowerCase();
+				const artistName = `Artist_${creatorAddressLower.slice(-8)}`;
+				
+				// First, search all artists to find one with this wallet address
+				let artist: any = null;
+				const allArtists: any[] = await prisma.artist.findMany();
+
+				// Check if any artist has this wallet address
+				artist = allArtists.find(a => {
+					if (!a.walletAddresses || !Array.isArray(a.walletAddresses)) return false;
+					return (a.walletAddresses as any[]).some((w: any) => 
+						w.address?.toLowerCase() === creatorAddressLower
+					);
+				}) || null;
+
+				if (!artist) {
+					// Try to find by exact name match as fallback
+					try {
+						artist = await prisma.artist.findUnique({
+							where: { name: artistName }
+						});
+					} catch (error) {
+						// Ignore errors from name lookup
+					}
 				}
+
+				if (!artist) {
+					// Create new artist with wallet address
+					const walletAddresses = [{
+						address: creatorAddressLower,
+						blockchain: creatorBlockchain,
+						lastIndexed: new Date().toISOString()
+					}];
+
+					// Try to create with the base name first, handle conflicts
+					let finalArtistName = artistName;
+					let createAttempts = 0;
+					const maxAttempts = 5;
+
+					while (createAttempts < maxAttempts) {
+						try {
+							artist = await prisma.artist.create({
+								data: {
+									name: finalArtistName,
+									walletAddresses: walletAddresses as any
+								}
+							});
+							break; // Success, exit the loop
+						} catch (error: any) {
+							if (error?.code === 'P2002' && error?.meta?.target?.includes('name')) {
+								// Name conflict, try with a unique suffix
+								createAttempts++;
+								const timestamp = Date.now().toString().slice(-6);
+								finalArtistName = `${artistName}_${timestamp}`;
+								console.log(`[ARTIST_CREATE] Name conflict for "${artistName}", trying "${finalArtistName}"`);
+							} else {
+								throw error; // Re-throw non-name-conflict errors
+							}
+						}
+					}
+
+					if (!artist) {
+						throw new Error(`Failed to create artist after ${maxAttempts} attempts due to name conflicts`);
+					}
+				} else {
+					// Update existing artist and merge wallet addresses if needed
+					const existingWallets = Array.isArray(artist.walletAddresses) ? artist.walletAddresses as any[] : [];
+					const addressExists = existingWallets.some((w: any) => 
+						w.address?.toLowerCase() === creatorAddressLower
+					);
+					
+					if (!addressExists) {
+						const updatedWallets = [...existingWallets, {
+							address: creatorAddressLower,
+							blockchain: creatorBlockchain,
+							lastIndexed: new Date().toISOString()
+						}];
+
+						artist = await prisma.artist.update({
+							where: { id: artist.id },
+							data: {
+								updatedAt: new Date(),
+								walletAddresses: updatedWallets as any
+							}
+						});
+					}
+				}
+
+				artistId = artist.id;
 			}
 		}
 
-		// Handle animation_url if provided
-		if (animation_url) {
-			const animationMimeType = guessMimeTypeFromUrl(animation_url);
-			if (animationMimeType) {
-				mimeType = animationMimeType;
-				isVideo = animationMimeType.startsWith('video/');
-			}
-		}
-
-		// Create new artist if provided
-		if (newArtistName && !artistId) {
-			const newArtist = await prisma.artist.create({ data: { name: newArtistName } });
-			artistId = String(newArtist.id);
-		}
-
-		// Create new collection if provided
-		if (newCollectionTitle && !collectionId) {
+		let collectionId: number | undefined;
+		if (collectionIdStr) {
+			collectionId = parseInt(collectionIdStr);
+		} else if (newCollectionTitle) {
 			const collectionSlug = slugify(newCollectionTitle, { lower: true, strict: true });
 			const newCollection = await prisma.collection.create({
-				data: { title: newCollectionTitle, slug: collectionSlug, enabled: true }
+				data: {
+					title: newCollectionTitle,
+					slug: collectionSlug,
+					enabled: true
+				}
 			});
-			collectionId = String(newCollection.id);
+			collectionId = newCollection.id;
 		}
 
-		const newArtworkData: ArtworkData = {
-			title: title ? String(title) : '',
+		const mediaMetadata: any = {};
+		if (image_dimensions) mediaMetadata.image_dimensions = image_dimensions;
+		if (fileSize) mediaMetadata.file_size_bytes = fileSize;
+		if (final_image_url) mediaMetadata.source_image_uri = final_image_url;
+
+		if (final_animation_url) {
+			mediaMetadata.source_animation_uri = final_animation_url;
+			if (animation_mime_type) mediaMetadata.animation_mime_type = animation_mime_type;
+			if (final_animation_url === final_image_url && image_dimensions) {
+				mediaMetadata.animation_dimensions = image_dimensions;
+			}
+		}
+
+		const newArtworkData: Prisma.ArtworkCreateInput = {
+			title: title ? String(title) : 'Untitled',
 			description: description ? String(description) : '',
-			curatorNotes: curatorNotes ? String(curatorNotes) : '',
-			enabled: true,
-			artistId: artistId ? parseInt(String(artistId)) : null,
-			collectionId: collectionId ? parseInt(String(collectionId)) : null
+
+			imageUrl: final_image_url ? convertToIpfsUrl(final_image_url) : final_image_url,
+			animationUrl: final_animation_url ? convertToIpfsUrl(final_animation_url) : final_animation_url,
+			mime: image_mime_type,
+
+			tokenId: formData.get('tokenID') as string | null,
+			contractAddress: formData.get('contractAddr') as string | null,
+			blockchain: formData.get('blockchain') as string | null,
+			mintDate: formData.get('mintDate') ? new Date(formData.get('mintDate') as string) : null
 		};
 
-		// Prioritize animation_url if provided
-		if (animation_url) {
-			newArtworkData.animation_url = animation_url;
-
-			// Set mime type for animation content
-			const animationMimeType = guessMimeTypeFromUrl(animation_url);
-			if (animationMimeType) {
-				newArtworkData.mime = animationMimeType;
-			}
-
-			// If we have a file upload too, use it as the image_url
-			if (imageOrVideoUrl) {
-				newArtworkData.image_url = imageOrVideoUrl;
-			}
-		} else if (imageOrVideoUrl) {
-			// If no animation_url, handle image/video content
-			if (isVideo) {
-				newArtworkData.animation_url = imageOrVideoUrl;
-				if (mimeType && mimeType.startsWith('video/')) {
-					newArtworkData.mime = mimeType;
-				}
-			} else {
-				newArtworkData.image_url = imageOrVideoUrl;
-				if (mimeType && mimeType.startsWith('image/')) {
-					newArtworkData.mime = mimeType;
-				}
-			}
-		}
-
-		// Store the dimensions if available
-		if (dimensions && dimensions.width && dimensions.height) {
-			newArtworkData.dimensions = {
-				width: dimensions.width,
-				height: dimensions.height
-			};
+		if (collectionId) {
+			newArtworkData.collection = { connect: { id: collectionId } };
 		}
 
 		const newArtwork = await prisma.artwork.create({
 			data: newArtworkData
 		});
 
+		// Link artist to artwork if we have one
+		if (artistId) {
+			try {
+				await prisma.artwork.update({
+					where: { id: newArtwork.id },
+					data: {
+						artists: {
+							connect: { id: artistId }
+						}
+					} as any
+				});
+			} catch (e) {
+				console.error(`Error linking artwork ${newArtwork.id} to artist ${artistId}:`, e);
+			}
+		}
+
+		// Pin artwork URLs to Pinata
+		try {
+			const artworkForPinning = {
+				title: newArtwork.title,
+				imageUrl: final_image_url,
+				thumbnailUrl: null, // This endpoint doesn't seem to handle thumbnails
+				animationUrl: final_animation_url,
+				metadataUrl: null // This endpoint doesn't seem to handle metadata URLs
+			};
+			
+			const { extractCidsFromArtwork, pinCidToPinata } = await import('$lib/pinataHelpers');
+			const cids = extractCidsFromArtwork(artworkForPinning);
+			if (cids.length > 0) {
+				console.log(`Pinning ${cids.length} IPFS URLs for artwork: ${newArtwork.title}`);
+				
+				for (const cid of cids) {
+					try {
+						const pinName = `${newArtwork.title} - ${cid}`;
+						await pinCidToPinata(cid, pinName);
+						console.log(`Successfully pinned CID: ${cid} for artwork: ${newArtwork.title}`);
+					} catch (pinError) {
+						console.error(`Failed to pin CID ${cid} for artwork ${newArtwork.title}:`, pinError);
+						// Continue with other CIDs even if one fails
+					}
+				}
+			}
+		} catch (pinningError) {
+			console.error(`Error during Pinata pinning for artwork ${newArtwork.title}:`, pinningError);
+			// Don't fail the creation if pinning fails
+		}
+
 		return new Response(JSON.stringify(newArtwork), {
 			status: 201,
 			headers: { 'Content-Type': 'application/json' }
 		});
 	} catch (error: unknown) {
-		console.error('Error in POST request:', error instanceof Error ? error.message : String(error));
-		return new Response(JSON.stringify({ error: 'Error creating new artwork' }), {
-			status: 500,
-			headers: { 'Content-Type': 'application/json' }
-		});
+		console.error('Error in POST request for artwork creation:', error);
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		if (error instanceof Error && error.stack) {
+			console.error(error.stack);
+		}
+		return new Response(
+			JSON.stringify({ error: 'Error creating new artwork', details: errorMessage }),
+			{
+				status: 500,
+				headers: { 'Content-Type': 'application/json' }
+			}
+		);
 	}
 }

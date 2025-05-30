@@ -1,4 +1,6 @@
 import crypto from 'crypto';
+// Remove the public env import - we'll handle authentication server-side
+// import { env } from '$env/dynamic/public';
 
 // Commenting out unused gateway list. Define a specific default gateway.
 // const IPFS_GATEWAYS = [
@@ -7,15 +9,19 @@ import crypto from 'crypto';
 // 	'https://dweb.link/ipfs/',
 // 	'https://ipfs.io/ipfs/'
 // ];
-const DEFAULT_IPFS_GATEWAY = 'https://w3s.link/ipfs/';
+const DEFAULT_IPFS_GATEWAY = 'https://nftstorage.link/ipfs/';
 const ONCHFS_GATEWAY = 'https://onchfs.fxhash2.xyz/';
 const ARWEAVE_GATEWAY = 'https://arweave.net/';
 
+// Note: IPFS content will be handled by the Wallace Museum IPFS microservice
+// The client-side code will use the external microservice for IPFS access
+const IPFS_MICROSERVICE_ENDPOINT = 'https://ipfs.wallacemuseum.com/ipfs/';
+
 /**
  * A set of reliable IPFS gateways to try in sequence
+ * Note: Primary IPFS access is via Wallace Museum IPFS microservice
  */
 export const IPFS_GATEWAYS = [
-	'https://w3s.link/ipfs/',
 	'https://nftstorage.link/ipfs/',
 	'https://cloudflare-ipfs.com/ipfs/',
 	'https://ipfs.io/ipfs/'
@@ -86,7 +92,7 @@ export function getMediaType(
 	return 'unknown';
 }
 
-export function sanitizeCloudinaryPublicId(name: string): string {
+export function sanitizePinataFileName(name: string): string {
 	// Remove special characters and replace spaces with underscores
 	return name
 		.replace(/[#?&]/g, '') // Remove #, ?, and & characters
@@ -96,7 +102,7 @@ export function sanitizeCloudinaryPublicId(name: string): string {
 }
 
 export function generateFileName(baseName: string, mimeType: string): string {
-	const sanitizedName = sanitizeCloudinaryPublicId(baseName);
+	const sanitizedName = sanitizePinataFileName(baseName);
 	const hash = createHashForString(baseName).substring(0, 8);
 	return `${sanitizedName}_${hash}`;
 }
@@ -157,55 +163,146 @@ export function removeQueryString(url: string | null | undefined): string {
  * - Accepts ipfs://[cid]/foo or ipfs:/[cid]/foo and returns gateway + [cid]/foo
  * - Accepts onchfs://[cid]/foo and returns onchfs gateway + [cid]/foo
  * - Accepts ar://[tx] or raw Arweave transaction IDs and returns Arweave gateway URL
- * - Leaves HTTP(S) and data URIs untouched.
+ * - Converts existing IPFS gateway URLs (w3s.link, dweb.link, etc.) to use IPFS proxy
+ * - Leaves other HTTP(S) and data URIs untouched.
  * - Optionally allows overriding the gateway.
  * @param uri - The URI to convert (IPFS, Arweave, or existing HTTP/S URL)
- * @param gateway - Optional gateway to use for IPFS (default: DEFAULT_IPFS_GATEWAY)
+ * @param gateway - Optional gateway to use for IPFS (default: fallback gateway)
+ * @param useProxy - Whether to use the IPFS microservice for IPFS (default: true)
  * @returns A full HTTPS URL for the content, or the original HTTP/S/data URI.
  */
 export function ipfsToHttpUrl(
 	uri: string | null | undefined,
-	gateway: string = DEFAULT_IPFS_GATEWAY
+	gateway: string = IPFS_GATEWAYS[0],
+	useProxy: boolean = true
 ): string {
 	if (!uri || typeof uri !== 'string') return '';
-	
-	// Already HTTP(S) or data URI
-	if (uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('data:')) {
-		return uri;
+
+	// Clean and sanitize input - remove any leading/trailing whitespace and special characters
+	let cleanUri = uri.trim();
+
+	// Remove any @ symbol that might have gotten prepended
+	if (cleanUri.startsWith('@')) {
+		cleanUri = cleanUri.substring(1);
+		console.warn(`[ipfsToHttpUrl] Removed @ symbol from URI: ${uri}`);
 	}
-	
+
+	// If this URL is already our microservice endpoint, return as-is to prevent double processing
+	if (cleanUri.startsWith(IPFS_MICROSERVICE_ENDPOINT)) {
+		return cleanUri;
+	}
+
+	// Handle data URIs
+	if (cleanUri.startsWith('data:')) {
+		return cleanUri;
+	}
+
 	// Handle onchfs:// protocol (fxhash)
-	if (uri.startsWith('onchfs://')) {
-		let cleaned = uri.replace(/^onchfs:\/\//, '');
+	if (cleanUri.startsWith('onchfs://')) {
+		const cleaned = cleanUri.replace(/^onchfs:\/\//, '');
 		return ONCHFS_GATEWAY + cleaned;
 	}
-	
+
 	// Handle Arweave
-	if (uri.startsWith('ar://')) {
-		let txId = uri.replace(/^ar:\/\//, '');
+	if (cleanUri.startsWith('ar://')) {
+		const txId = cleanUri.replace(/^ar:\/\//, '');
 		return ARWEAVE_GATEWAY + txId;
 	}
-	
+
 	// Handle raw Arweave transaction ID (43 characters)
-	if (uri.match(/^[a-zA-Z0-9_-]{43}$/)) {
-		return ARWEAVE_GATEWAY + uri;
+	if (cleanUri.match(/^[a-zA-Z0-9_-]{43}$/)) {
+		return ARWEAVE_GATEWAY + cleanUri;
 	}
-	
-	// Handle IPFS URIs
-	if (uri.startsWith('ipfs://') || uri.startsWith('ipfs:/')) {
+
+	// Handle existing IPFS gateway URLs - extract CID and route through our microservice
+	if (cleanUri.startsWith('http://') || cleanUri.startsWith('https://')) {
+		// Common IPFS gateway patterns to detect and convert
+		const ipfsGatewayPatterns = [
+			/https?:\/\/w3s\.link\/ipfs\/(.+)/,
+			/https?:\/\/dweb\.link\/ipfs\/(.+)/,
+			/https?:\/\/.*\.ipfs\.w3s\.link\/(.+)/,
+			/https?:\/\/.*\.ipfs\.dweb\.link\/(.+)/,
+			/https?:\/\/gateway\.pinata\.cloud\/ipfs\/(.+)/,
+			/https?:\/\/.*\.mypinata\.cloud\/ipfs\/(.+)/,
+			/https?:\/\/nftstorage\.link\/ipfs\/(.+)/,
+			/https?:\/\/cloudflare-ipfs\.com\/ipfs\/(.+)/,
+			/https?:\/\/ipfs\.io\/ipfs\/(.+)/,
+			/https?:\/\/.*\/ipfs\/(.+)/
+		];
+
+		for (const pattern of ipfsGatewayPatterns) {
+			const match = cleanUri.match(pattern);
+			if (match && match[1]) {
+				const cidAndPath = match[1];
+
+				// Use our IPFS microservice for IPFS access
+				if (useProxy) {
+					const pathParts = cidAndPath.split('/');
+					const cid = pathParts[0];
+					const path = pathParts.slice(1).join('/');
+
+					// Validate CID format (basic check for IPFS CID patterns)
+					if (!cid || (!cid.startsWith('Qm') && !cid.startsWith('bafy'))) {
+						console.warn(`[ipfsToHttpUrl] Invalid CID extracted: ${cid} from ${cleanUri}`);
+						return cleanUri; // Return original if CID is invalid
+					}
+
+					// Build microservice URL
+					return `${IPFS_MICROSERVICE_ENDPOINT}${cid}${path ? `/${path}` : ''}`;
+				}
+
+				return gateway + cidAndPath;
+			}
+		}
+
+		// If it's already an HTTP/HTTPS URL but not an IPFS gateway, return as-is
+		return cleanUri;
+	}
+
+	// Handle IPFS URIs - use IPFS microservice for authenticated access
+	if (cleanUri.startsWith('ipfs://') || cleanUri.startsWith('ipfs:/')) {
 		// Remove ipfs:// or ipfs:/ prefix
-		let cleaned = uri.replace(/^ipfs:\/\//, '').replace(/^ipfs:\//, '');
+		let cleaned = cleanUri.replace(/^ipfs:\/\//, '').replace(/^ipfs:\//, '');
+
+		// Use our IPFS microservice for authenticated access
+		if (useProxy) {
+			const pathParts = cleaned.split('/');
+			const cid = pathParts[0];
+			const path = pathParts.slice(1).join('/');
+
+			// Validate CID format
+			if (!cid || (!cid.startsWith('Qm') && !cid.startsWith('bafy'))) {
+				console.warn(
+					`[ipfsToHttpUrl] Invalid CID extracted from IPFS URI: ${cid} from ${cleanUri}`
+				);
+				return ''; // Return empty for invalid IPFS URIs
+			}
+
+			// Build microservice URL
+			return `${IPFS_MICROSERVICE_ENDPOINT}${cid}${path ? `/${path}` : ''}`;
+		}
+
 		return gateway + cleaned;
 	}
-	
-	// Handle IPFS paths without protocol
-	if (uri.startsWith('Qm') || uri.startsWith('bafy')) {
-		return gateway + uri;
+
+	// Handle IPFS paths without protocol (raw CIDs or CID/path)
+	if (cleanUri.startsWith('Qm') || cleanUri.startsWith('bafy')) {
+		// Use our IPFS microservice for IPFS access
+		if (useProxy) {
+			const pathParts = cleanUri.split('/');
+			const cid = pathParts[0];
+			const path = pathParts.slice(1).join('/');
+
+			// Build microservice URL
+			return `${IPFS_MICROSERVICE_ENDPOINT}${cid}${path ? `/${path}` : ''}`;
+		}
+
+		return gateway + cleanUri;
 	}
-	
+
 	// If nothing matched, return as is - might be a relative URL or something else
-	console.warn(`[ipfsToHttpUrl] Unrecognized URI format: ${uri}`);
-	return uri;
+	console.warn(`[ipfsToHttpUrl] Unrecognized URI format: ${cleanUri}`);
+	return cleanUri;
 }
 
 /**

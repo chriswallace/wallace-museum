@@ -2,8 +2,10 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
-	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import { getContractUrl, getContractName } from '$lib/utils';
 	import { linear } from 'svelte/easing';
+	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 
 	export let data: { artist?: any; error?: string };
 
@@ -26,21 +28,6 @@
 			minute: 'numeric',
 			timeZoneName: 'short'
 		}).format(date);
-	}
-
-	function getContractUrl(contractAddr: string, tokenId?: string): string | undefined {
-		if (contractAddr.startsWith('KT')) {
-			// Tezos contract
-			return tokenId
-				? `https://tzkt.io/${contractAddr}/tokens/${tokenId}`
-				: `https://tzkt.io/${contractAddr}`;
-		} else if (contractAddr.startsWith('0x')) {
-			// Ethereum contract
-			return tokenId
-				? `https://etherscan.io/token/${contractAddr}?a=${tokenId}`
-				: `https://etherscan.io/token/${contractAddr}`;
-		}
-		return undefined;
 	}
 
 	function closeOverlay() {
@@ -215,45 +202,32 @@
 			{#key currentIndex}
 				<div class="museum-content">
 					<div class="artwork-container">
-						{#if currentArtwork.animation_url}
-							{#if currentArtwork.mime && currentArtwork.mime.startsWith('video')}
-								<video
-									src={currentArtwork.animation_url}
-									autoplay
-									loop
-									muted
-									playsinline
-									class="artwork-media"
-								/>
-							{:else if currentArtwork.mime && currentArtwork.mime.startsWith('application')}
-								<div class="iframe-container" style="aspect-ratio: {aspectRatio}">
-									<iframe
-										bind:this={iframeEl}
-										on:load={handleIframeLoad}
-										src={currentArtwork.animation_url}
-										width="100%"
-										height="100%"
-										title="Artwork Animation"
-										class="artwork-iframe"
-										scrolling="no"
-										frameborder="0"
-										sandbox="allow-scripts allow-same-origin"
-										allowfullscreen
-									/>
-								</div>
-							{:else if currentArtwork.image_url}
-								<!-- Fall back to image_url for non-application, non-video animation_url types -->
-								<img
-									src={getCloudinaryTransformedUrl(currentArtwork.image_url, 'w_2000,q_90,f_auto')}
-									alt={currentArtwork.title}
-									class="artwork-media"
-								/>
-							{/if}
+						{#if currentArtwork.animation_url && currentArtwork.mime?.startsWith('application')}
+							<iframe
+								bind:this={iframeEl}
+								src={ipfsToHttpUrl(currentArtwork.animation_url)}
+								class="artwork-iframe"
+								title="Artwork Animation"
+							></iframe>
+						{:else if currentArtwork.animation_url && currentArtwork.mime?.startsWith('video')}
+							<video autoplay loop muted class="artwork-video">
+								<source src={ipfsToHttpUrl(currentArtwork.animation_url)} type="video/mp4" />
+								Your browser does not support the video tag.
+							</video>
 						{:else if currentArtwork.image_url}
-							<img
-								src={getCloudinaryTransformedUrl(currentArtwork.image_url, 'w_2000,q_90,f_auto')}
+							<OptimizedImage
+								src={currentArtwork.image_url}
 								alt={currentArtwork.title}
-								class="artwork-media"
+								responsive={true}
+								responsiveSizes={[800, 1200, 1600]}
+								sizes="100vw"
+								fit="contain"
+								format="webp"
+								quality={95}
+								aspectRatio={currentArtwork.dimensions
+									? `${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height}`
+									: '1/1'}
+								className="artwork-image"
 							/>
 						{/if}
 					</div>
@@ -315,23 +289,28 @@
 											{#if data.artist.artworks[currentIndex].contractAddr}
 												<div class="metadata-item">
 													<strong>Contract</strong>
-													{#if getContractUrl(data.artist.artworks[currentIndex].contractAddr, data.artist.artworks[currentIndex].tokenID)}
+													{#if getContractUrl(data.artist.artworks[currentIndex].contractAddr, data.artist.artworks[currentIndex].blockchain, data.artist.artworks[currentIndex].tokenID)}
 														<a
 															href={getContractUrl(
 																data.artist.artworks[currentIndex].contractAddr,
+																data.artist.artworks[currentIndex].blockchain,
 																data.artist.artworks[currentIndex].tokenID
 															)}
 															target="_blank"
 															rel="noopener noreferrer"
 															class="contract-link"
 														>
-															{data.artist.artworks[currentIndex].contractAlias ||
-																data.artist.artworks[currentIndex].contractAddr}
+															{getContractName(
+																data.artist.artworks[currentIndex].contractAddr,
+																data.artist.artworks[currentIndex].contractAlias
+															)}
 														</a>
 													{:else}
 														<span>
-															{data.artist.artworks[currentIndex].contractAlias ||
-																data.artist.artworks[currentIndex].contractAddr}
+															{getContractName(
+																data.artist.artworks[currentIndex].contractAddr,
+																data.artist.artworks[currentIndex].contractAlias
+															)}
 														</span>
 													{/if}
 												</div>
@@ -383,9 +362,9 @@
 																	{address.blockchain}:
 																	<span class="font-mono">{address.address}</span>
 																</span>
-																{#if getContractUrl(address.address)}
+																{#if getContractUrl(address.address, address.blockchain)}
 																	<a
-																		href={getContractUrl(address.address)}
+																		href={getContractUrl(address.address, address.blockchain)}
 																		target="_blank"
 																		rel="noopener noreferrer"
 																		class="text-blue-400 hover:text-blue-300 text-sm ml-2"
@@ -594,5 +573,13 @@
 
 	.divider {
 		@apply w-full h-px bg-gray-700 my-6;
+	}
+
+	/* Fix for artwork image to fit properly in container */
+	:global(.artwork-image) {
+		width: 100% !important;
+		height: 100% !important;
+		object-fit: contain !important;
+		object-position: center !important;
 	}
 </style>

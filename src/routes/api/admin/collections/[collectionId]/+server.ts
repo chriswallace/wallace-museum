@@ -6,7 +6,8 @@ export async function GET({ params }) {
 	const collection = await prisma.collection.findUnique({
 		where: { id: parseInt(collectionId, 10) },
 		include: {
-			artworks: true
+			artworks: true,
+			artists: true
 		}
 	});
 
@@ -29,15 +30,19 @@ export async function PUT({ params, request }) {
 	const data = await request.json();
 
 	try {
+		const updateData: any = {
+			title: data.title,
+			description: data.description,
+			curatorNotes: data.curatorNotes,
+			slug: data.slug,
+			enabled: data.enabled
+		};
+		if (data.artistIds && Array.isArray(data.artistIds)) {
+			updateData.artists = { set: data.artistIds.map((id: number) => ({ id })) };
+		}
 		const updatedCollection = await prisma.collection.update({
 			where: { id: parseInt(collectionId, 10) },
-			data: {
-				title: data.title,
-				description: data.description,
-				curatorNotes: data.curatorNotes,
-				slug: data.slug,
-				enabled: data.enabled
-			}
+			data: updateData
 		});
 
 		return new Response(JSON.stringify(updatedCollection), {

@@ -1,5 +1,6 @@
 import prisma from '$lib/prisma';
 import type { Artwork } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 /**
  * Normalized structure for indexed artwork data
@@ -34,26 +35,57 @@ export interface IndexedArtworkData {
 	editionSize: number | null;
 }
 
+interface ArtistForNormalization {
+	id: number;
+	name: string;
+}
+
 /**
  * Generate normalized data for an artwork
  */
-export async function normalizeArtworkData(artwork: Artwork): Promise<IndexedArtworkData> {
-	// Get related artists
-	const artistArtworks = await prisma.artistArtworks.findMany({
-		where: { artworkId: artwork.id },
+export async function normalizeArtworkData(artworkId: number): Promise<IndexedArtworkData | null> {
+	const artwork = await prisma.artwork.findUnique({
+		where: { id: artworkId },
 		include: {
-			artist: true
+			collection: true, // Include collection details
+			walletAddresses: {
+				// Include the wallet addresses (updated relation name)
+				include: {
+					artist: true // Include the artist linked to each wallet address
+				}
+			}
 		}
 	});
 
-	// Get collection data
-	const collection = artwork.collectionId
-		? await prisma.collection.findUnique({
-				where: { id: artwork.collectionId }
-			})
-		: null;
+	if (!artwork) {
+		console.error(`[artworkIndexer] Artwork with ID ${artworkId} not found for normalization.`);
+		return null;
+	}
 
-	// Parse attributes from JSON
+	const artists: ArtistForNormalization[] = [];
+	if (artwork.walletAddresses) {
+		for (const walletAddress of artwork.walletAddresses) {
+			if (walletAddress.artist) {
+				artists.push({
+					id: walletAddress.artist.id,
+					name: walletAddress.artist.name
+				});
+			}
+		}
+	}
+
+	const collectionData = artwork.collection
+		? {
+				id: artwork.collection.id,
+				name: artwork.collection.title,
+				slug: artwork.collection.slug
+			}
+		: {
+				id: null,
+				name: artwork.contractAddress ? `Contract ${artwork.contractAddress.substring(0, 10)}...` : 'Unknown Collection',
+				slug: null
+			};
+
 	const attributes = artwork.attributes
 		? (artwork.attributes as any[]).map((attr) => ({
 				trait_type: attr.trait_type || '',
@@ -61,7 +93,6 @@ export async function normalizeArtworkData(artwork: Artwork): Promise<IndexedArt
 			}))
 		: [];
 
-	// Extract edition size from attributes if available
 	let editionSize = null;
 	const editionAttr = attributes.find(
 		(attr) =>
@@ -76,31 +107,22 @@ export async function normalizeArtworkData(artwork: Artwork): Promise<IndexedArt
 		}
 	}
 
-	// Parse tags from JSON
-	const tags = artwork.tags ? (artwork.tags as string[]) : [];
+	const tags: string[] = []; // Assuming tags are not directly on artwork model as per linter errors
 
-	// Normalize the data
 	const normalizedData: IndexedArtworkData = {
 		id: artwork.id,
 		title: artwork.title,
 		description: artwork.description,
-		image_url: artwork.image_url,
-		animation_url: artwork.animation_url,
+		image_url: artwork.imageUrl,
+		animation_url: artwork.animationUrl,
 		blockchain: artwork.blockchain,
-		collection: {
-			id: collection?.id || null,
-			name: collection?.title || artwork.contractAlias || null,
-			slug: collection?.slug || null
-		},
-		artists: artistArtworks.map((aa) => ({
-			id: aa.artist.id,
-			name: aa.artist.name
-		})),
+		collection: collectionData,
+		artists,
 		attributes,
 		tags,
-		contractAddr: artwork.contractAddr,
-		contractAlias: artwork.contractAlias,
-		tokenID: artwork.tokenID,
+		contractAddr: artwork.contractAddress,
+		contractAlias: artwork.collection?.title || null, // Using collection title or null
+		tokenID: artwork.tokenId,
 		mime: artwork.mime,
 		tokenStandard: artwork.tokenStandard,
 		mintDate: artwork.mintDate ? artwork.mintDate.toISOString() : null,
@@ -114,35 +136,68 @@ export async function normalizeArtworkData(artwork: Artwork): Promise<IndexedArt
  * Index a single artwork
  */
 export async function indexArtwork(artworkId: number): Promise<void> {
-	const artwork = await prisma.artwork.findUnique({
-		where: { id: artworkId }
+	// Fetch the artwork to get its direct properties for uid and basic info
+	const artworkForUid = await prisma.artwork.findUnique({
+		where: { id: artworkId },
+		select: { contractAddress: true, tokenId: true, blockchain: true, attributes: true }
 	});
 
-	if (!artwork) {
-		throw new Error(`Artwork with ID ${artworkId} not found`);
+	if (!artworkForUid) {
+		console.error(`[artworkIndexer] Artwork with ID ${artworkId} not found for indexing.`);
+		return; // Don't proceed if artwork doesn't exist
 	}
 
-	const normalizedData = await normalizeArtworkData(artwork);
+	const normalizedData = await normalizeArtworkData(artworkId);
 
-	// Upsert the index record
-	await prisma.artworkIndex.upsert({
-		where: { artworkId: artwork.id },
-		create: {
-			artworkId: artwork.id,
-			indexedData: normalizedData as any
-		},
-		update: {
-			indexedData: normalizedData as any,
-			updatedAt: new Date()
+	if (!normalizedData) {
+		console.error(
+			`[artworkIndexer] Normalization failed for artwork ${artworkId}. Skipping indexing.`
+		);
+		return;
+	}
+
+	const nftUid = `${artworkForUid.contractAddress || 'unknown'}:${artworkForUid.tokenId || 'unknown'}`;
+	const blockchain = artworkForUid.blockchain || 'Ethereum';
+	const dataSource = blockchain.toLowerCase() === 'tezos' ? 'teztok' : 'opensea';
+
+	// Look for existing index record for this contract address and token ID
+	const existingIndexRecord = await prisma.artworkIndex.findFirst({
+		where: {
+			contractAddress: artworkForUid.contractAddress || 'unknown',
+			tokenId: artworkForUid.tokenId || 'unknown'
 		}
 	});
+
+	if (existingIndexRecord) {
+		// Update the existing index record to link it to the artwork
+		await prisma.artworkIndex.update({
+			where: { id: existingIndexRecord.id },
+			data: {
+				artworkId: artworkId,
+				nftUid: nftUid,
+				blockchain: blockchain,
+				dataSource: dataSource,
+				rawResponse: artworkForUid.attributes || Prisma.JsonNull,
+				normalizedData: normalizedData as any,
+				importStatus: 'imported', // Mark as imported since we're linking to an artwork
+				updatedAt: new Date()
+			}
+		});
+		console.log(`[artworkIndexer] Updated existing index record for artwork ${artworkId} (${nftUid})`);
+	} else {
+		// No existing index record found - this is expected for artworks created outside the indexing flow
+		// Do NOT create new index records while user is managing Artworks - they should only be created during discovery phase
+		console.warn(`[artworkIndexer] No existing index record found for artwork ${artworkId} (${nftUid}). Skipping indexing - index records should only be created during discovery phase.`);
+	}
 }
 
 /**
  * Index all artworks
  */
 export async function indexAllArtworks(): Promise<void> {
-	const artworks = await prisma.artwork.findMany();
+	const artworks = await prisma.artwork.findMany({
+		select: { id: true } // Only select IDs to avoid fetching large amounts of data
+	});
 
 	for (const artwork of artworks) {
 		await indexArtwork(artwork.id);
@@ -157,12 +212,12 @@ export async function reindexArtworks(
 	options: {
 		artworkIds?: number[];
 		collectionId?: number;
-		force?: boolean;
+		force?: boolean; // `force` is not used in current logic, but kept for signature
 	} = {}
 ): Promise<void> {
-	const { artworkIds, collectionId, force = false } = options;
+	const { artworkIds, collectionId } = options;
 
-	let whereClause: any = {};
+	let whereClause: Prisma.ArtworkWhereInput = {};
 
 	if (artworkIds && artworkIds.length > 0) {
 		whereClause.id = { in: artworkIds };
@@ -172,11 +227,12 @@ export async function reindexArtworks(
 		whereClause.collectionId = collectionId;
 	}
 
-	const artworks = await prisma.artwork.findMany({
-		where: whereClause
+	const artworksToReindex = await prisma.artwork.findMany({
+		where: whereClause,
+		select: { id: true }
 	});
 
-	for (const artwork of artworks) {
+	for (const artwork of artworksToReindex) {
 		await indexArtwork(artwork.id);
 	}
 }
@@ -186,15 +242,15 @@ export async function reindexArtworks(
  */
 export async function searchIndexedArtworks(params: {
 	search?: string;
-	artist?: string | number;
-	collection?: string | number;
+	artist?: string | number; // Can be artist ID (number) or artist name (string)
+	collection?: string | number; // Can be collection ID (number) or slug/name (string)
 	blockchain?: string;
 	tags?: string[];
 	minEditionSize?: number;
 	maxEditionSize?: number;
 	page?: number;
 	pageSize?: number;
-	sortBy?: string;
+	sortBy?: string; // Field in normalizedData to sort by
 	sortDirection?: 'asc' | 'desc';
 }) {
 	const {
@@ -207,104 +263,121 @@ export async function searchIndexedArtworks(params: {
 		maxEditionSize,
 		page = 1,
 		pageSize = 20,
-		sortBy = 'id',
+		sortBy = 'id', // Default sort field (ensure 'id' exists in your normalizedData or adjust)
 		sortDirection = 'desc'
 	} = params;
 
 	const skip = (page - 1) * pageSize;
 
-	// Build where clause
-	let whereClause: any = {};
+	const whereConditions: Prisma.ArtworkIndexWhereInput[] = [];
 
-	// Handle search term
 	if (search) {
-		whereClause.OR = [
-			{ indexedData: { path: ['title'], string_contains: search } },
-			{ indexedData: { path: ['description'], string_contains: search } },
-			{ indexedData: { path: ['collection', 'name'], string_contains: search } },
-			{ indexedData: { path: ['artists'], array_contains: [{ name: { contains: search } }] } }
-		];
+		whereConditions.push({
+			OR: [
+				{ normalizedData: { path: ['title'], string_contains: search } },
+				{ normalizedData: { path: ['description'], string_contains: search } },
+				{ normalizedData: { path: ['collection', 'name'], string_contains: search } },
+				{ normalizedData: { path: ['artists'], array_contains: [{ name: search }] } } // Assumes artist name for search
+			]
+		});
 	}
 
-	// Filter by artist
 	if (artist) {
-		const artistCondition = typeof artist === 'number' ? { id: artist } : { name: artist };
-
-		whereClause.indexedData = {
-			path: ['artists'],
-			array_contains: [artistCondition]
-		};
+		if (typeof artist === 'number') {
+			whereConditions.push({
+				normalizedData: { path: ['artists'], array_contains: [{ id: artist }] }
+			});
+		} else {
+			whereConditions.push({
+				normalizedData: { path: ['artists'], array_contains: [{ name: artist }] }
+			});
+		}
 	}
 
-	// Filter by collection
 	if (collection) {
 		if (typeof collection === 'number') {
-			whereClause.indexedData = {
-				path: ['collection', 'id'],
-				equals: collection
-			};
+			whereConditions.push({ normalizedData: { path: ['collection', 'id'], equals: collection } });
 		} else {
-			whereClause.OR = [
-				{ indexedData: { path: ['collection', 'name'], string_contains: collection } },
-				{ indexedData: { path: ['collection', 'slug'], string_contains: collection } }
-			];
+			whereConditions.push({
+				OR: [
+					{ normalizedData: { path: ['collection', 'name'], string_contains: collection } },
+					{ normalizedData: { path: ['collection', 'slug'], equals: collection } }
+				]
+			});
 		}
 	}
 
-	// Filter by blockchain
 	if (blockchain) {
-		whereClause.indexedData = {
-			path: ['blockchain'],
-			equals: blockchain
-		};
+		whereConditions.push({ normalizedData: { path: ['blockchain'], equals: blockchain } });
 	}
 
-	// Filter by tags
 	if (tags && tags.length > 0) {
-		whereClause.indexedData = {
-			path: ['tags'],
-			array_contains: tags
-		};
+		// Assuming tags is an array of strings in normalizedData
+		whereConditions.push({ normalizedData: { path: ['tags'], array_contains: tags } });
 	}
 
-	// Filter by edition size
 	if (minEditionSize !== undefined || maxEditionSize !== undefined) {
-		const editionSizeCondition: any = {};
-
+		const editionSizeConditions: any = {};
 		if (minEditionSize !== undefined) {
-			editionSizeCondition.gte = minEditionSize;
+			editionSizeConditions.gte = minEditionSize;
 		}
-
 		if (maxEditionSize !== undefined) {
-			editionSizeCondition.lte = maxEditionSize;
+			editionSizeConditions.lte = maxEditionSize;
 		}
-
-		whereClause.indexedData = {
-			path: ['editionSize'],
-			...editionSizeCondition
-		};
+		whereConditions.push({ normalizedData: { path: ['editionSize'], ...editionSizeConditions } });
 	}
 
-	// Get total count for pagination
+	const finalWhereClause: Prisma.ArtworkIndexWhereInput =
+		whereConditions.length > 0 ? { AND: whereConditions } : {};
+
 	const totalCount = await prisma.artworkIndex.count({
-		where: whereClause
+		where: finalWhereClause
 	});
 
-	// Get the indexed artworks
-	const indexedArtworks = (await prisma.artworkIndex.findMany({
-		where: whereClause,
-		orderBy: {
-			indexedData: {
-				path: [sortBy],
-				sort: sortDirection
-			}
-		},
+	// Prisma does not directly support orderBy on JSON sub-properties in a generic way for all DBs.
+	// Sorting might need to be done in-memory after fetching, or by denormalizing sortable fields.
+	const artworkIndexes = await prisma.artworkIndex.findMany({
+		where: finalWhereClause,
+		// orderBy: { normalizedData: { path: [sortBy], sort: sortDirection } }, // This specific JSON path ordering is not universally supported
 		skip,
 		take: pageSize
-	})) as { indexedData: any }[];
+	});
+
+	const items = artworkIndexes.map((ai) => {
+		if (typeof ai.normalizedData === 'string') {
+			try {
+				return JSON.parse(ai.normalizedData);
+			} catch (e) {
+				console.error('Failed to parse normalizedData from artworkIndex record:', ai.id, e);
+				return ai.normalizedData;
+			}
+		}
+		return ai.normalizedData;
+	});
+
+	// If sorting is critical and needs to be DB-driven, consider denormalizing key sort fields
+	// onto the ArtworkIndex table itself or use raw SQL for that specific query part.
+	if (sortBy && sortDirection) {
+		items.sort((a: any, b: any) => {
+			const valA = a && a[sortBy] !== undefined ? a[sortBy] : null;
+			const valB = b && b[sortBy] !== undefined ? b[sortBy] : null;
+
+			if (valA === null && valB === null) return 0;
+			if (valA === null) return sortDirection === 'asc' ? -1 : 1;
+			if (valB === null) return sortDirection === 'asc' ? 1 : -1;
+
+			if (typeof valA === 'string' && typeof valB === 'string') {
+				return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+			}
+			if (typeof valA === 'number' && typeof valB === 'number') {
+				return sortDirection === 'asc' ? valA - valB : valB - valA;
+			}
+			return 0;
+		});
+	}
 
 	return {
-		items: indexedArtworks.map((ia) => ia.indexedData),
+		items,
 		pagination: {
 			page,
 			pageSize,

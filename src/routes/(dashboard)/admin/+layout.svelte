@@ -40,7 +40,6 @@
 					>Artists</a
 				>
 				<a href="/admin/import" class={currentPage === '/admin/import' ? 'selected' : ''}>Import</a>
-				<a href="/admin/pinata" class={currentPage === '/admin/pinata' ? 'selected' : ''}>IPFS</a>
 			</div>
 
 			<form action="/logout" method="POST">

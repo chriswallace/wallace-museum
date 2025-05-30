@@ -1,6 +1,6 @@
 <!-- WalletAddressManager.svelte -->
 <script lang="ts">
-	import type { WalletAddress } from '$lib/settingsManager';
+	import type { WalletAddress } from '$lib/types/wallet';
 	import { fade } from 'svelte/transition';
 
 	// Props

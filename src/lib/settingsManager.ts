@@ -1,15 +1,12 @@
 import prisma from '$lib/prisma';
+import type { WalletAddress } from '$lib/types/wallet';
 
 export const SETTINGS_KEYS = {
 	WALLET_ADDRESSES: 'wallet_addresses'
 };
 
-export interface WalletAddress {
-	address: string;
-	blockchain: string;
-	alias?: string;
-	createdAt: string;
-}
+// Re-export the type for backward compatibility
+export type { WalletAddress };
 
 interface SettingsRecord {
 	key: string;
@@ -31,7 +28,26 @@ export async function getWalletAddresses(): Promise<WalletAddress[]> {
 			return [];
 		}
 
-		return setting.value as WalletAddress[];
+		// Ensure we always return an array
+		let value = setting.value;
+		
+		// If value is a string, try to parse it as JSON
+		if (typeof value === 'string') {
+			try {
+				value = JSON.parse(value);
+			} catch (parseError) {
+				console.error('Error parsing wallet addresses JSON:', parseError);
+				return [];
+			}
+		}
+		
+		// Ensure the value is an array
+		if (!Array.isArray(value)) {
+			console.error('Wallet addresses value is not an array:', value);
+			return [];
+		}
+
+		return value as WalletAddress[];
 	} catch (error) {
 		console.error('Error getting wallet addresses:', error);
 		return [];
@@ -76,10 +92,10 @@ export async function addWalletAddress(
 		// Create or update settings record
 		await prisma.settings.upsert({
 			where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
-			update: { value: updatedAddresses },
+			update: { value: JSON.stringify(updatedAddresses) },
 			create: {
 				key: SETTINGS_KEYS.WALLET_ADDRESSES,
-				value: updatedAddresses
+				value: JSON.stringify(updatedAddresses)
 			}
 		});
 
@@ -107,7 +123,7 @@ export async function removeWalletAddress(
 
 		await prisma.settings.update({
 			where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
-			data: { value: updatedAddresses }
+			data: { value: JSON.stringify(updatedAddresses) }
 		});
 
 		return updatedAddresses;
@@ -137,7 +153,7 @@ export async function updateWalletAddress(
 
 		await prisma.settings.update({
 			where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
-			data: { value: updatedAddresses }
+			data: { value: JSON.stringify(updatedAddresses) }
 		});
 
 		return updatedAddresses;

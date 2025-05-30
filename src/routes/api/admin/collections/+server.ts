@@ -1,24 +1,23 @@
 import prisma from '$lib/prisma';
 import { getCoverImages } from '$lib/utils';
 
-export async function GET({ url }) {
+export async function GET({ url }: { url: URL }): Promise<Response> {
 	try {
 		const page = parseInt(url.searchParams.get('page') || '1');
-		const sortColumn = url.searchParams.get('sort') || 'title'; // Default to sorting by title
+		const sortColumn = url.searchParams.get('sort') || 'title';
 		const sortOrder = url.searchParams.get('order') || 'asc';
 		const limit = 24;
 		const offset = (page - 1) * limit;
 
-		let orderBy = {};
+		let orderBy: Record<string, string> = {};
 		orderBy[sortColumn] = sortOrder;
 
 		const search = url.searchParams.get('search') || '';
-		let whereClause = {};
+		let whereClause: Record<string, any> = {};
 
 		if (search) {
 			whereClause = {
 				title: { contains: search, mode: 'insensitive' }
-				// Optionally include other searchable fields
 			};
 		}
 
@@ -30,15 +29,14 @@ export async function GET({ url }) {
 			orderBy: [orderBy],
 			include: {
 				artworks: {
-					take: 4, // Only take the first four artworks
-					select: { image_url: true } // Only select the image field
-				}
+					take: 4,
+					select: { imageUrl: true }
+				},
+				artists: true
 			}
 		});
 
-		// Adding coverImages to each collection
-		const defaultImage = '/images/medici-image.png'; // Default image URL
-
+		const defaultImage = '/images/medici-image.png';
 		const modifiedCollections = collections.map((collection) => ({
 			...collection,
 			coverImages: getCoverImages(collection.artworks, defaultImage)
@@ -58,7 +56,7 @@ export async function GET({ url }) {
 				}
 			}
 		);
-	} catch (error) {
+	} catch (error: any) {
 		console.error('Error in GET request:', error.message);
 		return new Response(JSON.stringify({ error: 'An error occurred' }), {
 			status: 500,

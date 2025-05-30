@@ -3,18 +3,20 @@
 	export let data: PageData;
 
 	import type { ArtistWithPreview as Artist } from './+page.server';
-	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import { fade, fly } from 'svelte/transition';
 	import { goto } from '$app/navigation';
 	import LoaderWrapper from '$lib/components/LoaderWrapper.svelte';
+	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
 
 	let hoveredArtist: Artist | null = null;
 	let mouseX = 0;
 	let mouseY = 0;
 	let preloadedImages: Record<string, HTMLImageElement> = {};
 	let previewWidth = 320;
-	let previewHeight = 220;
 	let loadingStates: Record<string, boolean> = {};
 	let isLargeScreen = false;
 
@@ -34,7 +36,13 @@
 			artist.artworks.forEach((artwork) => {
 				if (artwork.image_url && !preloadedImages[artwork.image_url]) {
 					const img = new window.Image();
-					img.src = artwork.image_url;
+					// Use optimized image URL for preloading - same as what will be displayed
+					img.src = buildOptimizedImageUrl(artwork.image_url, {
+						width: 320,
+						fit: 'contain',
+						format: 'webp',
+						quality: 80
+					});
 					preloadedImages[artwork.image_url] = img;
 				}
 			});
@@ -63,10 +71,7 @@
 		mouseX + 24,
 		(typeof window !== 'undefined' ? window.innerWidth : 10000) - previewWidth - 24
 	);
-	$: safeTop = Math.min(
-		mouseY + 24,
-		(typeof window !== 'undefined' ? window.innerHeight : 10000) - previewHeight - 24
-	);
+	$: safeTop = mouseY + 24;
 </script>
 
 <svelte:head>
@@ -124,22 +129,21 @@
 	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && hoveredArtist.artworks[0]?.image_url}
 		<div
 			class="floating-artwork-preview"
-			style="left: {safeLeft}px; top: {safeTop}px; width: {previewWidth}px; height: {previewHeight}px;"
+			style="left: {safeLeft}px; top: {safeTop}px; width: {previewWidth}px;"
 		>
 			{#if hoveredArtist.artworks[0].image_url && loadingStates[hoveredArtist.artworks[0].image_url]}
 				<div class="preview-loader">
-					<LoaderWrapper width="100%" height="100%" aspectRatio="320/220" />
+					<LoaderWrapper width="100%" height="200px" />
 				</div>
 			{/if}
-			<img
-				src={getCloudinaryTransformedUrl(
-					hoveredArtist.artworks[0].image_url,
-					'w_320,h_220,c_fit,q_70,f_auto'
-				)}
+			<OptimizedImage
+				src={hoveredArtist.artworks[0].image_url}
 				alt={hoveredArtist.artworks[0].title || ''}
-				class="preview-image"
-				class:hidden={hoveredArtist.artworks[0].image_url &&
-					loadingStates[hoveredArtist.artworks[0].image_url]}
+				width={320}
+				fit="contain"
+				format="webp"
+				quality={80}
+				className={hoveredArtist.artworks[0].image_url && loadingStates[hoveredArtist.artworks[0].image_url] ? 'hidden preview-image' : 'preview-image'}
 				on:load={() => {
 					const imageUrl = hoveredArtist?.artworks[0]?.image_url;
 					if (imageUrl) {
@@ -261,7 +265,6 @@
 	.floating-artwork-preview {
 		@apply fixed pointer-events-none z-[9999] p-0 flex gap-0 items-center overflow-hidden bg-none border-none shadow-xl rounded-lg;
 		max-width: 320px;
-		max-height: 220px;
 	}
 
 	.preview-loader {
@@ -269,17 +272,12 @@
 	}
 
 	.preview-image {
-		@apply h-auto w-auto max-h-[220px] max-w-full rounded-lg bg-black object-contain shadow-lg m-0;
+		@apply h-auto w-auto max-w-full rounded-lg bg-black object-contain shadow-lg m-0;
 	}
 
 	@media (max-width: 600px) {
 		.floating-artwork-preview {
 			max-width: 250px;
-			max-height: 180px;
-		}
-
-		.preview-image {
-			max-height: 180px;
 		}
 	}
 
@@ -314,11 +312,6 @@
 
 		.floating-artwork-preview {
 			max-width: 200px;
-			max-height: 150px;
-		}
-
-		.preview-image {
-			max-height: 150px;
 		}
 	}
 

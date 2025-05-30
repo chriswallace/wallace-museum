@@ -1,20 +1,20 @@
-import { uploadToCloudinary } from './mediaHelpers';
+import { uploadToPinata } from './pinataHelpers';
 
 export async function uploadAvatarImage(file: File): Promise<{ url: string }> {
 	try {
 		// Convert File to buffer
 		const buffer = Buffer.from(await file.arrayBuffer());
 
-		// Upload to Cloudinary with specific options for avatars
-		const result = await uploadToCloudinary(
+		// Upload to Pinata with specific options for avatars
+		const result = await uploadToPinata(
 			buffer,
 			`avatar_${Date.now()}`,
 			file.type,
-			'artist-avatars' // Tag for artist avatars
+			{ category: 'artist-avatars' } // Metadata for artist avatars
 		);
 
 		if (!result) {
-			throw new Error('Failed to upload avatar to Cloudinary');
+			throw new Error('Failed to upload avatar to Pinata');
 		}
 
 		return { url: result.url };

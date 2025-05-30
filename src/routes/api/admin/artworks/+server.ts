@@ -5,108 +5,73 @@ import { Prisma } from '@prisma/client';
 type ArtworkWithRelations = Prisma.ArtworkGetPayload<{
 	include: {
 		collection: true;
-		ArtistArtworks: {
-			include: {
-				artist: true;
-			};
-		};
+		artists: true;
 	};
 }>;
 
 export async function GET({ url }) {
+	const searchParams = url.searchParams;
+	const page = parseInt(searchParams.get('page') || '1');
+	const limit = parseInt(searchParams.get('limit') || '50');
+	const search = searchParams.get('search') || '';
+	const sortBy = searchParams.get('sortBy') || 'id';
+	const sortOrder = searchParams.get('sortOrder') || 'desc';
+
+	const offset = (page - 1) * limit;
+
+	const where: Prisma.ArtworkWhereInput = {};
+
+	if (search) {
+		where.OR = [
+			{ title: { contains: search, mode: 'insensitive' } },
+			{ description: { contains: search, mode: 'insensitive' } }
+		];
+	}
+
+	const orderBy: Prisma.ArtworkOrderByWithRelationInput = {};
+	orderBy[sortBy as keyof Prisma.ArtworkOrderByWithRelationInput] = sortOrder as 'asc' | 'desc';
+
 	try {
-		const page = parseInt(url.searchParams.get('page') || '1');
-		const sortColumn = url.searchParams.get('sort') || 'title';
-		const sortOrder = url.searchParams.get('order') || 'asc';
-		const limit = 25;
-		const offset = (page - 1) * limit;
+		const [artworks, totalCount] = await Promise.all([
+			prisma.artwork.findMany({
+				where,
+				include: {
+					collection: true,
+					artists: true
+				},
+				orderBy,
+				skip: offset,
+				take: limit
+			}),
+			prisma.artwork.count({ where })
+		]);
 
-		let orderBy: Prisma.ArtworkOrderByWithRelationInput[] = [];
-		if (sortColumn && sortOrder) {
-			if (sortColumn === 'artist') {
-				console.warn('Sorting by artist is not currently supported in this list view.');
-				orderBy.push({ title: 'asc' });
-			} else if (sortColumn === 'collection') {
-				orderBy.push({
-					collection: {
-						title: sortOrder as Prisma.SortOrder
-					}
-				});
-			} else {
-				orderBy.push({
-					[sortColumn]: sortOrder as Prisma.SortOrder
-				});
-			}
-		} else {
-			orderBy.push({ title: 'asc' });
-		}
-
-		const search = url.searchParams.get('search') || '';
-		let whereClause: Prisma.ArtworkWhereInput = {};
-
-		if (search) {
-			whereClause = {
-				OR: [
-					{ title: { contains: search, mode: 'insensitive' } },
-					{
-						ArtistArtworks: {
-							some: { artist: { name: { contains: search, mode: 'insensitive' } } }
-						}
-					},
-					{ collection: { title: { contains: search, mode: 'insensitive' } } }
-				]
-			};
-		}
-
-		const totalArtworks = await prisma.artwork.count({ where: whereClause });
-
-		const artworks: ArtworkWithRelations[] = await prisma.artwork.findMany({
-			where: whereClause,
-			skip: offset,
-			take: limit,
-			orderBy: orderBy,
-			include: {
-				collection: true,
-				ArtistArtworks: {
-					include: {
-						artist: true
-					}
-				}
-			}
-		});
-
-		const transformedArtworks = artworks.map((artwork) => {
-			type ArtistArtworkJoin = Prisma.ArtistArtworksGetPayload<{ include: { artist: true } }>;
-
-			const transformed = {
-				...artwork,
-				artists: artwork.ArtistArtworks.map((aa: ArtistArtworkJoin) => aa.artist)
-			};
-			return transformed;
-		});
+		const transformedArtworks = artworks.map((artwork: ArtworkWithRelations) => ({
+			...artwork,
+			tokenID: artwork.tokenId,
+			contractAddr: artwork.contractAddress,
+			artists: artwork.artists || [],
+			artist: artwork.artists && artwork.artists.length > 0 ? artwork.artists[0] : null
+		}));
 
 		return new Response(
 			JSON.stringify({
 				artworks: transformedArtworks,
-				total: totalArtworks,
+				totalCount,
 				page,
-				totalPages: Math.ceil(totalArtworks / limit)
+				limit,
+				totalPages: Math.ceil(totalCount / limit)
 			}),
 			{
 				status: 200,
-				headers: {
-					'Content-Type': 'application/json'
-				}
+				headers: { 'Content-Type': 'application/json' }
 			}
 		);
 	} catch (error) {
-		console.error('Error fetching artworks list:', error);
-		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-		return new Response(JSON.stringify({ error: 'An error occurred', details: errorMessage }), {
+		console.error('Error fetching artworks:', error);
+		return new Response(JSON.stringify({ error: 'Failed to fetch artworks' }), {
 			status: 500,
-			headers: {
-				'Content-Type': 'application/json'
-			}
+			headers: { 'Content-Type': 'application/json' }
 		});
 	}
 }

@@ -43,11 +43,19 @@ export function extractCidsFromArtwork(artwork: any): string[] {
 	const fieldsToCheck = [
 		'image_url',
 		'animation_url',
+		'thumbnail_url',
+		'generator_url',
 		'metadata_url',
 		'image_original_url',
 		'display_uri',
 		'artifact_uri',
-		'thumbnail_uri'
+		'thumbnail_uri',
+		// Also check camelCase versions
+		'imageUrl',
+		'animationUrl',
+		'thumbnailUrl',
+		'generatorUrl',
+		'metadataUrl'
 	];
 
 	// Check main fields
@@ -68,15 +76,8 @@ export function extractCidsFromArtwork(artwork: any): string[] {
 		}
 	}
 
-	// Check indexed data if available
-	if (artwork.indexedData && typeof artwork.indexedData === 'object') {
-		for (const field of fieldsToCheck) {
-			if (artwork.indexedData[field]) {
-				const cid = extractCidFromUrl(artwork.indexedData[field]);
-				if (cid) cids.add(cid);
-			}
-		}
-	}
+	// Check additional fields that might be present on the artwork object
+	// (The search API now returns these fields directly on the artwork object)
 
 	return Array.from(cids);
 }

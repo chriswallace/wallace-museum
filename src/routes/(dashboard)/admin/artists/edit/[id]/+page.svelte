@@ -7,12 +7,21 @@
 	interface Artwork {
 		id: number;
 		title: string;
-		image_url: string;
-		enabled: boolean;
+		imageUrl: string;
 	}
 
 	interface ArtistArtwork {
 		artwork: Artwork;
+	}
+
+	interface CreatorAddressWithArtworks {
+		id: number; // Or string, depending on your schema
+		address: string;
+		// other CreatorAddress fields...
+		artworks: Artwork[];
+		blockchain: string;
+		createdAt: Date;
+		updatedAt: Date;
 	}
 
 	interface ArtistAddress {
@@ -31,7 +40,7 @@
 		websiteUrl: string | null;
 		twitterHandle: string | null;
 		instagramHandle: string | null;
-		ArtistArtworks: ArtistArtwork[];
+		creatorAddresses: CreatorAddressWithArtworks[];
 		addresses: ArtistAddress[];
 	}
 
@@ -52,7 +61,7 @@
 		websiteUrl: null,
 		twitterHandle: null,
 		instagramHandle: null,
-		ArtistArtworks: [],
+		creatorAddresses: [],
 		addresses: []
 	};
 

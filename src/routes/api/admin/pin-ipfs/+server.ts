@@ -49,30 +49,43 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Handle artwork objects to extract and pin CIDs
 		if (requestData.artworks && Array.isArray(requestData.artworks)) {
-			// Extract unique CIDs from all artworks
-			const allCids = new Set<string>();
-			for (const artwork of requestData.artworks) {
-				const cids = extractCidsFromArtwork(artwork);
-				cids.forEach((cid) => allCids.add(cid));
-			}
+			const artworksToProcess = requestData.artworks;
+			console.log(`Processing ${artworksToProcess.length} artworks for pinning via API`);
 
-			// Pin all unique CIDs
-			const cidsArray = Array.from(allCids);
-			const results = await Promise.all(
-				cidsArray.map(async (cid) => {
-					// Check if already pinned to avoid duplicates
+			const results = [];
+			const processedCids = new Set<string>(); // To track already processed CIDs
+
+			for (const artwork of artworksToProcess) {
+				const cids = extractCidsFromArtwork(artwork);
+				const artworkName = artwork.title || artwork.name || `Artwork CID`;
+
+				for (const cid of cids) {
+					// If processing multiple artworks and a CID appears in more than one,
+					// we pin it once with the name from the first artwork it was found in.
+					if (processedCids.has(cid)) {
+						console.log(`CID ${cid} already processed in this API batch, skipping.`);
+						continue;
+					}
+
 					const alreadyPinned = await isCidPinned(cid);
 					if (alreadyPinned) {
-						return {
+						results.push({
 							IpfsHash: cid,
 							isDuplicate: true,
 							Timestamp: new Date().toISOString(),
 							PinSize: 0
-						};
+						});
+						processedCids.add(cid);
+						continue;
 					}
-					return pinCidToPinata(cid, `Artwork CID: ${cid}`);
-				})
-			);
+
+					const pinName = artworkName === 'Artwork CID' ? `${artworkName}: ${cid}` : artworkName;
+					console.log(`Pinning CID ${cid} with name: ${pinName} via API`);
+					const result = await pinCidToPinata(cid, pinName);
+					results.push(result);
+					processedCids.add(cid);
+				}
+			}
 
 			return json({
 				success: true,

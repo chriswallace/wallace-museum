@@ -21,9 +21,6 @@
 </div>
 
 <style>
-	.toast {
-		/* Your undismissable toast styling */
-	}
 	.progress-list {
 		max-height: 200px;
 		overflow-y: auto;

@@ -170,7 +170,7 @@
 	}
 
 	.ghost:hover {
-		@apply dark:bg-gray-700;
+		@apply dark:bg-green-500;
 	}
 
 	.edit {

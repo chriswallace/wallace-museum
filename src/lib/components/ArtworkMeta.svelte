@@ -1,5 +1,6 @@
 <script>
 	import { formatDate } from '$lib/dateFormatter.js';
+	import { getContractUrl, getContractName } from '$lib/utils';
 	export let artwork;
 </script>
 
@@ -19,7 +20,17 @@
 	<div class="non-editable">
 		<h3>Contract</h3>
 		<p>
-			<a href="https://etherscan.io/address/{artwork.contractAddr}">{artwork.contractAlias}</a>
+			{#if getContractUrl(artwork.contractAddr, artwork.blockchain, artwork.tokenID)}
+				<a
+					href={getContractUrl(artwork.contractAddr, artwork.blockchain, artwork.tokenID)}
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					{getContractName(artwork.contractAddr, artwork.contractAlias)}
+				</a>
+			{:else}
+				{getContractName(artwork.contractAddr, artwork.contractAlias)}
+			{/if}
 		</p>
 	</div>
 	<div class="non-editable">

@@ -19,47 +19,67 @@ export interface ArtistWithPreview {
 
 export const load: ServerLoad = async () => {
 	try {
-		const artistsFromDb = await prisma.artist.findMany({
-			// where: { enabled: true }, // Uncomment if you have an 'enabled' field for artists
-			include: {
-				ArtistArtworks: {
-					include: {
-						artwork: {
-							select: {
-								id: true,
-								title: true,
-								image_url: true
-							}
-						}
-					}
-				}
+		// First, let's get all artists and see if there are any
+		const allArtists = await prisma.artist.findMany({
+			select: {
+				id: true,
+				name: true,
+				avatarUrl: true
 			}
 		});
 
-		// Map to the desired structure for the frontend, using the first artwork from ArtistArtworks if available
-		const artists: ArtistWithPreview[] = artistsFromDb
-			.filter((artist) => artist.ArtistArtworks && artist.ArtistArtworks.length > 0)
-			.map((artist) => {
-				const aa = artist.ArtistArtworks[0];
-				const artworkPreviewData = aa?.artwork;
-				const allArtworks = artist.ArtistArtworks.map((aa) => ({
-					id: String(aa.artwork.id),
-					title: aa.artwork.title,
-					image_url: aa.artwork.image_url
+		// Get all artworks to see what's available
+		const allArtworks = await prisma.artwork.findMany({
+			select: {
+				id: true,
+				title: true,
+				imageUrl: true
+			},
+			take: 10
+		});
+
+		// Get artists with their artworks using raw query
+		const artistsWithArtworks = await Promise.all(
+			allArtists.map(async (artist) => {
+				const artworks = await prisma.$queryRaw`
+					SELECT a.id, a.title, a."imageUrl"
+					FROM "Artwork" a
+					JOIN "_ArtistArtworks" aa ON a.id = aa."B"
+					WHERE aa."A" = ${artist.id}
+					LIMIT 10
+				` as any[];
+
+				const transformedArtworks: PreviewArtwork[] = artworks.map((artwork) => ({
+					id: String(artwork.id),
+					title: artwork.title,
+					image_url: artwork.imageUrl
 				}));
+
 				return {
 					id: artist.id,
 					name: artist.name,
-					previewArtwork: artworkPreviewData
-						? {
-								id: String(artworkPreviewData.id),
-								title: artworkPreviewData.title,
-								image_url: artworkPreviewData.image_url
-							}
-						: null,
-					artworks: allArtworks
+					previewArtwork: transformedArtworks.length > 0 ? transformedArtworks[0] : null,
+					artworks: transformedArtworks
 				};
-			});
+			})
+		);
+
+		// Filter to only include artists with artworks
+		const artists = artistsWithArtworks.filter((artist) => artist.artworks.length > 0);
+
+		// If no artists with artworks, return all artists anyway for debugging
+		if (artists.length === 0 && allArtists.length > 0) {
+			const artistsWithoutArtworks: ArtistWithPreview[] = allArtists.map((artist) => ({
+				id: artist.id,
+				name: artist.name,
+				previewArtwork: null,
+				artworks: []
+			}));
+			
+			return {
+				artists: artistsWithoutArtworks
+			};
+		}
 
 		return {
 			artists: artists

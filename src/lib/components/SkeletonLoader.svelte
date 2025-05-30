@@ -21,10 +21,12 @@
 		background: linear-gradient(
 			90deg,
 			rgba(255, 255, 255, 0) 0%,
-			rgba(255, 255, 255, 0.1) 50%,
+			rgba(255, 255, 255, 0.4) 20%,
+			rgba(255, 255, 255, 0.6) 50%,
+			rgba(255, 255, 255, 0.4) 80%,
 			rgba(255, 255, 255, 0) 100%
 		);
-		animation: shimmer 1.5s infinite;
+		animation: shimmer 1.2s ease-in-out infinite;
 		contain: paint;
 	}
 
@@ -32,9 +34,11 @@
 		.shimmer {
 			background: linear-gradient(
 				90deg,
-				rgba(50, 50, 50, 0) 0%,
-				rgba(80, 80, 80, 0.2) 50%,
-				rgba(50, 50, 50, 0) 100%
+				rgba(120, 120, 120, 0) 0%,
+				rgba(160, 160, 160, 0.3) 20%,
+				rgba(200, 200, 200, 0.5) 50%,
+				rgba(160, 160, 160, 0.3) 80%,
+				rgba(120, 120, 120, 0) 100%
 			);
 		}
 	}

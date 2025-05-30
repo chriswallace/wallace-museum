@@ -3,17 +3,12 @@
 	import { goto } from '$app/navigation';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { placeholderAvatar } from '$lib/utils';
+	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 
 	interface Artist {
 		id: number;
 		name: string;
 		avatarUrl: string | null;
-	}
-
-	function getCloudinaryUrl(url: string): string {
-		if (!url || !url.includes('cloudinary.com')) return url;
-		// Insert Cloudinary transformations for face-detection and square cropping
-		return url.replace('/upload/', '/upload/c_thumb,g_face,h_300,w_300/');
 	}
 
 	let artists: Artist[] = [];
@@ -91,13 +86,24 @@
 		{#each artists as artist}
 			<button class="card" on:click={() => editArtist(artist.id)}>
 				<div class="aspect-square w-full relative">
-					<img
-						class="avatar absolute inset-0 w-full h-full object-cover"
-						src={artist.avatarUrl
-							? getCloudinaryUrl(artist.avatarUrl)
-							: placeholderAvatar(artist.name)}
-						alt={artist.name}
-					/>
+					{#if artist.avatarUrl}
+						<OptimizedImage
+							src={artist.avatarUrl}
+							alt={artist.name}
+							width={200}
+							height={200}
+							fit="cover"
+							format="webp"
+							quality={85}
+							className="avatar absolute inset-0 w-full h-full object-cover"
+						/>
+					{:else}
+						<img
+							class="avatar absolute inset-0 w-full h-full object-cover"
+							src={placeholderAvatar(artist.name)}
+							alt={artist.name}
+						/>
+					{/if}
 				</div>
 				<span>{artist.name}</span>
 			</button>

@@ -4,16 +4,27 @@
 	import { showToast } from '$lib/toastHelper';
 	import { createEventDispatcher } from 'svelte';
 	import { onMount } from 'svelte';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import { ImagePresets } from '$lib/imageOptimization';
+	import OptimizedImage from './OptimizedImage.svelte';
 
 	interface Artwork {
 		id: number;
 		title: string;
-		image_url: string;
-		enabled: boolean;
+		imageUrl: string;
 	}
 
 	interface ArtistArtwork {
 		artwork: Artwork;
+	}
+
+	interface CreatorAddressWithArtworks {
+		id: number;
+		address: string;
+		blockchain: string;
+		artworks: Artwork[];
+		createdAt: Date;
+		updatedAt: Date;
 	}
 
 	interface ArtistAddress {
@@ -32,8 +43,9 @@
 		websiteUrl: string | null;
 		twitterHandle: string | null;
 		instagramHandle: string | null;
-		ArtistArtworks: ArtistArtwork[];
+		creatorAddresses: CreatorAddressWithArtworks[];
 		addresses: ArtistAddress[];
+		artworks: Artwork[];
 	}
 
 	export let artist: Artist;
@@ -47,8 +59,8 @@
 
 	async function confirmAndDelete() {
 		const artworksMessage =
-			artist.ArtistArtworks && artist.ArtistArtworks.length > 0
-				? `\n\nWarning: This artist has ${artist.ArtistArtworks.length} associated artwork(s). Deleting the artist will remove these associations.`
+			artist.artworks && artist.artworks.length > 0
+				? `\n\nWarning: This artist has ${artist.artworks.length} associated artwork(s). Deleting the artist will remove these associations.`
 				: '';
 
 		if (window.confirm(`Are you sure you want to delete ${artist.name}?${artworksMessage}`)) {
@@ -107,9 +119,9 @@
 			});
 
 			if (response.ok) {
-				const address = await response.json();
-				console.log('Successfully added address:', address);
-				artist.addresses = [...artist.addresses, address];
+				const responseData = await response.json();
+				console.log('Successfully added address:', responseData);
+				artist.addresses = [...artist.addresses, responseData.address];
 				newAddress = { address: '', blockchain: 'ethereum' };
 				showToast('Address added successfully.', 'success');
 			} else {
@@ -155,38 +167,60 @@
 	on:submit|preventDefault={() => updateArtist(artist)}
 	class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start"
 >
-	<div class="md:col-span-1 relative group">
-		{#if artist.name}
-			<img
-				class="avatar w-full h-auto object-contain"
-				src={artist.avatarUrl || placeholderAvatar(artist.name)}
-				alt={artist.name}
-			/>
-			<button
-				type="button"
-				on:click={() => fileInputRef?.click()}
-				disabled={isUploadingAvatar}
-				class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-			>
-				{#if isUploadingAvatar}
-					<span>Uploading...</span>
+	<div class="md:col-span-1">
+		<div class="mb-6">
+			<label class="block text-sm font-medium mb-2">Avatar</label>
+			<div class="relative group w-full aspect-square">
+				{#if artist.avatarUrl}
+					<OptimizedImage
+						src={artist.avatarUrl}
+						alt={artist.name}
+						width={400}
+						height={400}
+						fit="crop"
+						gravity="auto"
+						format="webp"
+						quality={90}
+						className="w-full h-full object-cover border-2 border-gray-300 dark:border-gray-600 rounded-md"
+					/>
 				{:else}
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-						/>
-					</svg>
+					<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-md">
+						<span class="text-gray-500 dark:text-gray-400 text-lg">No Avatar</span>
+					</div>
 				{/if}
-			</button>
+				
+				<!-- Hover overlay -->
+				<button
+					type="button"
+					on:click={() => fileInputRef?.click()}
+					disabled={isUploadingAvatar}
+					class="absolute inset-0 bg-black bg-opacity-50 rounded-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed z-10"
+				>
+					{#if !isUploadingAvatar}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-12 w-12"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+							/>
+						</svg>
+					{/if}
+				</button>
+
+				<!-- Loading overlay -->
+				{#if isUploadingAvatar}
+					<div class="absolute inset-0 bg-black bg-opacity-50 rounded-md flex items-center justify-center z-20">
+						<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+					</div>
+				{/if}
+			</div>
 			<input
 				type="file"
 				class="hidden"
@@ -195,7 +229,7 @@
 				on:change={handleFileSelect}
 				disabled={isUploadingAvatar}
 			/>
-		{/if}
+		</div>
 	</div>
 	<div class="md:col-span-2 space-y-4">
 		<div class="mb-4">
@@ -273,23 +307,23 @@
 
 <div class="mt-8 md:col-span-3">
 	<h2 class="text-2xl font-bold mb-4">Artworks</h2>
-	{#if artist.ArtistArtworks && artist.ArtistArtworks.length > 0}
+	{#if artist.artworks && artist.artworks.length > 0}
 		<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-			{#each artist.ArtistArtworks as aa}
-				<a href="/admin/artworks/edit/{aa.artwork.id}" class="artwork-card">
+			{#each artist.artworks as artwork}
+				<a href="/admin/artworks/edit/{artwork.id}" class="artwork-card">
 					<div class="aspect-square relative">
-						<img
-							src={aa.artwork.image_url}
-							alt={aa.artwork.title}
-							class="w-full h-full object-contain rounded-lg"
+						<OptimizedImage
+							src={artwork.imageUrl}
+							alt={artwork.title}
+							width={300}
+							height={300}
+							fit="cover"
+							format="webp"
+							quality={85}
+							className="w-full h-full object-cover rounded-lg"
 						/>
-						{#if !aa.artwork.enabled}
-							<div class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
-								Disabled
-							</div>
-						{/if}
 					</div>
-					<h3 class="mt-2 text-sm font-medium truncate">{aa.artwork.title}</h3>
+					<h3 class="mt-2 text-sm font-medium truncate">{artwork.title}</h3>
 				</a>
 			{/each}
 		</div>
@@ -298,7 +332,7 @@
 			<p>No artworks found for this artist.</p>
 			<a
 				href="/admin/artworks/new"
-				class="inline-block mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+				class="inline-block mt-4 px-4 py-2 bg-blue-500 text-white hover:bg-blue-600"
 				>Add New Artwork</a
 			>
 		</div>
@@ -306,11 +340,6 @@
 </div>
 
 <style>
-	.avatar {
-		display: block;
-		pointer-events: none;
-	}
-
 	.artwork-card {
 		@apply block transition-transform hover:scale-105;
 	}

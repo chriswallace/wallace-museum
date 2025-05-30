@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { uploadToCloudinary } from '$lib/mediaHelpers'; // Keep helper here for now, but ensure IT doesn't import $env
+import { uploadToPinata } from '$lib/pinataHelpers';
 
 // Ensure mediaHelpers doesn't ALSO import $env/dynamic/private
 // Ideally, pass credentials from here if needed
@@ -16,12 +16,12 @@ export async function POST({ request }) {
 		const buffer = Buffer.from(await file.arrayBuffer());
 
 		// Call the updated upload function
-		const uploadResponse = await uploadToCloudinary(buffer, file.name, file.type);
+		const uploadResponse = await uploadToPinata(buffer, file.name, file.type);
 
 		if (uploadResponse && uploadResponse.url) {
 			return json({ url: uploadResponse.url }, { status: 200 });
 		} else {
-			console.error('Cloudinary upload failed or returned invalid response:', uploadResponse);
+			console.error('Pinata upload failed or returned invalid response:', uploadResponse);
 			return json({ error: 'Image upload failed on server' }, { status: 500 });
 		}
 	} catch (error) {

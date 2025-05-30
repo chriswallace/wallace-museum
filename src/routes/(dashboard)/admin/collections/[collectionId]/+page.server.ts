@@ -27,4 +27,11 @@ export const load: PageServerLoad = async ({ request, locals }) => {
 
 	// Set user in locals for use in layout and child pages
 	locals.user = user;
+
+	const artists = await prisma.artist.findMany({
+		select: { id: true, name: true, avatarUrl: true },
+		orderBy: { name: 'asc' }
+	});
+
+	return { artists };
 };

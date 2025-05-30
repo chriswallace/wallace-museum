@@ -3,10 +3,11 @@ import { writable, get, type Writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
 // Define Artwork and related types (adjust if these are defined elsewhere and can be imported)
-interface Artist {
+export interface Artist {
 	id: number;
 	name: string;
 	websiteUrl?: string;
+	avatarUrl?: string | null;
 }
 
 interface ArtistArtwork {
@@ -16,23 +17,32 @@ interface ArtistArtwork {
 export interface Artwork {
 	id: number;
 	title: string;
-	description: string;
-	image_url?: string;
-	animation_url?: string;
+	description?: string;
+	mintDate?: string | Date;
+	imageUrl?: string;
+	thumbnailUrl?: string;
+	animationUrl?: string;
+	mime?: string;
 	dimensions?: { width: number; height: number };
+	blockchain?: string;
+	symbol?: string;
+	tokenStandard?: string;
+	supply?: number;
+	metadataUrl?: string;
+	attributes?: { trait_type: string; value: string }[];
+	features?: Record<string, any>;
+	collectionId?: number;
+	creatorAddresses?: string[];
+	// --- Fields from ArtworkResult for import page compatibility ---
+	image_url?: string | null;
+	animation_url?: string | null;
 	contractAddr?: string;
 	contractAlias?: string;
-	tokenStandard?: string;
 	tokenID?: string;
-	mintDate?: string | Date;
-	mime?: string;
-	tags?: string[];
-	attributes?: { trait_type: string; value: string }[];
-	ArtistArtworks?: ArtistArtwork[];
-	src?: string;
-	srcset?: string;
-	sizes?: string;
-	blockchain?: string;
+	supportsArtistLookup?: boolean;
+	artist?: { name: string; avatarUrl: string | null; walletAddress?: string } | null;
+	// Add import status for UI display
+	isImported?: boolean;
 }
 
 // Define the NFT type (consistent with +page.svelte)

@@ -1,17 +1,32 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { toast } from '@zerodevx/svelte-toast';
-	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import type { Artist } from '$lib/stores';
+	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 
-	let artworks = [];
-	let page = 1;
-	let totalPages = 0;
-	let sortColumn = 'title';
-	let sortOrder = 'asc'; // 'asc' for ascending, 'desc' for descending
-	let searchQuery = '';
+	interface Artwork {
+		id: number | string;
+		title: string;
+		imageUrl?: string;
+		image_url?: string;
+		animationUrl?: string;
+		animation_url?: string;
+		artists?: Artist[];
+		collection?: { id: number | string; title: string };
+		enabled?: boolean;
+		// Add other fields as needed
+	}
 
-	async function fetchArtworks(page = 1) {
+	let artworks: Artwork[] = [];
+	let page: number = 1;
+	let totalPages: number = 0;
+	let sortColumn: string = 'title';
+	let sortOrder: 'asc' | 'desc' = 'asc'; // 'asc' for ascending, 'desc' for descending
+	let searchQuery: string = '';
+
+	async function fetchArtworks(page: number = 1) {
 		let url = `/api/admin/artworks/?page=${page}`;
 		if (sortColumn && sortOrder) {
 			url += `&sort=${sortColumn}&order=${sortOrder}`;
@@ -29,7 +44,7 @@
 		}
 	}
 
-	async function toggleArtworkEnabled(artwork) {
+	async function toggleArtworkEnabled(artwork: Artwork) {
 		const response = await fetch(`/api/admin/artworks/toggle/${artwork.id}`, {
 			method: 'POST' // Or the appropriate method
 		});
@@ -46,18 +61,18 @@
 		fetchArtworks(page);
 	});
 
-	function editArtwork(id) {
+	function editArtwork(id: number | string) {
 		goto(`/admin/artworks/edit/${id}`);
 	}
 
-	function handleSearchInput(event) {
-		searchQuery = event.target.value;
+	function handleSearchInput(event: Event) {
+		searchQuery = (event.target as HTMLInputElement).value;
 		if (searchQuery.length >= 3 || searchQuery.length === 0) {
 			fetchArtworks(page);
 		}
 	}
 
-	function changeSorting(column) {
+	function changeSorting(column: string) {
 		if (sortColumn === column) {
 			sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
 		} else {
@@ -67,7 +82,7 @@
 		fetchArtworks(page);
 	}
 
-	function changePage(newPage) {
+	function changePage(newPage: number) {
 		page = newPage;
 		fetchArtworks(page);
 
@@ -137,9 +152,15 @@
 					</td>
 					<td>
 						<button class="image" on:click={() => editArtwork(artwork.id)}>
-							<img
-								src={getCloudinaryTransformedUrl(artwork.image_url, 'w_120,h_120,c_fit,q_70')}
+							<OptimizedImage
+								src={artwork.imageUrl}
 								alt=""
+								width={80}
+								height={80}
+								fit="cover"
+								format="webp"
+								quality={85}
+								className="aspect-square"
 							/>
 						</button>
 					</td>
@@ -147,10 +168,25 @@
 					<td>
 						<div>
 							{#if artwork.artists && artwork.artists.length > 0}
-								{artwork.artists[0].name}
-								{#if artwork.artists.length > 1}
-									(+{artwork.artists.length - 1} others)
-								{/if}
+								<div class="artists-list">
+									{#each artwork.artists as artist}
+										<span class="artist-name">
+											{#if artist.avatarUrl}
+												<OptimizedImage
+													src={artist.avatarUrl}
+													alt={artist.name}
+													width={20}
+													height={20}
+													fit="cover"
+													format="webp"
+													quality={85}
+													className="artist-avatar"
+												/>
+											{/if}
+											{artist.name}
+										</span>
+									{/each}
+								</div>
 							{:else}
 								None
 							{/if}
@@ -160,10 +196,10 @@
 						><div>
 							{#if artwork.collection}
 								<a
-									href="/admin/collections/{artwork.collection.id}"
+									href="/admin/collections/{artwork.collection?.id}"
 									on:click|preventDefault={() =>
-										goto(`/admin/collections/${artwork.collection.id}`)}
-									>{artwork.collection.title}</a
+										goto(`/admin/collections/${artwork.collection?.id}`)}
+									>{artwork.collection?.title ?? 'Untitled'}</a
 								>
 							{:else}
 								None
@@ -212,5 +248,15 @@
 
 	.actions {
 		@apply w-12;
+	}
+
+	.artists-list {
+		@apply flex flex-wrap gap-2;
+	}
+	.artist-name {
+		@apply flex items-center gap-1 text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1;
+	}
+	.artist-avatar {
+		@apply w-5 h-5 rounded-full object-cover mr-1;
 	}
 </style>

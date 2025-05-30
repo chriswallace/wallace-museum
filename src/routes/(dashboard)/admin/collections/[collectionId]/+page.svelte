@@ -5,17 +5,29 @@
 	import { browser } from '$app/environment';
 	import { showToast } from '$lib/toastHelper';
 	import Modal from '$lib/components/Modal.svelte';
+	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import { goto } from '$app/navigation';
 	import { closeModal, openModal } from '$lib/modal';
-	import { getCloudinaryTransformedUrl } from '$lib/cloudinaryUtils';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+
+	// Get artists from server load
+	export let data;
+	let artists = data.artists || [];
+	let selectedArtistIds: number[] = [];
 
 	// Define a basic Artwork type (adjust properties as needed based on actual data)
 	interface Artwork {
 		id: number | string;
 		title?: string;
-		image_url?: string;
+		imageUrl?: string;
 		mime?: string;
 		// Add other properties returned by your API
+	}
+
+	// Define type for artist
+	interface Artist {
+		id: number;
+		name: string;
 	}
 
 	// Define type for the collection state
@@ -26,6 +38,7 @@
 		slug: string;
 		enabled: boolean;
 		artworks: Artwork[];
+		artists?: Artist[];
 	}
 
 	let collectionId: string;
@@ -80,6 +93,8 @@
 			const response = await fetch(`/api/admin/collections/${collectionId}`);
 			if (response.ok) {
 				collection = await response.json();
+				// Pre-select associated artists
+				selectedArtistIds = (collection.artists || []).map((a) => a.id);
 			} else {
 				showToast('Failed to fetch collection', 'error');
 			}
@@ -91,10 +106,14 @@
 	}
 
 	async function updateCollection() {
+		const payload = {
+			...collection,
+			artistIds: selectedArtistIds
+		};
 		const response = await fetch(`/api/admin/collections/${collectionId}`, {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(collection)
+			body: JSON.stringify(payload)
 		});
 
 		if (response.ok) {
@@ -264,17 +283,21 @@
 						class:active={selectedArtworks.has(artwork.id)}
 						on:click={() => toggleArtworkSelection(artwork.id)}
 					>
-						{#if artwork.mime?.startsWith('video') || artwork.image_url?.endsWith('.mp4')}
+						{#if artwork.mime?.startsWith('video') || artwork.imageUrl?.endsWith('.mp4')}
 							<video width="204" height="204" loop muted playsinline>
-								<source src={artwork.image_url} type="video/mp4" />
+								<source src={ipfsToHttpUrl(artwork.imageUrl)} type="video/mp4" />
 							</video>
 						{:else}
-							<img
-								src={getCloudinaryTransformedUrl(
-									artwork.image_url,
-									'w_400,h_400,c_pad,q_auto,f_auto,b_rgb:e9e9e9'
-								)}
+							<OptimizedImage
+								src={artwork.imageUrl}
 								alt={artwork.title || 'Artwork thumbnail'}
+								width={300}
+								height={300}
+								fit="cover"
+								format="webp"
+								quality={85}
+								className="w-full aspect-square object-cover rounded-md mb-3"
+								fallbackSrc="/images/medici-image.png"
 							/>
 						{/if}
 						<p>{artwork.title}</p>
@@ -319,17 +342,21 @@
 				<div class="artwork-grid">
 					{#each collection.artworks as artwork}
 						<div>
-							{#if artwork.mime?.startsWith('video') || artwork.image_url?.endsWith('.mp4')}
+							{#if artwork.mime?.startsWith('video') || artwork.imageUrl?.endsWith('.mp4')}
 								<video width="204" height="204" loop muted playsinline>
-									<source src={artwork.image_url} type="video/mp4" />
+									<source src={ipfsToHttpUrl(artwork.imageUrl)} type="video/mp4" />
 								</video>
 							{:else}
-								<img
-									src={getCloudinaryTransformedUrl(
-										artwork.image_url,
-										'w_204,h_204,c_fit,q_auto,f_auto'
-									)}
+								<OptimizedImage
+									src={artwork.imageUrl}
 									alt={artwork.title || 'Artwork thumbnail'}
+									width={300}
+									height={300}
+									fit="cover"
+									format="webp"
+									quality={85}
+									className="w-full aspect-square object-cover rounded-md mb-3"
+									fallbackSrc="/images/medici-image.png"
 								/>
 							{/if}
 							<h3>{artwork.title}</h3>
@@ -376,6 +403,17 @@
 						<textarea id="curator-notes" bind:value={collection.curatorNotes}></textarea>
 					</div>
 					<div class="mb-4">
+						<label for="artists">Artists</label>
+						<select id="artists" multiple bind:value={selectedArtistIds}>
+							{#each artists as artist}
+								<option value={artist.id}>{artist.name}</option>
+							{/each}
+						</select>
+						<small class="text-gray-600 dark:text-gray-400 block mt-1">
+							Hold Command/Ctrl to select multiple artists.
+						</small>
+					</div>
+					<div class="mb-4">
 						<input
 							type="checkbox"
 							id="enabled"
@@ -417,7 +455,6 @@
 		.card {
 			@apply p-0 rounded-[8px];
 
-			img,
 			video {
 				@apply w-full aspect-square object-contain rounded-t-[8px];
 			}
@@ -452,7 +489,7 @@
 		}
 
 		.remove {
-			@apply absolute top-[-8px] right-[-8px] bg-red-500 rounded-full p-1;
+			@apply absolute top-[-8px] right-[-8px] bg-red-500 rounded-full p-1 z-20;
 
 			svg {
 				@apply w-[20px] h-[20px];
@@ -460,10 +497,6 @@
 			path {
 				@apply fill-white;
 			}
-		}
-
-		img {
-			@apply w-full aspect-square mb-3 rounded-md;
 		}
 	}
 

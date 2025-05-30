@@ -14,7 +14,7 @@ export async function POST({ request }) {
 			});
 		}
 
-		// Upload image to Cloudinary using our new function
+		// Upload image to Pinata using our new function
 		const uploadResult = await uploadAvatarImage(image);
 
 		// Update artist with new avatar URL

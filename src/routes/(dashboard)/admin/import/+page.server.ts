@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 import prisma from '$lib/prisma';
 import { getWalletAddresses } from '$lib/settingsManager';
 import { pinCidToPinata, isCidPinned } from '$lib/pinataHelpers';
-import { extractCidsFromArtwork } from '$lib/pinataClientHelpers';
+import { extractCidsFromArtwork } from '$lib/pinataHelpers';
 import { fail } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
@@ -14,30 +14,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Get wallet addresses from settings
 	const walletAddresses = await getWalletAddresses();
 
-	// Get blockchains from existing artworks
-	const blockchains = await prisma.artwork.findMany({
-		select: { blockchain: true },
-		where: { blockchain: { not: null } },
-		distinct: ['blockchain']
-	});
-
-	// Get all artists
-	const artists = await prisma.artist.findMany({
-		select: { id: true, name: true },
-		orderBy: { name: 'asc' }
-	});
-
-	// Get all collections
-	const collections = await prisma.collection.findMany({
-		select: { id: true, title: true, slug: true },
-		orderBy: { title: 'asc' }
-	});
-
 	return {
 		walletAddresses,
-		blockchains: blockchains.map((b) => b.blockchain).filter(Boolean),
-		artists,
-		collections
 	};
 };
 
@@ -57,51 +35,100 @@ export const actions: Actions = {
 				return fail(400, { success: false, error: 'Invalid artworks data' });
 			}
 
-			// Extract unique CIDs from all artworks
-			const allCids = new Set<string>();
-			for (const artwork of artworks) {
+			console.log(`[PIN_BATCH] Processing ${artworks.length} artworks for pinning`);
+
+			const results = [];
+			const processedCids = new Set<string>(); // To track already processed CIDs and avoid duplicate processing in this run
+			const failedCids = new Set<string>(); // Track failed CIDs for debugging
+
+			for (let i = 0; i < artworks.length; i++) {
+				const artwork = artworks[i];
+				const artworkName = artwork.title || artwork.name || `Artwork CID`;
+				
+				console.log(`[PIN_BATCH] Processing artwork ${i + 1}/${artworks.length}: "${artworkName}"`);
+				
 				const cids = extractCidsFromArtwork(artwork);
-				cids.forEach((cid) => allCids.add(cid));
+				console.log(`[PIN_BATCH] Found ${cids.length} CIDs for artwork "${artworkName}": ${cids.join(', ')}`);
+
+				for (const cid of cids) {
+					if (processedCids.has(cid)) {
+						// If we've already processed this CID in this batch, skip to avoid redundant checks/pins
+						// Pinata itself handles duplicate pins gracefully, but this saves API calls if the same CID appears multiple times
+						// in the input `artworks` array under potentially different names.
+						// We will pin it once with the first encountered name for that CID.
+						console.log(`[PIN_BATCH] CID ${cid} already processed in this batch, skipping.`);
+						continue;
+					}
+
+					try {
+						const alreadyPinned = await isCidPinned(cid);
+						if (alreadyPinned) {
+							console.log(`[PIN_BATCH] CID ${cid} is already pinned, skipping`);
+							results.push({
+								IpfsHash: cid,
+								isDuplicate: true,
+								Timestamp: new Date().toISOString(),
+								PinSize: 0
+							});
+							processedCids.add(cid);
+							continue;
+						}
+
+						const pinName = artworkName === 'Artwork CID' ? `${artworkName}: ${cid}` : artworkName;
+						console.log(`[PIN_BATCH] Pinning CID ${cid} with name: ${pinName}`);
+						const result = await pinCidToPinata(cid, pinName);
+						
+						if (result.error) {
+							console.error(`[PIN_BATCH] Failed to pin CID ${cid}: ${result.error}`);
+							failedCids.add(cid);
+						} else {
+							console.log(`[PIN_BATCH] Successfully pinned CID ${cid}`);
+						}
+						
+						results.push(result);
+						processedCids.add(cid);
+					} catch (error) {
+						console.error(`[PIN_BATCH] Error processing CID ${cid}:`, error);
+						failedCids.add(cid);
+						results.push({
+							IpfsHash: cid,
+							error: error instanceof Error ? error.message : String(error),
+							PinSize: 0,
+							Timestamp: new Date().toISOString()
+						});
+						processedCids.add(cid);
+					}
+				}
 			}
 
-			// Pin all unique CIDs
-			const cidsArray = Array.from(allCids);
-			console.log(`Pinning ${cidsArray.length} unique CIDs from ${artworks.length} artworks`);
-
-			const results = await Promise.all(
-				cidsArray.map(async (cid) => {
-					// Check if already pinned to avoid duplicates
-					const alreadyPinned = await isCidPinned(cid);
-					if (alreadyPinned) {
-						console.log(`CID ${cid} is already pinned, skipping`);
-						return {
-							IpfsHash: cid,
-							isDuplicate: true,
-							Timestamp: new Date().toISOString(),
-							PinSize: 0
-						};
-					}
-					console.log(`Pinning CID ${cid}`);
-					return pinCidToPinata(cid, `Artwork CID: ${cid}`);
-				})
-			);
-
+			// Consider any status as success as long as there's no error
+			// The 'prechecking' status means the pin request is valid and being processed
 			const summary = {
 				total: results.length,
 				successful: results.filter((r) => !r.error).length,
-				failed: results.filter((r) => r.error).length,
+				failed: results.filter((r) => !!r.error).length,
 				duplicates: results.filter((r) => r.isDuplicate).length
 			};
 
-			console.log('Pinning summary:', summary);
+			console.log(`[PIN_BATCH] Pinning summary:`, summary);
+			
+			if (failedCids.size > 0) {
+				console.log(`[PIN_BATCH] Failed CIDs:`, Array.from(failedCids));
+			}
 
+			// Return simple plain object that SvelteKit can serialize
 			return {
 				success: true,
-				results,
-				summary
+				summary: {
+					total: summary.total,
+					successful: summary.successful,
+					failed: summary.failed,
+					duplicates: summary.duplicates
+				},
+				failedCids: Array.from(failedCids) // Include failed CIDs for debugging
 			};
 		} catch (error) {
-			console.error('Error pinning artworks:', error);
+			console.error('[PIN_BATCH] Error pinning artworks:', error);
 			return fail(500, {
 				success: false,
 				error: error instanceof Error ? error.message : 'Unknown error pinning artworks'

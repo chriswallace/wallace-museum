@@ -1,8 +1,8 @@
-import { PrismaClient, Prisma, Collection } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { Collection } from '@prisma/client';
 import { fetchCollection as fetchObjktCollection } from './objktHelpers';
 import { fetchCollection as fetchOpenSeaCollection } from './openseaHelpers';
-
-const prisma = new PrismaClient();
+import prisma from '$lib/prisma';
 
 interface CollectionData {
 	slug: string;
@@ -63,12 +63,12 @@ export async function syncCollection(
 			const collectionInfo = data.data.fa[0];
 
 			collectionData = {
-				slug: collectionInfo.contract,
-				title: collectionInfo.name,
+				slug: collectionInfo.contract || identifier,
+				title: collectionInfo.name || 'Unknown Collection',
 				description: collectionInfo.description,
 				chainIdentifier: 'tezos',
 				contractAddresses: [
-					{ address: collectionInfo.contract, chain: 'tezos' }
+					{ address: collectionInfo.contract || identifier, chain: 'tezos' }
 				] as unknown as Prisma.InputJsonValue,
 				websiteUrl: collectionInfo.website,
 				projectUrl: collectionInfo.website,
