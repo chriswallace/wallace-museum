@@ -6,22 +6,30 @@
 <div class="app-frame">
 	<main>
 		<div class="surface">
+			<img class="logo" src="/images/compendium.svg" alt="">
 			<slot />
 		</div>
 	</main>
 </div>
 
 <style lang="scss" global>
+	html,
+	body{
+		margin: 0;
+		padding: 0;
+		font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+	}
+
 	.app-frame {
-		@apply bg-gray-200 min-h-screen flex items-center justify-center;
+		@apply bg-gray-200 dark:bg-[#21401F] text-gray-700 dark:text-gray-400 min-h-screen flex items-start justify-start;
 	}
 
 	main {
-		@apply flex-grow w-full max-w-xl;
+		@apply flex-grow w-full min-h-[100svh] max-w-xl;
 	}
 
 	.surface {
-		@apply bg-white rounded-lg shadow-xl p-8;
+		@apply min-h-[100svh] bg-white dark:bg-gray-900/40 rounded-lg px-12;
 	}
 
 	:global {
@@ -29,8 +37,12 @@
 			font-variation-settings: initial;
 		}
 
+		.logo{
+			@apply my-12;
+		}
+
 		h1 {
-			@apply font-sans text-xl lg:text-2xl font-semibold;
+			@apply font-sans text-xl lg:text-2xl dark:text-gray-50 font-semibold;
 			font-variation-settings: initial;
 		}
 
@@ -39,18 +51,23 @@
 		}
 
 		label {
-			@apply block mb-2 text-lg font-semibold text-gray-700;
+			@apply block mb-2 text-lg font-semibold text-gray-700 dark:text-gray-400;
 		}
 
 		input[type='text'],
 		input[type='email'],
 		input[type='password'] {
-			@apply mb-6 p-4 box-border block w-full border border-gray-300 rounded-md shadow-sm text-base text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500;
+			@apply mb-6 p-4 box-border dark:bg-gray-900/0 block w-full border border-white/40 dark:border-gray-600 rounded-[8px] text-base text-gray-700 dark:text-white/70 placeholder-gray-400/60 focus:outline-none focus:ring-[#C57142] focus:border-[#C57142];
+			appearance: none;
+			-webkit-appearance: none;
+			-moz-appearance: none;
+			box-shadow: none;
+			border-style: solid;
 		}
 
 		input[type='submit'],
 		button[type='submit'] {
-			@apply py-4 px-6 block w-full border border-transparent rounded-md text-lg font-bold text-white bg-gray-700 hover:bg-primary focus:outline-none;
+			@apply py-4 px-6 block w-full border border-transparent rounded-[8px] transition transition-colors duration-200 text-lg font-bold text-white hover:text-black bg-[#C57142] hover:bg-white focus:outline-none;
 		}
 	}
 </style>

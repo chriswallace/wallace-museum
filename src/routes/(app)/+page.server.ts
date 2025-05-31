@@ -67,6 +67,9 @@ export const load: ServerLoad = async () => {
 		// Filter to only include artists with artworks
 		const artists = artistsWithArtworks.filter((artist) => artist.artworks.length > 0);
 
+		// Sort artists alphabetically by name
+		artists.sort((a, b) => a.name.localeCompare(b.name));
+
 		// If no artists with artworks, return all artists anyway for debugging
 		if (artists.length === 0 && allArtists.length > 0) {
 			const artistsWithoutArtworks: ArtistWithPreview[] = allArtists.map((artist) => ({
@@ -75,6 +78,9 @@ export const load: ServerLoad = async () => {
 				previewArtwork: null,
 				artworks: []
 			}));
+			
+			// Sort the fallback list alphabetically as well
+			artistsWithoutArtworks.sort((a, b) => a.name.localeCompare(b.name));
 			
 			return {
 				artists: artistsWithoutArtworks

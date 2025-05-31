@@ -24,8 +24,8 @@
 	};
 </script>
 
-<div class="ui-frame bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-	<div class="ui-header bg-white dark:bg-gray-800">
+<div class="ui-frame bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200">
+	<div class="ui-header bg-white dark:bg-[#B85C28]">
 		<nav>
 			<a class="medici" href="/">Medici.</a>
 
@@ -76,12 +76,12 @@
 
 		a,
 		button {
-			@apply text-gray-800 dark:text-gray-100 font-normal px-2 py-3 transition duration-300 ease-in-out decoration-2 underline-offset-8 underline decoration-transparent;
+			@apply text-gray-800 dark:text-white font-normal px-2 py-3 transition duration-300 ease-in-out decoration-2 underline-offset-8 underline decoration-transparent;
 			font-variation-settings: initial;
 		}
 
 		.selected {
-			@apply decoration-primary;
+			@apply decoration-white;
 		}
 	}
 

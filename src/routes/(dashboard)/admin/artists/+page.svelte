@@ -140,7 +140,7 @@
 	}
 
 	.avatar-container {
-		@apply aspect-square w-full relative overflow-hidden rounded-md bg-gray-200;
+		@apply aspect-square w-full relative overflow-hidden;
 		width: 100%;
 		height: auto;
 	}
@@ -151,8 +151,7 @@
 	}
 
 	.avatar-placeholder {
-		@apply w-full h-full flex items-center justify-center text-2xl font-bold text-gray-600 bg-gray-300;
-		border-radius: 6px;
+		@apply w-full h-full flex items-center justify-center text-2xl font-bold text-white bg-gray-500/20 border border-gray-500 rounded-full;
 	}
 
 	.empty {

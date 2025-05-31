@@ -17,6 +17,7 @@
 	let mouseY = 0;
 	let preloadedImages: Record<string, HTMLImageElement> = {};
 	let previewWidth = 320;
+	let previewHeight = 240; // Estimated height for positioning calculations
 	let loadingStates: Record<string, boolean> = {};
 	let isLargeScreen = false;
 
@@ -28,6 +29,19 @@
 
 	function updateScreenSize() {
 		isLargeScreen = window.innerWidth >= 1024;
+		// Update preview dimensions based on screen size
+		if (typeof window !== 'undefined') {
+			if (window.innerWidth <= 480) {
+				previewWidth = 200;
+				previewHeight = 150;
+			} else if (window.innerWidth <= 600) {
+				previewWidth = 250;
+				previewHeight = 188;
+			} else {
+				previewWidth = 320;
+				previewHeight = 240;
+			}
+		}
 	}
 
 	// Preload all artwork images for all artists
@@ -66,12 +80,52 @@
 		mouseY = event.clientY;
 	}
 
-	// Compute safe position for the floating preview
-	$: safeLeft = Math.min(
-		mouseX + 24,
-		(typeof window !== 'undefined' ? window.innerWidth : 10000) - previewWidth - 24
-	);
-	$: safeTop = mouseY + 24;
+	// Compute safe position for the floating preview with full viewport boundary checking
+	$: safeLeft = (() => {
+		if (typeof window === 'undefined') return mouseX + 24;
+		
+		const offset = 24;
+		const windowWidth = window.innerWidth;
+		
+		// Try positioning to the right of cursor first
+		let left = mouseX + offset;
+		
+		// If it would overflow on the right, position to the left of cursor
+		if (left + previewWidth > windowWidth - offset) {
+			left = mouseX - previewWidth - offset;
+		}
+		
+		// Ensure it doesn't go off the left edge
+		if (left < offset) {
+			// If it still doesn't fit, center it with some margin
+			left = Math.max(offset, (windowWidth - previewWidth) / 2);
+		}
+		
+		return Math.max(0, left);
+	})();
+
+	$: safeTop = (() => {
+		if (typeof window === 'undefined') return mouseY + 24;
+		
+		const offset = 24;
+		const windowHeight = window.innerHeight;
+		
+		// Try positioning below cursor first
+		let top = mouseY + offset;
+		
+		// If it would overflow at the bottom, position above cursor
+		if (top + previewHeight > windowHeight - offset) {
+			top = mouseY - previewHeight - offset;
+		}
+		
+		// Ensure it doesn't go off the top edge
+		if (top < offset) {
+			// If it still doesn't fit, position it with some margin from top
+			top = Math.max(offset, Math.min(mouseY - previewHeight / 2, windowHeight - previewHeight - offset));
+		}
+		
+		return Math.max(0, top);
+	})();
 </script>
 
 <svelte:head>
@@ -129,7 +183,7 @@
 	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && hoveredArtist.artworks[0]?.image_url}
 		<div
 			class="floating-artwork-preview"
-			style="left: {safeLeft}px; top: {safeTop}px; width: {previewWidth}px;"
+			style="left: {safeLeft}px; top: {safeTop}px; width: {previewWidth}px; height: {previewHeight}px;"
 		>
 			{#if hoveredArtist.artworks[0].image_url && loadingStates[hoveredArtist.artworks[0].image_url]}
 				<div class="preview-loader">
@@ -163,56 +217,28 @@
 
 	.homepage-container {
 		@apply w-full min-h-screen;
-
-		@media (min-width: 1024px) {
-			@apply grid grid-cols-[40vw_1fr] min-h-screen;
-		}
 	}
 
 	.homepage-intro {
 		@apply relative w-full p-4 bg-black;
-
-		@media (min-width: 1024px) {
-			@apply fixed top-0 left-0 bottom-0 w-[40vw] flex flex-col justify-center overflow-y-auto;
-		}
 	}
 
 	.intro-content {
 		@apply py-10;
-
-		@media (min-width: 1024px) {
-			@apply px-8 max-w-xl mx-auto w-full;
-		}
 	}
 
 	.artists-section {
 		@apply w-full p-4;
-
-		@media (min-width: 1024px) {
-			@apply ml-[40vw] p-12 pt-16 w-full;
-		}
 	}
 
 	.collection-title {
-		@apply text-2xl font-bold text-yellow-500 inline-block tracking-tight;
-
-		@media (min-width: 1024px) {
-			@apply text-3xl;
-		}
+		@apply text-2xl font-bold text-yellow-500 tracking-tight;
 	}
 
 	.collection-description {
-		@apply mt-8 mb-8 pb-8 border-b border-gray-800 text-xl max-w-full text-gray-100 font-semibold m-0 leading-normal tracking-tight;
+		@apply mb-8 pb-8 max-w-prose text-base text-gray-100 font-semibold m-0 leading-normal tracking-tight;
 		overflow-wrap: break-word;
 		word-wrap: break-word;
-
-		@media (min-width: 768px) {
-			@apply text-[1.3rem] mt-12 mb-10 pb-10;
-		}
-
-		@media (min-width: 1024px) {
-			@apply border-b-0 pb-0 mb-0;
-		}
 	}
 
 	.artist-title {
@@ -263,21 +289,27 @@
 	}
 
 	.floating-artwork-preview {
-		@apply fixed pointer-events-none z-[9999] p-0 flex gap-0 items-center overflow-hidden bg-none border-none shadow-xl rounded-lg;
+		@apply fixed pointer-events-none z-[9999] p-0 flex gap-0 items-center justify-center overflow-hidden bg-black border-none shadow-xl rounded-sm;
 		max-width: 320px;
+		max-height: 240px;
+		transition: opacity 0.2s ease-in-out;
+		border: 1px solid rgba(255, 255, 255, 0.15);
 	}
 
 	.preview-loader {
-		@apply w-full h-full overflow-hidden;
+		@apply w-full h-full overflow-hidden flex items-center justify-center;
 	}
 
 	.preview-image {
-		@apply h-auto w-auto max-w-full rounded-lg bg-black object-contain shadow-lg m-0;
+		@apply w-full h-full rounded-lg bg-black object-contain shadow-lg m-0;
+		max-width: 100%;
+		max-height: 100%;
 	}
 
 	@media (max-width: 600px) {
 		.floating-artwork-preview {
 			max-width: 250px;
+			max-height: 188px;
 		}
 	}
 
@@ -312,6 +344,7 @@
 
 		.floating-artwork-preview {
 			max-width: 200px;
+			max-height: 150px;
 		}
 	}
 
