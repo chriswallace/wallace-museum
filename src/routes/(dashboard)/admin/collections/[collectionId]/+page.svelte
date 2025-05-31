@@ -6,6 +6,8 @@
 	import { showToast } from '$lib/toastHelper';
 	import Modal from '$lib/components/Modal.svelte';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import ArtworkCard from '$lib/components/ArtworkCard.svelte';
+	import CollectionArtworkGrid from '$lib/components/CollectionArtworkGrid.svelte';
 	import { goto } from '$app/navigation';
 	import { closeModal, openModal } from '$lib/modal';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
@@ -276,37 +278,12 @@
 				/>
 				<button class="primary mt-0" on:click={searchExistingArtworks}>Search</button>
 			</div>
-			<div class="search-grid">
-				{#each searchResults as artwork}
-					<button
-						class="card"
-						class:active={selectedArtworks.has(artwork.id)}
-						on:click={() => toggleArtworkSelection(artwork.id)}
-					>
-						{#if artwork.mime?.startsWith('video') || artwork.imageUrl?.endsWith('.mp4')}
-							<video width="204" height="204" loop muted playsinline>
-								<source src={ipfsToHttpUrl(artwork.imageUrl)} type="video/mp4" />
-							</video>
-						{:else}
-							<OptimizedImage
-								src={artwork.imageUrl}
-								alt={artwork.title || 'Artwork thumbnail'}
-								width={300}
-								height={300}
-								fit="cover"
-								format="webp"
-								quality={85}
-								className="w-full aspect-square object-cover rounded-md mb-3"
-								fallbackSrc="/images/medici-image.png"
-							/>
-						{/if}
-						<p>{artwork.title}</p>
-						{#if selectedArtworks.has(artwork.id)}
-							<div class="selected-indicator">Selected</div>
-						{/if}
-					</button>
-				{/each}
-			</div>
+			<CollectionArtworkGrid
+				artworks={searchResults}
+				variant="search"
+				{selectedArtworks}
+				onToggleSelection={toggleArtworkSelection}
+			/>
 			<div class="well">
 				{#if selectedArtworks.size > 0}
 					<button class="primary" on:click={addSelectedArtworksToCollection}>
@@ -339,53 +316,15 @@
 
 		{#if activeTab === 'artworks'}
 			<div class="artworks-tab">
-				<div class="artwork-grid">
-					{#each collection.artworks as artwork}
-						<div>
-							{#if artwork.mime?.startsWith('video') || artwork.imageUrl?.endsWith('.mp4')}
-								<video width="204" height="204" loop muted playsinline>
-									<source src={ipfsToHttpUrl(artwork.imageUrl)} type="video/mp4" />
-								</video>
-							{:else}
-								<OptimizedImage
-									src={artwork.imageUrl}
-									alt={artwork.title || 'Artwork thumbnail'}
-									width={300}
-									height={300}
-									fit="cover"
-									format="webp"
-									quality={85}
-									className="w-full aspect-square object-cover rounded-md mb-3"
-									fallbackSrc="/images/medici-image.png"
-								/>
-							{/if}
-							<h3>{artwork.title}</h3>
-							<button class="remove" on:click={() => confirmRemoval(artwork)}>
-								<svg
-									fill="none"
-									height="15"
-									viewBox="0 0 15 15"
-									width="15"
-									xmlns="http://www.w3.org/2000/svg"
-									><path
-										clip-rule="evenodd"
-										d="M6.79289 7.49998L4.14645 4.85353L4.85355 4.14642L7.5 6.79287L10.1464 4.14642L10.8536 4.85353L8.20711 7.49998L10.8536 10.1464L10.1464 10.8535L7.5 8.20708L4.85355 10.8535L4.14645 10.1464L6.79289 7.49998Z"
-										fill="black"
-										fill-rule="evenodd"
-									/>
-								</svg>
-							</button>
-						</div>
-					{/each}
-					<div class="fieldset add-artwork">
-						<div class="add-artwork-buttons">
-							<button class="primary w-full mb-4" on:click={navigateToAddArtwork}>Add new</button>
-							<button class="secondary w-full" on:click={openAddExistingArtworkModal}
-								>Add existing</button
-							>
-						</div>
-					</div>
-				</div>
+				<CollectionArtworkGrid
+					artworks={collection.artworks}
+					variant="collection"
+					showRemoveButtons={true}
+					onRemove={confirmRemoval}
+					showAddCard={true}
+					onAddNew={navigateToAddArtwork}
+					onAddExisting={openAddExistingArtworkModal}
+				/>
 			</div>
 		{:else if activeTab === 'details'}
 			<div class="details-tab">
@@ -433,43 +372,11 @@
 </div>
 
 <style lang="scss">
-	h3 {
-		@apply text-lg font-semibold mb-3;
-	}
-
 	.button-split {
 		@apply flex gap-4;
 
 		button {
 			@apply w-full;
-		}
-	}
-
-	.add-artwork {
-		@apply grid grid-cols-1 content-center text-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-sm p-8 aspect-square;
-	}
-
-	.search-grid {
-		@apply grid grid-cols-4 gap-4 w-full max-h-[60vh] overflow-y-scroll mt-8 items-start justify-start;
-
-		.card {
-			@apply p-0 rounded-[8px];
-
-			video {
-				@apply w-full aspect-square object-contain rounded-t-[8px];
-			}
-		}
-
-		p {
-			@apply py-3 truncate;
-		}
-
-		.active {
-			@apply border-2 border-primary relative;
-
-			p {
-				@apply p-3;
-			}
 		}
 	}
 
@@ -479,25 +386,6 @@
 
 	.delete {
 		@apply bg-red-500 text-white;
-	}
-
-	.artwork-grid {
-		@apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4;
-
-		& > div {
-			@apply mb-8 relative;
-		}
-
-		.remove {
-			@apply absolute top-[-8px] right-[-8px] bg-red-500 rounded-full p-1 z-20;
-
-			svg {
-				@apply w-[20px] h-[20px];
-			}
-			path {
-				@apply fill-white;
-			}
-		}
 	}
 
 	.tabs {

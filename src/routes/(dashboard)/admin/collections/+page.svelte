@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { getCloudinaryTransformedUrl } from '$lib/pinataUtils.client';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import ArtistList from '$lib/components/ArtistList.svelte';
 
 	interface Artist {
 		id: number;
@@ -21,6 +22,15 @@
 	let page = 1;
 	let totalPages = 0;
 	let searchQuery = '';
+
+	// Video detection function consistent with media helpers
+	function isVideoUrl(url: string): boolean {
+		if (!url) return false;
+		
+		// Check for video file extensions (case insensitive)
+		const videoExtensions = /\.(mp4|webm|mov|avi|ogv|m4v|3gp|flv|wmv|mkv|gif)$/i;
+		return videoExtensions.test(url);
+	}
 
 	async function fetchCollections(page = 1) {
 		let url = `/api/admin/collections/?page=${page}`;
@@ -88,7 +98,7 @@
 				<div class="cover-image-wrap">
 					<div class="cover-image-grid">
 						{#each collection.coverImages as image}
-							{#if image.endsWith('.mp4')}
+							{#if isVideoUrl(image)}
 								<video
 									src={image}
 									autoplay
@@ -116,24 +126,15 @@
 				</div>
 				<div class="title">{collection.title}</div>
 				{#if collection.artists && collection.artists.length > 0}
-					<div class="artists-list">
-						{#each collection.artists as artist}
-							<span class="artist-name">
-								{#if artist.avatarUrl}
-									<OptimizedImage
-										src={artist.avatarUrl}
-										alt={artist.name}
-										width={20}
-										height={20}
-										fit="cover"
-										format="webp"
-										quality={85}
-										className="artist-avatar"
-									/>
-								{/if}
-								{artist.name}
-							</span>
-						{/each}
+					<div class="artists-container">
+						<ArtistList 
+							artists={collection.artists}
+							layout="badges"
+							size="xs"
+							showAvatars={true}
+							maxDisplay={3}
+							className="px-4 pb-2"
+						/>
 					</div>
 				{/if}
 			</button>
@@ -168,13 +169,7 @@
 	.pagination {
 		@apply flex justify-center items-center space-x-2 my-4;
 	}
-	.artists-list {
-		@apply flex flex-wrap gap-2 px-4 pb-2;
-	}
-	.artist-name {
-		@apply flex items-center gap-1 text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1;
-	}
-	.artist-avatar {
-		@apply w-5 h-5 rounded-full object-cover mr-1;
+	.artists-container {
+		@apply pb-2;
 	}
 </style>

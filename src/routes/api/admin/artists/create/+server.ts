@@ -1,5 +1,5 @@
 import prisma from '$lib/prisma';
-import { uploadToPinata } from '$lib/pinataHelpers';
+import { uploadAvatarImage } from '$lib/avatarUpload';
 
 export async function POST({ request }) {
 	try {
@@ -13,12 +13,8 @@ export async function POST({ request }) {
 		let avatarUrl = null;
 
 		if (file && file instanceof File) {
-			const buffer = Buffer.from(await file.arrayBuffer());
-			const mimeType = file.type;
-			const uploadResponse = await uploadToPinata(buffer, file.name, mimeType);
-			if (uploadResponse) {
-				avatarUrl = uploadResponse.url;
-			}
+			const uploadResult = await uploadAvatarImage(file);
+			avatarUrl = uploadResult.url;
 		} else if (file) {
 			throw new Error('Invalid file uploaded');
 		}

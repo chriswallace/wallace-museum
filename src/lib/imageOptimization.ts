@@ -36,14 +36,106 @@ function extractCidFromUrl(url: string): string | null {
 	// Handle ipfs:// protocol
 	if (url.startsWith('ipfs://')) {
 		const cleaned = url.replace('ipfs://', '');
-		return cleaned.split('/')[0];
+		// Split by '/' and take the first part (the CID)
+		const cidPart = cleaned.split('/')[0];
+		return cidPart;
+	}
+
+	// Handle various gateway URLs including Pinata
+	const gatewayPatterns = [
+		// Standard IPFS gateway pattern: https://gateway.pinata.cloud/ipfs/QmXXX
+		/https?:\/\/[^/]+\/ipfs\/([^/?#]+)/,
+		// Direct gateway pattern: https://gateway.pinata.cloud/QmXXX
+		/https?:\/\/gateway\.pinata\.cloud\/([^/?#]+)/,
+		// Other gateway patterns
+		/https?:\/\/[^/]+\/([^/?#]+)/
+	];
+
+	for (const pattern of gatewayPatterns) {
+		const match = url.match(pattern);
+		if (match && match[1]) {
+			const potentialCid = match[1];
+			// Validate that it looks like a CID (starts with Qm or bafy)
+			if (potentialCid.startsWith('Qm') || potentialCid.startsWith('bafy')) {
+				return potentialCid;
+			}
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Check if an IPFS URL has a path component (e.g., ipfs://QmXXX/image.jpg)
+ */
+function hasIpfsPath(url: string): boolean {
+	if (!url) return false;
+
+	// Handle ipfs:// protocol
+	if (url.startsWith('ipfs://')) {
+		const cleaned = url.replace('ipfs://', '');
+		// Check if there's a path after the CID
+		const parts = cleaned.split('/');
+		return parts.length > 1 && parts[1] !== '';
+	}
+
+	// Handle gateway URLs - need to capture the full path after /ipfs/
+	const gatewayPatterns = [
+		/https?:\/\/[^/]+\/ipfs\/(.+)/,
+		/https?:\/\/gateway\.pinata\.cloud\/(.+)/
+	];
+
+	for (const pattern of gatewayPatterns) {
+		const match = url.match(pattern);
+		if (match && match[1]) {
+			const cidAndPath = match[1];
+			const parts = cidAndPath.split('/');
+			// Check if there's a path after the CID
+			return parts.length > 1 && parts[1] !== '';
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Extract the full CID and path from an IPFS URL
+ */
+function extractCidAndPath(url: string): { cid: string; path: string } | null {
+	if (!url) return null;
+
+	// Handle ipfs:// protocol
+	if (url.startsWith('ipfs://')) {
+		const cleaned = url.replace('ipfs://', '');
+		const parts = cleaned.split('/');
+		const cid = parts[0];
+		const path = parts.slice(1).join('/');
+		
+		// Validate CID format
+		if (cid && (cid.startsWith('Qm') || cid.startsWith('bafy'))) {
+			return { cid, path };
+		}
 	}
 
 	// Handle gateway URLs
-	const gatewayRegex = /https?:\/\/[^/]+\/(?:ipfs\/)?([^/?#]+)/;
-	const match = url.match(gatewayRegex);
-	if (match && match[1]) {
-		return match[1];
+	const gatewayPatterns = [
+		/https?:\/\/[^/]+\/ipfs\/(.+)/,
+		/https?:\/\/gateway\.pinata\.cloud\/(.+)/
+	];
+
+	for (const pattern of gatewayPatterns) {
+		const match = url.match(pattern);
+		if (match && match[1]) {
+			const cidAndPath = match[1];
+			const parts = cidAndPath.split('/');
+			const cid = parts[0];
+			const path = parts.slice(1).join('/');
+			
+			// Validate CID format
+			if (cid && (cid.startsWith('Qm') || cid.startsWith('bafy'))) {
+				return { cid, path };
+			}
+		}
 	}
 
 	return null;
@@ -104,8 +196,16 @@ export function buildOptimizedImageUrl(
 		return imageUrl;
 	}
 
+	// Check if the IPFS URL has a path component (e.g., ipfs://QmXXX/image.jpg)
+	// If it does, we can't perform transformations and should serve directly
+	if (hasIpfsPath(imageUrl)) {
+		console.log(`[buildOptimizedImageUrl] IPFS URL has path, serving directly: ${imageUrl}`);
+		return buildDirectImageUrl(imageUrl);
+	}
+
 	// Extract CID from the IPFS image URL
 	const cid = extractCidFromUrl(imageUrl);
+	
 	if (!cid) {
 		// If we can't extract a CID from what should be an IPFS URL, fall back to conversion
 		return ipfsToHttpUrl(imageUrl);
@@ -140,6 +240,14 @@ export function buildDirectImageUrl(imageUrl: string | null | undefined): string
 		return imageUrl;
 	}
 
+	// Try to extract CID and path to preserve the full path
+	const cidAndPath = extractCidAndPath(imageUrl);
+	if (cidAndPath) {
+		const { cid, path } = cidAndPath;
+		return `${IPFS_DIRECT_ENDPOINT}/${cid}${path ? `/${path}` : ''}`;
+	}
+
+	// Fallback: extract just the CID (for backwards compatibility)
 	const cid = extractCidFromUrl(imageUrl);
 	if (!cid) {
 		return ipfsToHttpUrl(imageUrl);

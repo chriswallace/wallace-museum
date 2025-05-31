@@ -3,6 +3,7 @@ import { Artist, WalletAddress, Prisma } from '@prisma/client';
 import { indexArtwork } from './artworkIndexer';
 import { convertToIpfsUrl } from '$lib/pinataHelpers';
 import { detectBlockchainFromContract } from '$lib/utils/walletUtils.js';
+import { isProblematicThumbnail } from '$lib/constants/tezos';
 
 // Define interfaces for expected data structures
 interface SocialMediaAccounts {
@@ -841,16 +842,13 @@ export async function saveArtwork(
 		animationUrl: final_animation_url ? convertToIpfsUrl(final_animation_url) : final_animation_url,
 		// Add thumbnailUrl from various sources - prioritize based on blockchain
 		thumbnailUrl: (() => {
-			// Check for generic circle thumbnail from Tezos
-			const GENERIC_CIRCLE_IPFS = 'ipfs://QmNrhZHUaEqxhyLfqoq1mtHSipkWHeT31LNHb1QEbDHgnc';
-			
 			let thumbnailUrl = artworkBlockchain?.toLowerCase() === 'tezos' 
 				? (nft.metadata?.thumbnail_uri || nft.thumbnail_uri || nft.metadata?.display_uri || nft.display_uri || null)
 				: (nft.metadata?.display_uri || nft.display_uri || nft.metadata?.thumbnail_uri || nft.thumbnail_uri || null);
 			
-			// If we have the generic circle thumbnail, use the main image instead
-			if (thumbnailUrl === GENERIC_CIRCLE_IPFS) {
-				console.log(`[saveArtwork] Detected generic circle thumbnail for ${nft.collection.contract}:${nft.tokenID}, using display/artifact image instead`);
+			// If we have a problematic thumbnail, use the main image instead
+			if (isProblematicThumbnail(thumbnailUrl)) {
+				console.log(`[saveArtwork] Detected problematic thumbnail for ${nft.collection.contract}:${nft.tokenID}, using display/artifact image instead`);
 				thumbnailUrl = final_image_url;
 			}
 			

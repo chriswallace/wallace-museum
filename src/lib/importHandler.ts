@@ -16,8 +16,8 @@ import ImportStatus from '$lib/components/ImportStatus.svelte';
 import { tick } from 'svelte';
 import { browser } from '$app/environment';
 import { openModal, closeModal } from '$lib/modal';
-import { detectMimeType } from '$lib/utils';
 import { detectBlockchainFromContract } from '$lib/utils/walletUtils.js';
+import { isValidAddress } from '$lib/utils';
 
 const totalSteps = 3;
 
@@ -207,15 +207,6 @@ export async function finalizeImport(artworksToImport?: Artwork[]) {
 	await startImportProcess();
 }
 
-// Utility to validate blockchain addresses (Ethereum/Tezos)
-function isValidAddress(address: string | undefined | null): boolean {
-	if (!address) return false;
-	if (address === '-') return false;
-	if (address === '0x0000000000000000000000000000000000000000') return false;
-	if (address.length < 20) return false;
-	return true;
-}
-
 // Helper to detect shared contracts
 function isSharedContract(contractAddress: string, blockchain: string): boolean {
 	const normalizedAddress = contractAddress.toLowerCase();
@@ -324,12 +315,9 @@ async function importNft(nft: ImportNft) {
 
 		// Ensure we have a MIME type for animation_url content
 		let mimeType = nft.mime;
-		if (!mimeType && nft.animation_url) {
-			const detectedMime = detectMimeType(nft.animation_url);
-			if (detectedMime) {
-				mimeType = detectedMime;
-			}
-		}
+		// Note: MIME type detection from URLs is unreliable, especially for IPFS URLs
+		// The MIME type should be determined during indexing and stored in the nft.mime field
+		// If no MIME type is available, it will be determined later during media processing
 
 		// Handle creator/artist data - support both 'creator' and 'artist' fields
 		let creatorData = nft.creator;

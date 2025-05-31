@@ -92,9 +92,9 @@ function normalizeNFTData(nftData: any): {
 	const data: IndexerData = {
 		title: nftData.title || nftData.name || 'Untitled',
 		description: nftData.description,
-		imageUrl: nftData.imageUrl || nftData.image_url,
+		imageUrl: nftData.imageUrl || nftData.display_image_url || nftData.image_url,
 		animationUrl: nftData.animationUrl || nftData.animation_url,
-		thumbnailUrl: nftData.thumbnailUrl || nftData.display_image_url,
+		thumbnailUrl: nftData.thumbnailUrl || nftData.image_url || nftData.display_image_url,
 		metadataUrl: nftData.metadataUrl || nftData.metadata_url,
 		mime: nftData.mime || nftData.mimeType,
 		isGenerativeArt: nftData.isGenerativeArt || false,

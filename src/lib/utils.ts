@@ -94,6 +94,16 @@ const CONTRACT_NAMES: Record<string, string> = {
 };
 
 /**
+ * Truncate an address to show first 6 and last 4 characters
+ */
+export function truncateAddress(address: string): string {
+	if (!address || address.length <= 10) {
+		return address;
+	}
+	return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+}
+
+/**
  * Get a human-readable name for a contract address
  */
 export function getContractName(address: string, contractAlias?: string): string {
@@ -166,29 +176,13 @@ export function isFxhashContract(contractAddress: string): boolean {
 	return fxhashContracts.includes(contractAddress);
 }
 
-// Add a utility function to detect MIME type from URL pattern
-export function detectMimeType(url: string): string | null {
-	// Check file extensions
-	if (url.match(/\.(mp4|webm|mov)$/i)) return 'video/mp4';
-	if (url.match(/\.(jpg|jpeg)$/i)) return 'image/jpeg';
-	if (url.match(/\.(png)$/i)) return 'image/png';
-	if (url.match(/\.(gif)$/i)) return 'image/gif';
-	if (url.match(/\.(webp)$/i)) return 'image/webp';
-	if (url.match(/\.(svg)$/i)) return 'image/svg+xml';
-	if (url.match(/\.(pdf)$/i)) return 'application/pdf';
-	if (url.match(/\.(html|htm)$/i)) return 'text/html';
-	if (url.match(/\.(js)$/i)) return 'application/javascript';
-
-	// Check for common interactive art platforms
-	if (url.includes('fxhash.xyz') || url.includes('generator.artblocks.io')) {
-		return 'text/html';
-	}
-
-	// Check for Cloudinary patterns
-	if (url.includes('cloudinary.com')) {
-		if (url.includes('/video/')) return 'video/mp4';
-		if (url.includes('/image/')) return 'image/jpeg';
-	}
-
-	return null;
+/**
+ * Utility to validate blockchain addresses (Ethereum/Tezos)
+ */
+export function isValidAddress(address: string | undefined | null): boolean {
+	if (!address) return false;
+	if (address === '-') return false;
+	if (address === '0x0000000000000000000000000000000000000000') return false;
+	if (address.length < 20) return false;
+	return true;
 }

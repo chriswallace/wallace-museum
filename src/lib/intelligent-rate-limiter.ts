@@ -45,7 +45,7 @@ export class IntelligentRateLimiter {
   private static readonly GLOBAL_RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute window
 
   constructor(config: RateLimitConfig = {}) {
-    this.baseDelay = config.baseDelay || 100;
+    this.baseDelay = config.baseDelay || 1000;
     this.currentDelay = this.baseDelay;
     this.maxDelay = config.maxDelay || 10000;
     this.backoffMultiplier = config.backoffMultiplier || 1.5;
@@ -139,7 +139,7 @@ export class IntelligentRateLimiter {
     // If we've hit too many rate limits globally, add extra delay
     if (IntelligentRateLimiter.globalRateLimitCount > 10) {
       console.log(`[IntelligentRateLimiter] Global rate limit threshold reached (${IntelligentRateLimiter.globalRateLimitCount} in window)`);
-      this.currentDelay = Math.min(this.currentDelay * 2, this.maxDelay);
+      this.currentDelay = Math.min(this.currentDelay * 1.5, this.maxDelay); // Reduced from 2x to 1.5x
     }
   }
 
@@ -151,8 +151,8 @@ export class IntelligentRateLimiter {
     this.consecutiveFailures++;
     this.consecutiveSuccesses = 0;
     
-    // Immediately increase delay significantly
-    this.currentDelay = Math.min(this.currentDelay * this.backoffMultiplier * 2, this.maxDelay);
+    // Increase delay using the configured backoff multiplier (removed aggressive doubling)
+    this.currentDelay = Math.min(this.currentDelay * this.backoffMultiplier, this.maxDelay);
     
     console.log(`[IntelligentRateLimiter] Rate limit handled - global count: ${IntelligentRateLimiter.globalRateLimitCount}, new delay: ${this.currentDelay}ms`);
   }
@@ -280,18 +280,18 @@ export class IntelligentRateLimiter {
    */
   private calculateBatchDelay(): number {
     if (this.responseTimeHistory.length === 0) {
-      return this.currentDelay * 2;
+      return this.currentDelay * 1.2; // Modest 20% increase instead of doubling
     }
 
     const avgResponseTime = this.responseTimeHistory.reduce((a, b) => a + b, 0) / this.responseTimeHistory.length;
     
-    // Longer delays for slower responses
+    // Moderate delays for slower responses - less aggressive than before
     if (avgResponseTime > 2000) {
-      return this.currentDelay * 3;
+      return this.currentDelay * 1.5; // Reduced from 3x to 1.5x
     } else if (avgResponseTime > 1000) {
-      return this.currentDelay * 2;
+      return this.currentDelay * 1.2; // Reduced from 2x to 1.2x
     } else {
-      return this.currentDelay;
+      return this.currentDelay; // No change for fast responses
     }
   }
 

@@ -48,12 +48,7 @@ export async function normalizeArtworkData(artworkId: number): Promise<IndexedAr
 		where: { id: artworkId },
 		include: {
 			collection: true, // Include collection details
-			walletAddresses: {
-				// Include the wallet addresses (updated relation name)
-				include: {
-					artist: true // Include the artist linked to each wallet address
-				}
-			}
+			artists: true // Include the artists directly linked to this artwork
 		}
 	});
 
@@ -63,14 +58,12 @@ export async function normalizeArtworkData(artworkId: number): Promise<IndexedAr
 	}
 
 	const artists: ArtistForNormalization[] = [];
-	if (artwork.walletAddresses) {
-		for (const walletAddress of artwork.walletAddresses) {
-			if (walletAddress.artist) {
-				artists.push({
-					id: walletAddress.artist.id,
-					name: walletAddress.artist.name
-				});
-			}
+	if (artwork.artists) {
+		for (const artist of artwork.artists) {
+			artists.push({
+				id: artist.id,
+				name: artist.name
+			});
 		}
 	}
 

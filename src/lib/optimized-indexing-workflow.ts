@@ -19,14 +19,14 @@ export class OptimizedIndexingWorkflow {
   private tezosAPI: OptimizedTezosAPI;
 
   constructor(openSeaApiKey: string) {
-    // Configure rate limiter for better persistence with OpenSea's rate limits
+    // Configure rate limiter for approximately 1 request per second with less aggressive backoff
     const rateLimiterConfig = {
-      baseDelay: 1000,     // Start with 1 second between calls (more conservative)
-      maxDelay: 60000,    // Max 60 seconds (very patient)
-      backoffMultiplier: 3.0, // More aggressive backoff
-      maxRetries: 10,      // More retries with longer waits
-      batchSize: 3,       // Much smaller batches to be safer
-      adaptiveThreshold: 2 // Adjust faster when we hit rate limits
+      baseDelay: 1000,     // Start with 1 second between calls (maintains ~1 req/sec)
+      maxDelay: 10000,     // Max 10 seconds (much less aggressive than 60s)
+      backoffMultiplier: 1.5, // Gentler backoff (reduced from 3.0)
+      maxRetries: 5,       // Reasonable retry count (reduced from 10)
+      batchSize: 5,        // Slightly larger batches for efficiency (increased from 3)
+      adaptiveThreshold: 3 // Less sensitive to rate limit adjustments (increased from 2)
     };
 
     this.openSeaAPI = new OptimizedOpenSeaAPI(openSeaApiKey, rateLimiterConfig);
@@ -232,9 +232,9 @@ export class OptimizedIndexingWorkflow {
    * Calculate delay between pages based on current rate limiter state
    */
   private calculatePageDelay(currentDelay: number): number {
-    // More conservative delay for comprehensive data fetching
-    // Add extra buffer time to prevent hitting rate limits
-    return Math.max(1000, currentDelay * 2.0); // At least 1 second, double the current delay
+    // Reasonable delay for page requests - maintain ~1 req/sec baseline
+    // Add modest buffer time to prevent hitting rate limits
+    return Math.max(1000, currentDelay * 1.2); // At least 1 second, with 20% buffer
   }
 
   /**

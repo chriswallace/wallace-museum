@@ -2,16 +2,22 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import prisma from '$lib/prisma';
 
-// Re-using the Artwork interface, assuming it might be defined in a shared types file in a real app
-// For now, let's define it here for simplicity, or ensure it can be imported if it lives elsewhere (e.g., from the page.ts)
+// Updated Artwork interface to include all media fields
 interface Artwork {
 	id: string;
 	title: string;
-	imageUrl: string; // Will be the original image_url for frontend transformation
-	description?: string; // Added for potential use in details
+	imageUrl: string;
+	animationUrl?: string;
+	generatorUrl?: string;
+	thumbnailUrl?: string;
+	mime?: string;
+	description?: string;
 	year?: number;
-	artistId: string; // To associate artwork with an artist
-	// Add other relevant artwork properties here
+	artistId: string;
+	dimensions?: {
+		width: number;
+		height: number;
+	};
 }
 
 export const GET: RequestHandler = async ({ params }) => {
@@ -22,22 +28,26 @@ export const GET: RequestHandler = async ({ params }) => {
 	}
 
 	try {
-		// Query the database for real artwork data
+		// Query the database for real artwork data with all media fields
 		const artist = await prisma.artist.findUnique({
 			where: { id: parseInt(artistId, 10) },
 			include: {
-				ArtistArtworks: {
-					include: {
-						artwork: {
-							select: {
-								id: true,
-								title: true,
-								description: true,
-								image_url: true,
-								mintDate: true,
-								enabled: true
-							}
-						}
+				artworks: {
+					select: {
+						id: true,
+						title: true,
+						description: true,
+						imageUrl: true,
+						animationUrl: true,
+						generatorUrl: true,
+						thumbnailUrl: true,
+						mime: true,
+						mintDate: true,
+						dimensions: true
+					},
+					where: {
+						// Only return enabled artworks if that field exists
+						// enabled: true
 					}
 				}
 			}
@@ -48,18 +58,33 @@ export const GET: RequestHandler = async ({ params }) => {
 		}
 
 		// Transform the data to match the expected interface
-		const artworks: Artwork[] = artist.ArtistArtworks.filter((aa) => aa.artwork.enabled) // Only return enabled artworks
-			.map((aa) => {
-				const artwork = aa.artwork;
-				return {
-					id: String(artwork.id),
-					title: artwork.title,
-					imageUrl: artwork.image_url || '', // Original URL for frontend transformation
-					description: artwork.description || undefined,
-					year: artwork.mintDate ? new Date(artwork.mintDate).getFullYear() : undefined,
-					artistId: artistId
-				};
-			});
+		const artworks: Artwork[] = artist.artworks.map((artwork) => {
+			// Parse dimensions if they exist
+			let dimensions: { width: number; height: number } | undefined;
+			if (artwork.dimensions && typeof artwork.dimensions === 'object') {
+				const dims = artwork.dimensions as any;
+				if (dims.width && dims.height) {
+					dimensions = {
+						width: dims.width,
+						height: dims.height
+					};
+				}
+			}
+
+			return {
+				id: String(artwork.id),
+				title: artwork.title,
+				imageUrl: artwork.imageUrl || '',
+				animationUrl: artwork.animationUrl || undefined,
+				generatorUrl: artwork.generatorUrl || undefined,
+				thumbnailUrl: artwork.thumbnailUrl || undefined,
+				mime: artwork.mime || undefined,
+				description: artwork.description || undefined,
+				year: artwork.mintDate ? new Date(artwork.mintDate).getFullYear() : undefined,
+				artistId: artistId,
+				dimensions
+			};
+		});
 
 		return json(artworks);
 	} catch (error) {

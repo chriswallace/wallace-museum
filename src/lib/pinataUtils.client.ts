@@ -10,21 +10,31 @@
 export function extractCidFromUrl(url: string): string | null {
 	if (!url) return null;
 
-	// If it's already just a CID (starts with Qm or bafy)
+	// Clean the URL by removing any leading/trailing whitespace
+	url = url.trim();
+
+	// If it's already just a CID (starts with Qm or bafy), extract only the CID part
 	if (url.startsWith('Qm') || url.startsWith('bafy')) {
-		return url;
+		// Remove any query parameters or fragments that might be appended
+		const cidMatch = url.match(/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[a-z0-9]{55})/);
+		return cidMatch ? cidMatch[1] : null;
 	}
 
 	// Handle ipfs:// protocol
 	if (url.startsWith('ipfs://')) {
-		return url.replace('ipfs://', '');
+		const withoutProtocol = url.replace('ipfs://', '');
+		// Extract only the CID part, removing any path, query params, or fragments
+		const cidMatch = withoutProtocol.match(/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[a-z0-9]{55})/);
+		return cidMatch ? cidMatch[1] : null;
 	}
 
 	// Handle gateway URLs
 	const gatewayRegex = /https?:\/\/[^/]+\/ipfs\/([^/?#]+)/;
 	const match = url.match(gatewayRegex);
 	if (match && match[1]) {
-		return match[1];
+		// Extract only the CID part from the matched group
+		const cidMatch = match[1].match(/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|bafy[a-z0-9]{55})/);
+		return cidMatch ? cidMatch[1] : null;
 	}
 
 	return null;

@@ -79,8 +79,8 @@ export class OptimizedTezosAPI {
     
     // Extract tokens based on query type
     let tokens: any[] = [];
-    if (type === 'owned' && response.holder?.[0]?.held_tokens) {
-      tokens = response.holder[0].held_tokens.map((ht: any) => ht.token);
+    if (type === 'owned' && response.token_holder) {
+      tokens = response.token_holder.map((th: any) => th.token);
     } else if (type === 'created' && response.token) {
       tokens = response.token;
     }
@@ -97,8 +97,10 @@ export class OptimizedTezosAPI {
 
     console.log(`[OptimizedTezosAPI] Filtered ${tokens.length - filteredTokens.length} wrapped Tezos tokens, ${filteredTokens.length} remaining`);
 
-    // Transform tokens to MinimalNFTData
-    const nfts = filteredTokens.map(token => this.transformer.transformTezosToken(token));
+    // Transform tokens to MinimalNFTData - properly await async transformations
+    const nfts = await Promise.all(
+      filteredTokens.map(token => this.transformer.transformTezosToken(token))
+    );
 
     return {
       nfts,
@@ -123,7 +125,7 @@ export class OptimizedTezosAPI {
     const token = response.token[0];
     
     // Transform to MinimalNFTData with all enriched data
-    return this.transformer.transformTezosToken({
+    return await this.transformer.transformTezosToken({
       ...token,
       fa: token.fa
     });

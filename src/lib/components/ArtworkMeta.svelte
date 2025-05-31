@@ -7,7 +7,7 @@
 <div class="additional-meta">
 	<div class="non-editable">
 		<h3>Token ID</h3>
-		<p>{artwork.tokenID}</p>
+		<p class="truncate">{artwork.tokenID}</p>
 	</div>
 	<div class="non-editable">
 		<h3>Blockchain</h3>
@@ -15,7 +15,7 @@
 	</div>
 	<div class="non-editable">
 		<h3>Token Standard</h3>
-		<p>{artwork.tokenStandard}</p>
+		<p>{artwork.tokenStandard?.toUpperCase()}</p>
 	</div>
 	<div class="non-editable">
 		<h3>Contract</h3>
@@ -45,7 +45,7 @@
 	}
 
 	.additional-meta {
-		@apply grid grid-cols-2 mt-4 text-base;
+		@apply grid grid-cols-2 gap-4 mt-4 text-base;
 
 		h3 {
 			@apply mb-1 text-sm tracking-wide font-normal uppercase;

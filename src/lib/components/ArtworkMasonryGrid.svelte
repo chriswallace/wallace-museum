@@ -2,12 +2,16 @@
 	import OptimizedImage from './OptimizedImage.svelte';
 	import { fade } from 'svelte/transition';
 	import { onMount } from 'svelte';
+	import { getBestMediaUrl } from '$lib/utils/mediaHelpers';
+	import type { MediaUrls } from '$lib/utils/mediaHelpers';
 
 	interface Artwork {
 		id: number | string;
 		title: string;
 		imageUrl?: string;
 		animationUrl?: string;
+		generatorUrl?: string;
+		thumbnailUrl?: string;
 		mime?: string;
 		dimensions?: {
 			width: number;
@@ -63,9 +67,17 @@
 		return imageWidth; // Square fallback
 	}
 
-	// Get image URL with fallback
+	// Get image URL with cascading fallback logic using utility function
 	function getImageUrl(artwork: Artwork): string {
-		return artwork.imageUrl || artwork.animationUrl || '';
+		const mediaUrls: MediaUrls = {
+			generatorUrl: artwork.generatorUrl,
+			animationUrl: artwork.animationUrl,
+			imageUrl: artwork.imageUrl,
+			thumbnailUrl: artwork.thumbnailUrl
+		};
+		
+		const bestMedia = getBestMediaUrl(mediaUrls, 'thumbnail', artwork.mime);
+		return bestMedia?.url || '';
 	}
 
 	// Handle artwork click

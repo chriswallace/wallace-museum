@@ -2,8 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { toast } from '@zerodevx/svelte-toast';
-	import { placeholderAvatar } from '$lib/utils';
-	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
 
 	interface Artist {
 		id: number;
@@ -17,6 +16,36 @@
 	let sortColumn: string | null = null;
 	let sortOrder: 'asc' | 'desc' | null = null;
 	let searchQuery = '';
+
+	// Function to get optimized avatar URL with face detection
+	function getOptimizedAvatarUrl(avatarUrl: string): string {
+		try {
+			const optimizedUrl = buildOptimizedImageUrl(avatarUrl, {
+				width: 300,
+				height: 300,
+				fit: 'crop',
+				gravity: 'auto',
+				format: 'webp',
+				quality: 85
+			});
+			
+			// If the optimized URL contains 'hash=file' or similar invalid hash, fall back to original
+			if (optimizedUrl.includes('hash=file') || optimizedUrl.includes('hash=undefined')) {
+				return avatarUrl;
+			}
+			
+			return optimizedUrl;
+		} catch (error) {
+			console.error('Error optimizing avatar URL:', error);
+			return avatarUrl;
+		}
+	}
+
+	// Function to handle image error and fallback to original URL
+	function handleImageError(event: Event, originalUrl: string) {
+		const img = event.target as HTMLImageElement;
+		img.src = originalUrl;
+	}
 
 	async function fetchArtists(page = 1) {
 		let url = `/api/admin/artists/search/`;
@@ -85,24 +114,18 @@
 	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 w-full">
 		{#each artists as artist}
 			<button class="card" on:click={() => editArtist(artist.id)}>
-				<div class="aspect-square w-full relative">
+				<div class="avatar-container">
 					{#if artist.avatarUrl}
-						<OptimizedImage
-							src={artist.avatarUrl}
+						<img
+							src={getOptimizedAvatarUrl(artist.avatarUrl)}
 							alt={artist.name}
-							width={200}
-							height={200}
-							fit="cover"
-							format="webp"
-							quality={85}
-							className="avatar absolute inset-0 w-full h-full object-cover"
+							class="avatar-image"
+							on:error={(event) => handleImageError(event, artist.avatarUrl)}
 						/>
 					{:else}
-						<img
-							class="avatar absolute inset-0 w-full h-full object-cover"
-							src={placeholderAvatar(artist.name)}
-							alt={artist.name}
-						/>
+						<div class="avatar-placeholder">
+							{artist.name.charAt(0).toUpperCase()}
+						</div>
 					{/if}
 				</div>
 				<span>{artist.name}</span>
@@ -114,6 +137,22 @@
 <style lang="scss">
 	.card {
 		@apply p-4 shadow-md rounded-lg flex justify-between text-center items-center flex-col text-sm hover:scale-105 transition-transform;
+	}
+
+	.avatar-container {
+		@apply aspect-square w-full relative overflow-hidden rounded-md bg-gray-200;
+		width: 100%;
+		height: auto;
+	}
+
+	.avatar-image {
+		@apply w-full h-full object-cover;
+		border-radius: 6px;
+	}
+
+	.avatar-placeholder {
+		@apply w-full h-full flex items-center justify-center text-2xl font-bold text-gray-600 bg-gray-300;
+		border-radius: 6px;
 	}
 
 	.empty {

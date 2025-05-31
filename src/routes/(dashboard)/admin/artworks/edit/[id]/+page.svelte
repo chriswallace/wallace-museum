@@ -2,9 +2,9 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
-	import ArtworkDisplay from '$lib/components/ArtworkDisplay.svelte';
 	import ArtworkMeta from '$lib/components/ArtworkMeta.svelte';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import ArtistList from '$lib/components/ArtistList.svelte';
 
 	import { showToast } from '$lib/toastHelper';
 	import { goto } from '$app/navigation';
@@ -235,29 +235,70 @@
 		<button class="back-btn" on:click={goBack}>&lt; Back</button>
 		<h1>Edit artwork</h1>
 		{#if artwork.artists && artwork.artists.length > 0}
-			<div class="artists-list mb-6">
-				{#each artwork.artists as artist}
-					<span class="artist-name">
-						{#if artist.avatarUrl}
-							<OptimizedImage
-								src={artist.avatarUrl}
-								alt={artist.name}
-								width={32}
-								height={32}
-								fit="cover"
-								format="webp"
-								quality={85}
-								className="artist-avatar"
-							/>
-						{/if}
-						{artist.name}
-					</span>
-				{/each}
+			<div class="mb-6">
+				<ArtistList 
+					artists={artwork.artists}
+					layout="badges"
+					size="sm"
+					showAvatars={true}
+					linkToWebsite={true}
+				/>
 			</div>
 		{/if}
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 			<div>
-				<ArtworkDisplay {artwork} />
+				<div class="artwork-preview-container">
+					<div class="artwork-preview">
+						{#if artwork.animationUrl || artwork.generatorUrl}
+							{#if artwork.mime?.includes('video')}
+								<video 
+									src={artwork.animationUrl || artwork.generatorUrl} 
+									controls 
+									muted 
+									autoplay 
+									loop
+									class="media-content"
+								>
+									<track kind="captions" />
+								</video>
+							{:else if artwork.generatorUrl}
+								<iframe 
+									src={artwork.generatorUrl} 
+									title="Interactive Artwork"
+									class="media-content"
+									allowfullscreen
+								></iframe>
+							{:else}
+								<img 
+									src={artwork.animationUrl} 
+									alt={artwork.title}
+									class="media-content"
+								/>
+							{/if}
+						{:else if artwork.imageUrl}
+							<img 
+								src={artwork.imageUrl} 
+								alt={artwork.title}
+								class="media-content"
+							/>
+						{:else if artwork.thumbnailUrl}
+							<img 
+								src={artwork.thumbnailUrl} 
+								alt={artwork.title}
+								class="media-content"
+							/>
+						{:else}
+							<div class="no-media-placeholder">
+								<div class="no-media-content">
+									<svg class="w-12 h-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+									</svg>
+									<p class="text-gray-500">No media available</p>
+								</div>
+							</div>
+						{/if}
+					</div>
+				</div>
 				<ArtworkMeta {artwork} />
 			</div>
 			<div>
@@ -376,26 +417,61 @@
 		height: auto;
 		min-height: 150px;
 	}
-	.artists-list {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
+
+	.artwork-preview-container {
+		margin-bottom: 1.5rem;
 	}
-	.artist-name {
+
+	.artwork-preview {
+		background: var(--color-surface-secondary, #f8f9fa);
+		border: 1px solid var(--color-border, #e5e7eb);
+		border-radius: 8px;
+		padding: 1rem;
+		max-height: 400px;
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
-		font-size: 0.85rem;
-		background: #f3f4f6;
-		color: #222;
-		border-radius: 0.375rem;
-		padding: 0.15rem 0.5rem;
+		justify-content: center;
+		overflow: hidden;
 	}
-	.artist-avatar {
-		width: 1.5rem;
-		height: 1.5rem;
-		border-radius: 9999px;
-		object-fit: cover;
-		margin-right: 0.25rem;
+
+	.media-content {
+		max-width: 100%;
+		max-height: 100%;
+		width: auto;
+		height: auto;
+		object-fit: contain;
+		border-radius: 4px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	}
+
+	.no-media-placeholder {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 200px;
+		background: var(--color-surface-tertiary, #f3f4f6);
+		border: 2px dashed var(--color-border, #d1d5db);
+		border-radius: 8px;
+	}
+
+	.no-media-content {
+		text-align: center;
+		color: var(--color-text-secondary, #6b7280);
+	}
+
+	/* Dark mode support */
+	:global(.dark) .artwork-preview {
+		background: var(--color-surface-secondary-dark, #1f2937);
+		border-color: var(--color-border-dark, #374151);
+	}
+
+	:global(.dark) .no-media-placeholder {
+		background: var(--color-surface-tertiary-dark, #111827);
+		border-color: var(--color-border-dark, #374151);
+	}
+
+	:global(.dark) .no-media-content {
+		color: var(--color-text-secondary-dark, #9ca3af);
 	}
 </style>

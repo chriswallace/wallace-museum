@@ -6,6 +6,8 @@ import type {
   ImportResult 
 } from '../types/indexing';
 import { pinCidToPinata, extractCidsFromArtwork, convertToIpfsUrl } from '$lib/pinataHelpers';
+import { isProblematicThumbnail } from '$lib/constants/tezos';
+import { EnhancedFieldProcessor } from '../enhanced-field-processor';
 
 // Unified indexer format (stored as json string in database)
 export interface IndexerData {
@@ -84,9 +86,11 @@ export interface IndexerData {
 // Main unified indexer class
 export class UnifiedIndexer {
   private prisma: PrismaClient;
+  private fieldProcessor: EnhancedFieldProcessor;
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
+    this.fieldProcessor = new EnhancedFieldProcessor();
   }
 
   /**
@@ -111,7 +115,26 @@ export class UnifiedIndexer {
 
     const nftUid = `${finalContractAddress}:${finalTokenId}`;
 
-    // Store in ArtworkIndex
+    // Check if record already exists
+    const existingRecord = await this.prisma.artworkIndex.findUnique({
+      where: { nftUid }
+    });
+
+    if (existingRecord) {
+      // Record already exists - don't overwrite during import
+      // Only update lastAttempt to track that we tried to import this
+      await this.prisma.artworkIndex.update({
+        where: { id: existingRecord.id },
+        data: {
+          lastAttempt: new Date()
+        }
+      });
+      
+      console.log(`[UnifiedIndexer] Skipping existing index record for ${nftUid} to preserve indexed data`);
+      return { indexId: existingRecord.id, nftUid };
+    }
+
+    // Store in ArtworkIndex - only create new records
     const indexData = {
       nftUid,
       blockchain,
@@ -123,17 +146,8 @@ export class UnifiedIndexer {
       importStatus: 'pending' as ImportStatus
     };
 
-    // Upsert the index record
-    const indexed = await this.prisma.artworkIndex.upsert({
-      where: { nftUid },
-      update: {
-        rawResponse: indexData.rawResponse,
-        normalizedData: indexData.normalizedData,
-        dataSource: source,
-        blockchain,
-        lastAttempt: new Date()
-      },
-      create: indexData
+    const indexed = await this.prisma.artworkIndex.create({
+      data: indexData
     });
 
     return { indexId: indexed.id, nftUid };
@@ -144,40 +158,61 @@ export class UnifiedIndexer {
    */
   async processIndexedData(indexId: number): Promise<ImportResult> {
     const indexRecord = await this.prisma.artworkIndex.findUnique({
-      where: { id: indexId }
+      where: { id: indexId },
+      include: {
+        artwork: true
+      }
     });
 
     if (!indexRecord) {
-      throw new Error('Index record not found');
-    }
-
-    // Parse the normalized data properly
-    let indexerData: IndexerData;
-    try {
-      if (typeof indexRecord.normalizedData === 'string') {
-        indexerData = JSON.parse(indexRecord.normalizedData);
-      } else {
-        indexerData = indexRecord.normalizedData as unknown as IndexerData;
-      }
-    } catch (error) {
-      throw new Error('Failed to parse normalized data');
+      throw new Error(`Index record ${indexId} not found`);
     }
 
     const result: ImportResult = {
-      success: true,
+      success: false,
       errors: [],
       createdRecords: {}
     };
 
     try {
+      // Get the normalized data with proper type conversion
+      const indexerData = indexRecord.normalizedData as unknown as IndexerData;
+      
+      if (!indexerData) {
+        throw new Error('No normalized data found in index record');
+      }
+
+      // Use enhanced field processor to extract missing fields
+      const enhancedFields = await this.fieldProcessor.processArtworkFields(
+        indexRecord.rawResponse, 
+        indexRecord.blockchain
+      );
+
+      // Merge enhanced fields with existing indexer data
+      const mergedData = {
+        ...indexerData,
+        // Override with enhanced fields if they provide better data
+        mime: enhancedFields.mime || indexerData.mime,
+        dimensions: enhancedFields.dimensions || indexerData.dimensions,
+        attributes: enhancedFields.attributes || indexerData.attributes,
+        features: enhancedFields.features || indexerData.features,
+        supply: enhancedFields.supply || indexerData.supply,
+        generatorUrl: enhancedFields.generatorUrl || indexerData.generatorUrl,
+        // Ensure we have the best media URLs
+        imageUrl: enhancedFields.imageUrl || indexerData.imageUrl,
+        animationUrl: enhancedFields.animationUrl || indexerData.animationUrl,
+        thumbnailUrl: enhancedFields.thumbnailUrl || indexerData.thumbnailUrl,
+        metadataUrl: enhancedFields.metadataUrl || indexerData.metadataUrl
+      };
+
       // Step 1: Create/update Artist with wallet addresses stored as JSON
       let artistId: number | undefined;
 
-      if (indexerData.creator?.address) {
+      if (mergedData.creator?.address) {
         try {
           // Create or find artist by wallet address
-          const creatorAddress = indexerData.creator.address.toLowerCase();
-          const baseArtistName = indexerData.creator.username || `Artist_${creatorAddress.slice(-8)}`;
+          const creatorAddress = mergedData.creator.address.toLowerCase();
+          const baseArtistName = mergedData.creator.username || `Artist_${creatorAddress.slice(-8)}`;
           
           // First, search all artists to find one with this wallet address
           let artist: any = null;
@@ -224,21 +259,21 @@ export class UnifiedIndexer {
               artist = await this.prisma.artist.create({
                 data: {
                   name: artistName,
-                  bio: indexerData.creator.bio,
-                  description: indexerData.creator.description,
-                  username: indexerData.creator.username,
-                  displayName: indexerData.creator.displayName,
-                  ensName: indexerData.creator.ensName,
-                  isVerified: indexerData.creator.isVerified || false,
-                  avatarUrl: indexerData.creator.avatarUrl,
-                  profileUrl: indexerData.creator.profileUrl,
-                  websiteUrl: indexerData.creator.websiteUrl,
-                  twitterHandle: indexerData.creator.twitterHandle || indexerData.creator.socialLinks?.twitter,
-                  instagramHandle: indexerData.creator.instagramHandle || indexerData.creator.socialLinks?.instagram,
-                  profileData: indexerData.creator.profileData as any,
-                  resolutionSource: indexerData.creator.resolutionSource,
-                  resolvedAt: indexerData.creator.resolutionSource ? new Date() : undefined,
-                  socialLinks: indexerData.creator.socialLinks as any,
+                  bio: mergedData.creator.bio,
+                  description: mergedData.creator.description,
+                  username: mergedData.creator.username,
+                  displayName: mergedData.creator.displayName,
+                  ensName: mergedData.creator.ensName,
+                  isVerified: mergedData.creator.isVerified || false,
+                  avatarUrl: mergedData.creator.avatarUrl,
+                  profileUrl: mergedData.creator.profileUrl,
+                  websiteUrl: mergedData.creator.websiteUrl,
+                  twitterHandle: mergedData.creator.twitterHandle || mergedData.creator.socialLinks?.twitter,
+                  instagramHandle: mergedData.creator.instagramHandle || mergedData.creator.socialLinks?.instagram,
+                  profileData: mergedData.creator.profileData as any,
+                  resolutionSource: mergedData.creator.resolutionSource,
+                  resolvedAt: mergedData.creator.resolutionSource ? new Date() : undefined,
+                  socialLinks: mergedData.creator.socialLinks as any,
                   walletAddresses: walletAddresses as any
                 }
               });
@@ -281,21 +316,21 @@ export class UnifiedIndexer {
                 where: { id: artist.id },
                 data: {
                   updatedAt: new Date(),
-                  bio: indexerData.creator.bio || artist.bio,
-                  description: indexerData.creator.description || artist.description,
-                  username: indexerData.creator.username || artist.username,
-                  displayName: indexerData.creator.displayName || artist.displayName,
-                  ensName: indexerData.creator.ensName || artist.ensName,
-                  isVerified: indexerData.creator.isVerified ?? artist.isVerified,
-                  avatarUrl: indexerData.creator.avatarUrl || artist.avatarUrl,
-                  profileUrl: indexerData.creator.profileUrl || artist.profileUrl,
-                  websiteUrl: indexerData.creator.websiteUrl || artist.websiteUrl,
-                  twitterHandle: indexerData.creator.twitterHandle || indexerData.creator.socialLinks?.twitter || artist.twitterHandle,
-                  instagramHandle: indexerData.creator.instagramHandle || indexerData.creator.socialLinks?.instagram || artist.instagramHandle,
-                  profileData: (indexerData.creator.profileData || artist.profileData) as any,
-                  resolutionSource: indexerData.creator.resolutionSource || artist.resolutionSource,
-                  resolvedAt: indexerData.creator.resolutionSource && !artist.resolvedAt ? new Date() : artist.resolvedAt,
-                  socialLinks: (indexerData.creator.socialLinks || artist.socialLinks) as any,
+                  bio: mergedData.creator.bio || artist.bio,
+                  description: mergedData.creator.description || artist.description,
+                  username: mergedData.creator.username || artist.username,
+                  displayName: mergedData.creator.displayName || artist.displayName,
+                  ensName: mergedData.creator.ensName || artist.ensName,
+                  isVerified: mergedData.creator.isVerified ?? artist.isVerified,
+                  avatarUrl: mergedData.creator.avatarUrl || artist.avatarUrl,
+                  profileUrl: mergedData.creator.profileUrl || artist.profileUrl,
+                  websiteUrl: mergedData.creator.websiteUrl || artist.websiteUrl,
+                  twitterHandle: mergedData.creator.twitterHandle || mergedData.creator.socialLinks?.twitter || artist.twitterHandle,
+                  instagramHandle: mergedData.creator.instagramHandle || mergedData.creator.socialLinks?.instagram || artist.instagramHandle,
+                  profileData: (mergedData.creator.profileData || artist.profileData) as any,
+                  resolutionSource: mergedData.creator.resolutionSource || artist.resolutionSource,
+                  resolvedAt: mergedData.creator.resolutionSource && !artist.resolvedAt ? new Date() : artist.resolvedAt,
+                  socialLinks: (mergedData.creator.socialLinks || artist.socialLinks) as any,
                   walletAddresses: updatedWallets as any
                 }
               });
@@ -322,73 +357,73 @@ export class UnifiedIndexer {
       // Step 2: Create/update Collection
       let collectionId: number | undefined;
       
-      if (indexerData.collection) {
+      if (mergedData.collection) {
         try {
-          const collectionSlug = indexerData.collection.slug;
+          const collectionSlug = mergedData.collection.slug;
           const collection = await this.prisma.collection.upsert({
             where: { slug: collectionSlug },
             update: {
-              title: indexerData.collection.title || collectionSlug,
-              description: indexerData.collection.description,
-              websiteUrl: indexerData.collection.websiteUrl,
-              projectUrl: indexerData.collection.projectUrl,
-              mediumUrl: indexerData.collection.mediumUrl,
-              imageUrl: indexerData.collection.imageUrl,
-              bannerImageUrl: indexerData.collection.bannerImageUrl,
-              discordUrl: indexerData.collection.discordUrl,
-              telegramUrl: indexerData.collection.telegramUrl,
-              chainIdentifier: indexerData.collection.chainIdentifier,
-              contractAddresses: indexerData.collection.contractAddresses as any,
-              safelistStatus: indexerData.collection.safelistStatus,
-              fees: indexerData.collection.fees as any,
-              artBlocksProjectId: indexerData.collection.artBlocksProjectId,
-              fxhashProjectId: indexerData.collection.fxhashProjectId,
-              projectNumber: indexerData.collection.projectNumber,
-              collectionCreator: indexerData.collection.collectionCreator,
-              curatorAddress: indexerData.collection.curatorAddress,
-              parentContract: indexerData.collection.parentContract || indexerData.collection.contractAddress,
-              totalSupply: indexerData.collection.totalSupply,
-              currentSupply: indexerData.collection.currentSupply,
-              mintStartDate: indexerData.collection.mintStartDate ? new Date(indexerData.collection.mintStartDate) : undefined,
-              mintEndDate: indexerData.collection.mintEndDate ? new Date(indexerData.collection.mintEndDate) : undefined,
-              floorPrice: indexerData.collection.floorPrice,
-              volumeTraded: indexerData.collection.volumeTraded,
-              externalCollectionId: indexerData.collection.externalCollectionId,
-              isGenerativeArt: indexerData.collection.isGenerativeArt || false,
-              isSharedContract: indexerData.collection.isSharedContract || false,
+              title: mergedData.collection.title || collectionSlug,
+              description: mergedData.collection.description,
+              websiteUrl: mergedData.collection.websiteUrl,
+              projectUrl: mergedData.collection.projectUrl,
+              mediumUrl: mergedData.collection.mediumUrl,
+              imageUrl: mergedData.collection.imageUrl,
+              bannerImageUrl: mergedData.collection.bannerImageUrl,
+              discordUrl: mergedData.collection.discordUrl,
+              telegramUrl: mergedData.collection.telegramUrl,
+              chainIdentifier: mergedData.collection.chainIdentifier,
+              contractAddresses: mergedData.collection.contractAddresses as any,
+              safelistStatus: mergedData.collection.safelistStatus,
+              fees: mergedData.collection.fees as any,
+              artBlocksProjectId: mergedData.collection.artBlocksProjectId,
+              fxhashProjectId: mergedData.collection.fxhashProjectId,
+              projectNumber: mergedData.collection.projectNumber,
+              collectionCreator: mergedData.collection.collectionCreator,
+              curatorAddress: mergedData.collection.curatorAddress,
+              parentContract: mergedData.collection.parentContract || mergedData.collection.contractAddress,
+              totalSupply: mergedData.collection.totalSupply,
+              currentSupply: mergedData.collection.currentSupply,
+              mintStartDate: mergedData.collection.mintStartDate ? new Date(mergedData.collection.mintStartDate) : undefined,
+              mintEndDate: mergedData.collection.mintEndDate ? new Date(mergedData.collection.mintEndDate) : undefined,
+              floorPrice: mergedData.collection.floorPrice,
+              volumeTraded: mergedData.collection.volumeTraded,
+              externalCollectionId: mergedData.collection.externalCollectionId,
+              isGenerativeArt: mergedData.collection.isGenerativeArt || false,
+              isSharedContract: mergedData.collection.isSharedContract || false,
               lastSyncedAt: new Date()
             },
             create: {
               slug: collectionSlug,
-              title: indexerData.collection.title || collectionSlug,
-              description: indexerData.collection.description,
-              websiteUrl: indexerData.collection.websiteUrl,
-              projectUrl: indexerData.collection.projectUrl,
-              mediumUrl: indexerData.collection.mediumUrl,
-              imageUrl: indexerData.collection.imageUrl,
-              bannerImageUrl: indexerData.collection.bannerImageUrl,
-              discordUrl: indexerData.collection.discordUrl,
-              telegramUrl: indexerData.collection.telegramUrl,
-              chainIdentifier: indexerData.collection.chainIdentifier,
-              contractAddresses: indexerData.collection.contractAddresses as any,
-              safelistStatus: indexerData.collection.safelistStatus,
-              fees: indexerData.collection.fees as any,
-              artBlocksProjectId: indexerData.collection.artBlocksProjectId,
-              fxhashProjectId: indexerData.collection.fxhashProjectId,
-              projectNumber: indexerData.collection.projectNumber,
-              collectionCreator: indexerData.collection.collectionCreator,
-              curatorAddress: indexerData.collection.curatorAddress,
-              parentContract: indexerData.collection.parentContract || indexerData.collection.contractAddress,
-              totalSupply: indexerData.collection.totalSupply,
-              currentSupply: indexerData.collection.currentSupply,
-              mintStartDate: indexerData.collection.mintStartDate ? new Date(indexerData.collection.mintStartDate) : undefined,
-              mintEndDate: indexerData.collection.mintEndDate ? new Date(indexerData.collection.mintEndDate) : undefined,
-              floorPrice: indexerData.collection.floorPrice,
-              volumeTraded: indexerData.collection.volumeTraded,
-              externalCollectionId: indexerData.collection.externalCollectionId,
+              title: mergedData.collection.title || collectionSlug,
+              description: mergedData.collection.description,
+              websiteUrl: mergedData.collection.websiteUrl,
+              projectUrl: mergedData.collection.projectUrl,
+              mediumUrl: mergedData.collection.mediumUrl,
+              imageUrl: mergedData.collection.imageUrl,
+              bannerImageUrl: mergedData.collection.bannerImageUrl,
+              discordUrl: mergedData.collection.discordUrl,
+              telegramUrl: mergedData.collection.telegramUrl,
+              chainIdentifier: mergedData.collection.chainIdentifier,
+              contractAddresses: mergedData.collection.contractAddresses as any,
+              safelistStatus: mergedData.collection.safelistStatus,
+              fees: mergedData.collection.fees as any,
+              artBlocksProjectId: mergedData.collection.artBlocksProjectId,
+              fxhashProjectId: mergedData.collection.fxhashProjectId,
+              projectNumber: mergedData.collection.projectNumber,
+              collectionCreator: mergedData.collection.collectionCreator,
+              curatorAddress: mergedData.collection.curatorAddress,
+              parentContract: mergedData.collection.parentContract || mergedData.collection.contractAddress,
+              totalSupply: mergedData.collection.totalSupply,
+              currentSupply: mergedData.collection.currentSupply,
+              mintStartDate: mergedData.collection.mintStartDate ? new Date(mergedData.collection.mintStartDate) : undefined,
+              mintEndDate: mergedData.collection.mintEndDate ? new Date(mergedData.collection.mintEndDate) : undefined,
+              floorPrice: mergedData.collection.floorPrice,
+              volumeTraded: mergedData.collection.volumeTraded,
+              externalCollectionId: mergedData.collection.externalCollectionId,
               enabled: true,
-              isGenerativeArt: indexerData.collection.isGenerativeArt || false,
-              isSharedContract: indexerData.collection.isSharedContract || false,
+              isGenerativeArt: mergedData.collection.isGenerativeArt || false,
+              isSharedContract: mergedData.collection.isSharedContract || false,
               lastSyncedAt: new Date()
             }
           });
@@ -419,9 +454,9 @@ export class UnifiedIndexer {
 
       // Step 4: For imported artworks, pass through original IPFS URLs without modification
       // Only pin the CIDs to Pinata without uploading/transforming the media files
-      let processedImageUrl = indexerData.imageUrl;
-      let processedThumbnailUrl = indexerData.thumbnailUrl;
-      let processedAnimationUrl = indexerData.animationUrl;
+      let processedImageUrl = mergedData.imageUrl;
+      let processedThumbnailUrl = mergedData.thumbnailUrl;
+      let processedAnimationUrl = mergedData.animationUrl;
 
       // Only process media uploads for imported artworks, not indexed ones
       // This ensures media files are uploaded to Pinata with the group ID during import
@@ -430,26 +465,26 @@ export class UnifiedIndexer {
         // The media processing and upload to Pinata is skipped to preserve original IPFS URLs
         
         // Keep original URLs as-is
-        processedImageUrl = indexerData.imageUrl;
-        processedThumbnailUrl = indexerData.thumbnailUrl;
-        processedAnimationUrl = indexerData.animationUrl;
+        processedImageUrl = mergedData.imageUrl;
+        processedThumbnailUrl = mergedData.thumbnailUrl;
+        processedAnimationUrl = mergedData.animationUrl;
       }
 
       // Step 5: Create/update Artwork (this is the import step)
       // Parse mint date if available
       let mintDate: Date | undefined;
-      if (indexerData.mintDate) {
-        console.log(`[UnifiedIndexer] Processing mint date for ${indexRecord.contractAddress}:${indexRecord.tokenId}: ${indexerData.mintDate}`);
+      if (mergedData.mintDate) {
+        console.log(`[UnifiedIndexer] Processing mint date for ${indexRecord.contractAddress}:${indexRecord.tokenId}: ${mergedData.mintDate}`);
         try {
-          mintDate = new Date(indexerData.mintDate);
+          mintDate = new Date(mergedData.mintDate);
           if (isNaN(mintDate.getTime())) {
-            console.warn(`[UnifiedIndexer] Invalid mint date (NaN) for ${indexRecord.contractAddress}:${indexRecord.tokenId}: ${indexerData.mintDate}`);
+            console.warn(`[UnifiedIndexer] Invalid mint date (NaN) for ${indexRecord.contractAddress}:${indexRecord.tokenId}: ${mergedData.mintDate}`);
             mintDate = undefined;
           } else {
             console.log(`[UnifiedIndexer] Successfully parsed mint date: ${mintDate.toISOString()}`);
           }
         } catch (error) {
-          console.error(`[UnifiedIndexer] Failed to parse mint date for ${indexRecord.contractAddress}:${indexRecord.tokenId}: ${indexerData.mintDate}`, error);
+          console.error(`[UnifiedIndexer] Failed to parse mint date for ${indexRecord.contractAddress}:${indexRecord.tokenId}: ${mergedData.mintDate}`, error);
           mintDate = undefined;
         }
       } else {
@@ -457,22 +492,19 @@ export class UnifiedIndexer {
       }
 
       const baseArtworkData = {
-        title: indexerData.title,
-        description: indexerData.description,
+        title: mergedData.title,
+        description: mergedData.description,
         contractAddress: indexRecord.contractAddress,
         tokenId: indexRecord.tokenId,
         blockchain: indexRecord.blockchain,
-        tokenStandard: indexerData.tokenStandard,
+        tokenStandard: mergedData.tokenStandard,
         imageUrl: processedImageUrl,
         thumbnailUrl: (() => {
-          // Check if thumbnail is the generic circle image from Tezos
-          const GENERIC_CIRCLE_IPFS = 'ipfs://QmNrhZHUaEqxhyLfqoq1mtHSipkWHeT31LNHb1QEbDHgnc';
-          
-          // If we have the generic circle thumbnail, use the display/artifact image instead
-          if (processedThumbnailUrl === GENERIC_CIRCLE_IPFS || 
-              indexerData.thumbnailUrl === GENERIC_CIRCLE_IPFS) {
-            console.log(`[UnifiedIndexer] Detected generic circle thumbnail for ${indexRecord.contractAddress}:${indexRecord.tokenId}, using display/artifact image instead`);
-            return processedImageUrl || indexerData.imageUrl;
+          // If we have a problematic thumbnail, use the display/artifact image instead
+          if (isProblematicThumbnail(processedThumbnailUrl) || 
+              isProblematicThumbnail(mergedData.thumbnailUrl)) {
+            console.log(`[UnifiedIndexer] Detected problematic thumbnail for ${indexRecord.contractAddress}:${indexRecord.tokenId}, using display/artifact image instead`);
+            return processedImageUrl || mergedData.imageUrl;
           }
           
           // Don't store thumbnail URL if it's the same as the image URL
@@ -482,7 +514,7 @@ export class UnifiedIndexer {
           }
           
           // Don't store thumbnail URL if it's the same as the original image URL
-          if (processedThumbnailUrl && indexerData.imageUrl && processedThumbnailUrl === indexerData.imageUrl) {
+          if (processedThumbnailUrl && mergedData.imageUrl && processedThumbnailUrl === mergedData.imageUrl) {
             console.log(`[UnifiedIndexer] Thumbnail URL is same as original image URL for ${indexRecord.contractAddress}:${indexRecord.tokenId}, storing null to avoid duplication`);
             return null;
           }
@@ -491,14 +523,14 @@ export class UnifiedIndexer {
           return processedThumbnailUrl || null;
         })(),
         animationUrl: processedAnimationUrl,
-        generatorUrl: indexerData.generatorUrl,
-        metadataUrl: indexerData.metadataUrl,
-        mime: indexerData.mime,
-        supply: indexerData.supply,
+        generatorUrl: mergedData.generatorUrl,
+        metadataUrl: mergedData.metadataUrl,
+        mime: mergedData.mime,
+        supply: mergedData.supply,
         mintDate: mintDate,
-        dimensions: indexerData.dimensions ? indexerData.dimensions : undefined,
-        attributes: indexerData.attributes || undefined,
-        features: indexerData.features || undefined,
+        dimensions: mergedData.dimensions ? mergedData.dimensions : undefined,
+        attributes: mergedData.attributes || undefined,
+        features: mergedData.features || undefined,
         uid: indexRecord.nftUid
       };
 
@@ -575,25 +607,25 @@ export class UnifiedIndexer {
         // Don't fail the import if pinning fails
       }
 
-      return result;
+      result.success = true;
 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[UnifiedIndexer] Error processing index ${indexId}:`, error);
+      if (result.errors) {
+        result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+      }
       
+      // Update index record with error
       await this.prisma.artworkIndex.update({
         where: { id: indexId },
         data: {
           importStatus: 'failed',
-          errorMessage
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
         }
       });
-
-      return {
-        success: false,
-        errors: [errorMessage],
-        createdRecords: {}
-      };
     }
+
+    return result;
   }
 
   /**

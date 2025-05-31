@@ -39,14 +39,14 @@ export class EthereumNFTEnricher {
 
   constructor(apiKey: string, rateLimiter?: IntelligentRateLimiter) {
     this.apiKey = apiKey;
-    // Use provided rate limiter or create a new one with conservative settings
+    // Use provided rate limiter or create a new one with reasonable settings for ~1 req/sec
     this.rateLimiter = rateLimiter || new IntelligentRateLimiter({
       baseDelay: 1000,     // 1 second between calls
-      maxDelay: 30000,     // Max 30 seconds
-      backoffMultiplier: 2.5,
+      maxDelay: 10000,     // Max 10 seconds (reduced from 30s)
+      backoffMultiplier: 1.5, // Gentler backoff (reduced from 2.5)
       maxRetries: 5,
       batchSize: 5,
-      adaptiveThreshold: 2
+      adaptiveThreshold: 3 // Less sensitive adjustments (increased from 2)
     });
   }
 

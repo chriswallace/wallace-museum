@@ -46,10 +46,10 @@ async function processWallet(
 				}
 			);
 			
-			console.log(`[ProcessWallet] Fetched ${ownedNFTs.length} NFTs for ${walletAddress}`);
+			console.log(`[ProcessWallet] Fetched ${ownedNFTs.length} owned NFTs for ${walletAddress}`);
 			
-			// Store NFTs in database
-			const storeResult = await dbOps.batchStoreNFTs(ownedNFTs);
+			// Store NFTs in database with type and wallet address
+			const storeResult = await dbOps.batchStoreNFTs(ownedNFTs, 'owned', walletAddress);
 			
 			result.indexed = storeResult.stored;
 			result.new = storeResult.stored;
@@ -73,22 +73,17 @@ async function processWallet(
 				'created'
 			);
 			
-			// Combine and deduplicate NFTs
-			const allNFTs = [...ownedNFTs, ...createdNFTs];
-			const uniqueNFTs = allNFTs.filter((nft, index, self) => 
-				index === self.findIndex(n => 
-					n.contractAddress === nft.contractAddress && n.tokenId === nft.tokenId
-				)
-			);
+			console.log(`[ProcessWallet] Fetched ${ownedNFTs.length} owned + ${createdNFTs.length} created NFTs for ${walletAddress}`);
 			
-			console.log(`[ProcessWallet] Fetched ${uniqueNFTs.length} unique NFTs for ${walletAddress} (${ownedNFTs.length} owned + ${createdNFTs.length} created)`);
+			// Store owned NFTs
+			const ownedStoreResult = await dbOps.batchStoreNFTs(ownedNFTs, 'owned', walletAddress);
 			
-			// Store NFTs in database
-			const storeResult = await dbOps.batchStoreNFTs(uniqueNFTs);
+			// Store created NFTs
+			const createdStoreResult = await dbOps.batchStoreNFTs(createdNFTs, 'created', walletAddress);
 			
-			result.indexed = storeResult.stored;
-			result.new = storeResult.stored;
-			result.errors = storeResult.errors.map(e => e.error);
+			result.indexed = ownedStoreResult.stored + createdStoreResult.stored;
+			result.new = ownedStoreResult.stored + createdStoreResult.stored;
+			result.errors = [...ownedStoreResult.errors.map(e => e.error), ...createdStoreResult.errors.map(e => e.error)];
 		}
 
 		// Get final stats

@@ -170,10 +170,7 @@
 <div class="optimized-image-container {className}" {style}>
 	<!-- Skeleton loader -->
 	{#if shouldShowSkeleton}
-		<div 
-			class="skeleton-wrapper {isLoaded ? 'hidden' : ''}"
-			style={calculatedAspectRatio ? `aspect-ratio: ${calculatedAspectRatio}; position: relative;` : 'min-height: 200px; position: relative;'}
-		>
+		<div class="skeleton-wrapper {isLoaded ? 'hidden' : ''}">
 			<SkeletonLoader 
 				width="100%"
 				height="100%"
@@ -192,7 +189,6 @@
 			{alt}
 			{loading}
 			class={`${className} ${!isLoaded ? 'loading' : 'loaded'}`}
-			style={calculatedAspectRatio && !isLoaded ? `aspect-ratio: ${calculatedAspectRatio};` : ''}
 			on:load={handleLoad}
 			on:error={handleError}
 			{...$$restProps}
@@ -203,14 +199,22 @@
 <style>
 	.optimized-image-container {
 		position: relative;
-		display: block;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		width: 100%;
+		height: 100%;
+		max-width: 100%;
+		max-height: 100%;
 	}
 
 	.skeleton-wrapper {
 		width: 100%;
+		height: 100%;
 		z-index: 1;
-		position: relative;
+		position: absolute;
+		top: 0;
+		left: 0;
 		transition: opacity 0.3s ease-in-out;
 	}
 
@@ -224,20 +228,24 @@
 	}
 
 	img {
+		@apply mx-auto;
 		display: block;
-		max-width: 100%;
-		height: auto;
 		position: relative;
 		z-index: 2;
-		width: 100%;
 		transition: opacity 0.3s ease-in-out;
+		max-width: 100%;
+		max-height: 100%;
+		width: auto;
+		height: auto;
+		object-fit: contain;
 	}
 
 	img.loading {
 		opacity: 0;
 		position: absolute;
-		top: 0;
-		left: 0;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
 	}
 
 	img.loaded {

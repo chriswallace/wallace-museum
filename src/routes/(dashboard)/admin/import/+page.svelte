@@ -3,6 +3,8 @@
 	import type { Artwork } from '$lib/stores';
 
 	import WalletAddressManager from '$lib/components/WalletAddressManager.svelte';
+	import ImportArtworkCard from '$lib/components/ImportArtworkCard.svelte';
+	import ImportArtworkGrid from '$lib/components/ImportArtworkGrid.svelte';
 	import { finalizeImport } from '$lib/importHandler';
 	import { get } from 'svelte/store';
 	import { onMount } from 'svelte';
@@ -60,6 +62,8 @@
 		thumbnail_uri?: string;
 		displayUrl?: string;
 		artifactUrl?: string;
+		// Add MIME type for proper media detection
+		mime?: string | null;
 		[key: string]: any;
 	};
 
@@ -85,6 +89,8 @@
 	let searchTerm = '';
 	let viewMode: 'grid' | 'list' = 'grid'; // 'grid' or 'list'
 	let selectAll = false;
+	// Add tab state for filtering
+	let activeTab: 'owned' | 'created' = 'owned'; // Changed from 'all' to default to 'owned'
 
 	// Debug mode for skeleton loading
 	let debugSkeletonMode = false;
@@ -153,78 +159,38 @@
 	}
 
 	// Search indexed artworks
-	async function searchArtworks(resetOffset = true) {
-		if (resetOffset) {
+	async function searchArtworks(reset = false) {
+		if (reset) {
 			currentOffset = 0;
-			// Clear previous results if starting a new search
 			searchResults = [];
-			// Clear selection when starting a new search
-			selectedIdsStore.set([]);
-			selectedArtworksStore.set([]);
 		}
 
 		isSearching = true;
 
 		try {
-			// Build the URL with query parameters - always use 'all' filter since tabs are removed
-			let url = `/api/admin/search?offset=${currentOffset}&limit=48&fields=title,description,contractAlias,contractAddr&filter=all`;
+			const params = new URLSearchParams({
+				q: searchTerm,
+				limit: '20',
+				offset: currentOffset.toString(),
+				type: activeTab // Use the new type parameter instead of filter
+			});
 
-			// Only add search term if it's not empty
-			if (searchTerm) {
-				// No need to modify search term for quotes - the backend should handle quoted phrases
-				url += `&q=${encodeURIComponent(searchTerm)}`;
-			}
-
-			const response = await fetch(url);
-			
-			// Check if the response status is OK
-			if (!response.ok) {
-				throw new Error(`Search API returned ${response.status}: ${response.statusText}`);
-			}
-			
+			const response = await fetch(`/api/admin/search?${params}`);
 			const data = await response.json();
 
-			// Add validation
-			if (!data.results || !Array.isArray(data.results)) {
-				throw new Error('Invalid search response format: missing or non-array results');
+			if (data.results) {
+				if (reset) {
+					searchResults = data.results;
+				} else {
+					searchResults = [...searchResults, ...data.results];
+				}
+
+				totalResults = data.total;
+				currentOffset = data.offset + data.results.length;
+				hasMore = data.results.length === 20; // If we got a full page, there might be more
 			}
-
-			// Process results and handle pagination
-			if (resetOffset) {
-				searchResults = data.results;
-			} else {
-				searchResults = [...searchResults, ...data.results];
-			}
-
-			// If we already have selected items, filter out any that are no longer in the search results
-			if (selectedIds.length > 0) {
-				// Get all current result IDs
-				const resultIds = searchResults.map((art) => art.id);
-
-				// Filter selected items to only include those still in the results
-				selectedIdsStore.update((ids) => ids.filter((id) => resultIds.includes(id)));
-				selectedArtworksStore.update((artworks) =>
-					artworks.filter((art) => resultIds.includes(art.id))
-				);
-			}
-
-			// Calculate hasMore based on whether we got fewer results than requested
-			hasMore = data.results.length === 48; // If we got the full limit, there might be more
-			currentOffset = currentOffset + data.results.length;
-			totalResults = data.total || 0;
-			
-			// Artist data is now included in the search results from indexing
 		} catch (error) {
 			console.error('Error searching artworks:', error);
-			toast.push(`Search error: ${error instanceof Error ? error.message : String(error)}`, {
-				theme: { '--toastBackground': 'var(--color-error)', '--toastColor': 'white' }
-			});
-			// Reset UI state on error
-			hasMore = false;
-			if (resetOffset) {
-				searchResults = [];
-				totalResults = 0;
-			}
 		} finally {
 			isSearching = false;
 		}
@@ -372,9 +338,26 @@
 
 	// Initial search on mount
 	onMount(() => {
-		searchArtworks();
+		// Initial search on page load
+		searchArtworks(true);
+
+		// Set up intersection observer for infinite scroll
+		if (loadMoreTrigger) {
+			observer = new IntersectionObserver(
+				(entries) => {
+					if (entries[0].isIntersecting && hasMore && !isSearching) {
+						searchArtworks(false); // Load more without reset
+					}
+				},
+				{ threshold: 0.1 }
+			);
+			observer.observe(loadMoreTrigger);
+		}
+
 		return () => {
-			if (observer) observer.disconnect();
+			if (observer) {
+				observer.disconnect();
+			}
 		};
 	});
 
@@ -387,6 +370,15 @@
 	$: selectAll = searchResults.length > 0 && selectedIds.length === searchResults.length;
 
 	// Artist data is now included in search results from indexing - no need to fetch separately
+
+	// Handle tab change
+	function handleTabChange(newTab: 'owned' | 'created') {
+		if (newTab !== activeTab) {
+			activeTab = newTab;
+			// Reset search when changing tabs
+			searchArtworks(true);
+		}
+	}
 
 	// Function to run the indexer
 	async function runIndexer(forceRefresh: boolean) {
@@ -837,16 +829,45 @@
 					class="w-full h-11 !pl-11 pr-3 mb-0 border dark:border-gray-700 rounded-md dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
 					placeholder="Search by title, description, or contract name. Use quotes for exact phrases."
 					bind:value={searchTerm}
-					on:keydown={(e) => e.key === 'Enter' && searchArtworks()}
+					on:keydown={(e) => e.key === 'Enter' && searchArtworks(true)}
 				/>
 			</div>
 		</div>
 		<div class="flex gap-2 md:gap-4 items-end">
 			<button
 				class="primary button py-2 px-6 h-11"
-				on:click={() => searchArtworks()}
+				on:click={() => searchArtworks(true)}
 				disabled={isSearching}>{isSearching ? 'Searching...' : 'Search'}</button
 			>
+		</div>
+	</div>
+
+	<!-- Filter Tabs -->
+	<div class="bg-white dark:bg-gray-800 p-4 rounded-md shadow-sm mb-6 border border-gray-200 dark:border-gray-700">
+		<div class="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+			<button
+				class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors {activeTab === 'owned'
+					? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+					: 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}"
+				on:click={() => handleTabChange('owned')}
+			>
+				Owned by Me
+			</button>
+			<button
+				class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors {activeTab === 'created'
+					? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+					: 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}"
+				on:click={() => handleTabChange('created')}
+			>
+				Created by Me
+			</button>
+		</div>
+		<div class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+			{#if activeTab === 'owned'}
+				Showing NFTs owned by your wallet addresses (excluding those you created)
+			{:else if activeTab === 'created'}
+				Showing NFTs where the creator address matches one of your wallet addresses
+			{/if}
 		</div>
 	</div>
 
@@ -932,322 +953,16 @@
 			</div>
 
 			<!-- Grid View -->
-			{#if viewMode === 'grid'}
-				<div class="masonry-grid">
-					{#each searchResults as artwork (artwork.id)}
-						<!-- svelte-ignore a11y-click-events-have-key-events -->
-						<div
-							class="masonry-item group bg-white dark:bg-gray-800 rounded-sm shadow-sm overflow-hidden transition-all duration-200"
-							class:opacity-50={artwork.isImported}
-							class:cursor-not-allowed={artwork.isImported}
-							class:cursor-pointer={!artwork.isImported}
-							class:hover:shadow-lg={!artwork.isImported}
-							class:selected={$selectedIdsStore.includes(artwork.id) && !artwork.isImported}
-							on:click={() => canSelect(artwork) && toggleSelection(artwork)}
-							role="button"
-							tabindex={canSelect(artwork) ? 0 : -1}
-						>
-							<div class="relative">
-								<OptimizedImage
-									src={debugSkeletonMode ? '' : getArtworkImageUrl(artwork)}
-									alt={getArtworkTitle(artwork)}
-									width={300}
-									height={artwork.dimensions ? Math.round((300 * artwork.dimensions.height) / artwork.dimensions.width) : 300}
-									format="webp"
-									quality={80}
-									aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
-									showSkeleton={true}
-									skeletonBorderRadius="8px"
-									className="w-full h-auto object-contain rounded-t-sm"
-									fallbackSrc="/images/medici-image.png"
-									loading="lazy"
-									on:error={handleImageError}
-								/>
-
-								<!-- Always show selection indicator when selected -->
-								{#if $selectedIdsStore.includes(artwork.id)}
-									<div
-										class="absolute top-3 right-3 bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-xl border-4 border-white dark:border-gray-800 z-20"
-									>
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											width="20"
-											height="20"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="3"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="20 6 9 17 4 12"></polyline>
-										</svg>
-									</div>
-								{:else if !artwork.isImported}
-									<!-- Unselected state indicator (shows on hover) -->
-									<div
-										class="absolute top-3 right-3 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-full w-8 h-8 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-70 transition-all duration-200 z-20"
-									>
-										<!-- Empty circle for unselected state -->
-									</div>
-								{/if}
-
-								<!-- Imported indicator (separate from selection) -->
-								{#if artwork.isImported}
-									<div
-										class="absolute top-3 left-3 bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-xl border-2 border-white dark:border-gray-800 z-20"
-										title="Already imported"
-									>
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											width="18"
-											height="18"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="3"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="20 6 9 17 4 12"></polyline>
-										</svg>
-									</div>
-								{/if}
-
-								<!-- IPFS indicator if artwork has IPFS content -->
-								{#if hasIpfsContent(artwork)}
-									<div
-										class="absolute bottom-3 right-3 bg-purple-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800 z-10"
-										title="Contains IPFS content"
-									>
-										<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-											<path
-												d="M12 2L4 6V12C4 15.31 7.58 18.5 12 20C16.42 18.5 20 15.31 20 12V6L12 2Z"
-											/>
-										</svg>
-									</div>
-								{/if}
-							</div>
-							<div class="p-3">
-								<h3 class="font-medium text-base truncate dark:text-gray-100" title={getArtworkTitle(artwork)}>
-									{getArtworkTitle(artwork)}
-								</h3>
-
-								<!-- Enhanced collection/artist info -->
-								{#if artwork.supportsArtistLookup}
-									{@const collectionInfo = getCollectionInfo(artwork)}
-									{@const artistInfo = getArtistInfo(artwork)}
-
-									<div class="space-y-1">
-										<!-- Collection name -->
-										{#if collectionInfo}
-											<div class="font-medium text-sm">
-												{collectionInfo.title || 'Unknown Collection'}
-											</div>
-										{:else}
-											<div class="font-medium text-sm">
-												{getContractName(artwork)}
-											</div>
-										{/if}
-
-										<!-- Artist info -->
-										{#if artistInfo}
-											<div class="flex items-center space-x-2">
-												{#if artistInfo.avatarUrl}
-													<div class="flex-shrink-0 w-5 h-5">
-														<OptimizedImage
-															src={debugSkeletonMode ? '' : artistInfo.avatarUrl}
-															alt={artistInfo.name}
-															width={20}
-															height={20}
-															fit="cover"
-															format="webp"
-															quality={85}
-															aspectRatio="1/1"
-															showSkeleton={true}
-															skeletonBorderRadius="50%"
-															className="w-full h-full rounded-full object-cover"
-															fallbackSrc="/images/medici-image.png"
-															on:error={handleImageError}
-														/>
-													</div>
-												{/if}
-												<span class="text-xs text-gray-500 dark:text-gray-400">
-													by {artistInfo.name}
-												</span>
-											</div>
-										{/if}
-									</div>
-								{:else}
-									<div class="text-xs text-gray-500 dark:text-gray-400 truncate">
-										{getContractName(artwork)}
-									</div>
-								{/if}
-
-								{#if getBlockchain(artwork)}
-									<div class="mt-1">
-										<span
-											class="blockchain-badge px-2 py-1 text-xs font-semibold rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-										>
-											{getBlockchain(artwork)}
-										</span>
-									</div>
-								{/if}
-							</div>
-						</div>
-					{/each}
-				</div>
-			{:else}
-				<!-- List View -->
-				<div class="overflow-x-auto">
-					<table class="w-full border-collapse bg-white dark:bg-gray-800 rounded-sm shadow-sm">
-						<thead>
-							<tr class="bg-gray-50 dark:bg-gray-700">
-								<th class="p-3 text-left dark:text-gray-300 w-10">
-									<input
-										type="checkbox"
-										checked={selectAllChecked}
-										on:change={toggleSelectAll}
-										class="checkbox"
-									/>
-								</th>
-								<th class="p-3 text-left dark:text-gray-300">Image</th>
-								<th class="p-3 text-left dark:text-gray-300">Title</th>
-								<th class="p-3 text-left dark:text-gray-300">Contract</th>
-								<th class="p-3 text-left dark:text-gray-300">Blockchain</th>
-								<th class="p-3 text-left dark:text-gray-300">Storage</th>
-							</tr>
-						</thead>
-						<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-							{#each searchResults as artwork (artwork.id)}
-								<tr
-									class="{$selectedIdsStore.includes(artwork.id) && !artwork.isImported
-										? 'bg-blue-50 dark:bg-blue-900/30'
-										: 'dark:bg-gray-800'} {artwork.isImported
-										? 'opacity-50'
-										: 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50'}"
-									on:click={() => canSelect(artwork) && toggleSelection(artwork)}
-								>
-									<td class="p-3">
-										{#if artwork.isImported}
-											<div class="flex items-center space-x-2">
-												<span class="text-green-600 font-medium text-sm">✓ Imported</span>
-											</div>
-										{:else}
-											<input
-												type="checkbox"
-												checked={$selectedIdsStore.includes(artwork.id)}
-												class="checkbox"
-												on:change={(e) => {
-													e.stopPropagation();
-													toggleSelection(artwork);
-												}}
-												on:click={(e) => e.stopPropagation()}
-											/>
-										{/if}
-									</td>
-									<td class="p-3 w-16">
-										<div class="w-12 h-12 overflow-hidden rounded-sm">
-											<div class="relative">
-												<OptimizedImage
-													src={debugSkeletonMode ? '' : getArtworkImageUrl(artwork)}
-													alt={getArtworkTitle(artwork)}
-													width={48}
-													height={48}
-													fit="cover"
-													format="webp"
-													quality={80}
-													aspectRatio="1/1"
-													showSkeleton={true}
-													skeletonBorderRadius="6px"
-													className="w-full h-full object-cover"
-													fallbackSrc="/images/medici-image.png"
-													loading="lazy"
-													on:error={handleImageError}
+			<ImportArtworkGrid
+				artworks={searchResults}
+				selectedIds={$selectedIdsStore}
+				onToggleSelection={toggleSelection}
+				{canSelect}
+				{debugSkeletonMode}
+				{viewMode}
+				{selectAllChecked}
+				onToggleSelectAll={toggleSelectAll}
 												/>
-											</div>
-										</div>
-									</td>
-									<td class="p-3">
-										<div class="font-medium dark:text-gray-100">{getArtworkTitle(artwork)}</div>
-										<div class="text-xs text-gray-500 dark:text-gray-400">
-											ID: {getTokenId(artwork)}
-										</div>
-									</td>
-									<td class="p-3 dark:text-gray-300">
-										<!-- Enhanced collection/artist info -->
-										{#if artwork.supportsArtistLookup}
-											{@const collectionInfo = getCollectionInfo(artwork)}
-											{@const artistInfo = getArtistInfo(artwork)}
-
-											<div class="space-y-1">
-												<!-- Collection name -->
-												{#if collectionInfo}
-													<div class="font-medium text-sm">
-														{collectionInfo.title || 'Unknown Collection'}
-													</div>
-												{:else}
-													<div class="font-medium text-sm">
-														{getContractName(artwork)}
-													</div>
-												{/if}
-
-												<!-- Artist info -->
-												{#if artistInfo}
-													<div class="flex items-center space-x-2">
-														{#if artistInfo.avatarUrl}
-															<div class="flex-shrink-0 w-5 h-5">
-																<OptimizedImage
-																	src={debugSkeletonMode ? '' : artistInfo.avatarUrl}
-																	alt={artistInfo.name}
-																	width={20}
-																	height={20}
-																	fit="cover"
-																	format="webp"
-																	quality={85}
-																	aspectRatio="1/1"
-																	showSkeleton={true}
-																	skeletonBorderRadius="50%"
-																	className="w-full h-full rounded-full object-cover"
-																	fallbackSrc="/images/medici-image.png"
-																	on:error={handleImageError}
-																/>
-															</div>
-														{/if}
-														<span class="text-xs text-gray-500 dark:text-gray-400">
-															by {artistInfo.name}
-														</span>
-													</div>
-												{/if}
-											</div>
-										{:else}
-											{getContractName(artwork)}
-										{/if}
-									</td>
-									<td class="p-3">
-										{#if getBlockchain(artwork)}
-											<span
-												class="blockchain-badge px-2 py-1 text-xs font-semibold rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-											>
-												{getBlockchain(artwork)}
-											</span>
-										{/if}
-									</td>
-									<td class="p-3">
-										{#if hasIpfsContent(artwork)}
-											<span
-												class="blockchain-badge px-2 py-1 text-xs font-semibold rounded-sm bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-											>
-												IPFS
-											</span>
-										{/if}
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			{/if}
 
 			<!-- Intersection observer trigger element -->
 			<div bind:this={loadMoreTrigger} class="h-10 mt-4"></div>
@@ -1341,107 +1056,5 @@
 
 	.checkbox {
 		@apply w-5 h-5 border-2 border-gray-300 dark:border-gray-600 rounded-md checked:bg-blue-500 checked:border-blue-500;
-	}
-
-	/* Masonry Grid Styles - Stable Layout */
-	.masonry-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 1rem;
-		align-items: start;
-	}
-
-	@media (min-width: 640px) {
-		.masonry-grid {
-			grid-template-columns: repeat(3, 1fr);
-		}
-	}
-
-	@media (min-width: 768px) {
-		.masonry-grid {
-			grid-template-columns: repeat(4, 1fr);
-		}
-	}
-
-	@media (min-width: 1024px) {
-		.masonry-grid {
-			grid-template-columns: repeat(5, 1fr);
-		}
-	}
-
-	@media (min-width: 1280px) {
-		.masonry-grid {
-			grid-template-columns: repeat(6, 1fr);
-		}
-	}
-
-	.masonry-item {
-		width: 100%;
-		transition: all 0.2s ease;
-		position: relative;
-	}
-
-	/* Hover effect for selectable items */
-	.masonry-item:not(.opacity-50):hover {
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-	}
-
-	/* Active state for click feedback */
-	.masonry-item:not(.opacity-50):active {
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-	}
-
-	/* Selection indicator hover effect */
-	.masonry-item:not(.opacity-50):hover .selection-indicator {
-		transform: scale(1.1);
-	}
-
-	/* Prevent layout shifts during loading */
-	.masonry-item img {
-		width: 100%;
-		height: auto;
-		display: block;
-	}
-
-	/* Ensure skeleton loaders are visible during loading */
-	.masonry-item .optimized-image-container {
-		min-height: 200px; /* Minimum height to show skeleton */
-		background: #f8fafc;
-		border-radius: 8px;
-	}
-
-	.masonry-item .optimized-image-container.dark {
-		background: #1e293b;
-	}
-
-	/* List view image containers */
-	.masonry-item td .optimized-image-container {
-		min-height: 48px;
-		width: 48px;
-		height: 48px;
-	}
-
-	/* Selection states */
-	.masonry-item.selected {
-		box-shadow: 0 0 0 4px rgb(59 130 246), 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-		border: 2px solid rgb(59 130 246);
-	}
-
-	.masonry-item:not(.selected):not(.opacity-50):hover {
-		box-shadow: 0 0 0 2px rgb(147 197 253 / 0.5), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-	}
-
-	.masonry-item.ring-4 {
-		box-shadow: 0 0 0 4px rgb(59 130 246 / 0.5), 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-	}
-
-	/* Ensure selection indicators are always visible */
-	.selection-indicator {
-		pointer-events: none;
-	}
-
-	/* Make sure the selected state is very obvious */
-	.masonry-item.ring-4 .selection-indicator {
-		box-shadow: 0 4px 14px 0 rgb(0 0 0 / 0.25);
 	}
 </style>

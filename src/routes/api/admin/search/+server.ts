@@ -51,6 +51,8 @@ type ArtworkResult = {
 	mintDate?: string | null;
 	mint_date?: string | null;
 	timestamp?: string | null;
+	// Add MIME type for proper media detection
+	mime?: string | null;
 };
 
 /**
@@ -87,6 +89,7 @@ export async function GET({ url, request }: RequestEvent) {
 		const limit = parseInt(searchParams.get('limit') || '20', 10);
 		const offset = parseInt(searchParams.get('offset') || '0', 10);
 		const filter = searchParams.get('filter') || 'all';
+		const type = searchParams.get('type') || 'all'; // New type filter parameter
 
 		// Get user's wallet addresses for filtering
 		const walletAddresses = await getWalletAddresses();
@@ -94,53 +97,105 @@ export async function GET({ url, request }: RequestEvent) {
 			? walletAddresses.map((addr) => addr.address.toLowerCase())
 			: [];
 
-		const searchConditions: Prisma.ArtworkIndexWhereInput = {
-			// Remove the filter that excludes imported artworks
-			// importStatus: {
-			// 	not: 'imported' // Show all artworks that are NOT imported yet
-			// }
-		};
+		const searchConditions: Prisma.ArtworkIndexWhereInput = {};
 
-		// Add search query conditions
-		if (query) {
-			searchConditions.OR = [
-				{ contractAddress: { contains: query, mode: 'insensitive' } },
-				{ tokenId: { contains: query, mode: 'insensitive' } },
-				{ blockchain: { contains: query, mode: 'insensitive' } },
-				// Search in normalized data JSON for title and creator info
-				{
-					normalizedData: {
-						path: ['title'],
-						string_contains: query
-					}
-				} as any,
-				{
-					normalizedData: {
-						path: ['creator', 'username'],
-						string_contains: query
-					}
-				} as any,
-				{
+		// Add text search conditions
+		if (query.trim()) {
+			const searchTerms = query.trim().split(/\s+/);
+			const searchQueries = searchTerms.map(term => ({
+				OR: [
+					{ normalizedData: { path: ['title'], string_contains: term } },
+					{ normalizedData: { path: ['description'], string_contains: term } },
+					{ normalizedData: { path: ['collection', 'title'], string_contains: term } },
+					{ normalizedData: { path: ['collection', 'name'], string_contains: term } },
+					{ normalizedData: { path: ['creator', 'username'], string_contains: term } },
+					{ normalizedData: { path: ['creator', 'address'], string_contains: term } }
+				] as any
+			}));
+			
+			if (searchQueries.length === 1) {
+				searchConditions.OR = searchQueries[0].OR;
+			} else {
+				searchConditions.AND = searchQueries;
+			}
+		}
+
+		// Add type-based filtering using the new type field
+		if (type === 'owned') {
+			searchConditions.type = 'owned';
+		} else if (type === 'created') {
+			searchConditions.type = 'created';
+		}
+		// For type === 'all', we don't add any type filtering
+
+		// Legacy filter support (can be removed once frontend is updated)
+		if (filter === 'created') {
+			if (userAddresses.length > 0) {
+				// For created filter, check if creator address matches user addresses
+				const createdConditions = userAddresses.map(addr => ({
 					normalizedData: {
 						path: ['creator', 'address'],
-						string_contains: query
+						equals: addr
 					}
-				} as any
-			];
-		}
-
-		// Add filter conditions based on wallet addresses
-		if (filter === 'created' && userAddresses.length > 0) {
-			searchConditions.OR = searchConditions.OR || [];
-			searchConditions.OR.push({
-				normalizedData: {
-					path: ['creator', 'address'],
-					in: userAddresses
+				} as any));
+				
+				if (searchConditions.AND && Array.isArray(searchConditions.AND)) {
+					searchConditions.AND = [
+						...searchConditions.AND,
+						{ OR: createdConditions }
+					];
+				} else if (searchConditions.OR) {
+					searchConditions.AND = [
+						{ OR: searchConditions.OR },
+						{ OR: createdConditions }
+					];
+					delete searchConditions.OR;
+				} else {
+					searchConditions.OR = createdConditions;
 				}
-			} as any);
+			} else {
+				// No user addresses, so no results for "created" filter
+				searchConditions.id = -1; // This will return no results
+			}
+		} else if (filter === 'owned') {
+			if (userAddresses.length > 0) {
+				// For owned filter, we need to check if any owner address matches user addresses
+				// AND the creator address does NOT match user addresses (to exclude created NFTs)
+				const ownedConditions = userAddresses.map(addr => ({
+					normalizedData: {
+						path: ['owners'],
+						array_contains: [{ address: addr }]
+					}
+				} as any));
+				
+				const notCreatedConditions = userAddresses.map(addr => ({
+					normalizedData: {
+						path: ['creator', 'address'],
+						not: addr
+					}
+				} as any));
+				
+				const baseConditions = [
+					{ OR: ownedConditions }, // Must be owned by user
+					{ AND: notCreatedConditions } // Must NOT be created by user
+				];
+				
+				if (searchConditions.OR) {
+					// If we already have OR conditions from search query, combine them
+					searchConditions.AND = [
+						{ OR: searchConditions.OR },
+						...baseConditions
+					];
+					delete searchConditions.OR;
+				} else {
+					searchConditions.AND = baseConditions;
+				}
+			} else {
+				// No user addresses, so no results for "owned" filter
+				searchConditions.id = -1; // This will return no results
+			}
 		}
-		// Note: 'owned' filter would require owner data which isn't stored in ArtworkIndex currently
-		// For now, treat 'owned' the same as 'all'
+		// For filter === 'all', we don't add any wallet-based filtering
 
 		const results = await prisma.artworkIndex.findMany({
 			where: searchConditions,
@@ -266,7 +321,9 @@ export async function GET({ url, request }: RequestEvent) {
 				// Add mint date fields
 				mintDate: normalizedData.mintDate || null,
 				mint_date: normalizedData.mintDate || null,
-				timestamp: normalizedData.timestamp || null
+				timestamp: normalizedData.timestamp || null,
+				// Add MIME type for proper media detection
+				mime: normalizedData.mime || null
 			};
 		});
 

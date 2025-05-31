@@ -6,16 +6,23 @@ import type {
   MinimalCreatorData 
 } from './types/minimal-nft';
 import { fetchCreatorInfo } from './openseaHelpers.js';
-import { WRAPPED_TEZOS_CONTRACT } from './constants/tezos';
+import { WRAPPED_TEZOS_CONTRACT, isProblematicThumbnail } from './constants/tezos';
+import { detectBlockchainFromContract } from './utils/walletUtils';
+import { EnhancedFieldProcessor } from './enhanced-field-processor';
 
 /**
  * Minimal data transformer - only extracts fields we actually store in the database
  * Eliminates over-fetching and unnecessary data processing
  */
 export class MinimalNFTTransformer {
+  private fieldProcessor: EnhancedFieldProcessor;
+  
+  constructor() {
+    this.fieldProcessor = new EnhancedFieldProcessor();
+  }
   
   /**
-   * Transform OpenSea NFT data to minimal format
+   * Transform OpenSea NFT data to minimal format with enhanced field processing
    */
   async transformOpenSeaNFT(nft: any): Promise<MinimalNFTData> {
     // Validate required fields
@@ -23,181 +30,94 @@ export class MinimalNFTTransformer {
       throw new Error('Missing required fields: contract and identifier');
     }
     
-    const contractAddress = nft.contract;
+    const contractAddress = nft.contract.toLowerCase();
     const tokenId = nft.identifier;
-    const title = nft.name;
+    const blockchain = detectBlockchainFromContract(contractAddress);
+    
+    // Use enhanced field processor for better field extraction
+    const enhancedFields = await this.fieldProcessor.processArtworkFields(nft, blockchain);
+    
+    // Basic fields
+    const title = nft.name || nft.title || 'Untitled';
     const description = nft.description || undefined;
     
-    // Enhanced image URL extraction with fallbacks
-    let imageUrl = nft.image_url || nft.display_image_url;
-    let thumbnailUrl = nft.display_image_url || nft.image_url;
-    let animationUrl = nft.display_animation_url || nft.animation_url;
-    
-    // Ensure thumbnail is different from main image
-    if (thumbnailUrl === imageUrl) {
-      thumbnailUrl = undefined;
-    }
-    
-    // Enhanced dimensions extraction
-    let dimensions: { width: number; height: number } | undefined;
-    if (nft.image_details?.width && nft.image_details?.height) {
-      dimensions = {
-        width: nft.image_details.width,
-        height: nft.image_details.height
-      };
-    } else if (nft.animation_details?.width && nft.animation_details?.height) {
-      dimensions = {
-        width: nft.animation_details.width,
-        height: nft.animation_details.height
-      };
-    }
-    
-    // Enhanced attributes extraction
-    const attributes = nft.traits?.map((trait: any) => ({
-      trait_type: trait.trait_type,
-      value: trait.value
-    })) || [];
-    
-    // Enhanced features extraction
-    const features = nft.features || nft.metadata?.features || undefined;
-    
-    // Enhanced creator extraction
-    let creator: MinimalNFTData['creator'] = undefined;
-    if (nft.creator) {
-      creator = {
-        address: nft.creator,
-        username: nft.creator_username,
-        bio: nft.creator_bio,
-        description: nft.creator_bio, // Use bio as description fallback
-        profileUrl: nft.creator_profile_url,
-        avatarUrl: nft.creator_avatar_url,
-        websiteUrl: nft.creator_website_url,
-        displayName: nft.creator_display_name,
-        ensName: nft.creator_ens_name,
-        isVerified: nft.creator_is_verified || false,
-        twitterHandle: nft.creator_social_links?.twitter,
-        instagramHandle: nft.creator_social_links?.instagram,
-        profileData: nft.creator_profile_data,
-        resolutionSource: 'opensea',
-        socialLinks: nft.creator_social_links
-      };
-    }
-    
-    // Enhanced generator URL detection for generative art
-    let generatorUrl: string | undefined;
-    if (this.detectGenerativeArt(nft.collection?.name || (typeof nft.collection === 'string' ? nft.collection : ''))) {
-      // Check for generator URLs in various fields
-      generatorUrl = nft.generator_url || nft.generatorUrl || nft.generator_uri || nft.generatorUri;
-      
-      // For Art Blocks, the generator might be in animation_url
-      if (!generatorUrl && contractAddress && this.isArtBlocksContract(contractAddress)) {
-        generatorUrl = animationUrl; // Art Blocks uses animation_url for generators
-      }
-      
-      // For fxhash, check for generator URLs
-      if (!generatorUrl && nft.metadata?.generatorUri) {
-        generatorUrl = nft.metadata.generatorUri;
-      }
-    }
-    
-    const metadataUrl = nft.metadata_url || nft.metadataUrl;
-    
-    // Fix #2: Ensure token standard is captured for Ethereum NFTs
-    const tokenStandard = nft.token_standard || nft.tokenStandard || 'ERC721'; // Default to ERC721 if not provided
-    
-    // Enhanced mint date extraction with comprehensive priority order
+    // Enhanced mint date extraction
     let mintDate: string | undefined;
-    
-    // Priority order for mint date (most accurate to least accurate):
-    // 1. mint_date (from enhanced data or blockchain events API)
-    // 2. mintDate (alternative field name)
-    // 3. created_date (creation timestamp from OpenSea)
-    // 4. created_at (alternative creation timestamp)
-    // 5. minted_at (another possible field)
-    // Note: We intentionally exclude updated_at as it's not the mint date
-    if (nft.mint_date) {
-      mintDate = nft.mint_date;
-    } else if (nft.mintDate) {
-      mintDate = nft.mintDate;
-    } else if (nft.created_date) {
-      mintDate = nft.created_date;
-    } else if (nft.created_at) {
-      mintDate = nft.created_at;
-    } else if (nft.minted_at) {
-      mintDate = nft.minted_at;
-    }
-    
-    // Validate and normalize mint date
-    if (mintDate) {
+    if (nft.updated_at) {
       try {
-        const parsedDate = new Date(mintDate);
-        if (isNaN(parsedDate.getTime())) {
-          console.warn(`[MinimalNFTTransformer] Invalid mint date for ${contractAddress}:${tokenId}: ${mintDate}`);
-          mintDate = undefined;
-        } else {
-          // Ensure we have a valid ISO string
+        const parsedDate = new Date(nft.updated_at);
+        if (!isNaN(parsedDate.getTime())) {
           mintDate = parsedDate.toISOString();
         }
       } catch (error) {
-        console.warn(`[MinimalNFTTransformer] Failed to parse mint date for ${contractAddress}:${tokenId}: ${mintDate}`, error);
-        mintDate = undefined;
+        console.warn(`[MinimalNFTTransformer] Failed to parse mint date for OpenSea NFT ${contractAddress}:${tokenId}: ${nft.updated_at}`, error);
       }
     }
     
-    const supply = nft.supply || (nft.owners && nft.owners.length > 0 ? nft.owners[0].quantity : 1);
-    const symbol = nft.symbol || nft.collection?.symbol;
-    const mime = nft.mime || nft.metadata?.mime;
+    // Use enhanced fields with fallbacks to original data
+    const imageUrl = enhancedFields.imageUrl || nft.image_url || nft.display_image_url;
+    const animationUrl = enhancedFields.animationUrl || nft.animation_url || nft.display_animation_url;
+    const thumbnailUrl = enhancedFields.thumbnailUrl || nft.image_url;
+    const metadataUrl = enhancedFields.metadataUrl || nft.metadata_url;
     
-    // Fix #3: Enhanced collection data
+    // Enhanced creator extraction
+    let creator: MinimalNFTData['creator'] = undefined;
+    if (nft.creator || enhancedFields.creator) {
+      creator = {
+        address: nft.creator || enhancedFields.creator?.address || '',
+        username: enhancedFields.creator?.username,
+        bio: enhancedFields.creator?.bio,
+        description: enhancedFields.creator?.description,
+        profileUrl: enhancedFields.creator?.profileUrl,
+        avatarUrl: enhancedFields.creator?.avatarUrl,
+        websiteUrl: enhancedFields.creator?.websiteUrl,
+        displayName: enhancedFields.creator?.displayName,
+        ensName: enhancedFields.creator?.ensName,
+        isVerified: enhancedFields.creator?.isVerified,
+        twitterHandle: enhancedFields.creator?.twitterHandle,
+        instagramHandle: enhancedFields.creator?.instagramHandle,
+        resolutionSource: 'opensea',
+        socialLinks: enhancedFields.creator?.socialLinks
+      };
+    }
+    
+    // Enhanced collection extraction
     const collection = {
-      slug: nft.collection?.slug || nft.collection?.name || (typeof nft.collection === 'string' ? nft.collection : contractAddress),
-      title: nft.collection?.name || nft.collection_name || (typeof nft.collection === 'string' ? nft.collection : 'Unknown Collection'),
-      description: nft.collection?.description || nft.collection_description,
-      contractAddress,
-      websiteUrl: nft.collection?.website_url || nft.collection_website_url,
-      projectUrl: nft.collection?.project_url || nft.collection_project_url,
-      mediumUrl: nft.collection?.medium_url || nft.collection_medium_url,
-      imageUrl: nft.collection?.image_url || nft.collection_image_url,
-      bannerImageUrl: nft.collection?.banner_image_url || nft.collection_banner_image_url,
-      discordUrl: nft.collection?.discord_url || nft.collection_discord_url,
-      telegramUrl: nft.collection?.telegram_url || nft.collection_telegram_url,
-      chainIdentifier: nft.collection?.chain_identifier || nft.collection_chain_identifier,
-      contractAddresses: nft.collection?.contract_addresses || nft.collection_contract_addresses,
-      safelistStatus: nft.collection?.safelist_status || nft.collection_safelist_status,
-      fees: nft.collection?.fees || nft.collection_fees,
-      artBlocksProjectId: nft.collection?.art_blocks_project_id || nft.collection_art_blocks_project_id,
-      fxhashProjectId: nft.collection?.fxhash_project_id || nft.collection_fxhash_project_id,
-      projectNumber: nft.collection?.project_number || nft.collection_project_number,
-      collectionCreator: nft.collection?.collection_creator || nft.collection_collection_creator,
-      curatorAddress: nft.collection?.curator_address || nft.collection_curator_address,
-      parentContract: nft.collection?.parent_contract || nft.collection_parent_contract,
-      totalSupply: nft.collection?.total_supply || nft.collection_total_supply,
-      currentSupply: nft.collection?.current_supply || nft.collection_current_supply,
-      mintStartDate: nft.collection?.mint_start_date || nft.collection_mint_start_date,
-      mintEndDate: nft.collection?.mint_end_date || nft.collection_mint_end_date,
-      floorPrice: nft.collection?.floor_price || nft.collection_floor_price,
-      volumeTraded: nft.collection?.volume_traded || nft.collection_volume_traded,
-      externalCollectionId: nft.collection?.external_collection_id || nft.collection_external_collection_id,
-      isGenerativeArt: this.detectGenerativeArt(nft.collection?.name || (typeof nft.collection === 'string' ? nft.collection : '')),
-      isSharedContract: this.isSharedContract(contractAddress, 'ethereum')
+      slug: nft.collection || contractAddress,
+      title: nft.collection_name || 'Unknown Collection',
+      description: nft.collection_description,
+      contractAddress: contractAddress,
+      websiteUrl: nft.collection_website_url,
+      imageUrl: nft.collection_image_url,
+      isGenerativeArt: nft.collection_is_generative_art || false,
+      isSharedContract: nft.collection_is_shared_contract || false
     };
+    
+    const tokenStandard = nft.token_standard || 'ERC721';
+    const mime = enhancedFields.mime || nft.mime;
+    const symbol = nft.symbol;
+    const supply = enhancedFields.supply || nft.supply || 1;
+    const dimensions = enhancedFields.dimensions;
+    const attributes = enhancedFields.attributes || this.transformOpenSeaTraits(nft.traits);
+    const features = enhancedFields.features;
     
     return {
       contractAddress,
       tokenId,
-      blockchain: 'ethereum',
+      blockchain: blockchain as 'ethereum' | 'tezos' | 'polygon',
       title,
       description,
-      mintDate: mintDate ? mintDate.toString() : undefined,
+      mintDate,
       imageUrl,
       thumbnailUrl,
       animationUrl,
-      generatorUrl,
+      generatorUrl: enhancedFields.generatorUrl,
       metadataUrl,
       tokenStandard,
       mime,
       symbol,
       supply,
+      dimensions,
       attributes,
       features,
       creator,
@@ -206,9 +126,9 @@ export class MinimalNFTTransformer {
   }
   
   /**
-   * Transform Tezos token data to minimal format
+   * Transform Tezos token data to minimal format with enhanced field processing
    */
-  transformTezosToken(token: any): MinimalNFTData {
+  async transformTezosToken(token: any): Promise<MinimalNFTData> {
     // Handle nested token structure from objkt API
     const actualToken = token.token || token;
     
@@ -224,6 +144,11 @@ export class MinimalNFTTransformer {
     
     const contractAddress = actualToken.fa.contract;
     const tokenId = actualToken.token_id;
+    const blockchain = 'tezos';
+    
+    // Use enhanced field processor for better field extraction
+    const enhancedFields = await this.fieldProcessor.processArtworkFields(actualToken, blockchain);
+    
     const title = actualToken.name;
     const description = actualToken.description || undefined;
     
@@ -236,7 +161,6 @@ export class MinimalNFTTransformer {
           console.warn(`[MinimalNFTTransformer] Invalid timestamp for Tezos token ${contractAddress}:${tokenId}: ${actualToken.timestamp}`);
           mintDate = undefined;
         } else {
-          // Ensure we have a valid ISO string
           mintDate = parsedDate.toISOString();
         }
       } catch (error) {
@@ -245,107 +169,48 @@ export class MinimalNFTTransformer {
       }
     }
     
-    // Enhanced image URL extraction with proper prioritization for Tezos
-    let imageUrl: string | undefined;
-    let thumbnailUrl: string | undefined;
-    let animationUrl: string | undefined;
+    // Use enhanced fields with fallbacks to original data
+    const imageUrl = enhancedFields.imageUrl || actualToken.display_uri || actualToken.artifact_uri;
     
-    // For Tezos, prioritize display_uri for main image, artifact_uri for animation
-    imageUrl = actualToken.display_uri || actualToken.artifact_uri;
+    // Enhanced thumbnail URL processing with problematic thumbnail detection
+    let thumbnailUrl = enhancedFields.thumbnailUrl || actualToken.thumbnail_uri || actualToken.display_uri;
     
-    // Use thumbnail_uri if available and different from main image
-    if (actualToken.thumbnail_uri && actualToken.thumbnail_uri !== imageUrl) {
-      thumbnailUrl = actualToken.thumbnail_uri;
+    // Check for problematic platform-specific thumbnails (Versum, Hic et Nunc)
+    if (isProblematicThumbnail(thumbnailUrl)) {
+      console.log(`[MinimalNFTTransformer] Detected problematic thumbnail for Tezos token ${contractAddress}:${tokenId}, using display/artifact image instead`);
+      // Use display_uri or artifact_uri as fallback when problematic thumbnail is detected
+      thumbnailUrl = actualToken.display_uri || actualToken.artifact_uri;
     }
     
-    // Check if thumbnail is the generic circle image from Tezos
-    const GENERIC_CIRCLE_IPFS = 'ipfs://QmNrhZHUaEqxhyLfqoq1mtHSipkWHeT31LNHb1QEbDHgnc';
-    if (thumbnailUrl === GENERIC_CIRCLE_IPFS) {
-      console.log(`[transformTezosToken] Detected generic circle thumbnail for token ${tokenId}, will generate from display/artifact image`);
-      thumbnailUrl = undefined; // Clear it so we can generate a proper thumbnail
+    // Don't store thumbnail URL if it's the same as the main image URL to avoid duplication
+    if (thumbnailUrl && imageUrl && thumbnailUrl === imageUrl) {
+      console.log(`[MinimalNFTTransformer] Thumbnail URL is same as image URL for Tezos token ${contractAddress}:${tokenId}, storing null to avoid duplication`);
+      thumbnailUrl = undefined;
     }
     
-    // If no valid thumbnail, try to use display_uri or artifact_uri as fallback
-    if (!thumbnailUrl) {
-      // Prefer display_uri for thumbnails, fallback to artifact_uri if needed
-      const fallbackUrl = actualToken.display_uri || actualToken.artifact_uri;
-      if (fallbackUrl && fallbackUrl !== imageUrl) {
-        // Only use as thumbnail if it's different from the main image
-        thumbnailUrl = fallbackUrl;
-        console.log(`[transformTezosToken] Using ${fallbackUrl === actualToken.display_uri ? 'display_uri' : 'artifact_uri'} as thumbnail for token ${tokenId}`);
-      }
-    }
+    const animationUrl = enhancedFields.animationUrl || actualToken.animation_url;
+    const metadataUrl = enhancedFields.metadataUrl || actualToken.metadata_url;
     
-    // Use artifact_uri for animation if it's different from display_uri
-    if (actualToken.artifact_uri && actualToken.artifact_uri !== actualToken.display_uri) {
-      animationUrl = actualToken.artifact_uri;
-    }
-    
-    // Enhanced generator URL detection for Tezos generative art
+    // Enhanced generator URL detection for Tezos
     let generatorUrl: string | undefined;
-    
-    // Check if this is a generative art piece
-    const isGenerative = this.detectGenerativeArt(actualToken.fa?.name || '');
-    if (isGenerative) {
-      // For fxhash and other Tezos generative platforms
-      if (actualToken.generator_uri) {
-        generatorUrl = actualToken.generator_uri;
-      } else if (actualToken.metadata) {
-        try {
-          const metadata = typeof actualToken.metadata === 'string' 
-            ? JSON.parse(actualToken.metadata) 
-            : actualToken.metadata;
-          
-          generatorUrl = metadata.generatorUri || metadata.generator_uri || metadata.generator_url;
-          
-          // For fxhash, the generator might be in the artifact_uri
-          if (!generatorUrl && contractAddress.startsWith('KT1') && actualToken.artifact_uri) {
-            // Check if artifact_uri looks like a generator URL
-            if (actualToken.artifact_uri.includes('generator') || 
-                actualToken.artifact_uri.includes('fxhash') ||
-                actualToken.artifact_uri.includes('html')) {
-              generatorUrl = actualToken.artifact_uri;
-            }
-          }
-        } catch (error) {
-          console.warn(`[MinimalNFTTransformer] Failed to parse metadata for generator URL: ${error}`);
-        }
-      }
+    if (enhancedFields.generatorUrl) {
+      generatorUrl = enhancedFields.generatorUrl;
+    } else if (actualToken.artifact_uri && this.isGenerativeArtifact(actualToken.artifact_uri)) {
+      generatorUrl = actualToken.artifact_uri;
     }
     
-    // Enhanced metadata URL extraction
-    let metadataUrl: string | undefined;
-    if (actualToken.metadata) {
-      if (typeof actualToken.metadata === 'string' && actualToken.metadata.startsWith('ipfs://')) {
-        metadataUrl = actualToken.metadata;
-      } else if (actualToken.metadata_url) {
-        metadataUrl = actualToken.metadata_url;
-      }
-    }
-    
-    // Enhanced dimensions extraction from Tezos data
-    let dimensions: { width: number; height: number } | undefined;
-    if (actualToken.dimensions?.display?.dimensions) {
-      dimensions = {
-        width: actualToken.dimensions.display.dimensions.width,
-        height: actualToken.dimensions.display.dimensions.height
-      };
-    } else if (actualToken.dimensions?.artifact?.dimensions) {
-      dimensions = {
-        width: actualToken.dimensions.artifact.dimensions.width,
-        height: actualToken.dimensions.artifact.dimensions.height
-      };
-    }
+    // Use enhanced dimensions with fallback to Tezos-specific extraction
+    const dimensions = enhancedFields.dimensions || this.extractTezosSpecificDimensions(actualToken);
     
     // Enhanced attributes extraction
-    const attributes = actualToken.attributes?.map((attr: any) => ({
+    const attributes = enhancedFields.attributes || actualToken.attributes?.map((attr: any) => ({
       trait_type: attr.attribute?.name || attr.name || attr.trait_type,
       value: attr.value || attr.attribute?.value
     })) || [];
     
     // Enhanced features extraction from metadata
-    let features: Record<string, any> | undefined;
-    if (actualToken.metadata) {
+    let features = enhancedFields.features;
+    if (!features && actualToken.metadata) {
       try {
         const metadata = typeof actualToken.metadata === 'string' 
           ? JSON.parse(actualToken.metadata) 
@@ -390,19 +255,19 @@ export class MinimalNFTTransformer {
       contractAddress: actualToken.fa.contract,
       websiteUrl: actualToken.fa.website,
       imageUrl: actualToken.fa.logo,
-      isGenerativeArt: isGenerative,
+      isGenerativeArt: this.isGenerativeCollection(actualToken.fa.contract),
       isSharedContract: false // Tezos doesn't have shared contracts like OpenSea
     };
     
     const tokenStandard = 'FA2'; // Tezos standard
-    const mime = actualToken.mime;
+    const mime = enhancedFields.mime || actualToken.mime;
     const symbol = actualToken.symbol || actualToken.fa?.symbol;
-    const supply = actualToken.supply ? parseInt(actualToken.supply.toString()) : 1;
+    const supply = enhancedFields.supply || (actualToken.supply ? parseInt(actualToken.supply.toString()) : 1);
     
     return {
       contractAddress,
       tokenId,
-      blockchain: 'tezos',
+      blockchain,
       title,
       description,
       mintDate,
@@ -421,6 +286,20 @@ export class MinimalNFTTransformer {
       creator,
       collection
     };
+  }
+  
+  /**
+   * Transform OpenSea traits to standard attributes format
+   */
+  private transformOpenSeaTraits(traits: any[]): Array<{ trait_type: string; value: any }> {
+    if (!traits || !Array.isArray(traits)) {
+      return [];
+    }
+    
+    return traits.map(trait => ({
+      trait_type: trait.trait_type || trait.name || 'Unknown',
+      value: trait.value
+    }));
   }
   
   /**
@@ -855,5 +734,61 @@ export class MinimalNFTTransformer {
   private isFxhashContract(contractAddress?: string): boolean {
     if (!contractAddress) return false;
     return contractAddress.toLowerCase().includes('kt1');
+  }
+
+  /**
+   * Extract Tezos-specific dimensions from token data
+   */
+  private extractTezosSpecificDimensions(token: any): { width: number; height: number } | undefined {
+    if (token.dimensions) {
+      // Handle different dimension formats
+      if (typeof token.dimensions === 'object' && token.dimensions.width && token.dimensions.height) {
+        return token.dimensions;
+      }
+      if (typeof token.dimensions === 'string' && token.dimensions.includes('x')) {
+        const [width, height] = token.dimensions.split('x').map((n: string) => parseInt(n, 10));
+        if (!isNaN(width) && !isNaN(height)) {
+          return { width, height };
+        }
+      }
+      // Tezos API format
+      if (token.dimensions.display?.dimensions) {
+        return {
+          width: token.dimensions.display.dimensions.width,
+          height: token.dimensions.display.dimensions.height
+        };
+      }
+      if (token.dimensions.artifact?.dimensions) {
+        return {
+          width: token.dimensions.artifact.dimensions.width,
+          height: token.dimensions.artifact.dimensions.height
+        };
+      }
+    }
+    return undefined;
+  }
+  
+  /**
+   * Check if an artifact URI is likely a generative art piece
+   */
+  private isGenerativeArtifact(uri: string): boolean {
+    return uri.includes('.html') || 
+           uri.includes('generator') || 
+           uri.includes('fxhash.xyz') ||
+           uri.includes('interactive');
+  }
+  
+  /**
+   * Check if a collection is known to be generative art
+   */
+  private isGenerativeCollection(contractAddress: string): boolean {
+    const generativeContracts = [
+      'KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi', // fxhash v1
+      'KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE', // fxhash v2
+      'KT1AaaBSo5AE6Eo8fpEN5xhCD4w3kHStafxk', // fxhash gentk v1
+      'KT1XCoGnfupWk7Sp8536EfrxcP73LmT68Nyr'  // fxhash gentk v2
+    ];
+    
+    return generativeContracts.includes(contractAddress);
   }
 } 

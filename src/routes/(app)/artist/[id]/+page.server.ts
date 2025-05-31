@@ -8,19 +8,21 @@ export const load: PageServerLoad = async ({ params }) => {
 		include: {
 			artworks: true
 		}
-	} as any);
+	});
 
 	if (!artist) {
 		return { status: 404, error: 'Artist not found' };
 	}
 
-	const artworks = (artist.artworks || []).map((artwork: any) => {
+	const artworks = (artist.artworks || []).map((artwork) => {
 		return {
 			id: String(artwork.id),
 			title: artwork.title,
 			description: artwork.description,
 			image_url: artwork.imageUrl,
 			animation_url: artwork.animationUrl,
+			generator_url: artwork.generatorUrl,
+			thumbnail_url: artwork.thumbnailUrl,
 			dimensions: artwork.dimensions,
 			contractAddr: artwork.contractAddress,
 			contractAlias: null,

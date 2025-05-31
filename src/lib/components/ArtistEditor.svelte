@@ -5,7 +5,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import { onMount } from 'svelte';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
-	import { ImagePresets } from '$lib/imageOptimization';
+	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
 	import OptimizedImage from './OptimizedImage.svelte';
 
 	interface Artwork {
@@ -56,6 +56,36 @@
 		address: '',
 		blockchain: 'ethereum'
 	};
+
+	// Function to get optimized avatar URL with face detection
+	function getOptimizedAvatarUrl(avatarUrl: string): string {
+		try {
+			const optimizedUrl = buildOptimizedImageUrl(avatarUrl, {
+				width: 400,
+				height: 400,
+				fit: 'crop',
+				gravity: 'auto',
+				format: 'webp',
+				quality: 90
+			});
+			
+			// If the optimized URL contains 'hash=file' or similar invalid hash, fall back to original
+			if (optimizedUrl.includes('hash=file') || optimizedUrl.includes('hash=undefined')) {
+				return avatarUrl;
+			}
+			
+			return optimizedUrl;
+		} catch (error) {
+			console.error('Error optimizing avatar URL:', error);
+			return avatarUrl;
+		}
+	}
+
+	// Function to handle image error and fallback to original URL
+	function handleImageError(event: Event, originalUrl: string) {
+		const img = event.target as HTMLImageElement;
+		img.src = originalUrl;
+	}
 
 	async function confirmAndDelete() {
 		const artworksMessage =
@@ -172,16 +202,11 @@
 			<label class="block text-sm font-medium mb-2">Avatar</label>
 			<div class="relative group w-full aspect-square">
 				{#if artist.avatarUrl}
-					<OptimizedImage
-						src={artist.avatarUrl}
+					<img
+						src={getOptimizedAvatarUrl(artist.avatarUrl)}
 						alt={artist.name}
-						width={400}
-						height={400}
-						fit="crop"
-						gravity="auto"
-						format="webp"
-						quality={90}
-						className="w-full h-full object-cover border-2 border-gray-300 dark:border-gray-600 rounded-md"
+						class="avatar-image w-full h-full object-cover border-2 border-gray-300 dark:border-gray-600 rounded-md"
+						on:error={(event) => handleImageError(event, artist.avatarUrl || '')}
 					/>
 				{:else}
 					<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-md">

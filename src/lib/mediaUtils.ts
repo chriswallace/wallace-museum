@@ -23,7 +23,6 @@ const IPFS_MICROSERVICE_ENDPOINT = 'https://ipfs.wallacemuseum.com/ipfs/';
  */
 export const IPFS_GATEWAYS = [
 	'https://nftstorage.link/ipfs/',
-	'https://cloudflare-ipfs.com/ipfs/',
 	'https://ipfs.io/ipfs/'
 ];
 

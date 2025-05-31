@@ -5,6 +5,7 @@
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import type { Artist } from '$lib/stores';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import ArtistTableCell from '$lib/components/ArtistTableCell.svelte';
 
 	interface Artwork {
 		id: number | string;
@@ -166,31 +167,13 @@
 					</td>
 					<td><div>{artwork.title}</div></td>
 					<td>
-						<div>
-							{#if artwork.artists && artwork.artists.length > 0}
-								<div class="artists-list">
-									{#each artwork.artists as artist}
-										<span class="artist-name">
-											{#if artist.avatarUrl}
-												<OptimizedImage
-													src={artist.avatarUrl}
-													alt={artist.name}
-													width={20}
-													height={20}
-													fit="cover"
-													format="webp"
-													quality={85}
-													className="artist-avatar"
-												/>
-											{/if}
-											{artist.name}
-										</span>
-									{/each}
-								</div>
-							{:else}
-								None
-							{/if}
-						</div>
+						<ArtistTableCell 
+							artists={artwork.artists}
+							size="xs"
+							showAvatars={true}
+							linkToArtist={false}
+							maxDisplay={3}
+						/>
 					</td>
 					<td
 						><div>
@@ -248,15 +231,5 @@
 
 	.actions {
 		@apply w-12;
-	}
-
-	.artists-list {
-		@apply flex flex-wrap gap-2;
-	}
-	.artist-name {
-		@apply flex items-center gap-1 text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1;
-	}
-	.artist-avatar {
-		@apply w-5 h-5 rounded-full object-cover mr-1;
 	}
 </style>

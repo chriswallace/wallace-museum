@@ -76,14 +76,15 @@ async function graphqlFetch(query, retryCount = 0) {
 export async function fetchAccount(walletAddress) {
 	const query = `
     {
-        holder(where: {address: {_eq: "${walletAddress}"}}) {
-            address
-            held_tokens {
-                token {
-                    token_id
-                    artifact_uri
-                    name
-                }
+        token_holder(
+            where: {holder_address: {_eq: "${walletAddress}"}, quantity: {_gt: "0"}}
+            limit: 500
+        ) {
+            quantity
+            token {
+                token_id
+                artifact_uri
+                name
             }
         }
     }`;
@@ -203,14 +204,14 @@ export async function fetchArtist(address) {
 /**
  * Fetches owned NFTs for a Tezos address from Objkt GraphQL API.
  * @param {string} walletAddress
- * @param {number} [limit=1000]
+ * @param {number} [limit=500]
  * @param {number} [offset=0]
  * @param {string | null} [searchTerm=null]
- * @returns {Promise<{ data: { holder: [{ held_tokens: TezosToken[] }] } }>} // Adjust structure if needed
+ * @returns {Promise<{ data: { holder: Array<{ held_tokens: Array<any> }> } }>} // Simplified type for backward compatibility
  */
 export async function fetchOwnedNFTsByAddress(
 	walletAddress,
-	limit = 1000,
+	limit = 500,
 	offset = 0,
 	searchTerm = null
 ) {
@@ -219,93 +220,91 @@ export async function fetchOwnedNFTsByAddress(
 		? `{_or: [{name: {_ilike: "%${searchTerm}%"}}, {description: {_ilike: "%${searchTerm}%"}}]}`
 		: '';
 
-	// Construct the where clause for held_tokens
-	// Combine the search condition with potential future filters if needed
-	const tokenWhereClause = searchCondition ? `where: {token: ${searchCondition}}` : '';
-
-	// Conditionally add comma before the where clause if it exists
-	const whereArgument = tokenWhereClause ? `, ${tokenWhereClause}` : '';
+	// Construct the where clause for token search within token_holder
+	// We need to filter by quantity > 0 to get only currently owned tokens
+	const tokenWhereClause = searchCondition
+		? `{quantity: {_gt: "0"}, token: ${searchCondition}}`
+		: `{quantity: {_gt: "0"}}`;
 
 	const query = `
     {
-        holder(where: {address: {_eq: "${walletAddress}"}}) {
-            held_tokens(limit: ${limit}, offset: ${offset}${whereArgument}) {
-                token {
-                    token_id
-                    name
-                    artifact_uri
-                    display_uri
-                    description
-                    mime
-                    supply
-                    symbol
-                    metadata
-                    dimensions
-                    extra
-                    tags{
-                        tag {
-                            name
-                        }
-                    }
-                    fa {
+        token_holder(
+            where: {holder_address: {_eq: "${walletAddress}"}, ${tokenWhereClause.slice(1, -1)}}
+            limit: ${limit}
+            offset: ${offset}
+            order_by: {last_incremented_at: desc}
+        ) {
+            quantity
+            last_incremented_at
+            token {
+                token_id
+                name
+                artifact_uri
+                display_uri
+                description
+                mime
+                supply
+                symbol
+                metadata
+                dimensions
+                extra
+                tags{
+                    tag {
                         name
-                        metadata
+                    }
+                }
+                fa {
+                    name
+                    metadata
+                    description
+                    website
+                    twitter
+                    short_name
+                    contract
+                    path
+                }
+                creators{
+                    creator_address
+                    holder {
+                        alias
+                        address
+                        logo
                         description
                         website
+                        instagram
                         twitter
-                        short_name
-                        contract
-                        path
                     }
-                    creators{
-                        creator_address
-                        holder {
-                            alias
-                            address
-                            logo
-                            description
-                            website
-                            instagram
-                            twitter
-                        }
-                    }
-                    timestamp
                 }
+                timestamp
             }
         }
     }`;
 
 	const response = await graphqlFetch(query);
 
-	// Basic response validation - Improved
-	if (!response || !response.data || !response.data.holder) {
+	// Basic response validation - Updated for new structure
+	if (!response || !response.data || !response.data.token_holder) {
 		console.error(
-			'Invalid response structure from Objkt API: Missing data or holder field.',
+			'Invalid response structure from Objkt API: Missing data or token_holder field.',
 			response
 		);
 		// Return structure consistent with expected format but empty
 		return { data: { holder: [{ held_tokens: [] }] } };
 	}
 
-	// Handle case where holder array is empty
-	if (!Array.isArray(response.data.holder) || response.data.holder.length === 0) {
-		console.warn('Objkt API returned empty holder array for address:', walletAddress);
+	// Handle case where token_holder array is empty
+	if (!Array.isArray(response.data.token_holder) || response.data.token_holder.length === 0) {
+		console.warn('Objkt API returned empty token_holder array for address:', walletAddress);
 		// Return structure consistent with expected format but empty
 		return { data: { holder: [{ held_tokens: [] }] } };
 	}
 
-	// Ensure held_tokens exists within the first holder, even if empty
-	if (!response.data.holder[0].held_tokens) {
-		console.warn('Holder exists but held_tokens is missing, defaulting to empty array.');
-		response.data.holder[0].held_tokens = [];
-	}
-
 	// Filter out wrapped Tezos tokens - these are not real NFTs
-	const originalCount = response.data.holder[0].held_tokens.length;
-	response.data.holder[0].held_tokens = response.data.holder[0].held_tokens.filter(
-		/** @param {any} heldToken */
-		(heldToken) => {
-			const contractAddress = heldToken?.token?.fa?.contract;
+	const originalCount = response.data.token_holder.length;
+	const filteredTokens = response.data.token_holder.filter(
+		/** @param {any} tokenHolder */
+		(tokenHolder) => {
+			const contractAddress = tokenHolder?.token?.fa?.contract;
 			if (contractAddress === WRAPPED_TEZOS_CONTRACT) {
 				console.log(
 					`[objktHelpers] Filtering out wrapped Tezos token from contract ${contractAddress}`
@@ -316,27 +315,45 @@ export async function fetchOwnedNFTsByAddress(
 		}
 	);
 
-	const filteredCount = response.data.holder[0].held_tokens.length;
+	const filteredCount = filteredTokens.length;
 	if (originalCount !== filteredCount) {
 		console.log(
 			`[objktHelpers] Filtered ${originalCount - filteredCount} wrapped Tezos tokens, ${filteredCount} remaining`
 		);
 	}
 
-	return response;
+	// Transform the response to match the expected format
+	// Convert token_holder array to held_tokens format for backward compatibility
+	const transformedResponse = {
+		data: {
+			holder: [
+				{
+					held_tokens: filteredTokens.map(
+						/** @param {any} tokenHolder */ (tokenHolder) => ({
+							token: tokenHolder.token,
+							quantity: tokenHolder.quantity,
+							last_incremented_at: tokenHolder.last_incremented_at
+						})
+					)
+				}
+			]
+		}
+	};
+
+	return transformedResponse;
 }
 
 /**
  * Fetches created NFTs for a Tezos address from Objkt GraphQL API.
  * @param {string} walletAddress
- * @param {number} [limit=1000]
+ * @param {number} [limit=500]
  * @param {number} [offset=0]
  * @param {string | null} [searchTerm=null]
  * @returns {Promise<{ data: { holder: [{ created_tokens: TezosToken[] }] } }>} // Adjust structure if needed
  */
 export async function fetchCreatedNFTsByAddress(
 	walletAddress,
-	limit = 1000,
+	limit = 500,
 	offset = 0,
 	searchTerm = null
 ) {

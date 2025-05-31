@@ -6,61 +6,65 @@
 import { WRAPPED_TEZOS_CONTRACT } from '../constants/tezos';
 
 /**
- * Comprehensive query to fetch NFTs by wallet address with all required data
+ * Optimized query for fetching wallet NFTs with all required data in a single request.
  * This single query fetches:
  * - Token details (name, description, URIs, metadata)
  * - Creator/artist information with profile data
  * - Collection (FA) information
  * - Mint date (timestamp)
  * - All display media URLs
+ * - Dimensions data
  */
 export const FETCH_WALLET_NFTS_QUERY = `
   query FetchWalletNFTs($address: String!, $limit: Int!, $offset: Int!) {
-    holder(where: {address: {_eq: $address}}) {
-      address
-      held_tokens(
-        where: {token: {fa_contract: {_neq: "${WRAPPED_TEZOS_CONTRACT}"}}}
-        limit: $limit
-        offset: $offset
-        order_by: {last_incremented_at: desc}
-      ) {
-        quantity
-        token {
-          token_id
+    token_holder(
+      where: {
+        holder_address: {_eq: $address}
+        quantity: {_gt: "0"}
+        token: {fa_contract: {_neq: "${WRAPPED_TEZOS_CONTRACT}"}}
+      }
+      limit: $limit
+      offset: $offset
+      order_by: {last_incremented_at: desc}
+    ) {
+      quantity
+      last_incremented_at
+      token {
+        token_id
+        name
+        description
+        display_uri
+        thumbnail_uri
+        artifact_uri
+        metadata
+        mime
+        supply
+        timestamp
+        dimensions
+        fa {
+          contract
           name
           description
-          display_uri
-          thumbnail_uri
-          artifact_uri
-          metadata
-          mime
-          supply
-          timestamp
-          fa {
-            contract
-            name
-            description
+          logo
+          website
+        }
+        creators {
+          creator_address
+          holder {
+            address
+            alias
             logo
+            description
             website
+            twitter
+            instagram
           }
-          creators {
-            creator_address
-            holder {
-              address
-              alias
-              logo
-              description
-              website
-              twitter
-              instagram
-            }
-          }
-          attributes {
-            attribute {
-              name
-              type
-              value
-            }
+        }
+        attributes {
+          attribute {
+            name
+            type
+            value
           }
         }
       }
@@ -92,6 +96,7 @@ export const FETCH_CREATED_NFTS_QUERY = `
       mime
       supply
       timestamp
+      dimensions
       fa {
         contract
         name

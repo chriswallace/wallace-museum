@@ -5,7 +5,7 @@
 </script>
 
 <div
-	class="skeleton-loader bg-gray-200 dark:bg-gray-700 relative overflow-hidden box-border"
+	class="skeleton-loader bg-gray-200 dark:bg-gray-900 relative overflow-hidden box-border"
 	style="width: {width}; height: {height}; border-radius: {borderRadius}; max-width: 100%;"
 >
 	<div class="shimmer absolute inset-0"></div>
@@ -22,8 +22,8 @@
 			90deg,
 			rgba(255, 255, 255, 0) 0%,
 			rgba(255, 255, 255, 0.4) 20%,
-			rgba(255, 255, 255, 0.6) 50%,
-			rgba(255, 255, 255, 0.4) 80%,
+			rgba(255, 255, 255, 0.6) 30%,
+			rgba(255, 255, 255, 0.4) 40%,
 			rgba(255, 255, 255, 0) 100%
 		);
 		animation: shimmer 1.2s ease-in-out infinite;

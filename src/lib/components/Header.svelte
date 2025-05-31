@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CollectionDropdown from '$lib/components/CollectionDropdown.svelte';
+	import ArtistList from '$lib/components/ArtistList.svelte';
 	import { page } from '$app/stores';
 	import { selectedArtwork, isLiveCodeVisible } from '$lib/stores';
 	import { get } from 'svelte/store';
@@ -99,20 +100,20 @@
 
 		{#if artworkDetails && artworkDetails.ArtistArtworks && artworkDetails.ArtistArtworks.length > 0}
 			<div class="artist-details">
-				{#each artworkDetails.ArtistArtworks as artistArtwork, i (artistArtwork.artist.id)}
-					<span class="artist-name">
-						{#if artistArtwork.artist.websiteUrl}
-							<a href={artistArtwork.artist.websiteUrl} target="_blank" rel="noopener noreferrer"
-								>{artistArtwork.artist.name}</a
-							>
-						{:else}
-							{artistArtwork.artist.name}
-						{/if}
-					</span>{artworkDetails.ArtistArtworks.length > 1 &&
-					i < artworkDetails.ArtistArtworks.length - 1
-						? ', '
-						: ''}
-				{/each}
+				<ArtistList 
+					artists={artworkDetails.ArtistArtworks.map(aa => ({
+						id: aa.artist.id,
+						name: aa.artist.name,
+						websiteUrl: aa.artist.websiteUrl,
+						avatarUrl: null
+					}))}
+					layout="horizontal"
+					size="sm"
+					showAvatars={false}
+					linkToWebsite={true}
+					separator=", "
+					className="text-sm"
+				/>
 			</div>
 		{/if}
 
@@ -147,7 +148,7 @@
 						{/if}
 						{#if artworkDetails.tokenStandard}
 							<dt>Token Standard</dt>
-							<dd>{artworkDetails.tokenStandard}</dd>
+							<dd>{artworkDetails.tokenStandard?.toUpperCase()}</dd>
 						{/if}
 						{#if artworkDetails.contractAddr && artworkDetails.tokenID}
 							<dt>Contract</dt>
@@ -231,26 +232,6 @@
 		span {
 			@apply font-bold;
 		}
-	}
-
-	.artist-name,
-	.artist-name a {
-		display: inline;
-	}
-
-	.artist-name:after {
-		content: ', ';
-		display: inline;
-		color: #fff;
-		font-weight: 700;
-	}
-
-	.artist-name:last-child:after {
-		content: '';
-	}
-
-	.artist-name {
-		@apply text-sm font-normal;
 	}
 
 	.artwork-title {

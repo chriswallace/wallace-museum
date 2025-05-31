@@ -1,13 +1,16 @@
 <script lang="ts">
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
-	import { ImagePresets, buildOptimizedImageUrl } from '$lib/imageOptimization';
+	import { getBestMediaUrl, getMediaDisplayType } from '$lib/utils/mediaHelpers';
 	import OptimizedImage from './OptimizedImage.svelte';
 	import SkeletonLoader from './SkeletonLoader.svelte';
+	import VideoPlayer from './VideoPlayer.svelte';
 
 	interface Artwork {
+		generatorUrl?: string | null;
 		animationUrl?: string | null;
-		mime?: string | null;
 		imageUrl?: string | null;
+		thumbnailUrl?: string | null;
+		mime?: string | null;
 		title: string;
 		dimensions?: {
 			width: number;
@@ -21,58 +24,38 @@
 
 	let isLoading = true;
 
-	function hasVideo(): boolean {
-		return Boolean(getAnimationUrl() && artwork.mime?.startsWith('video'));
-	}
-
-	function hasApplicationMime(): boolean {
-		return Boolean(getAnimationUrl() && artwork.mime && artwork.mime.startsWith('application'));
-	}
-
 	function handleLoad(): void {
 		isLoading = false;
 	}
 
-	// Helper functions to prioritize display URLs
-	function getImageUrl(): string {
-		// Priority: imageUrl > displayUri
-		if (artwork.imageUrl) return artwork.imageUrl;
-		return '';
-	}
+	// Get the best media URL and display type
+	$: artworkMediaUrls = {
+		generatorUrl: artwork.generatorUrl,
+		animationUrl: artwork.animationUrl,
+		imageUrl: artwork.imageUrl,
+		thumbnailUrl: artwork.thumbnailUrl
+	};
 
-	function getAnimationUrl(): string | null {
-		// Priority: animationUrl
-		if (artwork.animationUrl) return artwork.animationUrl;
-		return null;
-	}
+	$: bestMedia = getBestMediaUrl(artworkMediaUrls, 'fullscreen', artwork.mime);
+	$: mediaType = getMediaDisplayType(bestMedia, artwork.mime);
+	$: displayUrl = bestMedia?.url || '';
+	$: transformedUrl = displayUrl ? ipfsToHttpUrl(displayUrl) : '';
 
-	// Transform URLs for display - use optimization for images, direct for videos/apps
-	$: displayImageUrl = getImageUrl() ? getImageUrl() : ''; // Keep as IPFS URL for OptimizedImage component
-	$: displayAnimationUrl = getAnimationUrl() ? ipfsToHttpUrl(getAnimationUrl()) : null; // Direct for videos/apps
-
-	// Get appropriate dimensions based on size
-	$: maxWidth = {
-		small: 400,
-		medium: 800,
-		large: 1200,
-		fullscreen: 1920
-	}[size];
-
-	// Calculate responsive sizes
-	$: responsiveSizes = [
-		Math.floor(maxWidth * 0.5),
-		maxWidth,
-		Math.floor(maxWidth * 1.5)
-	];
-
-	// Calculate aspect ratio for skeleton
+	// Calculate aspect ratio for consistent sizing
 	$: aspectRatio = artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1';
 </script>
 
 <div class="artwork-display">
-	{#if hasVideo()}
+	{#if !displayUrl}
+		<!-- No media available -->
+		<div class="no-media">
+			<div class="no-media-content">
+				<p>No media available</p>
+			</div>
+		</div>
+	{:else if mediaType === 'video'}
 		{#if showLoader && isLoading}
-			<div class="media-skeleton" style="aspect-ratio: {aspectRatio};">
+			<div class="media-skeleton">
 				<SkeletonLoader 
 					width="100%" 
 					height="100%" 
@@ -80,25 +63,19 @@
 				/>
 			</div>
 		{/if}
-		<video
-			autoplay
-			loop
-			muted
+		<VideoPlayer
+			src={transformedUrl}
+			autoplay={true}
+			loop={true}
+			muted={true}
+			width={artwork.dimensions?.width}
+			height={artwork.dimensions?.height}
+			className="video-player-artwork"
 			on:loadeddata={handleLoad}
-			class:hidden={showLoader && isLoading}
-			style="aspect-ratio: {aspectRatio};"
-		>
-			<source
-				src={displayAnimationUrl}
-				type="video/mp4"
-				height={artwork.dimensions?.height}
-				width={artwork.dimensions?.width}
-			/>
-			Your browser does not support the video tag.
-		</video>
-	{:else if hasApplicationMime()}
+		/>
+	{:else if mediaType === 'iframe'}
 		{#if showLoader && isLoading}
-			<div class="media-skeleton" style="aspect-ratio: {aspectRatio};">
+			<div class="media-skeleton">
 				<SkeletonLoader 
 					width="100%" 
 					height="100%" 
@@ -107,25 +84,17 @@
 			</div>
 		{/if}
 		<iframe
-			src={displayAnimationUrl}
-			class="live-code"
-			title="Artwork Animation"
+			src={transformedUrl}
+			class="interactive-content"
+			title="Interactive Artwork"
 			on:load={handleLoad}
 			class:hidden={showLoader && isLoading}
-			style="aspect-ratio: {aspectRatio};"
+			allowfullscreen
 		></iframe>
-	{:else if getImageUrl()}
+	{:else if mediaType === 'image'}
 		<OptimizedImage
-			src={getImageUrl()}
+			src={displayUrl}
 			alt={artwork.title}
-			width={maxWidth}
-			responsive={true}
-			responsiveSizes={responsiveSizes}
-			sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 70vw"
-			fit="contain"
-			quality={size === 'fullscreen' ? 95 : 90}
-			format="webp"
-			aspectRatio={aspectRatio}
 			showSkeleton={showLoader}
 			skeletonBorderRadius="4px"
 			className="artwork-image"
@@ -139,6 +108,9 @@
 		position: relative;
 		width: 100%;
 		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.media-skeleton {
@@ -150,17 +122,41 @@
 		z-index: 1;
 	}
 
-	video, iframe, :global(.artwork-image) {
+	.no-media {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: var(--color-surface-secondary, #f5f5f5);
+		border-radius: 4px;
 		width: 100%;
 		height: 100%;
+	}
+
+	.no-media-content {
+		text-align: center;
+		color: var(--color-text-secondary, #666);
+		font-size: 0.875rem;
+	}
+
+	:global(.video-player-artwork), iframe, :global(.artwork-image) {
+		max-width: 100%;
+		max-height: 100%;
+		width: auto;
+		height: auto;
 		object-fit: contain;
 		position: relative;
 		z-index: 2;
+		display: block;
+		margin: 0 auto;
 	}
 
-	.live-code {
+	.interactive-content {
 		border: none;
 		background: transparent;
+		width: 100%;
+		height: 100%;
+		max-width: 100%;
+		max-height: 100%;
 	}
 
 	.hidden {

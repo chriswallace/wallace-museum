@@ -242,11 +242,11 @@
 	}
 
 	.artist-list .artist-row {
-		@apply opacity-60 duration-300 text-gray-600;
+		@apply duration-300 text-gray-600;
 	}
 
 	.artist-list:hover .artist-row:hover {
-		@apply opacity-100 text-yellow-500;
+		@apply text-yellow-500;
 	}
 
 	.artist-name {

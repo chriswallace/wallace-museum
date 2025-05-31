@@ -17,40 +17,109 @@ export class MinimalDBOperations {
    * Store NFT data in the index only - does NOT import to final models
    * This method only creates/updates ArtworkIndex records for later processing
    */
-  async storeNFT(nftData: MinimalNFTData): Promise<{ indexId: number }> {
+  async storeNFT(nftData: MinimalNFTData, type: 'owned' | 'created' = 'owned', indexingWalletAddress?: string): Promise<{ indexId: number }> {
+    // Validate required fields
+    if (!nftData.contractAddress || !nftData.tokenId) {
+      throw new Error(`Missing required fields: contractAddress=${nftData.contractAddress}, tokenId=${nftData.tokenId}`);
+    }
+
     const contractAddress = nftData.contractAddress.toLowerCase();
     const uid = `${contractAddress}:${nftData.tokenId}`;
+    
+    // Log NFT data structure for debugging (first few only to avoid spam)
+    if (Math.random() < 0.1) { // Log 10% of NFTs for debugging
+      console.log(`[MinimalDBOperations] Sample NFT data structure:`, {
+        contractAddress: nftData.contractAddress,
+        tokenId: nftData.tokenId,
+        blockchain: nftData.blockchain,
+        title: nftData.title,
+        hasCreator: !!nftData.creator,
+        hasCollection: !!nftData.collection,
+        dataKeys: Object.keys(nftData)
+      });
+    }
     
     // Determine blockchain based on contract address format instead of relying on API data
     const blockchain = detectBlockchainFromContract(contractAddress);
     
-    // Create/update index record only - no importing to final models
-    const indexRecord = await this.prisma.artworkIndex.upsert({
+    // Determine if this NFT was created by the wallet being indexed
+    let nftType = type;
+    if (indexingWalletAddress && nftData.creator?.address) {
+      const creatorAddress = nftData.creator.address.toLowerCase();
+      const walletAddress = indexingWalletAddress.toLowerCase();
+      
+      // If the creator address matches the wallet being indexed, mark as created
+      if (creatorAddress === walletAddress) {
+        nftType = 'created';
+      }
+    }
+    
+    // Check if record already exists
+    const existingRecord = await this.prisma.artworkIndex.findUnique({
       where: { 
         contractAddress_tokenId: {
           contractAddress: contractAddress,
           tokenId: nftData.tokenId
         }
-      },
-      create: {
-        nftUid: uid,
-        blockchain: blockchain,
-        dataSource: blockchain === 'tezos' ? 'objkt' : 'opensea',
-        contractAddress: contractAddress,
-        tokenId: nftData.tokenId,
-        rawResponse: nftData as unknown as Prisma.InputJsonValue,
-        normalizedData: nftData as unknown as Prisma.InputJsonValue,
-        importStatus: 'pending' // Set to pending for later import
-      },
-      update: {
-        rawResponse: nftData as unknown as Prisma.InputJsonValue,
-        normalizedData: nftData as unknown as Prisma.InputJsonValue,
-        updatedAt: new Date(),
-        importStatus: 'pending' // Reset to pending for re-import
       }
     });
-    
-    return { indexId: indexRecord.id };
+
+    if (existingRecord) {
+      // Record already exists - update the type if it's more specific (created > owned)
+      // and update lastAttempt to track that we tried to import this
+      const updateData: any = {
+        lastAttempt: new Date()
+      };
+      
+      // Only update type if we're upgrading from 'owned' to 'created'
+      if (existingRecord.type === 'owned' && nftType === 'created') {
+        updateData.type = 'created';
+        console.log(`[MinimalDBOperations] Upgrading type from 'owned' to 'created' for ${uid}`);
+      }
+      
+      await this.prisma.artworkIndex.update({
+        where: { id: existingRecord.id },
+        data: updateData
+      });
+      
+      console.log(`[MinimalDBOperations] Updated existing index record for ${uid} (type: ${existingRecord.type}${updateData.type ? ` -> ${updateData.type}` : ''})`);
+      return { indexId: existingRecord.id };
+    }
+
+    // Validate data before creating record
+    try {
+      // Create new index record only - no importing to final models
+      const indexRecord = await this.prisma.artworkIndex.create({
+        data: {
+          nftUid: uid,
+          type: nftType,
+          blockchain: blockchain,
+          dataSource: blockchain === 'tezos' ? 'objkt' : 'opensea',
+          contractAddress: contractAddress,
+          tokenId: nftData.tokenId,
+          rawResponse: nftData as unknown as Prisma.InputJsonValue,
+          normalizedData: nftData as unknown as Prisma.InputJsonValue,
+          importStatus: 'pending' // Set to pending for later import
+        }
+      });
+      
+      console.log(`[MinimalDBOperations] Created new index record for ${uid} with type: ${nftType}`);
+      return { indexId: indexRecord.id };
+    } catch (error: any) {
+      console.error(`[MinimalDBOperations] Database error creating index record for ${uid}:`, {
+        error: error.message,
+        code: error.code,
+        nftData: {
+          contractAddress,
+          tokenId: nftData.tokenId,
+          blockchain,
+          uid,
+          nftType,
+          dataSource: blockchain === 'tezos' ? 'objkt' : 'opensea'
+        }
+      });
+      throw error;
+    }
   }
   
   /**
@@ -148,7 +217,9 @@ export class MinimalDBOperations {
    * Batch store NFTs with connection management
    */
   async batchStoreNFTs(
-    nfts: MinimalNFTData[]
+    nfts: MinimalNFTData[],
+    type: 'owned' | 'created' = 'owned',
+    indexingWalletAddress?: string
   ): Promise<{
     stored: number;
     errors: Array<{ index: number; error: string; nft: MinimalNFTData }>;
@@ -156,7 +227,7 @@ export class MinimalDBOperations {
     const stored: number[] = [];
     const errors: Array<{ index: number; error: string; nft: MinimalNFTData }> = [];
 
-    console.log(`[MinimalDBOperations] Storing batch of ${nfts.length} NFTs`);
+    console.log(`[MinimalDBOperations] Storing batch of ${nfts.length} NFTs with type: ${type}${indexingWalletAddress ? ` for wallet: ${indexingWalletAddress}` : ''}`);
 
     // Process in smaller batches to avoid connection pool exhaustion
     const batchSize = 10;
@@ -173,11 +244,24 @@ export class MinimalDBOperations {
         
         while (retries > 0) {
           try {
-            const result = await this.storeNFT(nft);
+            const result = await this.storeNFT(nft, type, indexingWalletAddress);
             stored.push(result.indexId);
             break; // Success, exit retry loop
           } catch (error: any) {
             lastError = error;
+            
+            // Log the specific error details for debugging
+            console.error(`[MinimalDBOperations] Error storing NFT ${nft.contractAddress}:${nft.tokenId} (attempt ${4 - retries}/3):`, {
+              error: error.message,
+              code: error.code,
+              stack: error.stack,
+              nftData: {
+                contractAddress: nft.contractAddress,
+                tokenId: nft.tokenId,
+                blockchain: nft.blockchain,
+                title: nft.title
+              }
+            });
             
             // Check if it's a connection pool error
             if (error.code === 'P2024' || error.message?.includes('connection pool')) {
@@ -186,6 +270,7 @@ export class MinimalDBOperations {
               retries--;
             } else {
               // Non-connection pool error, don't retry
+              console.error(`[MinimalDBOperations] Non-retryable error for NFT ${nft.contractAddress}:${nft.tokenId}:`, error.message);
               break;
             }
           }
@@ -197,6 +282,7 @@ export class MinimalDBOperations {
             error: lastError.message || 'Unknown error',
             nft
           });
+          console.error(`[MinimalDBOperations] Failed to store NFT ${nft.contractAddress}:${nft.tokenId} after all retries:`, lastError.message);
         }
       }
       
@@ -210,7 +296,10 @@ export class MinimalDBOperations {
     console.log(`[MinimalDBOperations] Batch complete: ${stored.length}/${nfts.length} stored (${(successRate * 100).toFixed(2)}% success rate)`);
 
     if (errors.length > 0) {
-      console.warn(`[MinimalDBOperations] ${errors.length} errors during batch storage`);
+      console.warn(`[MinimalDBOperations] ${errors.length} errors during batch storage:`);
+      errors.forEach((error, idx) => {
+        console.warn(`  Error ${idx + 1}: ${error.error} (NFT: ${error.nft.contractAddress}:${error.nft.tokenId})`);
+      });
     }
 
     return { stored: stored.length, errors };

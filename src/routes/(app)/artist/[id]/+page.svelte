@@ -3,9 +3,10 @@
 	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
-	import { getContractUrl, getContractName } from '$lib/utils';
+	import { getContractUrl, getContractName, truncateAddress } from '$lib/utils';
 	import { linear } from 'svelte/easing';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import ArtworkDisplay from '$lib/components/ArtworkDisplay.svelte';
 
 	export let data: { artist?: any; error?: string };
 
@@ -162,6 +163,17 @@
 		: data.error
 			? 'Artist Not Found | Wallace Museum'
 			: 'Loading Artist | Wallace Museum';
+
+	// Transform artwork data to match ArtworkDisplay component interface
+	$: currentArtworkForDisplay = currentArtwork ? {
+		generatorUrl: currentArtwork.generator_url || currentArtwork.generatorUrl,
+		animationUrl: currentArtwork.animation_url || currentArtwork.animationUrl,
+		imageUrl: currentArtwork.image_url || currentArtwork.imageUrl,
+		thumbnailUrl: currentArtwork.thumbnail_url || currentArtwork.thumbnailUrl,
+		mime: currentArtwork.mime,
+		title: currentArtwork.title,
+		dimensions: currentArtwork.dimensions
+	} : null;
 </script>
 
 <svelte:head>
@@ -202,32 +214,11 @@
 			{#key currentIndex}
 				<div class="museum-content">
 					<div class="artwork-container">
-						{#if currentArtwork.animation_url && currentArtwork.mime?.startsWith('application')}
-							<iframe
-								bind:this={iframeEl}
-								src={ipfsToHttpUrl(currentArtwork.animation_url)}
-								class="artwork-iframe"
-								title="Artwork Animation"
-							></iframe>
-						{:else if currentArtwork.animation_url && currentArtwork.mime?.startsWith('video')}
-							<video autoplay loop muted class="artwork-video">
-								<source src={ipfsToHttpUrl(currentArtwork.animation_url)} type="video/mp4" />
-								Your browser does not support the video tag.
-							</video>
-						{:else if currentArtwork.image_url}
-							<OptimizedImage
-								src={currentArtwork.image_url}
-								alt={currentArtwork.title}
-								responsive={true}
-								responsiveSizes={[800, 1200, 1600]}
-								sizes="100vw"
-								fit="contain"
-								format="webp"
-								quality={95}
-								aspectRatio={currentArtwork.dimensions
-									? `${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height}`
-									: '1/1'}
-								className="artwork-image"
+						{#if currentArtworkForDisplay}
+							<ArtworkDisplay 
+								artwork={currentArtworkForDisplay}
+								size="fullscreen"
+								showLoader={true}
 							/>
 						{/if}
 					</div>
@@ -330,7 +321,7 @@
 											{#if data.artist.artworks[currentIndex].tokenStandard}
 												<div class="metadata-item">
 													<strong>Token Standard</strong>
-													<span>{data.artist.artworks[currentIndex].tokenStandard}</span>
+													<span>{data.artist.artworks[currentIndex].tokenStandard?.toUpperCase()}</span>
 												</div>
 											{/if}
 
@@ -360,7 +351,7 @@
 															<div class="flex items-center justify-between">
 																<span class="text-sm">
 																	{address.blockchain}:
-																	<span class="font-mono">{address.address}</span>
+																	<span class="font-mono" title={address.address}>{truncateAddress(address.address)}</span>
 																</span>
 																{#if getContractUrl(address.address, address.blockchain)}
 																	<a
@@ -395,21 +386,25 @@
 	}
 
 	.close-button {
-		@apply text-3xl text-gray-400 hover:text-white bg-transparent border-none cursor-pointer absolute top-8 right-8;
+		@apply text-3xl text-gray-400 hover:text-white bg-transparent border-none cursor-pointer absolute top-3 right-6 z-50;
 	}
 
 	.museum-content {
 		@apply flex flex-col w-full items-center justify-start;
-		padding: 2rem 0;
+		padding: 1rem 0;
 	}
 
 	.artwork-container {
 		@apply flex items-center justify-center bg-black bg-opacity-50 rounded-lg p-4;
-		width: 90%;
+		width: 100%;
 		max-width: 1400px;
-		height: 70vh;
+		height: 80svh;
 		margin-bottom: 2rem;
 		overflow: hidden;
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.artwork-media {
@@ -575,11 +570,4 @@
 		@apply w-full h-px bg-gray-700 my-6;
 	}
 
-	/* Fix for artwork image to fit properly in container */
-	:global(.artwork-image) {
-		width: 100% !important;
-		height: 100% !important;
-		object-fit: contain !important;
-		object-position: center !important;
-	}
 </style>

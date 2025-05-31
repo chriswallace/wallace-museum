@@ -407,12 +407,20 @@ export class MinimalObjktAPI {
     offset = 0,
     type: 'owned' | 'created' = 'owned'
   ): Promise<{ nfts: MinimalNFTData[]; hasMore: boolean }> {
-    const tokenField = type === 'owned' ? 'held_tokens' : 'created_tokens';
+    let query: string;
     
-    const query = `
-      query {
-        holder(where: {address: {_eq: "${walletAddress}"}}) {
-          ${tokenField}(limit: ${limit}, offset: ${offset}) {
+    if (type === 'owned') {
+      // Use token_holder with quantity > 0 to get only currently owned tokens
+      query = `
+        query {
+          token_holder(
+            where: {holder_address: {_eq: "${walletAddress}"}, quantity: {_gt: "0"}}
+            limit: ${limit}
+            offset: ${offset}
+            order_by: {last_incremented_at: desc}
+          ) {
+            quantity
+            last_incremented_at
             token {
               token_id
               name
@@ -447,15 +455,65 @@ export class MinimalObjktAPI {
             }
           }
         }
-      }
-    `;
+      `;
+    } else {
+      // For created tokens, use the original approach with created_tokens
+      query = `
+        query {
+          holder(where: {address: {_eq: "${walletAddress}"}}) {
+            created_tokens(limit: ${limit}, offset: ${offset}) {
+              token {
+                token_id
+                name
+                description
+                artifact_uri
+                display_uri
+                thumbnail_uri
+                mime
+                symbol
+                supply
+                metadata
+                timestamp
+                dimensions
+                fa {
+                  contract
+                  name
+                  description
+                  website
+                }
+                creators {
+                  creator_address
+                  holder {
+                    address
+                    alias
+                    logo
+                    description
+                    website
+                    twitter
+                    instagram
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+    }
     
     const response = await this.graphqlFetch(query);
-    const tokens = response?.data?.holder?.[0]?.[tokenField] || [];
+    
+    let tokens: any[];
+    if (type === 'owned') {
+      tokens = response?.data?.token_holder || [];
+    } else {
+      tokens = response?.data?.holder?.[0]?.created_tokens || [];
+    }
     
     // Filter out wrapped Tezos tokens - these are not real NFTs
     const filteredTokens = tokens.filter((item: any) => {
-      const contractAddress = item?.token?.fa?.contract;
+      const contractAddress = type === 'owned' 
+        ? item?.token?.fa?.contract 
+        : item?.token?.fa?.contract;
       if (contractAddress === WRAPPED_TEZOS_CONTRACT) {
         console.log(`[MinimalObjktAPI] Filtering out wrapped Tezos token from contract ${contractAddress}`);
         return false;
@@ -465,8 +523,13 @@ export class MinimalObjktAPI {
 
     console.log(`[MinimalObjktAPI] Filtered ${tokens.length - filteredTokens.length} wrapped Tezos tokens, ${filteredTokens.length} remaining`);
     
+    // Transform tokens to MinimalNFTData - properly await async transformations
+    const nfts = await Promise.all(
+      filteredTokens.map((item: any) => transformer.transformTezosToken(item))
+    );
+    
     return {
-      nfts: filteredTokens.map((item: any) => transformer.transformTezosToken(item)),
+      nfts,
       hasMore: tokens.length === limit
     };
   }
@@ -518,7 +581,7 @@ export class MinimalObjktAPI {
     const response = await this.graphqlFetch(query);
     const token = response?.data?.token?.[0];
     
-    return token ? transformer.transformTezosToken(token) : null;
+    return token ? await transformer.transformTezosToken(token) : null;
   }
   
   /**

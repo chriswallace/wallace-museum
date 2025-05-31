@@ -136,6 +136,7 @@ model ArtworkIndex {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   nftUid          String   @unique
+  type            String   @default("owned")
   blockchain      String
   contractAddress String
   tokenId         String
@@ -151,6 +152,7 @@ model ArtworkIndex {
   @@index([blockchain])
   @@index([dataSource])
   @@index([importStatus])
+  @@index([type])
 }
 
 model UserWallet {
