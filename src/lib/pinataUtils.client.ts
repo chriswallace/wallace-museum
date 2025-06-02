@@ -52,14 +52,19 @@ export function getPinataTransformedUrl(
 		width?: number;
 		height?: number;
 		quality?: number;
-		format?: 'webp' | 'jpg' | 'png';
-		fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+		format?: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png';
+		fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
+		gravity?: 'auto' | 'side' | string;
+		dpr?: number;
+		sharpen?: number;
+		animation?: boolean;
+		metadata?: 'keep' | 'copyright' | 'none';
 	} = {}
 ): string {
 	// Use public gateway for client-side transformations
 	const baseUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
 	
-	// Build query parameters for transformations
+	// Build query parameters for transformations using correct Pinata naming conventions
 	const params = new URLSearchParams();
 	
 	if (options.width) params.append('img-width', options.width.toString());
@@ -67,6 +72,11 @@ export function getPinataTransformedUrl(
 	if (options.quality) params.append('img-quality', options.quality.toString());
 	if (options.format) params.append('img-format', options.format);
 	if (options.fit) params.append('img-fit', options.fit);
+	if (options.gravity) params.append('img-gravity', options.gravity);
+	if (options.dpr) params.append('img-dpr', options.dpr.toString());
+	if (options.sharpen) params.append('img-sharpen', options.sharpen.toString());
+	if (options.animation !== undefined) params.append('img-anim', options.animation ? 'true' : 'false');
+	if (options.metadata) params.append('img-metadata', options.metadata);
 	
 	const queryString = params.toString();
 	return queryString ? `${baseUrl}?${queryString}` : baseUrl;
@@ -84,8 +94,13 @@ export function getPinataTransformedImageUrl(
 		width?: number;
 		height?: number;
 		quality?: number;
-		format?: 'webp' | 'jpg' | 'png';
-		fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+		format?: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png';
+		fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
+		gravity?: 'auto' | 'side' | string;
+		dpr?: number;
+		sharpen?: number;
+		animation?: boolean;
+		metadata?: 'keep' | 'copyright' | 'none';
 	} = {}
 ): string {
 	if (!url) return url;
@@ -123,7 +138,7 @@ export const ImagePresets = {
 	small: (url: string) => getPinataTransformedImageUrl(url, {
 		width: 400,
 		height: 400,
-		fit: 'inside',
+		fit: 'contain',
 		format: 'webp',
 		quality: 85
 	}),
@@ -131,7 +146,7 @@ export const ImagePresets = {
 	medium: (url: string) => getPinataTransformedImageUrl(url, {
 		width: 800,
 		height: 800,
-		fit: 'inside',
+		fit: 'contain',
 		format: 'webp',
 		quality: 85
 	}),
@@ -139,7 +154,7 @@ export const ImagePresets = {
 	large: (url: string) => getPinataTransformedImageUrl(url, {
 		width: 1200,
 		height: 1200,
-		fit: 'inside',
+		fit: 'contain',
 		format: 'webp',
 		quality: 90
 	}),
@@ -163,8 +178,13 @@ export function getCloudinaryTransformedUrl(
 		width?: number;
 		height?: number;
 		quality?: number;
-		format?: 'webp' | 'jpg' | 'png';
-		fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+		format?: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png';
+		fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
+		gravity?: 'auto' | 'side' | string;
+		dpr?: number;
+		sharpen?: number;
+		animation?: boolean;
+		metadata?: 'keep' | 'copyright' | 'none';
 	} = {}
 ): string {
 	console.warn('getCloudinaryTransformedUrl is deprecated. Use getPinataTransformedImageUrl instead.');

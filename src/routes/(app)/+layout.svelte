@@ -68,12 +68,12 @@
 	}
 
 	.site-footer {
-		@apply py-4 px-8 mt-16 border-t border-gray-800 relative z-10;
+		@apply py-4 md:px-8 mt-16 border-t border-gray-800 relative z-10;
 		background: rgba(0, 0, 0, 0.95);
 	}
 
 	.footer-content {
-		@apply max-w-full mx-auto px-4 text-sm flex	justify-between;
+		@apply max-w-full mx-auto px-4 text-sm md:flex	justify-between;
 	}
 
 	.copyright {

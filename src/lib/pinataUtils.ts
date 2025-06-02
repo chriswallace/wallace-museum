@@ -20,8 +20,13 @@ export function getPinataTransformedImageUrl(
 		width?: number;
 		height?: number;
 		quality?: number;
-		format?: 'webp' | 'jpg' | 'png';
-		fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+		format?: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png';
+		fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
+		gravity?: 'auto' | 'side' | string;
+		dpr?: number;
+		sharpen?: number;
+		animation?: boolean;
+		metadata?: 'keep' | 'copyright' | 'none';
 	} = {}
 ): string {
 	if (!url) return url;
@@ -59,7 +64,7 @@ export const ImagePresets = {
 	small: (url: string) => getPinataTransformedImageUrl(url, {
 		width: 400,
 		height: 400,
-		fit: 'inside',
+		fit: 'contain',
 		format: 'webp',
 		quality: 85
 	}),
@@ -67,7 +72,7 @@ export const ImagePresets = {
 	medium: (url: string) => getPinataTransformedImageUrl(url, {
 		width: 800,
 		height: 800,
-		fit: 'inside',
+		fit: 'contain',
 		format: 'webp',
 		quality: 85
 	}),
@@ -75,7 +80,7 @@ export const ImagePresets = {
 	large: (url: string) => getPinataTransformedImageUrl(url, {
 		width: 1200,
 		height: 1200,
-		fit: 'inside',
+		fit: 'contain',
 		format: 'webp',
 		quality: 90
 	}),
@@ -99,8 +104,13 @@ export function getCloudinaryTransformedUrl(
 		width?: number;
 		height?: number;
 		quality?: number;
-		format?: 'webp' | 'jpg' | 'png';
-		fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+		format?: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png';
+		fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
+		gravity?: 'auto' | 'side' | string;
+		dpr?: number;
+		sharpen?: number;
+		animation?: boolean;
+		metadata?: 'keep' | 'copyright' | 'none';
 	} = {}
 ): string {
 	console.warn('getCloudinaryTransformedUrl is deprecated. Use getPinataTransformedImageUrl instead.');

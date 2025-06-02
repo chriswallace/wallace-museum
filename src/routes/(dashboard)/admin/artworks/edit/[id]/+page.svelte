@@ -234,17 +234,6 @@
 	{:else}
 		<button class="back-btn" on:click={goBack}>&lt; Back</button>
 		<h1>Edit artwork</h1>
-		{#if artwork.artists && artwork.artists.length > 0}
-			<div class="mb-6">
-				<ArtistList 
-					artists={artwork.artists}
-					layout="badges"
-					size="sm"
-					showAvatars={true}
-					linkToWebsite={true}
-				/>
-			</div>
-		{/if}
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 			<div>
 				<div class="artwork-preview-container">
@@ -269,23 +258,44 @@
 									allowfullscreen
 								></iframe>
 							{:else}
-								<img 
-									src={artwork.animationUrl} 
+								<OptimizedImage
+									src={artwork.animationUrl}
 									alt={artwork.title}
-									class="media-content"
+									width={400}
+									height={400}
+									fit="contain"
+									format="webp"
+									quality={85}
+									showSkeleton={true}
+									skeletonBorderRadius="8px"
+									className="media-content"
 								/>
 							{/if}
 						{:else if artwork.imageUrl}
-							<img 
-								src={artwork.imageUrl} 
+							<OptimizedImage
+								src={artwork.imageUrl}
 								alt={artwork.title}
-								class="media-content"
+								width={400}
+								height={400}
+								fit="contain"
+								format="webp"
+								quality={85}
+								showSkeleton={true}
+								skeletonBorderRadius="8px"
+								className="media-content"
 							/>
 						{:else if artwork.thumbnailUrl}
-							<img 
-								src={artwork.thumbnailUrl} 
+							<OptimizedImage
+								src={artwork.thumbnailUrl}
 								alt={artwork.title}
-								class="media-content"
+								width={400}
+								height={400}
+								fit="contain"
+								format="webp"
+								quality={85}
+								showSkeleton={true}
+								skeletonBorderRadius="8px"
+								className="media-content"
 							/>
 						{:else}
 							<div class="no-media-placeholder">
@@ -423,10 +433,6 @@
 	}
 
 	.artwork-preview {
-		background: var(--color-surface-secondary, #f8f9fa);
-		border: 1px solid var(--color-border, #e5e7eb);
-		border-radius: 8px;
-		padding: 1rem;
 		max-height: 400px;
 		display: flex;
 		align-items: center;

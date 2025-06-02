@@ -16,6 +16,10 @@
 		description?: string;
 		year?: number;
 		artistId: string;
+		dimensions?: {
+			width: number;
+			height: number;
+		};
 	}
 
 	let artworks: Artwork[] = [];
@@ -155,13 +159,17 @@
 					src={displayImageUrl} 
 					alt={currentArtwork.title} 
 					className="current-artwork-image"
-					width={800}
+					width={currentArtwork.dimensions?.width || 800}
+					height={currentArtwork.dimensions?.height}
+					aspectRatio={currentArtwork.dimensions ? `${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height}` : undefined}
 					responsive={true}
 					responsiveSizes={[400, 800, 1200]}
 					sizes="(max-width: 768px) 100vw, 80vw"
 					fit="contain"
 					format="webp"
 					quality={90}
+					showSkeleton={true}
+					skeletonBorderRadius="0px"
 				/>
 			</div>
 			<button

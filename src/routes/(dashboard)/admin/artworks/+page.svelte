@@ -161,6 +161,8 @@
 								fit="cover"
 								format="webp"
 								quality={85}
+								showSkeleton={true}
+								skeletonBorderRadius="4px"
 								className="aspect-square"
 							/>
 						</button>

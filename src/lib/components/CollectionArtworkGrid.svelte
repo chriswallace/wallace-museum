@@ -6,6 +6,10 @@
 		title?: string;
 		imageUrl?: string;
 		mime?: string;
+		dimensions?: {
+			width: number;
+			height: number;
+		};
 	}> = [];
 	export let variant: 'collection' | 'search' = 'collection';
 	export let showRemoveButtons = false;

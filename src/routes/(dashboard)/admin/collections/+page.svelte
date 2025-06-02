@@ -115,28 +115,32 @@
 									alt=""
 									width={250}
 									height={250}
-									fit="cover"
+									fit="crop"
 									format="webp"
 									quality={80}
+									showSkeleton={true}
+									skeletonBorderRadius="4px"
 									className="aspect-square object-cover"
 								/>
 							{/if}
 						{/each}
 					</div>
 				</div>
-				<div class="title">{collection.title}</div>
-				{#if collection.artists && collection.artists.length > 0}
-					<div class="artists-container">
-						<ArtistList 
-							artists={collection.artists}
-							layout="badges"
-							size="xs"
-							showAvatars={true}
-							maxDisplay={3}
-							className="px-4 pb-2"
-						/>
-					</div>
-				{/if}
+				<div class="flex items-center justify-between">
+					<div class="title">{collection.title}</div>
+					{#if collection.artists && collection.artists.length > 0}
+						<div class="artists-container">
+							<ArtistList 
+								artists={collection.artists}
+								layout="badges"
+								size="md"
+								showAvatars={true}
+								maxDisplay={3}
+								className="pr-2"
+							/>
+						</div>
+					{/if}
+				</div>
 			</button>
 		{/each}
 	</div>

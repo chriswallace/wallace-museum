@@ -95,8 +95,11 @@
 		<OptimizedImage
 			src={displayUrl}
 			alt={artwork.title}
+			width={artwork.dimensions?.width}
+			height={artwork.dimensions?.height}
+			aspectRatio={aspectRatio}
 			showSkeleton={showLoader}
-			skeletonBorderRadius="4px"
+			skeletonBorderRadius="0px"
 			className="artwork-image"
 			on:load={handleLoad}
 		/>

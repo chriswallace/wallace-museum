@@ -13,6 +13,10 @@
 		generatorUrl?: string;
 		thumbnailUrl?: string;
 		mime?: string;
+		dimensions?: {
+			width: number;
+			height: number;
+		};
 	};
 	export let showRemoveButton = false;
 	export let onRemove: ((artwork: any) => void) | null = null;
@@ -50,12 +54,15 @@
 					<OptimizedImage
 						src={cardImageUrl}
 						alt={artwork.title || 'Artwork thumbnail'}
-						width={300}
-						height={300}
-						fit="cover"
+						width={artwork.dimensions?.width || 300}
+						height={artwork.dimensions?.height || 300}
+						aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
+						fit="contain"
 						format="webp"
 						quality={85}
-						className="w-full aspect-square object-cover rounded-md mb-3"
+						showSkeleton={true}
+						skeletonBorderRadius="0px"
+						className="w-full aspect-square object-contain rounded-md mb-3"
 						fallbackSrc="/images/medici-image.png"
 					/>
 				{/if}
@@ -66,7 +73,7 @@
 			</div>
 		</button>
 	{:else}
-		<div class="artwork-content">
+		<div class="artwork-content rounded-md bg-gray-500/10 py-5">
 			{#if displayAsVideo}
 				<video width="204" height="204" loop muted playsinline>
 					<source src={ipfsToHttpUrl(cardImageUrl)} type="video/mp4" />
@@ -75,12 +82,15 @@
 				<OptimizedImage
 					src={cardImageUrl}
 					alt={artwork.title || 'Artwork thumbnail'}
-					width={300}
-					height={300}
-					fit="cover"
+					width={artwork.dimensions?.width || 300}
+					height={artwork.dimensions?.height || 300}
+					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
+					fit="contain"
 					format="webp"
 					quality={85}
-					className="w-full aspect-square object-cover rounded-md mb-3"
+					showSkeleton={true}
+					skeletonBorderRadius="0px"
+					className="w-full object-contain mb-3"
 					fallbackSrc="/images/medici-image.png"
 				/>
 			{/if}
@@ -110,7 +120,7 @@
 
 <style lang="scss">
 	.artwork-card {
-		@apply relative mb-8;
+		@apply relative mb-0;
 
 		&.selectable {
 			@apply mb-0;
@@ -138,7 +148,7 @@
 	}
 
 	.artwork-title {
-		@apply text-lg font-semibold mb-3;
+		@apply text-base text-center font-normal mb-3;
 
 		.selectable & {
 			@apply py-3 truncate text-base font-normal mb-0;

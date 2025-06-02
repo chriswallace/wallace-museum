@@ -14,7 +14,7 @@ export interface ImageOptimizationOptions {
 	height?: number;
 	dpr?: 1 | 2 | 3; // Device pixel ratio
 	fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
-	gravity?: 'auto' | 'center' | 'top' | 'bottom' | 'left' | 'right';
+	gravity?: 'auto' | 'side' | string; // 'side' includes left, right, top, bottom, or coordinates like '0x1'
 	quality?: number; // 1-100
 	format?: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png';
 	animation?: boolean; // Preserve animations

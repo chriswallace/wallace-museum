@@ -202,11 +202,19 @@
 			<label class="block text-sm font-medium mb-2">Avatar</label>
 			<div class="relative group w-full aspect-square">
 				{#if artist.avatarUrl}
-					<img
-						src={getOptimizedAvatarUrl(artist.avatarUrl)}
+					<OptimizedImage
+						src={artist.avatarUrl}
 						alt={artist.name}
-						class="avatar-image w-full h-full object-cover border-2 border-gray-300 dark:border-gray-600 rounded-md"
-						on:error={(event) => handleImageError(event, artist.avatarUrl || '')}
+						width={300}
+						height={300}
+						fit="crop"
+						gravity="auto"
+						format="webp"
+						quality={85}
+						showSkeleton={true}
+						skeletonBorderRadius="6px"
+						className="avatar-image w-full h-full object-cover border-2 border-gray-300 dark:border-gray-600 rounded-md"
+						fallbackSrc="/images/medici-image.png"
 					/>
 				{:else}
 					<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-md">

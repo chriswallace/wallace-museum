@@ -567,13 +567,21 @@ export async function uploadToPinata(
 		let dimensions = null;
 		if (mimeType.startsWith('image/')) {
 			try {
+				// Use dynamic import for better serverless compatibility
 				const sharp = await import('sharp');
 				const imageInfo = await sharp.default(buffer).metadata();
 				if (imageInfo.width && imageInfo.height) {
 					dimensions = { width: imageInfo.width, height: imageInfo.height };
 				}
 			} catch (error) {
-				console.warn('Could not extract image dimensions:', error);
+				console.warn('Could not extract image dimensions with Sharp:', error);
+				// Fallback: try to get dimensions from file-type or other methods
+				try {
+					// You could add alternative dimension extraction here if needed
+					console.log('Sharp not available in this environment, skipping dimension extraction');
+				} catch (fallbackError) {
+					console.warn('Fallback dimension extraction also failed:', fallbackError);
+				}
 			}
 		}
 
@@ -601,8 +609,13 @@ export function getPinataTransformedUrl(
 		width?: number;
 		height?: number;
 		quality?: number;
-		format?: 'webp' | 'jpg' | 'png';
-		fit?: 'cover' | 'contain' | 'fill' | 'inside' | 'outside';
+		format?: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png';
+		fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
+		gravity?: 'auto' | 'side' | string;
+		dpr?: number;
+		sharpen?: number;
+		animation?: boolean;
+		metadata?: 'keep' | 'copyright' | 'none';
 	} = {}
 ): string {
 	const gateway = getPinataGateway();
@@ -615,14 +628,19 @@ export function getPinataTransformedUrl(
 		return baseUrl;
 	}
 
-	// Build transformation parameters for custom gateway
+	// Build transformation parameters for custom gateway using correct Pinata naming conventions
 	const params = new URLSearchParams();
 	
-	if (options.width) params.append('w', options.width.toString());
-	if (options.height) params.append('h', options.height.toString());
-	if (options.quality) params.append('q', options.quality.toString());
-	if (options.format) params.append('f', options.format);
-	if (options.fit) params.append('fit', options.fit);
+	if (options.width) params.append('img-width', options.width.toString());
+	if (options.height) params.append('img-height', options.height.toString());
+	if (options.quality) params.append('img-quality', options.quality.toString());
+	if (options.format) params.append('img-format', options.format);
+	if (options.fit) params.append('img-fit', options.fit);
+	if (options.gravity) params.append('img-gravity', options.gravity);
+	if (options.dpr) params.append('img-dpr', options.dpr.toString());
+	if (options.sharpen) params.append('img-sharpen', options.sharpen.toString());
+	if (options.animation !== undefined) params.append('img-anim', options.animation ? 'true' : 'false');
+	if (options.metadata) params.append('img-metadata', options.metadata);
 
 	const queryString = params.toString();
 	return queryString ? `${baseUrl}?${queryString}` : baseUrl;
@@ -695,9 +713,9 @@ export function convertToIpfsUrl(url: string): string {
 		return url;
 	}
 	
-	// Check if it's a Pinata gateway URL
-	const pinataGatewayRegex = /https?:\/\/[^/]*\.mypinata\.cloud\/ipfs\/([^/?#]+)/;
-	const publicGatewayRegex = /https?:\/\/gateway\.pinata\.cloud\/ipfs\/([^/?#]+)/;
+	// Check if it's a Pinata gateway URL - preserve full path
+	const pinataGatewayRegex = /https?:\/\/[^/]*\.mypinata\.cloud\/ipfs\/(.+)/;
+	const publicGatewayRegex = /https?:\/\/gateway\.pinata\.cloud\/ipfs\/(.+)/;
 	
 	let match = url.match(pinataGatewayRegex) || url.match(publicGatewayRegex);
 	
@@ -705,8 +723,8 @@ export function convertToIpfsUrl(url: string): string {
 		return `ipfs://${match[1]}`;
 	}
 	
-	// Check for other common IPFS gateway patterns
-	const genericGatewayRegex = /https?:\/\/[^/]+\/ipfs\/([^/?#]+)/;
+	// Check for other common IPFS gateway patterns - preserve full path
+	const genericGatewayRegex = /https?:\/\/[^/]+\/ipfs\/(.+)/;
 	match = url.match(genericGatewayRegex);
 	
 	if (match && match[1]) {

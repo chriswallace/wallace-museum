@@ -434,12 +434,11 @@
 	}
 
 	.museum-details-overlay {
-		@apply flex flex-col gap-6 w-full px-6 py-6 mx-auto bg-black bg-opacity-50 rounded-lg relative mt-0;
+		@apply flex flex-col gap-6 w-full md:px-6 py-6 mx-auto bg-black bg-opacity-50 rounded-lg relative mt-0;
 	}
 
 	.museum-header {
-		@apply flex justify-between items-start mb-0;
-		height: 70px;
+		@apply flex justify-between items-start mb-0 min-h-[70px];
 	}
 
 	.museum-artist-title {
@@ -548,13 +547,6 @@
 		}
 		100% {
 			transform: rotate(360deg);
-		}
-	}
-
-	@media (max-width: 768px) {
-		.artwork-container {
-			height: 60vh;
-			width: 95%;
 		}
 	}
 

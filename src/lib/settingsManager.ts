@@ -16,13 +16,43 @@ interface SettingsRecord {
 }
 
 /**
+ * Retry wrapper for database operations
+ */
+async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
+	let lastError: Error;
+	
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			return await operation();
+		} catch (error: any) {
+			lastError = error;
+			
+			// Only retry on connection pool timeouts
+			if (error?.code === 'P2024' && attempt < maxRetries) {
+				console.warn(`[SettingsManager] Connection pool timeout, retrying (${attempt}/${maxRetries})...`);
+				// Wait before retrying with exponential backoff
+				await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+				continue;
+			}
+			
+			// For other errors or max retries reached, throw immediately
+			throw error;
+		}
+	}
+	
+	throw lastError!;
+}
+
+/**
  * Get wallet addresses from settings
  */
 export async function getWalletAddresses(): Promise<WalletAddress[]> {
 	try {
-		const setting = (await prisma.settings.findUnique({
-			where: { key: SETTINGS_KEYS.WALLET_ADDRESSES }
-		})) as SettingsRecord | null;
+		const setting = await withRetry(async () => {
+			return (await prisma.settings.findUnique({
+				where: { key: SETTINGS_KEYS.WALLET_ADDRESSES }
+			})) as SettingsRecord | null;
+		});
 
 		if (!setting) {
 			return [];
@@ -89,14 +119,16 @@ export async function addWalletAddress(
 
 		const updatedAddresses = [...existingAddresses, newAddress];
 
-		// Create or update settings record
-		await prisma.settings.upsert({
-			where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
-			update: { value: JSON.stringify(updatedAddresses) },
-			create: {
-				key: SETTINGS_KEYS.WALLET_ADDRESSES,
-				value: JSON.stringify(updatedAddresses)
-			}
+		// Create or update settings record with retry logic
+		await withRetry(async () => {
+			return await prisma.settings.upsert({
+				where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
+				update: { value: JSON.stringify(updatedAddresses) },
+				create: {
+					key: SETTINGS_KEYS.WALLET_ADDRESSES,
+					value: JSON.stringify(updatedAddresses)
+				}
+			});
 		});
 
 		return updatedAddresses;
@@ -121,9 +153,11 @@ export async function removeWalletAddress(
 				!(addr.address.toLowerCase() === address.toLowerCase() && addr.blockchain === blockchain)
 		);
 
-		await prisma.settings.update({
-			where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
-			data: { value: JSON.stringify(updatedAddresses) }
+		await withRetry(async () => {
+			return await prisma.settings.update({
+				where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
+				data: { value: JSON.stringify(updatedAddresses) }
+			});
 		});
 
 		return updatedAddresses;
@@ -151,9 +185,11 @@ export async function updateWalletAddress(
 			return addr;
 		});
 
-		await prisma.settings.update({
-			where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
-			data: { value: JSON.stringify(updatedAddresses) }
+		await withRetry(async () => {
+			return await prisma.settings.update({
+				where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
+				data: { value: JSON.stringify(updatedAddresses) }
+			});
 		});
 
 		return updatedAddresses;

@@ -47,12 +47,27 @@
 	export let viewMode: 'grid' | 'list' = 'grid';
 	export let selectAllChecked = false;
 	export let onToggleSelectAll: (() => void) | null = null;
+
+	// Create unique key from contract address and token ID
+	function createUniqueKey(artwork: typeof artworks[0]): string {
+		return `${artwork.contractAddr || 'unknown'}-${artwork.tokenID || artwork.id}`;
+	}
+
+	// Deduplicate artworks by contract address + token ID to prevent duplicate key errors
+	$: uniqueArtworks = artworks.reduce((acc, artwork) => {
+		const key = createUniqueKey(artwork);
+		const existingIndex = acc.findIndex(item => createUniqueKey(item) === key);
+		if (existingIndex === -1) {
+			acc.push(artwork);
+		}
+		return acc;
+	}, [] as typeof artworks);
 </script>
 
 {#if viewMode === 'grid'}
 	<!-- Grid View -->
 	<div class="css-grid">
-		{#each artworks as artwork (artwork.id)}
+		{#each uniqueArtworks as artwork (createUniqueKey(artwork))}
 			<ImportArtworkCard
 				{artwork}
 				isSelected={selectedIds.includes(artwork.id)}
@@ -85,7 +100,7 @@
 				</tr>
 			</thead>
 			<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-				{#each artworks as artwork (artwork.id)}
+				{#each uniqueArtworks as artwork (createUniqueKey(artwork))}
 					<ImportArtworkCard
 						{artwork}
 						isSelected={selectedIds.includes(artwork.id)}

@@ -1,4 +1,3 @@
-import sharp from 'sharp';
 import path from 'path';
 import { promises as fs } from 'fs';
 import crypto from 'crypto';
@@ -23,6 +22,17 @@ import {
 
 // Import Pinata helpers
 import { uploadToPinata as pinataUpload, getPinataTransformedUrl } from './pinataHelpers';
+
+// Helper function to dynamically import Sharp with error handling
+async function getSharp() {
+	try {
+		const sharp = await import('sharp');
+		return sharp.default;
+	} catch (error) {
+		console.warn('Sharp not available in this environment:', error);
+		return null;
+	}
+}
 
 // Set the paths to the static binaries
 if (typeof ffmpegPath === 'string') {
@@ -514,13 +524,19 @@ export async function fetchMedia(
 		if (mimeType.startsWith('image/')) {
 			try {
 				//console.log(`[MEDIA_DEBUG] Extracting image dimensions for ${fileName}`);
-				const metadata = await sharp(buffer).metadata();
-				if (metadata.width && metadata.height) {
-					dimensions = createDimensions(metadata.width, metadata.height);
-					//console.log(`[MEDIA_DEBUG] Image dimensions: ${dimensions?.width}x${dimensions?.height}`);
-				} else {
-					//console.log(`[MEDIA_DEBUG] Image dimensions could not be determined from metadata`);
+				const sharp = await getSharp();
+				if (!sharp) {
+					console.warn('[MEDIA_DEBUG] Sharp not available, skipping image dimension extraction');
 					dimensions = null;
+				} else {
+					const metadata = await sharp(buffer).metadata();
+					if (metadata.width && metadata.height) {
+						dimensions = createDimensions(metadata.width, metadata.height);
+						//console.log(`[MEDIA_DEBUG] Image dimensions: ${dimensions?.width}x${dimensions?.height}`);
+					} else {
+						//console.log(`[MEDIA_DEBUG] Image dimensions could not be determined from metadata`);
+						dimensions = null;
+					}
 				}
 			} catch (sharpError: unknown) {
 				console.error(`[MEDIA_DEBUG] Error extracting image dimensions:`, sharpError);
@@ -606,6 +622,16 @@ async function convertToWebP(
 		//console.log('[WEBP_CONVERT] Converting image to WebP format');
 		const maxSizeBytes = maxSizeMB * 1024 * 1024;
 		const originalSize = buffer.length;
+
+		const sharp = await getSharp();
+		if (!sharp) {
+			console.warn('[WEBP_CONVERT] Sharp not available, returning original buffer');
+			// Return original buffer if Sharp is not available
+			return {
+				buffer,
+				mimeType: 'image/jpeg' // Assume JPEG as fallback
+			};
+		}
 
 		// Don't do any conversion if the image is already small enough
 		if (buffer.length <= maxSizeBytes) {
@@ -710,7 +736,7 @@ async function convertToWebP(
 		// Return original buffer on error
 		return {
 			buffer,
-			mimeType: buffer.length > 0 ? 'image/jpeg' : 'application/octet-stream'
+			mimeType: 'image/jpeg' // Assume JPEG as fallback
 		};
 	}
 }
@@ -1239,6 +1265,12 @@ export async function resizeMedia(
 		let success = false; // Flag to track if resize loop completed successfully
 
 		if (mimeType.startsWith('image/')) {
+			const sharp = await getSharp();
+			if (!sharp) {
+				console.warn('[RESIZE_MEDIA] Sharp not available, cannot resize image');
+				return null;
+			}
+
 			while (sizeMB > maxSizeMB && attempt < 10) {
 				let scaleFactor = attempt === 0 ? 1 : Math.pow(0.9, attempt);
 
@@ -1329,11 +1361,16 @@ export async function resizeMedia(
 		// Try to get dimensions of the final buffer (original or resized)
 		const finalDimensions = await (
 			mimeType.startsWith('image/')
-				? sharp(resizedBuffer)
-						.metadata()
-						.then((m) =>
-							createDimensions(m.width || dimensions.width, m.height || dimensions.height)
-						)
+				? (async () => {
+					const sharp = await getSharp();
+					if (!sharp) return dimensions;
+					try {
+						const metadata = await sharp(resizedBuffer).metadata();
+						return createDimensions(metadata.width || dimensions?.width, metadata.height || dimensions?.height);
+					} catch (error) {
+						return dimensions;
+					}
+				})()
 				: getVideoDimensions(resizedBuffer).then((d) => d || dimensions)
 		).catch(() => dimensions);
 
@@ -1638,6 +1675,11 @@ async function getImageDimensionsFromBuffer(buffer: Buffer): Promise<Dimensions 
 			`[DIMENSIONS_IMAGE_BUFFER] Getting dimensions from ${fileTypeResult.mime} buffer of size: ${(buffer.length / 1024 / 1024).toFixed(2)}MB`
 		);*/
 
+		const sharp = await getSharp();
+		if (!sharp) {
+			console.warn('[DIMENSIONS_IMAGE_BUFFER] Sharp not available, skipping image dimension extraction');
+			return null;
+		}
 		const metadata = await sharp(buffer).metadata();
 		if (metadata.width && metadata.height) {
 			/*console.log(

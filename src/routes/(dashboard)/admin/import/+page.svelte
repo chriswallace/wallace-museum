@@ -1,3 +1,7 @@
+<svelte:head>
+	<title>Import NFTs | Wallace Museum Admin</title>
+</svelte:head>
+
 <script lang="ts">
 	import { nfts, isLoading, walletAddress, isModalOpen } from '$lib/stores';
 	import type { Artwork } from '$lib/stores';
@@ -182,7 +186,9 @@
 				if (reset) {
 					searchResults = data.results;
 				} else {
-					searchResults = [...searchResults, ...data.results];
+					// Deduplicate when appending new results
+					const combinedResults = [...searchResults, ...data.results];
+					searchResults = deduplicateArtworks(combinedResults);
 				}
 
 				totalResults = data.total;
@@ -201,6 +207,24 @@
 		if (!isSearching && hasMore) {
 			searchArtworks(false);
 		}
+	}
+
+	// Helper function to create unique key from contract address and token ID
+	function createUniqueKey(artwork: ExtendedArtwork): string {
+		return `${artwork.contractAddr || 'unknown'}-${artwork.tokenID || artwork.id}`;
+	}
+
+	// Helper function to deduplicate artworks by contract address + token ID
+	function deduplicateArtworks(artworks: ExtendedArtwork[]): ExtendedArtwork[] {
+		const seen = new Set<string>();
+		return artworks.filter(artwork => {
+			const key = createUniqueKey(artwork);
+			if (seen.has(key)) {
+				return false;
+			}
+			seen.add(key);
+			return true;
+		});
 	}
 
 	// NEW: Simple selection functions
@@ -254,7 +278,7 @@
 			// Store imported IDs to remove from selection later
 			const importedIds = selectedArtworks.map((art) => art.id);
 
-			await finalizeImport(selectedArtworks);
+			await finalizeImport(selectedArtworks as Artwork[]);
 
 			// Clear selection after import
 			selectedIdsStore.set([]);

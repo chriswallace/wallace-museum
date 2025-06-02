@@ -163,7 +163,7 @@
 					quality={80}
 					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
 					showSkeleton={true}
-					skeletonBorderRadius="8px"
+					skeletonBorderRadius="0px"
 					className="w-full h-auto object-contain rounded-t-sm"
 					fallbackSrc="/images/medici-image.png"
 					loading="lazy"
@@ -195,7 +195,7 @@
 					quality={80}
 					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
 					showSkeleton={true}
-					skeletonBorderRadius="8px"
+					skeletonBorderRadius="0px"
 					className="w-full h-auto object-contain rounded-t-sm"
 					fallbackSrc="/images/medici-image.png"
 					loading="lazy"

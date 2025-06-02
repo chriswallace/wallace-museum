@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
+	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 
 	interface Artist {
 		id: number;
@@ -116,11 +117,19 @@
 			<button class="card" on:click={() => editArtist(artist.id)}>
 				<div class="avatar-container">
 					{#if artist.avatarUrl}
-						<img
-							src={getOptimizedAvatarUrl(artist.avatarUrl)}
+						<OptimizedImage
+							src={artist.avatarUrl}
 							alt={artist.name}
-							class="avatar-image"
-							on:error={(event) => handleImageError(event, artist.avatarUrl)}
+							width={120}
+							height={120}
+							fit="crop"
+							gravity="auto"
+							format="webp"
+							quality={85}
+							showSkeleton={true}
+							skeletonBorderRadius="6px"
+							className="avatar-image"
+							fallbackSrc="/images/medici-image.png"
 						/>
 					{:else}
 						<div class="avatar-placeholder">

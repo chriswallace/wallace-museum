@@ -49,7 +49,7 @@
 </script>
 
 <svelte:head>
-	<title>New collection</title>
+	<title>New Collection | Wallace Museum Admin</title>
 </svelte:head>
 
 <div class="max-w-3xl mx-auto">

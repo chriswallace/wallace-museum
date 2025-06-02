@@ -160,7 +160,7 @@
 							responsiveSizes={[imageWidth * 0.5, imageWidth, imageWidth * 1.5]}
 							sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
 							aspectRatio={item.aspectRatio}
-							skeletonBorderRadius="12px"
+							skeletonBorderRadius="0px"
 							className="masonry-image"
 						/>
 					</div>
@@ -184,7 +184,7 @@
 							width={imageWidth}
 							height={item.height}
 							aspectRatio={item.aspectRatio}
-							skeletonBorderRadius="12px"
+							skeletonBorderRadius="0px"
 							className="masonry-image"
 						/>
 					</div>

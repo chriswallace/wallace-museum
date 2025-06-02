@@ -389,11 +389,11 @@
 	}
 
 	.tabs {
-		@apply flex mb-8;
+		@apply relative flex mb-8 after:content-[''] after:block after:z-0 after:h-[2px] after:absolute after:bottom-0 after:left-0 after:bg-gray-700 after:w-full;
 	}
 
 	.tabs button {
-		@apply border-b-2 py-2 px-4 mr-4;
+		@apply z-10 border-b-2 border-b-transparent py-2 px-4;
 	}
 
 	.tabs button.active {

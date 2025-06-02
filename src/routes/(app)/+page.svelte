@@ -246,8 +246,7 @@
 	}
 
 	.artist-list {
-		@apply list-none p-0 flex flex-col items-stretch gap-2 m-0 pb-24 w-full;
-		max-width: min(800px, 55vw);
+		@apply list-none p-0 flex flex-col items-stretch gap-2 m-0 pb-24 w-full lg:max-w-[min(800px,55vw)];
 	}
 
 	.artist-list > li {

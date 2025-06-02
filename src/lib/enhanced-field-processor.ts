@@ -97,14 +97,20 @@ export class EnhancedFieldProcessor {
   ];
   
   /**
-   * Simple IPFS to HTTP conversion for internal use
+   * Convert IPFS URL to HTTP gateway URL while preserving full path
    */
   private simpleIpfsToHttp(url: string): string {
     if (!url) return url;
     
     if (url.startsWith('ipfs://')) {
-      const hash = url.replace('ipfs://', '');
-      return `${EnhancedFieldProcessor.IPFS_GATEWAYS[0]}${hash}`;
+      const pathAfterProtocol = url.replace('ipfs://', '');
+      return `${EnhancedFieldProcessor.IPFS_GATEWAYS[0]}${pathAfterProtocol}`;
+    }
+    
+    // If it's already a gateway URL, replace the gateway part
+    const gatewayRegex = /https?:\/\/[^/]+\/ipfs\//;
+    if (gatewayRegex.test(url)) {
+      return url.replace(gatewayRegex, `${EnhancedFieldProcessor.IPFS_GATEWAYS[0]}`);
     }
     
     return url;
@@ -219,15 +225,22 @@ export class EnhancedFieldProcessor {
    */
   private async detectMimeFromIpfs(url: string): Promise<string | null> {
     try {
-      // Convert IPFS URL to HTTP gateway URL
+      // Convert IPFS URL to HTTP gateway URL while preserving full path
       const httpUrl = this.simpleIpfsToHttp(url);
-      
-      const cid = this.extractCidFromUrl(url);
-      if (!cid) return null;
       
       for (const gateway of EnhancedFieldProcessor.IPFS_GATEWAYS) {
         try {
-          const testUrl = `${gateway}${cid}`;
+          // Replace gateway while preserving full path
+          let testUrl: string;
+          if (url.startsWith('ipfs://')) {
+            const pathAfterProtocol = url.replace('ipfs://', '');
+            testUrl = `${gateway}${pathAfterProtocol}`;
+          } else {
+            // Replace existing gateway
+            const gatewayRegex = /https?:\/\/[^/]+\/ipfs\//;
+            testUrl = url.replace(gatewayRegex, gateway);
+          }
+          
           const response = await fetchWithRetry(testUrl, 1, 1000);
           
           if (response.ok) {
@@ -570,27 +583,53 @@ export class EnhancedFieldProcessor {
   }
   
   /**
-   * Enhanced dimension extraction from IPFS URLs with multiple gateway support
+   * Get dimensions from IPFS URL while preserving full path
    */
   private async getDimensionsFromIpfs(url: string): Promise<{ width: number; height: number } | null> {
-    const cid = this.extractCidFromUrl(url);
-    if (!cid) return null;
-    
-    for (const gateway of EnhancedFieldProcessor.IPFS_GATEWAYS) {
-      try {
-        const testUrl = `${gateway}${cid}`;
-        const dims = await this.getDimensionsFromHttp(testUrl);
-        if (dims) {
-          console.log(`[EnhancedFieldProcessor] Extracted dimensions from IPFS: ${dims.width}x${dims.height} for ${url}`);
-          return dims;
+    try {
+      for (const gateway of EnhancedFieldProcessor.IPFS_GATEWAYS) {
+        try {
+          // Replace gateway while preserving full path
+          let testUrl: string;
+          if (url.startsWith('ipfs://')) {
+            const pathAfterProtocol = url.replace('ipfs://', '');
+            testUrl = `${gateway}${pathAfterProtocol}`;
+          } else {
+            // Replace existing gateway
+            const gatewayRegex = /https?:\/\/[^/]+\/ipfs\//;
+            testUrl = url.replace(gatewayRegex, gateway);
+          }
+          
+          const response = await fetchWithRetry(testUrl, 1, 1000);
+          
+          if (response.ok) {
+            const contentLength = response.headers.get('content-length');
+            if (contentLength && parseInt(contentLength) < 2 * 1024 * 1024) { // Only for files < 2MB
+              const buffer = await response.arrayBuffer();
+              const uint8Array = new Uint8Array(buffer.slice(0, 8192)); // Read first 8KB for analysis
+              
+              const contentType = response.headers.get('content-type');
+              const mimeType = contentType ? contentType.split(';')[0].trim() : null;
+              
+              if (mimeType) {
+                const dimensions = this.extractDimensionsFromImageBuffer(uint8Array, mimeType);
+                if (dimensions) {
+                  return dimensions;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          // Try next gateway
+          continue;
         }
-      } catch (error) {
-        // Try next gateway
-        continue;
       }
+      
+      return null;
+    } catch (error) {
+      console.warn(`[EnhancedFieldProcessor] Error getting dimensions from IPFS: ${error}`);
+      return null;
     }
-    
-    return null;
   }
   
   /**
@@ -789,12 +828,19 @@ export class EnhancedFieldProcessor {
    */
   private async processIpfsMetadata(metadataUrl: string): Promise<any> {
     try {
-      const cid = this.extractCidFromUrl(metadataUrl);
-      if (!cid) return null;
-      
       for (const gateway of EnhancedFieldProcessor.IPFS_GATEWAYS) {
         try {
-          const testUrl = `${gateway}${cid}`;
+          // Replace gateway while preserving full path
+          let testUrl: string;
+          if (metadataUrl.startsWith('ipfs://')) {
+            const pathAfterProtocol = metadataUrl.replace('ipfs://', '');
+            testUrl = `${gateway}${pathAfterProtocol}`;
+          } else {
+            // Replace existing gateway
+            const gatewayRegex = /https?:\/\/[^/]+\/ipfs\//;
+            testUrl = metadataUrl.replace(gatewayRegex, gateway);
+          }
+          
           const response = await fetchWithRetry(testUrl, 1, 2000);
           
           if (response.ok) {

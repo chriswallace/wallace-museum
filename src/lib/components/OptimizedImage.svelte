@@ -18,7 +18,7 @@
 	export let quality: number = 85;
 	export let format: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png' = 'webp';
 	export let fit: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad' = 'contain';
-	export let gravity: 'auto' | 'center' | 'top' | 'bottom' | 'left' | 'right' = 'auto';
+	export let gravity: 'auto' | 'side' | string = 'auto';
 	export let dpr: 1 | 2 | 3 = 1;
 	export let sharpen: number | undefined = undefined;
 	export let animation: boolean = true;
@@ -136,7 +136,7 @@
 
 	// Improved skeleton visibility logic - show skeleton when:
 	// 1. showSkeleton is enabled AND
-	// 2. Either no image source OR image hasn't loaded yet (and no error with fallback)
+	// 2. Either no image source OR image hasn't loaded yet
 	$: shouldShowSkeleton = showSkeleton && (!shouldShowImage || !isLoaded);
 
 	// Handle image load
@@ -167,10 +167,18 @@
 	}
 </script>
 
-<div class="optimized-image-container {className}" {style}>
+<div 
+	class="optimized-image-container {className}" 
+	{style}
+	style:aspect-ratio={calculatedAspectRatio}
+	style:width={width ? `${width}px` : '100%'}
+	style:height={height ? `${height}px` : (calculatedAspectRatio ? 'auto' : '100%')}
+	style:max-width="100%"
+	style:max-height="100%"
+>
 	<!-- Skeleton loader -->
 	{#if shouldShowSkeleton}
-		<div class="skeleton-wrapper {isLoaded ? 'hidden' : ''}">
+		<div class="skeleton-wrapper" class:hidden={isLoaded && shouldShowImage}>
 			<SkeletonLoader 
 				width="100%"
 				height="100%"
@@ -202,10 +210,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 100%;
-		height: 100%;
-		max-width: 100%;
-		max-height: 100%;
+		/* Width and height are now set inline based on props */
+		/* Ensure container maintains aspect ratio when specified */
+		min-height: 0;
 	}
 
 	.skeleton-wrapper {
@@ -216,13 +223,11 @@
 		top: 0;
 		left: 0;
 		transition: opacity 0.3s ease-in-out;
+		/* Ensure skeleton fills container properly */
+		min-height: 100px; /* Minimum height for visibility */
 	}
 
 	.skeleton-wrapper.hidden {
-		position: absolute;
-		top: 0;
-		left: 0;
-		z-index: 0;
 		opacity: 0;
 		pointer-events: none;
 	}
