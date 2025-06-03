@@ -182,27 +182,34 @@ export class UnifiedIndexer {
         throw new Error('No normalized data found in index record');
       }
 
-      // Use enhanced field processor to extract missing fields
-      const enhancedFields = await this.fieldProcessor.processArtworkFields(
-        indexRecord.rawResponse, 
-        indexRecord.blockchain
-      );
+      // Use enhanced field processor to extract missing fields with error handling
+      let enhancedFields: Partial<any> = {};
+      try {
+        enhancedFields = await this.fieldProcessor.processArtworkFields(
+          indexRecord.rawResponse, 
+          indexRecord.blockchain
+        );
+      } catch (enhancedError) {
+        console.warn(`[UnifiedIndexer] Enhanced field processing failed for index ${indexId}:`, enhancedError);
+        // Continue with empty enhanced fields if processing fails
+        enhancedFields = {};
+      }
 
-      // Merge enhanced fields with existing indexer data
+      // Merge enhanced fields with existing indexer data, filtering out undefined values
       const mergedData = {
         ...indexerData,
-        // Override with enhanced fields if they provide better data
-        mime: enhancedFields.mime || indexerData.mime,
-        dimensions: enhancedFields.dimensions || indexerData.dimensions,
-        attributes: enhancedFields.attributes || indexerData.attributes,
-        features: enhancedFields.features || indexerData.features,
-        supply: enhancedFields.supply || indexerData.supply,
-        generatorUrl: enhancedFields.generatorUrl || indexerData.generatorUrl,
-        // Ensure we have the best media URLs
-        imageUrl: enhancedFields.imageUrl || indexerData.imageUrl,
-        animationUrl: enhancedFields.animationUrl || indexerData.animationUrl,
-        thumbnailUrl: enhancedFields.thumbnailUrl || indexerData.thumbnailUrl,
-        metadataUrl: enhancedFields.metadataUrl || indexerData.metadataUrl
+        // Override with enhanced fields if they provide better data (and are not undefined)
+        ...(enhancedFields.mime && { mime: enhancedFields.mime }),
+        ...(enhancedFields.dimensions && { dimensions: enhancedFields.dimensions }),
+        ...(enhancedFields.attributes && { attributes: enhancedFields.attributes }),
+        ...(enhancedFields.features && { features: enhancedFields.features }),
+        ...(enhancedFields.supply && { supply: enhancedFields.supply }),
+        ...(enhancedFields.generatorUrl && { generatorUrl: enhancedFields.generatorUrl }),
+        // Ensure we have the best media URLs (only if they exist)
+        ...(enhancedFields.imageUrl && { imageUrl: enhancedFields.imageUrl }),
+        ...(enhancedFields.animationUrl && { animationUrl: enhancedFields.animationUrl }),
+        ...(enhancedFields.thumbnailUrl && { thumbnailUrl: enhancedFields.thumbnailUrl }),
+        ...(enhancedFields.metadataUrl && { metadataUrl: enhancedFields.metadataUrl })
       };
 
       // Step 1: Create/update Artist with wallet addresses stored as JSON
@@ -211,18 +218,18 @@ export class UnifiedIndexer {
       if (mergedData.creator?.address) {
         try {
           // Create or find artist by wallet address
-          const creatorAddress = mergedData.creator.address.toLowerCase();
+          const creatorAddress = mergedData.creator.address;
           const baseArtistName = mergedData.creator.username || `Artist_${creatorAddress.slice(-8)}`;
           
           // First, search all artists to find one with this wallet address
           let artist: any = null;
           const allArtists: any[] = await this.prisma.artist.findMany();
 
-          // Check if any artist has this wallet address
+          // Check if any artist has this wallet address (case-insensitive comparison)
           artist = allArtists.find(a => {
             if (!a.walletAddresses || !Array.isArray(a.walletAddresses)) return false;
             return (a.walletAddresses as any[]).some((w: any) => 
-              w.address?.toLowerCase() === creatorAddress
+              w.address?.toLowerCase() === creatorAddress.toLowerCase()
             );
           }) || null;
 
@@ -294,59 +301,52 @@ export class UnifiedIndexer {
             }
           } else {
             // Update existing artist and merge wallet addresses if needed
-            try {
-              console.log(`[UnifiedIndexer] Found existing artist with ID: ${artist.id}`);
-              
-              const existingWallets = Array.isArray(artist.walletAddresses) ? artist.walletAddresses as any[] : [];
-              const addressExists = existingWallets.some((w: any) => 
-                w.address?.toLowerCase() === creatorAddress
-              );
-              
-              let updatedWallets = existingWallets;
-              if (!addressExists) {
-                updatedWallets = [...existingWallets, {
-                  address: creatorAddress,
-                  blockchain: indexRecord.blockchain,
-                  lastIndexed: new Date().toISOString()
-                }];
-              }
-
-              // Update the artist with new information
-              artist = await this.prisma.artist.update({
-                where: { id: artist.id },
-                data: {
-                  updatedAt: new Date(),
-                  bio: mergedData.creator.bio || artist.bio,
-                  description: mergedData.creator.description || artist.description,
-                  username: mergedData.creator.username || artist.username,
-                  displayName: mergedData.creator.displayName || artist.displayName,
-                  ensName: mergedData.creator.ensName || artist.ensName,
-                  isVerified: mergedData.creator.isVerified ?? artist.isVerified,
-                  avatarUrl: mergedData.creator.avatarUrl || artist.avatarUrl,
-                  profileUrl: mergedData.creator.profileUrl || artist.profileUrl,
-                  websiteUrl: mergedData.creator.websiteUrl || artist.websiteUrl,
-                  twitterHandle: mergedData.creator.twitterHandle || mergedData.creator.socialLinks?.twitter || artist.twitterHandle,
-                  instagramHandle: mergedData.creator.instagramHandle || mergedData.creator.socialLinks?.instagram || artist.instagramHandle,
-                  profileData: (mergedData.creator.profileData || artist.profileData) as any,
-                  resolutionSource: mergedData.creator.resolutionSource || artist.resolutionSource,
-                  resolvedAt: mergedData.creator.resolutionSource && !artist.resolvedAt ? new Date() : artist.resolvedAt,
-                  socialLinks: (mergedData.creator.socialLinks || artist.socialLinks) as any,
-                  walletAddresses: updatedWallets as any
-                }
-              });
-
-              if (!artist || !artist.id) {
-                throw new Error('Failed to update artist - no ID returned');
-              }
-
-              artistId = artist.id;
-              result.artistId = artist.id;
-              result.createdRecords.artist = true;
-              console.log(`[UnifiedIndexer] Updated artist with ID: ${artistId}`);
-            } catch (updateError) {
-              console.error(`[UnifiedIndexer] Failed to update artist:`, updateError);
-              throw new Error(`Failed to update artist: ${updateError instanceof Error ? updateError.message : 'Unknown error'}`);
+            const existingWallets = Array.isArray(artist.walletAddresses) ? artist.walletAddresses as any[] : [];
+            const addressExists = existingWallets.some((w: any) => 
+              w.address?.toLowerCase() === creatorAddress.toLowerCase()
+            );
+            
+            let updatedWallets = existingWallets;
+            if (!addressExists) {
+              updatedWallets = [...existingWallets, {
+                address: creatorAddress,
+                blockchain: indexRecord.blockchain,
+                lastIndexed: new Date().toISOString()
+              }];
             }
+
+            // Update the artist with new information
+            artist = await this.prisma.artist.update({
+              where: { id: artist.id },
+              data: {
+                updatedAt: new Date(),
+                bio: mergedData.creator.bio || artist.bio,
+                description: mergedData.creator.description || artist.description,
+                username: mergedData.creator.username || artist.username,
+                displayName: mergedData.creator.displayName || artist.displayName,
+                ensName: mergedData.creator.ensName || artist.ensName,
+                isVerified: mergedData.creator.isVerified ?? artist.isVerified,
+                avatarUrl: mergedData.creator.avatarUrl || artist.avatarUrl,
+                profileUrl: mergedData.creator.profileUrl || artist.profileUrl,
+                websiteUrl: mergedData.creator.websiteUrl || artist.websiteUrl,
+                twitterHandle: mergedData.creator.twitterHandle || mergedData.creator.socialLinks?.twitter || artist.twitterHandle,
+                instagramHandle: mergedData.creator.instagramHandle || mergedData.creator.socialLinks?.instagram || artist.instagramHandle,
+                profileData: (mergedData.creator.profileData || artist.profileData) as any,
+                resolutionSource: mergedData.creator.resolutionSource || artist.resolutionSource,
+                resolvedAt: mergedData.creator.resolutionSource && !artist.resolvedAt ? new Date() : artist.resolvedAt,
+                socialLinks: (mergedData.creator.socialLinks || artist.socialLinks) as any,
+                walletAddresses: updatedWallets as any
+              }
+            });
+
+            if (!artist || !artist.id) {
+              throw new Error('Failed to update artist - no ID returned');
+            }
+
+            artistId = artist.id;
+            result.artistId = artist.id;
+            result.createdRecords.artist = true;
+            console.log(`[UnifiedIndexer] Updated artist with ID: ${artistId}`);
           }
         } catch (artistError) {
           console.error(`[UnifiedIndexer] Error in artist processing:`, artistError);
@@ -491,67 +491,109 @@ export class UnifiedIndexer {
         console.log(`[UnifiedIndexer] No mint date provided for ${indexRecord.contractAddress}:${indexRecord.tokenId}`);
       }
 
-      const baseArtworkData = {
+      // Create artwork data object, filtering out undefined values
+      const baseArtworkData: any = {
         title: mergedData.title,
-        description: mergedData.description,
         contractAddress: indexRecord.contractAddress,
         tokenId: indexRecord.tokenId,
         blockchain: indexRecord.blockchain,
         tokenStandard: mergedData.tokenStandard,
-        imageUrl: processedImageUrl,
-        thumbnailUrl: (() => {
-          // If we have a problematic thumbnail, use the display/artifact image instead
-          if (isProblematicThumbnail(processedThumbnailUrl) || 
-              isProblematicThumbnail(mergedData.thumbnailUrl)) {
-            console.log(`[UnifiedIndexer] Detected problematic thumbnail for ${indexRecord.contractAddress}:${indexRecord.tokenId}, using display/artifact image instead`);
-            return processedImageUrl || mergedData.imageUrl;
-          }
-          
-          // Don't store thumbnail URL if it's the same as the image URL
-          if (processedThumbnailUrl && processedImageUrl && processedThumbnailUrl === processedImageUrl) {
-            console.log(`[UnifiedIndexer] Thumbnail URL is same as image URL for ${indexRecord.contractAddress}:${indexRecord.tokenId}, storing null to avoid duplication`);
-            return null;
-          }
-          
-          // Don't store thumbnail URL if it's the same as the original image URL
-          if (processedThumbnailUrl && mergedData.imageUrl && processedThumbnailUrl === mergedData.imageUrl) {
-            console.log(`[UnifiedIndexer] Thumbnail URL is same as original image URL for ${indexRecord.contractAddress}:${indexRecord.tokenId}, storing null to avoid duplication`);
-            return null;
-          }
-          
-          // Return the thumbnail URL if it's different from the image URL, or null if no thumbnail
-          return processedThumbnailUrl || null;
-        })(),
-        animationUrl: processedAnimationUrl,
-        generatorUrl: mergedData.generatorUrl,
-        metadataUrl: mergedData.metadataUrl,
-        mime: mergedData.mime,
-        supply: mergedData.supply,
-        mintDate: mintDate,
-        dimensions: mergedData.dimensions ? mergedData.dimensions : undefined,
-        attributes: mergedData.attributes || undefined,
-        features: mergedData.features || undefined,
         uid: indexRecord.nftUid
       };
 
-       const artwork = await this.prisma.artwork.upsert({
-         where: {
-           contractAddress_tokenId: {
-             contractAddress: indexRecord.contractAddress,
-             tokenId: indexRecord.tokenId
-           }
-         },
-         update: baseArtworkData,
-         create: {
-           ...baseArtworkData,
-           ...(collectionId ? { collectionId } : {})
-         }
-       });
+      // Add optional fields only if they have values
+      if (mergedData.description !== undefined) {
+        baseArtworkData.description = mergedData.description;
+      }
+      
+      if (processedImageUrl !== undefined) {
+        baseArtworkData.imageUrl = processedImageUrl;
+      }
+      
+      if (processedAnimationUrl !== undefined) {
+        baseArtworkData.animationUrl = processedAnimationUrl;
+      }
+      
+      if (mergedData.generatorUrl !== undefined) {
+        baseArtworkData.generatorUrl = mergedData.generatorUrl;
+      }
+      
+      if (mergedData.metadataUrl !== undefined) {
+        baseArtworkData.metadataUrl = mergedData.metadataUrl;
+      }
+      
+      if (mergedData.mime !== undefined) {
+        baseArtworkData.mime = mergedData.mime;
+      }
+      
+      if (mergedData.supply !== undefined) {
+        baseArtworkData.supply = mergedData.supply;
+      }
+      
+      if (mintDate !== undefined) {
+        baseArtworkData.mintDate = mintDate;
+      }
+      
+      if (mergedData.dimensions !== undefined) {
+        baseArtworkData.dimensions = mergedData.dimensions;
+      }
+      
+      if (mergedData.attributes !== undefined) {
+        baseArtworkData.attributes = mergedData.attributes;
+      }
+      
+      if (mergedData.features !== undefined) {
+        baseArtworkData.features = mergedData.features;
+      }
+
+      // Handle thumbnail URL with special logic
+      const thumbnailUrl = (() => {
+        // If we have a problematic thumbnail, use the display/artifact image instead
+        if (isProblematicThumbnail(processedThumbnailUrl) || 
+            isProblematicThumbnail(mergedData.thumbnailUrl)) {
+          console.log(`[UnifiedIndexer] Detected problematic thumbnail for ${indexRecord.contractAddress}:${indexRecord.tokenId}, using display/artifact image instead`);
+          return processedImageUrl || mergedData.imageUrl;
+        }
+        
+        // Don't store thumbnail URL if it's the same as the image URL
+        if (processedThumbnailUrl && processedImageUrl && processedThumbnailUrl === processedImageUrl) {
+          console.log(`[UnifiedIndexer] Thumbnail URL is same as image URL for ${indexRecord.contractAddress}:${indexRecord.tokenId}, storing null to avoid duplication`);
+          return null;
+        }
+        
+        // Don't store thumbnail URL if it's the same as the original image URL
+        if (processedThumbnailUrl && mergedData.imageUrl && processedThumbnailUrl === mergedData.imageUrl) {
+          console.log(`[UnifiedIndexer] Thumbnail URL is same as original image URL for ${indexRecord.contractAddress}:${indexRecord.tokenId}, storing null to avoid duplication`);
+          return null;
+        }
+        
+        // Return the thumbnail URL if it's different from the image URL, or null if no thumbnail
+        return processedThumbnailUrl || null;
+      })();
+
+      if (thumbnailUrl !== undefined) {
+        baseArtworkData.thumbnailUrl = thumbnailUrl;
+      }
+
+      // Step 6: Create/update Artwork (this is the import step)
+      const artwork = await this.prisma.artwork.upsert({
+        where: {
+          contractAddress_tokenId: {
+            contractAddress: indexRecord.contractAddress,
+            tokenId: indexRecord.tokenId
+          }
+        },
+        update: baseArtworkData,
+        create: {
+          ...baseArtworkData,
+          ...(collectionId ? { collectionId } : {})
+        }
+      });
 
       result.artworkId = artwork.id;
       result.createdRecords.artwork = true;
 
-      // Step 6: Link artist to artwork using direct many-to-many relationship
+      // Step 7: Link artist to artwork using direct many-to-many relationship
       if (artistId) {
         try {
           await this.prisma.artwork.update({
@@ -576,7 +618,7 @@ export class UnifiedIndexer {
         }
       });
 
-      // Step 7: Pin any remaining IPFS URLs that weren't uploaded to Pinata
+      // Step 8: Pin any remaining IPFS URLs that weren't uploaded to Pinata
       // This is for cases where media processing failed or for metadata URLs
       try {
         const { extractCidsFromArtwork, pinCidToPinata } = await import('$lib/pinataHelpers');

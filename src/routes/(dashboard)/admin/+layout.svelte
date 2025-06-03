@@ -25,7 +25,7 @@
 </script>
 
 <div class="ui-frame bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200">
-	<div class="ui-header bg-white dark:bg-[#B85C28]">
+	<div class="ui-header bg-white dark:bg-primary">
 		<nav>
 			<a class="medici" href="/">Medici.</a>
 

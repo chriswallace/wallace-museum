@@ -1026,6 +1026,56 @@ export class EnhancedFieldProcessor {
   }
   
   /**
+   * Check if a URL looks like a generator/interactive URL
+   */
+  private isGeneratorUrl(url: string): boolean {
+    const generatorPatterns = [
+      /generator/i,
+      /artblocks\.io\/generator/i,
+      /fxhash\.xyz.*\/gentk/i,
+      /\.html$/i,
+      /interactive/i,
+      /live/i
+    ];
+    
+    return generatorPatterns.some(pattern => pattern.test(url));
+  }
+  
+  /**
+   * Check if this is fxhash generative content based on contract and content type
+   */
+  private isFxhashGenerativeContent(rawData: any): boolean {
+    // Check if it's from a known fxhash contract
+    const fxhashContracts = [
+      'KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi', // fxhash v1
+      'KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE', // fxhash v2
+      'KT1AaaBSo5AE6Eo8fpEN5xhCD4w3kHStafxk', // fxhash gentk v1
+      'KT1XCoGnfupWk7Sp8536EfrxcP73LmT68Nyr'  // fxhash gentk v2
+    ];
+    
+    const contractAddress = rawData.fa?.contract || rawData.contract_address || rawData.contractAddress;
+    const isFxhashContract = contractAddress && fxhashContracts.includes(contractAddress);
+    
+    if (!isFxhashContract) {
+      return false;
+    }
+    
+    // For fxhash contracts, check if artifact_uri looks like generative content
+    const artifactUri = rawData.artifact_uri;
+    if (!artifactUri) {
+      return false;
+    }
+    
+    // fxhash generative content indicators
+    return artifactUri.includes('.html') ||
+           artifactUri.includes('fxhash') ||
+           artifactUri.includes('generator') ||
+           artifactUri.includes('interactive') ||
+           rawData.mime === 'text/html' ||
+           rawData.mime === 'application/javascript';
+  }
+  
+  /**
    * Process all artwork fields with enhanced extraction
    */
   async processArtworkFields(rawData: any, blockchain: string): Promise<Partial<EnhancedArtworkData>> {
@@ -1099,11 +1149,23 @@ export class EnhancedFieldProcessor {
    */
   private extractAnimationUrl(rawData: any, blockchain: string): string | null {
     if (blockchain === 'tezos') {
-      // For Tezos, animation might be in artifact_uri if it's not an image
-      return rawData.animation_url || 
-             rawData.animationUrl || 
-             (rawData.artifact_uri && this.isAnimationUrl(rawData.artifact_uri) ? rawData.artifact_uri : null) ||
-             null;
+      // For Tezos, check animation_url first, then check artifact_uri for interactive content
+      const directAnimationUrl = rawData.animation_url || rawData.animationUrl;
+      if (directAnimationUrl) {
+        return directAnimationUrl;
+      }
+      
+      // Check if artifact_uri is interactive/generative content
+      if (rawData.artifact_uri) {
+        // Be more aggressive about detecting interactive content for fxhash
+        if (this.isAnimationUrl(rawData.artifact_uri) || 
+            this.isGeneratorUrl(rawData.artifact_uri) ||
+            this.isFxhashGenerativeContent(rawData)) {
+          return rawData.artifact_uri;
+        }
+      }
+      
+      return null;
     } else {
       // Ethereum prioritization
       return rawData.animation_url || 
@@ -1138,23 +1200,8 @@ export class EnhancedFieldProcessor {
            rawData.metadataUrl || 
            rawData.token_uri || 
            rawData.tokenUri || 
+           rawData.metadata || // Add support for Tezos metadata field
            null;
-  }
-  
-  /**
-   * Check if a URL looks like a generator/interactive URL
-   */
-  private isGeneratorUrl(url: string): boolean {
-    const generatorPatterns = [
-      /generator/i,
-      /artblocks\.io\/generator/i,
-      /fxhash\.xyz.*\/gentk/i,
-      /\.html$/i,
-      /interactive/i,
-      /live/i
-    ];
-    
-    return generatorPatterns.some(pattern => pattern.test(url));
   }
   
   /**
@@ -1162,6 +1209,7 @@ export class EnhancedFieldProcessor {
    */
   private isAnimationUrl(url: string): boolean {
     const animationPatterns = [
+      // Video files
       /\.(mp4|webm|mov|gif|avi|ogv)$/i,
       /video/i,
       /animation/i,
@@ -1169,7 +1217,22 @@ export class EnhancedFieldProcessor {
       /openseauserdata\.com.*\.mp4/i,
       /raw\.seadn\.io.*\.mp4/i,
       /cloudfront\.net.*\.mp4/i,
-      /\.gif$/i
+      /\.gif$/i,
+      
+      // Interactive/generative content
+      /\.html$/i,
+      /\.htm$/i,
+      /fxhash\.xyz.*\/gentk/i,
+      /generator\.artblocks\.io/i,
+      /artblocks\.io\/generator/i,
+      /interactive/i,
+      /generator/i,
+      /live/i,
+      
+      // IPFS URLs that might be interactive content
+      /ipfs.*\.html/i,
+      /ipfs.*generator/i,
+      /ipfs.*interactive/i
     ];
     
     return animationPatterns.some(pattern => pattern.test(url));

@@ -139,13 +139,8 @@ export async function processArtist(artistInfo: ArtistInfo) {
 	// Fallback to address if username is missing, empty, or zero address
 	if (!artistName || artistName.trim() === '' || artistName === zeroAddress) {
 		if (artistInfo.address && artistInfo.address !== zeroAddress) {
-			// For Ethereum addresses, make them more readable with proper formatting
-			if (artistInfo.address.startsWith('0x')) {
-				// Keep it in the original format but normalize case
-				artistName = artistInfo.address.toLowerCase();
-			} else {
-				artistName = artistInfo.address;
-			}
+			// For Ethereum addresses, keep them in their original format
+			artistName = artistInfo.address;
 		} else {
 			// If both username and address are invalid, cannot process artist
 			console.warn('[ARTIST_PROCESS] Invalid artist name and address provided.');
@@ -716,7 +711,7 @@ export async function saveArtwork(
 	if (rawCreatorAddress) {
 		try {
 			// Create or find artist using the new schema with JSON wallet addresses
-			const creatorAddress = rawCreatorAddress.toLowerCase();
+			const creatorAddress = rawCreatorAddress;
 			const artistName = `Artist_${creatorAddress.slice(-8)}`;
 			
 			// First, search all artists to find one with this wallet address
@@ -727,7 +722,7 @@ export async function saveArtwork(
 			artist = allArtists.find(a => {
 				if (!a.walletAddresses || !Array.isArray(a.walletAddresses)) return false;
 				return (a.walletAddresses as any[]).some((w: any) => 
-					w.address?.toLowerCase() === creatorAddress
+					w.address === creatorAddress
 				);
 			}) || null;
 
@@ -784,7 +779,7 @@ export async function saveArtwork(
 				// Update existing artist and merge wallet addresses if needed
 				const existingWallets = Array.isArray(artist.walletAddresses) ? artist.walletAddresses as any[] : [];
 				const addressExists = existingWallets.some((w: any) => 
-					w.address?.toLowerCase() === creatorAddress
+					w.address === creatorAddress
 				);
 				
 				if (!addressExists) {

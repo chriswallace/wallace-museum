@@ -11,7 +11,20 @@ module.exports = {
 		},
 		extend: {
 			colors: {
-				primary: 'var(--color-primary)',
+				primary: {
+					DEFAULT: 'rgb(184 92 40)',
+					50: 'rgb(251 247 244)',
+					100: 'rgb(247 237 230)',
+					200: 'rgb(238 218 201)',
+					300: 'rgb(229 199 172)',
+					400: 'rgb(211 161 114)',
+					500: 'rgb(184 92 40)',
+					600: 'rgb(166 83 36)',
+					700: 'rgb(138 69 30)',
+					800: 'rgb(110 55 24)',
+					900: 'rgb(92 46 20)',
+					950: 'rgb(55 27 12)'
+				},
 				secondary: 'var(--color-secondary)',
 				success: 'var(--color-background-success)',
 				success_text: 'var(--color-text-success)',
@@ -26,7 +39,8 @@ module.exports = {
 					600: '#616161',
 					700: '#424242',
 					800: '#303030',
-					900: '#1C1C1C'
+					900: '#222222',
+					950: '#1C1C1C'
 				}
 			},
 			fontFamily: {

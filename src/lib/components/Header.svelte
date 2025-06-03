@@ -11,6 +11,10 @@
 		id: number;
 		name: string;
 		websiteUrl?: string;
+		avatarUrl?: string;
+		bio?: string;
+		twitterHandle?: string;
+		instagramHandle?: string;
 	}
 
 	interface ArtistArtwork {
@@ -105,12 +109,17 @@
 						id: aa.artist.id,
 						name: aa.artist.name,
 						websiteUrl: aa.artist.websiteUrl,
-						avatarUrl: null
+						avatarUrl: aa.artist.avatarUrl,
+						bio: aa.artist.bio,
+						twitterHandle: aa.artist.twitterHandle,
+						instagramHandle: aa.artist.instagramHandle
 					}))}
 					layout="horizontal"
 					size="sm"
 					showAvatars={false}
-					linkToWebsite={true}
+					linkToWebsite={false}
+					linkToArtist={false}
+					showPopover={true}
 					separator=", "
 					className="text-sm"
 				/>

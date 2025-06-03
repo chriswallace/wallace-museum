@@ -39,6 +39,11 @@ export const load: PageServerLoad = async ({ params }) => {
 		artist: {
 			id: artist.id,
 			name: artist.name,
+			bio: artist.bio,
+			avatarUrl: artist.avatarUrl,
+			websiteUrl: artist.websiteUrl,
+			twitterHandle: artist.twitterHandle,
+			instagramHandle: artist.instagramHandle,
 			addresses: artist.walletAddresses,
 			artworks
 		}

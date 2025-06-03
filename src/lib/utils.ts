@@ -137,9 +137,11 @@ export function getContractUrl(
 ): string | undefined {
 	if (!address) return undefined;
 
-	// Handle Tezos addresses
-	if (address.startsWith('KT1') || address.startsWith('KT2')) {
-		if (tokenId) {
+	// Handle Tezos addresses (both contracts KT1/KT2 and wallets tz1/tz2/tz3)
+	if (address.startsWith('KT1') || address.startsWith('KT2') || 
+		address.startsWith('tz1') || address.startsWith('tz2') || address.startsWith('tz3')) {
+		if (tokenId && (address.startsWith('KT1') || address.startsWith('KT2'))) {
+			// Only contracts can have token IDs
 			return `https://tzkt.io/${address}/tokens/${tokenId}`;
 		}
 		return `https://tzkt.io/${address}`;

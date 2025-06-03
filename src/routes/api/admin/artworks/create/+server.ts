@@ -98,7 +98,7 @@ export async function POST({ request }) {
 			if (newArtistName) {
 				// Create new artist with the provided name and wallet address
 				const walletAddresses = [{
-					address: creatorAddress.toLowerCase(),
+					address: creatorAddress,
 					blockchain: creatorBlockchain,
 					lastIndexed: new Date().toISOString()
 				}];
@@ -112,8 +112,7 @@ export async function POST({ request }) {
 				artistId = newArtist.id;
 			} else {
 				// Find or create artist using wallet address
-				const creatorAddressLower = creatorAddress.toLowerCase();
-				const artistName = `Artist_${creatorAddressLower.slice(-8)}`;
+				const artistName = `Artist_${creatorAddress.slice(-8)}`;
 				
 				// First, search all artists to find one with this wallet address
 				let artist: any = null;
@@ -123,7 +122,7 @@ export async function POST({ request }) {
 				artist = allArtists.find(a => {
 					if (!a.walletAddresses || !Array.isArray(a.walletAddresses)) return false;
 					return (a.walletAddresses as any[]).some((w: any) => 
-						w.address?.toLowerCase() === creatorAddressLower
+						w.address === creatorAddress
 					);
 				}) || null;
 
@@ -141,7 +140,7 @@ export async function POST({ request }) {
 				if (!artist) {
 					// Create new artist with wallet address
 					const walletAddresses = [{
-						address: creatorAddressLower,
+						address: creatorAddress,
 						blockchain: creatorBlockchain,
 						lastIndexed: new Date().toISOString()
 					}];
@@ -180,12 +179,12 @@ export async function POST({ request }) {
 					// Update existing artist and merge wallet addresses if needed
 					const existingWallets = Array.isArray(artist.walletAddresses) ? artist.walletAddresses as any[] : [];
 					const addressExists = existingWallets.some((w: any) => 
-						w.address?.toLowerCase() === creatorAddressLower
+						w.address === creatorAddress
 					);
 					
 					if (!addressExists) {
 						const updatedWallets = [...existingWallets, {
-							address: creatorAddressLower,
+							address: creatorAddress,
 							blockchain: creatorBlockchain,
 							lastIndexed: new Date().toISOString()
 						}];

@@ -174,7 +174,7 @@
 		try {
 			const params = new URLSearchParams({
 				q: searchTerm,
-				limit: '20',
+				limit: '48',
 				offset: currentOffset.toString(),
 				type: activeTab // Use the new type parameter instead of filter
 			});
@@ -193,7 +193,7 @@
 
 				totalResults = data.total;
 				currentOffset = data.offset + data.results.length;
-				hasMore = data.results.length === 20; // If we got a full page, there might be more
+				hasMore = data.results.length === 48; // If we got a full page, there might be more
 			}
 		} catch (error) {
 			console.error('Error searching artworks:', error);

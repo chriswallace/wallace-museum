@@ -85,7 +85,7 @@
 	<!-- ArtistNameWithAvatar Component -->
 	<section class="space-y-4">
 		<h2 class="text-2xl font-semibold">ArtistNameWithAvatar Component</h2>
-		<p class="text-gray-600 dark:text-gray-400">Artist name with avatar, supporting links and prefixes.</p>
+		<p class="text-gray-600 dark:text-gray-400">Artist name with avatar, supporting links, prefixes, and popover functionality.</p>
 		
 		<div class="space-y-3">
 			<div class="p-3 border rounded">
@@ -111,6 +111,20 @@
 			<div class="p-3 border rounded">
 				<p class="text-sm text-gray-500 mb-2">Large size:</p>
 				<ArtistNameWithAvatar artist={sampleArtists[0]} size="lg" />
+			</div>
+
+			<div class="p-3 border rounded bg-blue-50 dark:bg-blue-900/20">
+				<p class="text-sm text-gray-500 mb-2">🆕 With popover (click artist name):</p>
+				<ArtistNameWithAvatar 
+					artist={{
+						...sampleArtists[0],
+						bio: "Alice is a contemporary digital artist exploring the intersection of technology and human emotion through generative art and interactive installations.",
+						twitterHandle: "alicejohnson_art",
+						instagramHandle: "alice.creates"
+					}} 
+					showPopover={true} 
+					prefix="by"
+				/>
 			</div>
 		</div>
 	</section>

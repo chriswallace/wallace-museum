@@ -33,7 +33,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
 		// Check if address already exists for this artist and blockchain
 		const addressExists = currentWallets.some((wallet: any) => 
-			wallet.address?.toLowerCase() === data.address.toLowerCase() && 
+			wallet.address === data.address && 
 			wallet.blockchain === data.blockchain
 		);
 
@@ -43,7 +43,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
 		// Create the new wallet object
 		const newWallet = {
-			address: data.address.toLowerCase(),
+			address: data.address,
 			blockchain: data.blockchain,
 			lastIndexed: new Date().toISOString()
 		};

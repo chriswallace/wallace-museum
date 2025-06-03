@@ -45,11 +45,11 @@ export class MinimalDBOperations {
     // Determine if this NFT was created by the wallet being indexed
     let nftType = type;
     if (indexingWalletAddress && nftData.creator?.address) {
-      const creatorAddress = nftData.creator.address.toLowerCase();
-      const walletAddress = indexingWalletAddress.toLowerCase();
+      const creatorAddress = nftData.creator.address;
+      const walletAddress = indexingWalletAddress;
       
-      // If the creator address matches the wallet being indexed, mark as created
-      if (creatorAddress === walletAddress) {
+      // If the creator address matches the wallet being indexed, mark as created (case-insensitive)
+      if (creatorAddress.toLowerCase() === walletAddress.toLowerCase()) {
         nftType = 'created';
       }
     }
@@ -126,7 +126,7 @@ export class MinimalDBOperations {
    * Upsert collection data
    */
   async upsertCollection(collectionData: MinimalCollectionData): Promise<{ id: number }> {
-    const contractAddress = collectionData.contractAddress.toLowerCase();
+    const contractAddress = collectionData.contractAddress;
     
     // Determine blockchain based on contract address format
     const blockchain = detectBlockchainFromContract(contractAddress);
@@ -170,7 +170,7 @@ export class MinimalDBOperations {
    * Upsert wallet address data (requires artist to be created first)
    */
   async upsertWalletAddress(creatorData: MinimalCreatorData): Promise<{ id: number }> {
-    const walletAddress = creatorData.address.toLowerCase();
+    const walletAddress = creatorData.address;
     
     // Determine blockchain based on wallet address format
     const blockchain = detectBlockchain(walletAddress);
@@ -230,9 +230,11 @@ export class MinimalDBOperations {
     console.log(`[MinimalDBOperations] Storing batch of ${nfts.length} NFTs with type: ${type}${indexingWalletAddress ? ` for wallet: ${indexingWalletAddress}` : ''}`);
 
     // Process in smaller batches to avoid connection pool exhaustion
-    const batchSize = 10;
+    const batchSize = 5; // Reduced from 10 to be more conservative
     for (let i = 0; i < nfts.length; i += batchSize) {
       const batch = nfts.slice(i, i + batchSize);
+      
+      console.log(`[MinimalDBOperations] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(nfts.length / batchSize)} (${batch.length} items)`);
       
       // Store batch with retry logic
       for (let j = 0; j < batch.length; j++) {
@@ -265,8 +267,8 @@ export class MinimalDBOperations {
             
             // Check if it's a connection pool error
             if (error.code === 'P2024' || error.message?.includes('connection pool')) {
-              console.warn(`[MinimalDBOperations] Connection pool error, retrying in 1s... (${retries} retries left)`);
-              await new Promise(resolve => setTimeout(resolve, 1000));
+              console.warn(`[MinimalDBOperations] Connection pool error, retrying in 2s... (${retries} retries left)`);
+              await new Promise(resolve => setTimeout(resolve, 2000)); // Increased delay
               retries--;
             } else {
               // Non-connection pool error, don't retry
@@ -286,22 +288,14 @@ export class MinimalDBOperations {
         }
       }
       
-      // Add delay between batches to prevent overwhelming the connection pool
+      // Add longer delay between batches to prevent overwhelming the connection pool
       if (i + batchSize < nfts.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        console.log(`[MinimalDBOperations] Waiting 1s before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Increased from 100ms
       }
     }
 
-    const successRate = stored.length / nfts.length;
-    console.log(`[MinimalDBOperations] Batch complete: ${stored.length}/${nfts.length} stored (${(successRate * 100).toFixed(2)}% success rate)`);
-
-    if (errors.length > 0) {
-      console.warn(`[MinimalDBOperations] ${errors.length} errors during batch storage:`);
-      errors.forEach((error, idx) => {
-        console.warn(`  Error ${idx + 1}: ${error.error} (NFT: ${error.nft.contractAddress}:${error.nft.tokenId})`);
-      });
-    }
-
+    console.log(`[MinimalDBOperations] Batch complete: ${stored.length} stored, ${errors.length} errors`);
     return { stored: stored.length, errors };
   }
   

@@ -19,68 +19,53 @@ export interface ArtistWithPreview {
 
 export const load: ServerLoad = async () => {
 	try {
-		// First, let's get all artists and see if there are any
-		const allArtists = await prisma.artist.findMany({
+		// Use a more efficient query with proper includes instead of raw SQL
+		const artists = await prisma.artist.findMany({
 			select: {
 				id: true,
 				name: true,
-				avatarUrl: true
+				avatarUrl: true,
+				artworks: {
+					select: {
+						id: true,
+						title: true,
+						imageUrl: true
+					},
+					take: 10 // Limit artworks per artist
+				}
+			},
+			orderBy: {
+				name: 'asc'
 			}
 		});
 
-		// Get all artworks to see what's available
-		const allArtworks = await prisma.artwork.findMany({
-			select: {
-				id: true,
-				title: true,
-				imageUrl: true
-			},
-			take: 10
+		// Transform the data to match the expected interface
+		const artistsWithPreview: ArtistWithPreview[] = artists.map((artist) => {
+			const transformedArtworks: PreviewArtwork[] = artist.artworks.map((artwork) => ({
+				id: String(artwork.id),
+				title: artwork.title,
+				image_url: artwork.imageUrl
+			}));
+
+			return {
+				id: artist.id,
+				name: artist.name,
+				previewArtwork: transformedArtworks.length > 0 ? transformedArtworks[0] : null,
+				artworks: transformedArtworks
+			};
 		});
 
-		// Get artists with their artworks using raw query
-		const artistsWithArtworks = await Promise.all(
-			allArtists.map(async (artist) => {
-				const artworks = await prisma.$queryRaw`
-					SELECT a.id, a.title, a."imageUrl"
-					FROM "Artwork" a
-					JOIN "_ArtistArtworks" aa ON a.id = aa."B"
-					WHERE aa."A" = ${artist.id}
-					LIMIT 10
-				` as any[];
-
-				const transformedArtworks: PreviewArtwork[] = artworks.map((artwork) => ({
-					id: String(artwork.id),
-					title: artwork.title,
-					image_url: artwork.imageUrl
-				}));
-
-				return {
-					id: artist.id,
-					name: artist.name,
-					previewArtwork: transformedArtworks.length > 0 ? transformedArtworks[0] : null,
-					artworks: transformedArtworks
-				};
-			})
-		);
-
 		// Filter to only include artists with artworks
-		const artists = artistsWithArtworks.filter((artist) => artist.artworks.length > 0);
-
-		// Sort artists alphabetically by name
-		artists.sort((a, b) => a.name.localeCompare(b.name));
+		const artistsWithArtworks = artistsWithPreview.filter((artist) => artist.artworks.length > 0);
 
 		// If no artists with artworks, return all artists anyway for debugging
-		if (artists.length === 0 && allArtists.length > 0) {
-			const artistsWithoutArtworks: ArtistWithPreview[] = allArtists.map((artist) => ({
+		if (artistsWithArtworks.length === 0 && artists.length > 0) {
+			const artistsWithoutArtworks: ArtistWithPreview[] = artists.map((artist) => ({
 				id: artist.id,
 				name: artist.name,
 				previewArtwork: null,
 				artworks: []
 			}));
-			
-			// Sort the fallback list alphabetically as well
-			artistsWithoutArtworks.sort((a, b) => a.name.localeCompare(b.name));
 			
 			return {
 				artists: artistsWithoutArtworks
@@ -88,7 +73,7 @@ export const load: ServerLoad = async () => {
 		}
 
 		return {
-			artists: artists
+			artists: artistsWithArtworks
 		};
 	} catch (error) {
 		console.error('Failed to load artists:', error);

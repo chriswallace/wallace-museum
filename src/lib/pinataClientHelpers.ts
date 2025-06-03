@@ -1,6 +1,7 @@
 /**
  * Client-side version of Pinata helpers
  * This file contains only functions that don't require server-side environment variables
+ * Updated for Pinata V3 API compatibility
  */
 
 /**
@@ -49,6 +50,15 @@ export function extractCidFromUrl(url: string): string | null {
 export function extractCidsFromArtwork(artwork: any): string[] {
 	const cids = new Set<string>();
 
+	const extractAndLog = (url: string, source: string) => {
+		if (!url) return;
+		const cid = extractCidFromUrl(url);
+		if (cid) {
+			console.log(`[EXTRACT_CIDS] Found CID ${cid} from ${source}: ${url}`);
+			cids.add(cid);
+		}
+	};
+
 	// Common fields that might contain IPFS URLs
 	const fieldsToCheck = [
 		'image_url',
@@ -71,8 +81,7 @@ export function extractCidsFromArtwork(artwork: any): string[] {
 	// Check main fields
 	for (const field of fieldsToCheck) {
 		if (artwork[field]) {
-			const cid = extractCidFromUrl(artwork[field]);
-			if (cid) cids.add(cid);
+			extractAndLog(artwork[field], `artwork.${field}`);
 		}
 	}
 
@@ -80,14 +89,23 @@ export function extractCidsFromArtwork(artwork: any): string[] {
 	if (artwork.metadata && typeof artwork.metadata === 'object') {
 		for (const field of fieldsToCheck) {
 			if (artwork.metadata[field]) {
-				const cid = extractCidFromUrl(artwork.metadata[field]);
-				if (cid) cids.add(cid);
+				extractAndLog(artwork.metadata[field], `artwork.metadata.${field}`);
 			}
 		}
-	}
 
-	// Check additional fields that might be present on the artwork object
-	// (The search API now returns these fields directly on the artwork object)
+		// Also check for any other fields in metadata that might contain IPFS URLs
+		const checkForIpfsUrls = (obj: any, prefix: string = '') => {
+			for (const [key, value] of Object.entries(obj)) {
+				if (typeof value === 'string' && (value.includes('ipfs://') || value.includes('/ipfs/'))) {
+					extractAndLog(value, `${prefix}${key}`);
+				} else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+					checkForIpfsUrls(value, `${prefix}${key}.`);
+				}
+			}
+		};
+
+		checkForIpfsUrls(artwork.metadata, 'artwork.metadata.');
+	}
 
 	return Array.from(cids);
 }
@@ -110,4 +128,20 @@ export function getIpfsGatewayUrl(cid: string, gateway?: string): string {
 	const normalizedGateway = gatewayUrl.endsWith('/') ? gatewayUrl : `${gatewayUrl}/`;
 
 	return `${normalizedGateway}${extractedCid}`;
+}
+
+/**
+ * Convert various URL formats to IPFS URL format
+ * @param url - The URL to convert
+ * @returns IPFS URL (ipfs://CID) or original URL if not IPFS
+ */
+export function convertToIpfsUrl(url: string): string {
+	if (!url) return url;
+
+	const cid = extractCidFromUrl(url);
+	if (cid) {
+		return `ipfs://${cid}`;
+	}
+
+	return url;
 }

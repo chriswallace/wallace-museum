@@ -86,7 +86,7 @@ export async function GET({ url, request }: RequestEvent) {
 
 		const searchParams = url.searchParams;
 		const query = searchParams.get('q') || '';
-		const limit = parseInt(searchParams.get('limit') || '20', 10);
+		const limit = parseInt(searchParams.get('limit') || '48', 10);
 		const offset = parseInt(searchParams.get('offset') || '0', 10);
 		const filter = searchParams.get('filter') || 'all';
 		const type = searchParams.get('type') || 'all'; // New type filter parameter

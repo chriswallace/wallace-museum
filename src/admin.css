@@ -19,7 +19,7 @@
 	--border-radius-md: 12px;
 	--border-radius-lg: 18px;
 
-	--color-primary: hsl(99, 63%, 48%);
+	--color-primary: rgb(184 92 40);
 	--color-secondary: #242424;
 	--color-background-error: #f20000;
 	--color-text-error: #fff;
@@ -28,14 +28,14 @@
 
 	--grid-spacing: 8px;
 
-	--button-color-background-primary: var(--color-primary);
-	--button-color-background-primary-dark: hsl(99, 85%, 40%);
+	--button-color-background-primary: rgb(184 92 40);
+	--button-color-background-primary-dark: rgb(166 83 36);
 	--button-color-text-primary: #ffffff;
-	--button-color-text-primary-dark: #000000;
-	--button-color-background-primary-hover: hsl(99, 84%, 58%);
-	--button-color-background-primary-dark-hover: hsl(99, 65%, 50%);
-	--button-color-text-primary-hover: #000000;
-	--button-color-text-primary-dark-hover: #000000;
+	--button-color-text-primary-dark: #ffffff;
+	--button-color-background-primary-hover: rgb(211 161 114);
+	--button-color-background-primary-dark-hover: rgb(138 69 30);
+	--button-color-text-primary-hover: #ffffff;
+	--button-color-text-primary-dark-hover: #ffffff;
 
 	--button-color-background-secondary: var(--color-secondary);
 	--button-color-text-secondary: #000000;
@@ -59,13 +59,13 @@
 		--background-without-opacity: #1c1c1c;
 		--logo-color: #f5f5f5;
 
-		--color-primary: hsl(99, 63%, 45%);
+		--color-primary: rgb(184 92 40);
 		--color-secondary: #f5f5f5;
 
-		--button-color-background-primary: var(--color-primary);
-		--button-color-text-primary: #000000;
-		--button-color-background-primary-hover: hsl(99, 84%, 55%);
-		--button-color-text-primary-hover: #000000;
+		--button-color-background-primary: rgb(184 92 40);
+		--button-color-text-primary: #ffffff;
+		--button-color-background-primary-hover: rgb(211 161 114);
+		--button-color-text-primary-hover: #ffffff;
 
 		--input-color-background: #303030;
 		--input-color-text: #f5f5f5;
@@ -130,7 +130,14 @@
 	}
 
 	.medici {
-		@apply font-semibold tracking-tight text-2xl mr-6 justify-self-start text-[#21401F] dark:text-primary;
+		@apply font-semibold tracking-tight text-2xl mr-6 justify-self-start;
+		color: rgb(138 69 30);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.medici {
+			color: rgb(184 92 40);
+		}
 	}
 
 	.content {
@@ -146,11 +153,12 @@
 	}
 
 	.primary {
-		@apply rounded-sm bg-primary whitespace-nowrap text-white dark:text-black font-semibold;
+		@apply rounded-sm whitespace-nowrap text-white font-semibold;
+		background-color: rgb(184 92 40);
 	}
 
 	.primary:hover {
-		background-color: var(--button-color-background-primary-dark);
+		background-color: rgb(166 83 36);
 	}
 
 	.destructive {
@@ -174,11 +182,14 @@
 	}
 
 	.edit {
-		@apply bg-transparent text-primary border border-primary;
+		@apply bg-transparent border;
+		color: rgb(184 92 40);
+		border-color: rgb(184 92 40);
 	}
 
 	.edit:hover {
-		@apply bg-primary text-white dark:text-black;
+		background-color: rgb(184 92 40);
+		@apply text-white;
 	}
 
 	button[disabled] {
@@ -434,7 +445,8 @@ input[type='radio'] {
 
 input[type='checkbox']:checked,
 input[type='radio']:checked {
-	@apply bg-primary border-primary;
+	background-color: rgb(184 92 40);
+	border-color: rgb(184 92 40);
 }
 
 /* Small descriptive text under inputs */
@@ -465,7 +477,8 @@ small {
 }
 
 .selected-indicator {
-	@apply bg-primary dark:text-black;
+	background-color: rgb(184 92 40);
+	@apply text-white;
 }
 
 /* Non-editable content style */

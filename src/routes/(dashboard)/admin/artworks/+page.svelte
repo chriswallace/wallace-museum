@@ -16,8 +16,12 @@
 		animation_url?: string;
 		artists?: Artist[];
 		collection?: { id: number | string; title: string };
-		enabled?: boolean;
 		// Add other fields as needed
+	}
+
+	interface Collection {
+		id: number;
+		title: string;
 	}
 
 	let artworks: Artwork[] = [];
@@ -26,6 +30,19 @@
 	let sortColumn: string = 'title';
 	let sortOrder: 'asc' | 'desc' = 'asc'; // 'asc' for ascending, 'desc' for descending
 	let searchQuery: string = '';
+	
+	// Bulk actions state
+	let selectedArtworks = new Set<number | string>();
+	let showBulkActions = false;
+	let allArtists: Artist[] = [];
+	let allCollections: Collection[] = [];
+	let bulkEditArtistIds: number[] = [];
+	let bulkEditCollectionId: number | null = null;
+
+	// Reactive variables for bulk actions
+	$: selectedCount = selectedArtworks.size;
+	$: allSelected = artworks.length > 0 && selectedArtworks.size === artworks.length;
+	$: someSelected = selectedArtworks.size > 0 && selectedArtworks.size < artworks.length;
 
 	async function fetchArtworks(page: number = 1) {
 		let url = `/api/admin/artworks/?page=${page}`;
@@ -45,21 +62,146 @@
 		}
 	}
 
-	async function toggleArtworkEnabled(artwork: Artwork) {
-		const response = await fetch(`/api/admin/artworks/toggle/${artwork.id}`, {
-			method: 'POST' // Or the appropriate method
-		});
-		if (response.ok) {
-			artwork.enabled = !artwork.enabled;
-			toast.push(`Artwork ${artwork.enabled ? 'enabled' : 'disabled'} successfully`);
+	async function fetchArtistsAndCollections() {
+		try {
+			const [artistsRes, collectionsRes] = await Promise.all([
+				fetch('/api/admin/artists'),
+				fetch('/api/admin/collections/all')
+			]);
+
+			if (artistsRes.ok) {
+				allArtists = await artistsRes.json();
+			}
+
+			if (collectionsRes.ok) {
+				const collectionsData = await collectionsRes.json();
+				allCollections = collectionsData.collections;
+			}
+		} catch (error) {
+			console.error('Error fetching artists and collections:', error);
+		}
+	}
+
+	function toggleArtworkSelection(artworkId: number | string) {
+		if (selectedArtworks.has(artworkId)) {
+			selectedArtworks.delete(artworkId);
 		} else {
-			toast.push(`Artwork ${artwork.enabled ? 'enable' : 'disable'} failed`);
-			console.error('Failed to toggle artwork enabled state');
+			selectedArtworks.add(artworkId);
+		}
+		selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
+	}
+
+	function toggleSelectAll() {
+		if (allSelected) {
+			selectedArtworks.clear();
+		} else {
+			selectedArtworks = new Set(artworks.map(artwork => artwork.id));
+		}
+		selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
+	}
+
+	function openBulkActions() {
+		if (selectedCount === 0) {
+			toast.push('Please select at least one artwork');
+			return;
+		}
+		showBulkActions = true;
+	}
+
+	function closeBulkActions() {
+		showBulkActions = false;
+		bulkEditArtistIds = [];
+		bulkEditCollectionId = null;
+	}
+
+	async function handleBulkDelete() {
+		if (selectedCount === 0) {
+			toast.push('Please select at least one artwork');
+			return;
+		}
+
+		if (!confirm(`Are you sure you want to delete ${selectedCount} artwork(s)? This action cannot be undone.`)) {
+			return;
+		}
+
+		try {
+			const response = await fetch('/api/admin/artworks/bulk', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					action: 'delete',
+					artworkIds: Array.from(selectedArtworks)
+				})
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				toast.push(result.message || 'Artworks deleted successfully');
+				selectedArtworks.clear();
+				selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
+				fetchArtworks(page);
+			} else {
+				const error = await response.json();
+				toast.push(`Failed to delete artworks: ${error.error}`);
+			}
+		} catch (error) {
+			console.error('Error deleting artworks:', error);
+			toast.push('Error deleting artworks');
+		}
+	}
+
+	async function handleBulkEdit() {
+		if (selectedCount === 0) {
+			toast.push('Please select at least one artwork');
+			return;
+		}
+
+		if (bulkEditArtistIds.length === 0 && bulkEditCollectionId === null) {
+			toast.push('Please select at least one artist or collection to assign');
+			return;
+		}
+
+		try {
+			const editData: any = {};
+			
+			if (bulkEditArtistIds.length > 0) {
+				editData.artistIds = bulkEditArtistIds;
+			}
+			
+			if (bulkEditCollectionId !== null) {
+				editData.collectionId = bulkEditCollectionId;
+			}
+
+			const response = await fetch('/api/admin/artworks/bulk', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					action: 'edit',
+					artworkIds: Array.from(selectedArtworks),
+					data: editData
+				})
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				toast.push(result.message || 'Artworks updated successfully');
+				selectedArtworks.clear();
+				selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
+				closeBulkActions();
+				fetchArtworks(page);
+			} else {
+				const error = await response.json();
+				toast.push(`Failed to update artworks: ${error.error}`);
+			}
+		} catch (error) {
+			console.error('Error updating artworks:', error);
+			toast.push('Error updating artworks');
 		}
 	}
 
 	onMount(() => {
 		fetchArtworks(page);
+		fetchArtistsAndCollections();
 	});
 
 	function editArtwork(id: number | string) {
@@ -114,13 +256,31 @@
 		on:input={handleSearchInput}
 	/>
 
+	<!-- Bulk Actions Bar -->
+	{#if selectedCount > 0}
+		<div class="bulk-actions-bar">
+			<span class="selected-count">{selectedCount} artwork(s) selected</span>
+			<div class="bulk-actions-buttons">
+				<button class="secondary" on:click={openBulkActions}>
+					Bulk Edit
+				</button>
+				<button class="delete" on:click={handleBulkDelete}>
+					Delete Selected
+				</button>
+			</div>
+		</div>
+	{/if}
+
 	<table>
 		<thead>
 			<tr>
-				<th class="enable sortable" on:click={() => changeSorting('enabled')}>
-					Enabled
-					{sortColumn === 'enabled' && sortOrder === 'asc' ? ' ↑' : ''}
-					{sortColumn === 'enabled' && sortOrder === 'desc' ? ' ↓' : ''}
+				<th class="select">
+					<input
+						type="checkbox"
+						checked={allSelected}
+						indeterminate={someSelected}
+						on:change={toggleSelectAll}
+					/>
 				</th>
 				<th class="artwork"></th>
 				<th class="title sortable" on:click={() => changeSorting('title')}>
@@ -147,8 +307,8 @@
 					<td>
 						<input
 							type="checkbox"
-							checked={artwork.enabled}
-							on:click={() => toggleArtworkEnabled(artwork)}
+							checked={selectedArtworks.has(artwork.id)}
+							on:change={() => toggleArtworkSelection(artwork.id)}
 						/>
 					</td>
 					<td>
@@ -210,9 +370,47 @@
 	</nav>
 {/if}
 
+<!-- Bulk Edit Modal -->
+{#if showBulkActions}
+	<div class="modal-overlay" on:click={closeBulkActions}>
+		<div class="modal" on:click|stopPropagation>
+			<div class="modal-header">
+				<h2>Bulk Edit {selectedCount} Artwork(s)</h2>
+				<button class="close-button" on:click={closeBulkActions}>&times;</button>
+			</div>
+			<div class="modal-content">
+				<div class="form-group">
+					<label for="bulk-artists">Assign Artists</label>
+					<select id="bulk-artists" multiple bind:value={bulkEditArtistIds} class="multi-select">
+						{#each allArtists as artist}
+							<option value={artist.id}>{artist.name}</option>
+						{/each}
+					</select>
+					<small class="help-text">Hold Command/Ctrl to select multiple artists. This will replace existing artist assignments.</small>
+				</div>
+				
+				<div class="form-group">
+					<label for="bulk-collection">Assign Collection</label>
+					<select id="bulk-collection" bind:value={bulkEditCollectionId}>
+						<option value={null}>-- No Collection --</option>
+						{#each allCollections as collection}
+							<option value={collection.id}>{collection.title}</option>
+						{/each}
+					</select>
+					<small class="help-text">This will replace existing collection assignments.</small>
+				</div>
+			</div>
+			<div class="modal-actions">
+				<button class="secondary" on:click={closeBulkActions}>Cancel</button>
+				<button class="primary" on:click={handleBulkEdit}>Update Artworks</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <style lang="scss">
-	.enable {
-		@apply w-32;
+	.select {
+		@apply w-12;
 	}
 
 	.artwork {
@@ -233,5 +431,64 @@
 
 	.actions {
 		@apply w-12;
+	}
+
+	.bulk-actions-bar {
+		@apply flex items-center justify-between border rounded-md p-4 mb-4;
+		background-color: rgba(184, 92, 40, 0.1);
+		border-color: rgba(184, 92, 40, 0.3);
+		
+		.selected-count {
+			color: rgb(138 69 30);
+			@apply font-medium;
+		}
+		
+		.bulk-actions-buttons {
+			@apply flex gap-2;
+		}
+	}
+
+	.modal-overlay {
+		@apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+	}
+
+	.modal {
+		@apply bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4;
+	}
+
+	.modal-header {
+		@apply flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700;
+		
+		h2 {
+			@apply text-lg font-semibold text-gray-900 dark:text-white;
+		}
+		
+		.close-button {
+			@apply text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl font-bold bg-transparent border-none cursor-pointer;
+		}
+	}
+
+	.modal-content {
+		@apply p-6 space-y-4;
+	}
+
+	.form-group {
+		@apply space-y-2;
+		
+		label {
+			@apply block text-sm font-medium text-gray-700 dark:text-gray-300;
+		}
+		
+		.multi-select {
+			@apply min-h-[120px];
+		}
+		
+		.help-text {
+			@apply text-xs text-gray-500 dark:text-gray-400;
+		}
+	}
+
+	.modal-actions {
+		@apply flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700;
 	}
 </style>

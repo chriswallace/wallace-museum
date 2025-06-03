@@ -112,7 +112,7 @@
 		<p>No artists found.</p>
 	</div>
 {:else}
-	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 w-full">
+	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 w-full">
 		{#each artists as artist}
 			<button class="card" on:click={() => editArtist(artist.id)}>
 				<div class="avatar-container">
@@ -120,8 +120,8 @@
 						<OptimizedImage
 							src={artist.avatarUrl}
 							alt={artist.name}
-							width={120}
-							height={120}
+							width={300}
+							height={300}
 							fit="crop"
 							gravity="auto"
 							format="webp"
@@ -149,14 +149,13 @@
 	}
 
 	.avatar-container {
-		@apply aspect-square w-full relative overflow-hidden;
+		@apply aspect-square w-full relative overflow-hidden rounded-full;
 		width: 100%;
 		height: auto;
 	}
 
 	.avatar-image {
-		@apply w-full h-full object-cover;
-		border-radius: 6px;
+		@apply w-full h-full object-cover rounded-full;
 	}
 
 	.avatar-placeholder {

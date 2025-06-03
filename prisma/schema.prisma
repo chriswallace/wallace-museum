@@ -8,8 +8,8 @@ datasource db {
 }
 
 model Artist {
-  id               Int             @id @default(autoincrement())
-  name             String          @unique
+  id               Int          @id @default(autoincrement())
+  name             String       @unique
   bio              String?
   websiteUrl       String?
   twitterHandle    String?
@@ -17,57 +17,57 @@ model Artist {
   avatarUrl        String?
   description      String?
   username         String?
-  createdAt        DateTime        @default(now())
+  createdAt        DateTime     @default(now())
   displayName      String?
   ensName          String?
-  isVerified       Boolean         @default(false)
+  isVerified       Boolean      @default(false)
   profileData      Json?
   profileUrl       String?
   resolutionSource String?
   resolvedAt       DateTime?
   socialLinks      Json?
-  walletAddresses  Json?           // JSON array of wallet objects: [{ address: string, blockchain: string, lastIndexed?: DateTime }]
-  updatedAt        DateTime        @updatedAt
-  collections      Collection[]    @relation("ArtistCollections")
-  artworks         Artwork[]       @relation("ArtistArtworks")
+  walletAddresses  Json?
+  updatedAt        DateTime     @updatedAt
+  artworks         Artwork[]    @relation("ArtistArtworks")
+  collections      Collection[] @relation("ArtistCollections")
 }
 
 model Collection {
-  id                         Int                 @id @default(autoincrement())
-  slug                       String              @unique
-  title                      String
-  description                String?
-  curatorNotes               String?
-  enabled                    Boolean
-  bannerImageUrl             String?
-  chainIdentifier            String?
-  contractAddresses          Json?
-  discordUrl                 String?
-  fees                       Json?
-  imageUrl                   String?
-  lastSyncedAt               DateTime?
-  mediumUrl                  String?
-  projectUrl                 String?
-  safelistStatus             String?
-  telegramUrl                String?
-  websiteUrl                 String?
-  artBlocksProjectId         Int?
-  collectionCreator          String?
-  curatorAddress             String?
-  currentSupply              Int?
-  externalCollectionId       String?
-  floorPrice                 Float?
-  fxhashProjectId            Int?
-  isGenerativeArt            Boolean             @default(false)
-  isSharedContract           Boolean             @default(false)
-  mintEndDate                DateTime?
-  mintStartDate              DateTime?
-  parentContract             String?
-  projectNumber              Int?
-  totalSupply                Int?
-  volumeTraded               Float?
-  artworks                   Artwork[]
-  artists                    Artist[]            @relation("ArtistCollections")
+  id                   Int       @id @default(autoincrement())
+  slug                 String    @unique
+  title                String
+  description          String?
+  curatorNotes         String?
+  enabled              Boolean
+  bannerImageUrl       String?
+  chainIdentifier      String?
+  contractAddresses    Json?
+  discordUrl           String?
+  fees                 Json?
+  imageUrl             String?
+  lastSyncedAt         DateTime?
+  mediumUrl            String?
+  projectUrl           String?
+  safelistStatus       String?
+  telegramUrl          String?
+  websiteUrl           String?
+  artBlocksProjectId   Int?
+  collectionCreator    String?
+  curatorAddress       String?
+  currentSupply        Int?
+  externalCollectionId String?
+  floorPrice           Float?
+  fxhashProjectId      Int?
+  isGenerativeArt      Boolean   @default(false)
+  isSharedContract     Boolean   @default(false)
+  mintEndDate          DateTime?
+  mintStartDate        DateTime?
+  parentContract       String?
+  projectNumber        Int?
+  totalSupply          Int?
+  volumeTraded         Float?
+  artworks             Artwork[]
+  artists              Artist[]  @relation("ArtistCollections")
 
   @@index([parentContract])
   @@index([isGenerativeArt])
@@ -76,7 +76,7 @@ model Collection {
 }
 
 model Artwork {
-  id              Int             @id @default(autoincrement())
+  id              Int           @id @default(autoincrement())
   title           String
   description     String?
   collectionId    Int?
@@ -87,7 +87,7 @@ model Artwork {
   mime            String?
   metadataUrl     String?
   animationUrl    String?
-  generatorUrl    String?         // Generator URI for generative artworks
+  generatorUrl    String?
   contractAddress String?
   dimensions      Json?
   features        Json?
@@ -95,10 +95,10 @@ model Artwork {
   supply          Int?
   thumbnailUrl    String?
   tokenId         String?
-  uid             String?         @unique
-  collection      Collection?     @relation(fields: [collectionId], references: [id])
+  uid             String?       @unique
+  collection      Collection?   @relation(fields: [collectionId], references: [id])
   indexData       ArtworkIndex?
-  artists         Artist[]        @relation("ArtistArtworks")
+  artists         Artist[]      @relation("ArtistArtworks")
 
   @@unique([contractAddress, tokenId])
 }
@@ -146,7 +146,7 @@ model ArtworkIndex {
   normalizedData  Json     @default("{}")
   errorMessage    String?
   lastAttempt     DateTime @default(now())
-  artwork         Artwork? @relation(fields: [artworkId], references: [id], onDelete: SetNull)
+  artwork         Artwork? @relation(fields: [artworkId], references: [id])
 
   @@unique([contractAddress, tokenId])
   @@index([blockchain])
@@ -158,8 +158,8 @@ model ArtworkIndex {
 model UserWallet {
   id        Int      @id @default(autoincrement())
   userId    String
-  name      String?  // Optional name for the wallet set
-  wallets   Json     // JSON array of wallet objects: [{ address: string, blockchain: string }]
+  name      String?
+  wallets   Json
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

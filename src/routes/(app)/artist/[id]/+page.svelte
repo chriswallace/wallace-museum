@@ -7,6 +7,7 @@
 	import { linear } from 'svelte/easing';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import ArtworkDisplay from '$lib/components/ArtworkDisplay.svelte';
+	import ArtistNameWithAvatar from '$lib/components/ArtistNameWithAvatar.svelte';
 
 	export let data: { artist?: any; error?: string };
 
@@ -227,7 +228,24 @@
 						<div class="museum-details-overlay">
 							<div class="museum-header">
 								<div class="museum-artist-title">
-									<div class="museum-artist">{data.artist.name}</div>
+									<div class="museum-artist">
+										<ArtistNameWithAvatar 
+											artist={{
+												id: data.artist.id,
+												name: data.artist.name,
+												bio: data.artist.bio,
+												avatarUrl: data.artist.avatarUrl,
+												websiteUrl: data.artist.websiteUrl,
+												twitterHandle: data.artist.twitterHandle,
+												instagramHandle: data.artist.instagramHandle,
+												addresses: data.artist.addresses
+											}}
+											showPopover={true}
+											showAvatar={false}
+											size="lg"
+											nameClassName="text-yellow-500 text-sm font-medium uppercase tracking-wider"
+										/>
+									</div>
 									<div class="museum-title">{data.artist.artworks[currentIndex].title}</div>
 								</div>
 
@@ -341,31 +359,6 @@
 												<div class="metadata-item">
 													<strong>Tags</strong>
 													<span>{parseAndJoinTags(data.artist.artworks[currentIndex].tags)}</span>
-												</div>
-											{/if}
-											{#if data.artist.addresses && data.artist.addresses.length > 0}
-												<div class="metadata-item">
-													<strong>Artist Addresses</strong>
-													<div class="flex flex-col gap-1 mt-1">
-														{#each data.artist.addresses as address}
-															<div class="flex items-center justify-between">
-																<span class="text-sm">
-																	{address.blockchain}:
-																	<span class="font-mono" title={address.address}>{truncateAddress(address.address)}</span>
-																</span>
-																{#if getContractUrl(address.address, address.blockchain)}
-																	<a
-																		href={getContractUrl(address.address, address.blockchain)}
-																		target="_blank"
-																		rel="noopener noreferrer"
-																		class="text-blue-400 hover:text-blue-300 text-sm ml-2"
-																	>
-																		View
-																	</a>
-																{/if}
-															</div>
-														{/each}
-													</div>
 												</div>
 											{/if}
 										</div>

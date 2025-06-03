@@ -26,21 +26,21 @@ const getDatabaseUrl = () => {
 	// Parse the URL to add connection pool parameters if not already present
 	const url = new URL(baseUrl);
 	
-	// Set connection pool parameters if not already specified
+	// Set more appropriate connection pool parameters for the application's usage patterns
 	if (!url.searchParams.has('connection_limit')) {
-		url.searchParams.set('connection_limit', '25'); // Increased from default 10
+		url.searchParams.set('connection_limit', '15'); // Increased from 10 to handle concurrent operations
 	}
 	if (!url.searchParams.has('pool_timeout')) {
-		url.searchParams.set('pool_timeout', '60'); // Increased from default 20
+		url.searchParams.set('pool_timeout', '30'); // Increased from 20 to reduce timeout errors
 	}
 	if (!url.searchParams.has('connect_timeout')) {
-		url.searchParams.set('connect_timeout', '30');
+		url.searchParams.set('connect_timeout', '15'); // Increased from 10 for better reliability
 	}
 	if (!url.searchParams.has('statement_timeout')) {
-		url.searchParams.set('statement_timeout', '60000'); // 60 seconds
+		url.searchParams.set('statement_timeout', '45000'); // Increased from 30s to 45s for complex queries
 	}
 	if (!url.searchParams.has('idle_in_transaction_session_timeout')) {
-		url.searchParams.set('idle_in_transaction_session_timeout', '120000'); // 2 minutes
+		url.searchParams.set('idle_in_transaction_session_timeout', '120000'); // Increased from 1 to 2 minutes
 	}
 
 	return url.toString();
@@ -61,10 +61,10 @@ const prismaOptions: Prisma.PrismaClientOptions = {
 // Connection pool settings are now automatically configured in getDatabaseUrl()
 // 
 // Current settings:
-// - connection_limit: 25 (increased from 10)
-// - pool_timeout: 60 (increased from 20 seconds)
-// - connect_timeout: 30 (seconds to wait for initial connection)
-// - statement_timeout: 60000 (60 seconds for query timeout)
+// - connection_limit: 15 (increased from 10)
+// - pool_timeout: 30 (increased from 20 seconds)
+// - connect_timeout: 15 (seconds to wait for initial connection)
+// - statement_timeout: 45000 (45 seconds for query timeout)
 // - idle_in_transaction_session_timeout: 120000 (2 minutes)
 
 // Create a singleton instance with retry logic
@@ -172,10 +172,27 @@ export async function getConnectionPoolMetrics() {
 if (dev && process.env.ENABLE_POOL_MONITORING === 'true') {
 	setInterval(async () => {
 		const metrics = await getConnectionPoolMetrics();
-		if (metrics && metrics.utilization > 70) {
-			console.warn(`[Prisma] High connection pool utilization: ${metrics.active}/${metrics.max} (${metrics.utilization}%)`);
+		if (metrics) {
+			// Log connection pool status more frequently in development
+			console.log(`[Prisma] Connection pool status: ${metrics.active}/${metrics.max} (${metrics.utilization}%)`);
+			
+			if (metrics.utilization > 80) {
+				console.warn(`[Prisma] HIGH connection pool utilization: ${metrics.active}/${metrics.max} (${metrics.utilization}%)`);
+			} else if (metrics.utilization > 60) {
+				console.warn(`[Prisma] Elevated connection pool utilization: ${metrics.active}/${metrics.max} (${metrics.utilization}%)`);
+			}
 		}
-	}, 30000); // Check every 30 seconds
+	}, 15000); // Check every 15 seconds instead of 30
+}
+
+// Add production monitoring as well
+if (!dev) {
+	setInterval(async () => {
+		const metrics = await getConnectionPoolMetrics();
+		if (metrics && metrics.utilization > 85) {
+			console.error(`[Prisma] CRITICAL connection pool utilization in production: ${metrics.active}/${metrics.max} (${metrics.utilization}%)`);
+		}
+	}, 30000); // Check every 30 seconds in production
 }
 
 // Graceful shutdown handling with timeout

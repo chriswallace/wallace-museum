@@ -6,12 +6,16 @@
 		avatarUrl?: string | null;
 		websiteUrl?: string | null;
 		id?: number;
+		bio?: string | null;
+		twitterHandle?: string | null;
+		instagramHandle?: string | null;
 	}>;
 	export let layout: 'horizontal' | 'vertical' | 'badges' = 'horizontal';
 	export let size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' = 'sm';
 	export let showAvatars = true;
 	export let linkToWebsite = false;
 	export let linkToArtist = false;
+	export let showPopover = false;
 	export let maxDisplay = 0; // 0 means show all
 	export let separator = ', ';
 	export let className = '';
@@ -32,6 +36,7 @@
 				showAvatar={showAvatars}
 				{linkToWebsite}
 				{linkToArtist}
+				{showPopover}
 				{debugSkeletonMode}
 				className={itemClassName}
 			/>
@@ -54,6 +59,7 @@
 				showAvatar={showAvatars}
 				{linkToWebsite}
 				{linkToArtist}
+				{showPopover}
 				{debugSkeletonMode}
 				className={itemClassName}
 			/>
@@ -74,6 +80,7 @@
 					showAvatar={showAvatars}
 					{linkToWebsite}
 					{linkToArtist}
+					{showPopover}
 					{debugSkeletonMode}
 					containerClassName="gap-1"
 				/>

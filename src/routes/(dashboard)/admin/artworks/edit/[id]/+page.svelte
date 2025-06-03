@@ -43,7 +43,6 @@
 		blockchain?: string;
 		tokenID?: string;
 		mintDate?: string;
-		enabled?: boolean;
 
 		// OpenSea-specific display-optimized URLs
 		// display_image_url?: string;
@@ -93,7 +92,6 @@
 		blockchain: '',
 		tokenID: '',
 		mintDate: '',
-		enabled: true,
 		metadataUrl: null,
 		externalUrl: null,
 		dimensions: null
@@ -122,7 +120,6 @@
 		const payload = {
 			title: artwork.title,
 			description: artwork.description,
-			enabled: artwork.enabled,
 			collectionId: artwork.collectionId,
 			artistIds: selectedArtistIds,
 			image_url: artwork.imageUrl,

@@ -1,6 +1,5 @@
 import prisma from '$lib/prisma';
 import { Prisma } from '@prisma/client';
-import { unpinArtworkCids } from '$lib/pinataHelpers';
 
 // Simple function to guess mime type from URL
 function guessMimeTypeFromUrl(url: string): string | null {
@@ -265,6 +264,7 @@ export async function DELETE({ params }) {
 
 		// Unpin files from Pinata before deleting
 		try {
+			const { unpinArtworkCids } = await import('$lib/pinataHelpers');
 			await unpinArtworkCids({
 				title: artwork.title,
 				imageUrl: artwork.imageUrl,

@@ -65,7 +65,7 @@ export class OptimizedIndexingWorkflow {
     const maxPages = options.maxPages || 100;
     const pageSize = options.pageSize || 50;
     let consecutiveFailures = 0;
-    const maxConsecutiveFailures = 5; // Allow up to 5 consecutive failures before giving up
+    const maxConsecutiveFailures = 15; // Increased from 5 to handle OpenSea rate limiting better
 
     // Determine enrichment strategy based on options
     const enrichmentLevel = options.enrichmentLevel || 'standard';
@@ -168,16 +168,16 @@ export class OptimizedIndexingWorkflow {
 
         // For rate limit errors, wait longer and retry the same page
         if (this.isRateLimitError(error)) {
-          // Exponential backoff based on consecutive failures
-          const backoffDelay = Math.min(2000 * Math.pow(2, consecutiveFailures - 1), 30000);
+          // Exponential backoff based on consecutive failures - more conservative
+          const backoffDelay = Math.min(5000 * Math.pow(2, consecutiveFailures - 1), 60000); // Increased from 2000 to 5000, max 60s
           console.log(`[OptimizedIndexingWorkflow] Rate limited, waiting ${backoffDelay}ms before retry ${consecutiveFailures}/${maxConsecutiveFailures}...`);
           await this.sleep(backoffDelay);
           // Don't increment pageCount or change nextCursor - retry the same page
           continue;
         } else {
           // For other errors, wait a bit and try to continue
-          console.log(`[OptimizedIndexingWorkflow] Non-rate-limit error, waiting 5000ms before continuing...`);
-          await this.sleep(5000);
+          console.log(`[OptimizedIndexingWorkflow] Non-rate-limit error, waiting 10000ms before continuing...`); // Increased from 5000 to 10000
+          await this.sleep(10000);
           // Try to continue with the next page
           pageCount++;
           continue;
@@ -232,9 +232,9 @@ export class OptimizedIndexingWorkflow {
    * Calculate delay between pages based on current rate limiter state
    */
   private calculatePageDelay(currentDelay: number): number {
-    // Reasonable delay for page requests - maintain ~1 req/sec baseline
-    // Add modest buffer time to prevent hitting rate limits
-    return Math.max(1000, currentDelay * 1.2); // At least 1 second, with 20% buffer
+    // More conservative delay for page requests to avoid rate limits
+    // Minimum 2 seconds between requests, with 50% buffer on current delay
+    return Math.max(2000, currentDelay * 1.5); // Increased from 1000ms min and 1.2x to 2000ms min and 1.5x
   }
 
   /**

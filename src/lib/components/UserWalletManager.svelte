@@ -424,12 +424,12 @@
 	}
 
 	.primary {
-		background-color: #3b82f6;
+		background-color: rgb(184 92 40);
 		color: white;
 	}
 
 	.primary:hover:not(:disabled) {
-		background-color: #2563eb;
+		background-color: rgb(166 83 36);
 	}
 
 	.primary:disabled {
