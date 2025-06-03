@@ -42,6 +42,7 @@
 		instagramHandle: string | null;
 		creatorAddresses: CreatorAddressWithArtworks[];
 		addresses: ArtistAddress[];
+		artworks: Artwork[];
 	}
 
 	interface Collection {
@@ -62,7 +63,8 @@
 		twitterHandle: null,
 		instagramHandle: null,
 		creatorAddresses: [],
-		addresses: []
+		addresses: [],
+		artworks: []
 	};
 
 	let collections: Collection[] = [];

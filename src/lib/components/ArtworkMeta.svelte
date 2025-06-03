@@ -5,6 +5,12 @@
 </script>
 
 <div class="additional-meta">
+	{#if artwork.supply}
+		<div class="non-editable">
+			<h3>Edition</h3>
+			<p>1 of {artwork.supply}</p>
+		</div>
+	{/if}
 	<div class="non-editable">
 		<h3>Token ID</h3>
 		<p class="truncate">{artwork.tokenID}</p>

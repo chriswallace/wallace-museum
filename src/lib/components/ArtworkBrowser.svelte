@@ -20,6 +20,7 @@
 			width: number;
 			height: number;
 		};
+		supply?: number;
 	}
 
 	let artworks: Artwork[] = [];
@@ -189,6 +190,9 @@
 			class:revealed={detailsAreVisible}
 		>
 			<h3 class="artwork-title">{currentArtwork.title}</h3>
+			{#if currentArtwork.supply}
+				<p class="artwork-edition">1 of {currentArtwork.supply}</p>
+			{/if}
 			{#if currentArtwork.year}
 				<p class="artwork-year">{currentArtwork.year}</p>
 			{/if}
@@ -315,6 +319,13 @@
 		font-family: 'europa', sans-serif;
 		margin-bottom: 0.75rem;
 		color: #fff;
+	}
+
+	.artwork-edition {
+		font-size: 0.9rem;
+		color: #888;
+		margin-bottom: 0.5rem;
+		font-style: italic;
 	}
 
 	.artwork-year {

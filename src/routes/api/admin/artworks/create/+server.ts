@@ -40,6 +40,7 @@ export async function POST({ request }) {
 		// Media URLs from form
 		const form_image_url = formData.get('image_url') as string | null;
 		const form_animation_url = formData.get('animation_url') as string | null;
+		const form_mime_type = formData.get('mime') as string | null;
 
 		// Creator related form fields
 		const creatorAddress = formData.get('creatorAddress') as string | null;
@@ -91,6 +92,11 @@ export async function POST({ request }) {
 
 		if (final_animation_url && !animation_mime_type) {
 			animation_mime_type = guessMimeTypeFromUrl(final_animation_url);
+		}
+
+		// Override mime type with form value if provided
+		if (form_mime_type && form_mime_type.trim() !== '') {
+			image_mime_type = form_mime_type;
 		}
 
 		let artistId: number | undefined;

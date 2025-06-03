@@ -91,6 +91,7 @@ export async function PUT({ params, request }) {
 		mintDate?: string | Date | null;
 		curatorNotes?: string;
 		supply?: number;
+		dimensions?: { width: number; height: number } | null;
 	}
 
 	const requestData = (await request.json()) as ArtworkUpdateRequestData;
@@ -130,6 +131,12 @@ export async function PUT({ params, request }) {
 		if (requestData.attributes !== undefined) {
 			updateData.attributes =
 				requestData.attributes === null ? Prisma.JsonNull : requestData.attributes;
+		}
+
+		// Dimensions
+		if (requestData.dimensions !== undefined) {
+			updateData.dimensions =
+				requestData.dimensions === null ? Prisma.JsonNull : requestData.dimensions;
 		}
 
 		// Collection linking

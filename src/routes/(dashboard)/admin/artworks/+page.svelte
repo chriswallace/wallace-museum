@@ -30,6 +30,10 @@
 	let sortColumn: string = 'title';
 	let sortOrder: 'asc' | 'desc' = 'asc'; // 'asc' for ascending, 'desc' for descending
 	let searchQuery: string = '';
+	let isLoading: boolean = true;
+	let error: string = '';
+	let searchTimeout: NodeJS.Timeout;
+	let lastFetchParams: string = '';
 	
 	// Bulk actions state
 	let selectedArtworks = new Set<number | string>();
@@ -45,20 +49,49 @@
 	$: someSelected = selectedArtworks.size > 0 && selectedArtworks.size < artworks.length;
 
 	async function fetchArtworks(page: number = 1) {
-		let url = `/api/admin/artworks/?page=${page}`;
-		if (sortColumn && sortOrder) {
-			url += `&sort=${sortColumn}&order=${sortOrder}`;
+		// Create a cache key from current parameters
+		const cacheKey = `${page}-${sortColumn}-${sortOrder}-${searchQuery}`;
+		
+		// Skip if we're already loading the same data
+		if (isLoading && lastFetchParams === cacheKey) {
+			return;
 		}
-		if (searchQuery) {
-			url += `&search=${encodeURIComponent(searchQuery)}`;
-		}
+		
+		lastFetchParams = cacheKey;
+		isLoading = true;
+		error = '';
+		
+		try {
+			let url = `/api/admin/artworks/?page=${page}`;
+			if (sortColumn && sortOrder) {
+				// Fix parameter names to match API endpoint
+				url += `&sortBy=${sortColumn}&sortOrder=${sortOrder}`;
+			}
+			if (searchQuery) {
+				url += `&search=${encodeURIComponent(searchQuery)}`;
+			}
 
-		const response = await fetch(url);
-		if (response.ok) {
-			const data = await response.json();
-			artworks = data.artworks;
-			totalPages = data.totalPages;
-			page = data.page;
+			const response = await fetch(url);
+			if (response.ok) {
+				const data = await response.json();
+				artworks = data.artworks || [];
+				totalPages = data.totalPages || 0;
+				page = data.page || 1;
+				
+				// Log query time for debugging
+				if (data.queryTime && data.queryTime > 500) {
+					console.warn(`Slow query took ${data.queryTime}ms`);
+				}
+			} else {
+				const errorData = await response.json();
+				error = errorData.error || 'Failed to fetch artworks';
+				artworks = [];
+			}
+		} catch (e) {
+			error = (e as Error).message || 'Network error occurred';
+			artworks = [];
+		} finally {
+			isLoading = false;
 		}
 	}
 
@@ -202,6 +235,13 @@
 	onMount(() => {
 		fetchArtworks(page);
 		fetchArtistsAndCollections();
+		
+		// Cleanup function
+		return () => {
+			if (searchTimeout) {
+				clearTimeout(searchTimeout);
+			}
+		};
 	});
 
 	function editArtwork(id: number | string) {
@@ -209,10 +249,22 @@
 	}
 
 	function handleSearchInput(event: Event) {
-		searchQuery = (event.target as HTMLInputElement).value;
-		if (searchQuery.length >= 3 || searchQuery.length === 0) {
-			fetchArtworks(page);
+		const newSearchQuery = (event.target as HTMLInputElement).value;
+		
+		// Clear existing timeout
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
 		}
+		
+		// Update search query immediately for UI responsiveness
+		searchQuery = newSearchQuery;
+		
+		// Debounce the actual search
+		searchTimeout = setTimeout(() => {
+			// Reset to page 1 when searching
+			page = 1;
+			fetchArtworks(1);
+		}, 300); // 300ms delay
 	}
 
 	function changeSorting(column: string) {
@@ -244,9 +296,22 @@
 
 <h1>Artworks <button class="ghost" on:click={() => addNew()}>+ Add new</button></h1>
 
-{#if artworks.length === 0}
+{#if isLoading}
+	<div class="loading">
+		<div class="loading-spinner"></div>
+		<p>Loading artworks...</p>
+	</div>
+{:else if error}
+	<div class="error">
+		<p>Error: {error}</p>
+		<button class="secondary" on:click={() => fetchArtworks(page)}>Retry</button>
+	</div>
+{:else if artworks.length === 0}
 	<div class="empty">
 		<p>No artworks found.</p>
+		{#if searchQuery}
+			<p class="text-sm text-gray-600">Try adjusting your search terms.</p>
+		{/if}
 	</div>
 {:else}
 	<input
@@ -490,5 +555,33 @@
 
 	.modal-actions {
 		@apply flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700;
+	}
+
+	.loading {
+		@apply flex flex-col items-center justify-center py-12;
+		
+		.loading-spinner {
+			@apply w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mb-4;
+		}
+		
+		p {
+			@apply text-gray-600 dark:text-gray-400;
+		}
+	}
+
+	.error {
+		@apply flex flex-col items-center justify-center py-12 text-center;
+		
+		p {
+			@apply text-red-600 dark:text-red-400 mb-4;
+		}
+	}
+
+	.empty {
+		@apply text-center py-12;
+		
+		p {
+			@apply text-gray-600 dark:text-gray-400;
+		}
 	}
 </style>

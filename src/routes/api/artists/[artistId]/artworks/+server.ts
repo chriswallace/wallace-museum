@@ -18,6 +18,7 @@ interface Artwork {
 		width: number;
 		height: number;
 	};
+	supply?: number;
 }
 
 export const GET: RequestHandler = async ({ params }) => {
@@ -43,7 +44,8 @@ export const GET: RequestHandler = async ({ params }) => {
 						thumbnailUrl: true,
 						mime: true,
 						mintDate: true,
-						dimensions: true
+						dimensions: true,
+						supply: true
 					},
 					where: {
 						// Only return enabled artworks if that field exists
@@ -82,7 +84,8 @@ export const GET: RequestHandler = async ({ params }) => {
 				description: artwork.description || undefined,
 				year: artwork.mintDate ? new Date(artwork.mintDate).getFullYear() : undefined,
 				artistId: artistId,
-				dimensions
+				dimensions,
+				supply: artwork.supply ?? undefined
 			};
 		});
 

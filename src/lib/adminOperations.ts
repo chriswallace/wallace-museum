@@ -39,6 +39,7 @@ interface NftMetadata {
 	image_url?: string;
 	animation_url?: string;
 	generator_url?: string; // Add generator_url support
+	ipfs?: string; // Add ipfs field which sometimes contains generator URLs
 	attributes?: any[]; // Keep attributes flexible for now
 	symbol?: string;
 	tags?: string[] | string; // Add tags field that can be string or array
@@ -603,7 +604,7 @@ export async function saveArtwork(
 
 	// Prioritization for animation_url (video, gif, interactive)
 	let final_animation_url =
-		nft.metadata?.animation_url || nft.metadata?.artifact_uri || nft.generator_url || null;
+		nft.metadata?.animation_url || nft.metadata?.artifact_uri || nft.generator_url || nft.metadata?.ipfs || null;
 
 	// Fix #1: Only import gifs, videos, and code-powered artworks into animation_url
 	if (final_animation_url) {
@@ -700,6 +701,9 @@ export async function saveArtwork(
 		mediaMetadata.generator_url = nft.generator_url;
 	} else if (nft.metadata?.generator_url) {
 		mediaMetadata.generator_url = nft.metadata.generator_url;
+	} else if (nft.metadata?.ipfs) {
+		// Check if metadata.ipfs field contains a generator URL
+		mediaMetadata.generator_url = nft.metadata.ipfs;
 	}
 
 	// --- Artist and WalletAddress Linking ---

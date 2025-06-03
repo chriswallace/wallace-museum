@@ -289,6 +289,12 @@
 
 									<div class="metadata-section">
 										<div class="metadata-grid">
+											{#if data.artist.artworks[currentIndex].supply}
+												<div class="metadata-item">
+													<strong>Edition</strong>
+													<span>1 of {data.artist.artworks[currentIndex].supply}</span>
+												</div>
+											{/if}
 											{#if currentDimensions}
 												<div class="metadata-item">
 													<strong>Dimensions</strong>

@@ -16,10 +16,61 @@
 	let mouseX = 0;
 	let mouseY = 0;
 	let preloadedImages: Record<string, HTMLImageElement> = {};
-	let previewWidth = 320;
-	let previewHeight = 240; // Estimated height for positioning calculations
 	let loadingStates: Record<string, boolean> = {};
 	let isLargeScreen = false;
+
+	// Calculate preview dimensions based on artwork dimensions
+	$: previewDimensions = (() => {
+		if (!hoveredArtist?.artworks[0]?.dimensions) {
+			// Fallback to default dimensions if no artwork dimensions available
+			return { width: 320, height: 240 };
+		}
+
+		const artwork = hoveredArtist.artworks[0];
+		const { width: originalWidth, height: originalHeight } = artwork.dimensions;
+		
+		// Adjust max size based on screen size
+		let maxSize = 340;
+		if (typeof window !== 'undefined') {
+			if (window.innerWidth <= 480) {
+				maxSize = 200;
+			} else if (window.innerWidth <= 600) {
+				maxSize = 250;
+			}
+		}
+
+		// Calculate aspect ratio
+		const aspectRatio = originalWidth / originalHeight;
+
+		let previewWidth: number;
+		let previewHeight: number;
+
+		// Scale down to fit within maxSize while maintaining aspect ratio
+		if (originalWidth > originalHeight) {
+			// Landscape: limit by width
+			previewWidth = Math.min(originalWidth, maxSize);
+			previewHeight = previewWidth / aspectRatio;
+		} else {
+			// Portrait or square: limit by height
+			previewHeight = Math.min(originalHeight, maxSize);
+			previewWidth = previewHeight * aspectRatio;
+		}
+
+		// Ensure neither dimension exceeds maxSize
+		if (previewWidth > maxSize) {
+			previewWidth = maxSize;
+			previewHeight = previewWidth / aspectRatio;
+		}
+		if (previewHeight > maxSize) {
+			previewHeight = maxSize;
+			previewWidth = previewHeight * aspectRatio;
+		}
+
+		return {
+			width: Math.round(previewWidth),
+			height: Math.round(previewHeight)
+		};
+	})();
 
 	onMount(() => {
 		updateScreenSize();
@@ -29,19 +80,6 @@
 
 	function updateScreenSize() {
 		isLargeScreen = window.innerWidth >= 1024;
-		// Update preview dimensions based on screen size
-		if (typeof window !== 'undefined') {
-			if (window.innerWidth <= 480) {
-				previewWidth = 200;
-				previewHeight = 150;
-			} else if (window.innerWidth <= 600) {
-				previewWidth = 250;
-				previewHeight = 188;
-			} else {
-				previewWidth = 320;
-				previewHeight = 240;
-			}
-		}
 	}
 
 	// Preload all artwork images for all artists
@@ -52,7 +90,7 @@
 					const img = new window.Image();
 					// Use optimized image URL for preloading - same as what will be displayed
 					img.src = buildOptimizedImageUrl(artwork.image_url, {
-						width: 320,
+						width: 340, // Use max size for preloading
 						fit: 'contain',
 						format: 'webp',
 						quality: 80
@@ -91,14 +129,14 @@
 		let left = mouseX + offset;
 		
 		// If it would overflow on the right, position to the left of cursor
-		if (left + previewWidth > windowWidth - offset) {
-			left = mouseX - previewWidth - offset;
+		if (left + previewDimensions.width > windowWidth - offset) {
+			left = mouseX - previewDimensions.width - offset;
 		}
 		
 		// Ensure it doesn't go off the left edge
 		if (left < offset) {
 			// If it still doesn't fit, center it with some margin
-			left = Math.max(offset, (windowWidth - previewWidth) / 2);
+			left = Math.max(offset, (windowWidth - previewDimensions.width) / 2);
 		}
 		
 		return Math.max(0, left);
@@ -114,14 +152,14 @@
 		let top = mouseY + offset;
 		
 		// If it would overflow at the bottom, position above cursor
-		if (top + previewHeight > windowHeight - offset) {
-			top = mouseY - previewHeight - offset;
+		if (top + previewDimensions.height > windowHeight - offset) {
+			top = mouseY - previewDimensions.height - offset;
 		}
 		
 		// Ensure it doesn't go off the top edge
 		if (top < offset) {
 			// If it still doesn't fit, position it with some margin from top
-			top = Math.max(offset, Math.min(mouseY - previewHeight / 2, windowHeight - previewHeight - offset));
+			top = Math.max(offset, Math.min(mouseY - previewDimensions.height / 2, windowHeight - previewDimensions.height - offset));
 		}
 		
 		return Math.max(0, top);
@@ -183,7 +221,7 @@
 	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && hoveredArtist.artworks[0]?.image_url}
 		<div
 			class="floating-artwork-preview"
-			style="left: {safeLeft}px; top: {safeTop}px; width: {previewWidth}px; height: {previewHeight}px;"
+			style="left: {safeLeft}px; top: {safeTop}px; width: {previewDimensions.width}px; height: {previewDimensions.height}px;"
 		>
 			{#if hoveredArtist.artworks[0].image_url && loadingStates[hoveredArtist.artworks[0].image_url]}
 				<div class="preview-loader">
@@ -193,7 +231,8 @@
 			<OptimizedImage
 				src={hoveredArtist.artworks[0].image_url}
 				alt={hoveredArtist.artworks[0].title || ''}
-				width={320}
+				width={previewDimensions.width}
+				height={previewDimensions.height}
 				fit="contain"
 				format="webp"
 				quality={80}
@@ -289,8 +328,6 @@
 
 	.floating-artwork-preview {
 		@apply fixed pointer-events-none z-[9999] p-0 flex gap-0 items-center justify-center overflow-hidden bg-black border-none shadow-xl rounded-sm;
-		max-width: 320px;
-		max-height: 240px;
 		transition: opacity 0.2s ease-in-out;
 		border: 1px solid rgba(255, 255, 255, 0.15);
 	}
@@ -306,10 +343,7 @@
 	}
 
 	@media (max-width: 600px) {
-		.floating-artwork-preview {
-			max-width: 250px;
-			max-height: 188px;
-		}
+		/* Remove fixed constraints for mobile - dynamic sizing will handle this */
 	}
 
 	@media (max-width: 480px) {
@@ -341,10 +375,7 @@
 			@apply text-lg;
 		}
 
-		.floating-artwork-preview {
-			max-width: 200px;
-			max-height: 150px;
-		}
+		/* Remove fixed constraints for mobile - dynamic sizing will handle this */
 	}
 
 	.hidden {

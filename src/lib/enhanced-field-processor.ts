@@ -1010,7 +1010,9 @@ export class EnhancedFieldProcessor {
       rawData?.generatorUrl,
       metadata?.generatorUrl,
       rawData?.animation_url,
-      metadata?.animation_url
+      metadata?.animation_url,
+      // Check metadata "ipfs" field which sometimes contains generator URLs
+      metadata?.ipfs
     ];
     
     for (const source of sources) {

@@ -31,7 +31,8 @@ export const load: PageServerLoad = async ({ params }) => {
 			mintDate: artwork.mintDate,
 			mime: artwork.mime,
 			tags: null,
-			attributes: artwork.attributes
+			attributes: artwork.attributes,
+			supply: artwork.supply
 		};
 	});
 

@@ -43,6 +43,28 @@
 	let collections: Collection[] = [];
 	let error = '';
 
+	// Common MIME types for artworks
+	const commonMimeTypes = [
+		{ value: '', label: '-- Select MIME Type --' },
+		{ value: 'image/jpeg', label: 'JPEG Image (image/jpeg)' },
+		{ value: 'image/png', label: 'PNG Image (image/png)' },
+		{ value: 'image/gif', label: 'GIF Image (image/gif)' },
+		{ value: 'image/webp', label: 'WebP Image (image/webp)' },
+		{ value: 'image/svg+xml', label: 'SVG Image (image/svg+xml)' },
+		{ value: 'video/mp4', label: 'MP4 Video (video/mp4)' },
+		{ value: 'video/webm', label: 'WebM Video (video/webm)' },
+		{ value: 'video/quicktime', label: 'QuickTime Video (video/quicktime)' },
+		{ value: 'video/ogg', label: 'OGG Video (video/ogg)' },
+		{ value: 'text/html', label: 'HTML Document (text/html)' },
+		{ value: 'application/javascript', label: 'JavaScript (application/javascript)' },
+		{ value: 'model/gltf+json', label: 'glTF Model (model/gltf+json)' },
+		{ value: 'model/gltf-binary', label: 'glTF Binary (model/gltf-binary)' },
+		{ value: 'application/pdf', label: 'PDF Document (application/pdf)' },
+		{ value: 'audio/mpeg', label: 'MP3 Audio (audio/mpeg)' },
+		{ value: 'audio/wav', label: 'WAV Audio (audio/wav)' },
+		{ value: 'audio/ogg', label: 'OGG Audio (audio/ogg)' }
+	];
+
 	function goBack() {
 		history.back();
 	}
@@ -80,12 +102,14 @@
 		formData.append('description', artwork.description);
 		formData.append('curatorNotes', artwork.curatorNotes);
 
-		// Add animation_url and mime if provided
+		// Add animation_url if provided
 		if (artwork.animation_url) {
 			formData.append('animation_url', artwork.animation_url);
-			if (artwork.mime) {
-				formData.append('mime', artwork.mime);
-			}
+		}
+
+		// Add mime type if provided
+		if (artwork.mime) {
+			formData.append('mime', artwork.mime);
 		}
 
 		// Append artist and collection IDs or new names
@@ -171,6 +195,17 @@
 						<small class="text-gray-600 dark:text-gray-400 block mt-1"
 							>URL for animation or interactive content. Will be used if no file is uploaded. MIME
 							type will be auto-detected.</small
+						>
+					</div>
+					<div class="mb-4">
+						<label for="mime">MIME Type (Optional)</label>
+						<select id="mime" bind:value={artwork.mime}>
+							{#each commonMimeTypes as mimeType}
+								<option value={mimeType.value}>{mimeType.label}</option>
+							{/each}
+						</select>
+						<small class="text-gray-600 dark:text-gray-400 block mt-1"
+							>The MIME type of the primary media file. Leave blank for auto-detection.</small
 						>
 					</div>
 					<fieldset class="mb-4 border-0 p-0">

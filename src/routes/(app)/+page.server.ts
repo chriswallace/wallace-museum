@@ -7,6 +7,10 @@ export interface PreviewArtwork {
 	id: string; // Assuming artwork IDs might be strings (UUIDs, CUIDs)
 	title: string;
 	image_url: string | null; // Changed to allow null
+	dimensions?: {
+		width: number;
+		height: number;
+	} | null;
 }
 
 // Define the structure for an Artist, including all artworks
@@ -29,7 +33,8 @@ export const load: ServerLoad = async () => {
 					select: {
 						id: true,
 						title: true,
-						imageUrl: true
+						imageUrl: true,
+						dimensions: true
 					},
 					take: 10 // Limit artworks per artist
 				}
@@ -44,7 +49,8 @@ export const load: ServerLoad = async () => {
 			const transformedArtworks: PreviewArtwork[] = artist.artworks.map((artwork) => ({
 				id: String(artwork.id),
 				title: artwork.title,
-				image_url: artwork.imageUrl
+				image_url: artwork.imageUrl,
+				dimensions: artwork.dimensions as { width: number; height: number } | null
 			}));
 
 			return {
