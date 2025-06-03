@@ -55,7 +55,7 @@
 		</div>
 	{:else if mediaType === 'video'}
 		{#if showLoader && isLoading}
-			<div class="media-skeleton">
+			<div class="media-skeleton" style="aspect-ratio: {aspectRatio};">
 				<SkeletonLoader 
 					width="100%" 
 					height="100%" 
@@ -75,7 +75,7 @@
 		/>
 	{:else if mediaType === 'iframe'}
 		{#if showLoader && isLoading}
-			<div class="media-skeleton">
+			<div class="media-skeleton" style="aspect-ratio: {aspectRatio};">
 				<SkeletonLoader 
 					width="100%" 
 					height="100%" 
@@ -89,6 +89,7 @@
 			title="Interactive Artwork"
 			on:load={handleLoad}
 			class:hidden={showLoader && isLoading}
+			style="aspect-ratio: {aspectRatio};"
 			allowfullscreen
 		></iframe>
 	{:else if mediaType === 'image'}
@@ -118,10 +119,13 @@
 
 	.media-skeleton {
 		position: absolute;
-		top: 0;
-		left: 0;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
 		width: 100%;
-		height: 100%;
+		height: auto;
+		max-width: 100%;
+		max-height: 100%;
 		z-index: 1;
 	}
 
@@ -157,7 +161,7 @@
 		border: none;
 		background: transparent;
 		width: 100%;
-		height: 100%;
+		height: auto;
 		max-width: 100%;
 		max-height: 100%;
 	}

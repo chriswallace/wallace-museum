@@ -1,9 +1,4 @@
 {
-  "functions": {
-    "src/routes/api/**/*.ts": {
-      "maxDuration": 60
-    }
-  },
   "build": {
     "env": {
       "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"

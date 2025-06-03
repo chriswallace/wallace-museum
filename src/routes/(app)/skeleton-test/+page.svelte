@@ -1,6 +1,6 @@
 <script lang="ts">
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
-	import SkeletonLoader from '$lib/components/SkeletonLoader.svelte';
+	import LoaderWrapper from '$lib/components/LoaderWrapper.svelte';
 	import { onMount } from 'svelte';
 
 	let showImages = false;
@@ -38,17 +38,18 @@
 	</div>
 
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-		<!-- Direct SkeletonLoader Test -->
+		<!-- Direct LoaderWrapper Test -->
 		<div class="border rounded-lg p-4 bg-yellow-50">
-			<h3 class="font-semibold mb-2">Direct SkeletonLoader Test</h3>
+			<h3 class="font-semibold mb-2">Direct LoaderWrapper Test</h3>
 			<div style="width: 300px; height: 200px; position: relative;">
-				<SkeletonLoader 
+				<LoaderWrapper 
 					width="100%" 
 					height="100%" 
 					borderRadius="8px"
+					aspectRatio="3/2"
 				/>
 			</div>
-			<p class="text-sm text-gray-600 mt-2">This should always show a skeleton loader</p>
+			<p class="text-sm text-gray-600 mt-2">This should always show a skeleton loader with 3:2 aspect ratio</p>
 		</div>
 
 		<!-- Test 1: Empty src (should always show skeleton) -->

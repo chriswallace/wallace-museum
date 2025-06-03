@@ -116,6 +116,9 @@
 		height = artwork.dimensions.height ?? 0;
 	}
 
+	// Calculate aspect ratio for iframe
+	$: aspectRatio = artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '16/9';
+
 	async function updateArtwork(event: Event) {
 		const payload = {
 			title: artwork.title,
@@ -244,6 +247,7 @@
 									autoplay 
 									loop
 									class="media-content"
+									style="aspect-ratio: {aspectRatio};"
 								>
 									<track kind="captions" />
 								</video>
@@ -252,6 +256,7 @@
 									src={artwork.generatorUrl} 
 									title="Interactive Artwork"
 									class="media-content"
+									style="aspect-ratio: {aspectRatio};"
 									allowfullscreen
 								></iframe>
 							{:else}
