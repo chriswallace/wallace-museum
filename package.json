@@ -22,6 +22,7 @@
 		"test:ui": "vitest --ui",
 		"migrate-wallets": "node migrate-wallet-addresses.js",
 		"db:push": "npx prisma db push",
+		"db:push:safe": "echo 'Use db:push for local development only'",
 		"db:migrate": "npx prisma migrate deploy"
 	},
 	"devDependencies": {
