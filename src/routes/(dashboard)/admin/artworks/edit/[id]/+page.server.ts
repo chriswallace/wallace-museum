@@ -12,12 +12,12 @@ export const load: PageServerLoad = async ({ request, locals }) => {
 	if (sessionId) {
 		const session = await prisma.session.findUnique({
 			where: { sessionId },
-			include: { user: true }
+			include: { User: true }
 		});
 
 		// Check if the session is valid and not expired
 		if (session && new Date(session.expiresAt) > new Date()) {
-			user = session.user;
+			user = session.User;
 		}
 	}
 

@@ -126,6 +126,7 @@
 							gravity="auto"
 							format="webp"
 							quality={85}
+							aspectRatio="1/1"
 							showSkeleton={true}
 							skeletonBorderRadius="6px"
 							className="avatar-image"

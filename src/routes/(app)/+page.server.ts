@@ -29,7 +29,7 @@ export const load: ServerLoad = async () => {
 				id: true,
 				name: true,
 				avatarUrl: true,
-				artworks: {
+				Artwork: {
 					select: {
 						id: true,
 						title: true,
@@ -46,7 +46,7 @@ export const load: ServerLoad = async () => {
 
 		// Transform the data to match the expected interface
 		const artistsWithPreview: ArtistWithPreview[] = artists.map((artist) => {
-			const transformedArtworks: PreviewArtwork[] = artist.artworks.map((artwork) => ({
+			const transformedArtworks: PreviewArtwork[] = artist.Artwork.map((artwork) => ({
 				id: String(artwork.id),
 				title: artwork.title,
 				image_url: artwork.imageUrl,

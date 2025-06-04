@@ -8,6 +8,7 @@
 
 	import { showToast } from '$lib/toastHelper';
 	import { goto } from '$app/navigation';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 
 	let artworkId: string;
 
@@ -43,6 +44,7 @@
 		blockchain?: string;
 		tokenID?: string;
 		mintDate?: string;
+		fullscreen?: boolean;
 
 		// OpenSea-specific display-optimized URLs
 		// display_image_url?: string;
@@ -94,7 +96,8 @@
 		mintDate: '',
 		metadataUrl: null,
 		externalUrl: null,
-		dimensions: null
+		dimensions: null,
+		fullscreen: false
 	};
 
 	interface Collection {
@@ -162,7 +165,8 @@
 			externalUrl: artwork.externalUrl,
 			supply: artwork.supply,
 			attributes: artwork.attributes,
-			dimensions: width && height ? { width: Number(width), height: Number(height) } : null
+			dimensions: width && height ? { width: Number(width), height: Number(height) } : null,
+			fullscreen: artwork.fullscreen
 		};
 
 		const response = await fetch(`/api/admin/artworks/${artwork.id}`, {
@@ -314,7 +318,7 @@
 						{#if artwork.animationUrl || artwork.generatorUrl}
 							{#if artwork.mime?.startsWith('video/')}
 								<video 
-									src={artwork.animationUrl || artwork.generatorUrl} 
+									src={ipfsToHttpUrl(artwork.animationUrl || artwork.generatorUrl)} 
 									controls 
 									muted 
 									autoplay 
@@ -328,7 +332,7 @@
 								</video>
 							{:else if artwork.mime === 'text/html' || artwork.mime === 'application/javascript' || artwork.generatorUrl}
 								<iframe 
-									src={artwork.animationUrl || artwork.generatorUrl} 
+									src={ipfsToHttpUrl(artwork.animationUrl || artwork.generatorUrl)} 
 									title="Interactive Artwork"
 									class="media-content"
 									style={mediaStyle}
@@ -533,6 +537,20 @@
 							</small>
 						</fieldset>
 					</div>
+					<div class="mb-4">
+						<label class="flex items-center">
+							<input 
+								type="checkbox" 
+								bind:checked={artwork.fullscreen}
+								class="mr-2"
+							/>
+							<span>Fullscreen Display</span>
+						</label>
+						<small class="text-gray-600 dark:text-gray-400 block mt-1">
+							Enable this for artworks that can be stretched to any dimensions and still render beautifully. 
+							Fullscreen artworks will be displayed with full bleed to the browser edges at 82svh height.
+						</small>
+					</div>
 					<div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
 						<h3 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Refetch Data</h3>
 						<p class="text-sm text-blue-700 dark:text-blue-300">
@@ -573,7 +591,7 @@
 	{/if}
 </div>
 
-<style>
+<style lang="postcss">
 	.multi-select {
 		height: auto;
 		min-height: 150px;
@@ -629,12 +647,7 @@
 	}
 
 	legend {
-		font-weight: 600;
+		@apply text-gray-700 dark:text-white font-medium;
 		padding: 0 0.5rem;
-		color: #374151;
-	}
-
-	:global(.dark) legend {
-		color: #d1d5db;
 	}
 </style>

@@ -100,6 +100,36 @@
 	let debugSkeletonMode = false;
 	let showDebugControls = true;
 
+	// Debounced search functionality
+	let searchTimeout: NodeJS.Timeout;
+	const SEARCH_DEBOUNCE_MS = 300; // 300ms debounce delay
+	let isMounted = false;
+
+	// Reactive statement for typeahead search
+	$: if (isMounted && searchTerm !== undefined) {
+		// Clear existing timeout
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
+		
+		// Set new timeout for debounced search
+		searchTimeout = setTimeout(() => {
+			searchArtworks(true);
+		}, SEARCH_DEBOUNCE_MS);
+	}
+
+	// Reactive statement for tab changes (immediate search, no debounce needed)
+	let previousActiveTab: 'owned' | 'created' = activeTab;
+	$: if (isMounted && activeTab !== previousActiveTab) {
+		previousActiveTab = activeTab;
+		// Clear any pending search timeout since tab change should be immediate
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
+		// Trigger immediate search when tab changes
+		searchArtworks(true);
+	}
+
 	// Use reactive stores for selection
 	const selectedIdsStore = writable<number[]>([]);
 	const selectedArtworksStore = writable<ExtendedArtwork[]>([]);
@@ -164,9 +194,10 @@
 
 	// Search indexed artworks
 	async function searchArtworks(reset = false) {
+		// Don't clear results immediately on reset to prevent interface flashing
 		if (reset) {
 			currentOffset = 0;
-			searchResults = [];
+			// Only clear results after new ones are loaded
 		}
 
 		isSearching = true;
@@ -184,6 +215,7 @@
 
 			if (data.results) {
 				if (reset) {
+					// Now replace the results after getting new data
 					searchResults = data.results;
 				} else {
 					// Deduplicate when appending new results
@@ -197,6 +229,10 @@
 			}
 		} catch (error) {
 			console.error('Error searching artworks:', error);
+			// On error, only clear results if this was a reset search
+			if (reset) {
+				searchResults = [];
+			}
 		} finally {
 			isSearching = false;
 		}
@@ -364,7 +400,7 @@
 	onMount(() => {
 		// Initial search on page load
 		searchArtworks(true);
-
+		
 		// Set up intersection observer for infinite scroll
 		if (loadMoreTrigger) {
 			observer = new IntersectionObserver(
@@ -378,9 +414,16 @@
 			observer.observe(loadMoreTrigger);
 		}
 
+		// Enable reactive statements after initial mount
+		isMounted = true;
+
 		return () => {
 			if (observer) {
 				observer.disconnect();
+			}
+			// Clean up search timeout
+			if (searchTimeout) {
+				clearTimeout(searchTimeout);
 			}
 		};
 	});
@@ -399,8 +442,7 @@
 	function handleTabChange(newTab: 'owned' | 'created') {
 		if (newTab !== activeTab) {
 			activeTab = newTab;
-			// Reset search when changing tabs
-			searchArtworks(true);
+			// Search is now handled by reactive statement
 		}
 	}
 
@@ -1079,6 +1121,20 @@
 	}
 
 	.checkbox {
-		@apply w-5 h-5 border-2 border-gray-300 dark:border-gray-600 rounded-md checked:bg-blue-500 checked:border-blue-500;
+		width: 1.25rem;
+		height: 1.25rem;
+		border: 2px solid rgb(209 213 219);
+		border-radius: 0.375rem;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.checkbox {
+			border-color: rgb(75 85 99);
+		}
+	}
+
+	.checkbox:checked {
+		background-color: rgb(59 130 246);
+		border-color: rgb(59 130 246);
 	}
 </style>

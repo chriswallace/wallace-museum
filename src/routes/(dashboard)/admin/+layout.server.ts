@@ -1,6 +1,6 @@
 // src/routes/(dashboard)/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
-import prisma from '$lib/prisma';
+import { db } from '$lib/prisma'; // Use read/write clients
 import { redirect } from '@sveltejs/kit';
 
 export const load: LayoutServerLoad = async ({ request, locals }) => {
@@ -10,14 +10,24 @@ export const load: LayoutServerLoad = async ({ request, locals }) => {
 
 	let user = null;
 	if (sessionId) {
-		const session = await prisma.session.findUnique({
-			where: { sessionId },
-			include: { user: true }
-		});
+		try {
+			// Use read client for better performance and add expiration filter at DB level
+			const session = await db.read.session.findFirst({
+				where: { 
+					sessionId,
+					expiresAt: {
+						gt: new Date() // Only fetch non-expired sessions
+					}
+				},
+				include: { User: true }
+			});
 
-		// Check if the session is valid and not expired
-		if (session && new Date(session.expiresAt) > new Date()) {
-			user = session.user;
+			if (session) {
+				user = session.User;
+			}
+		} catch (error) {
+			console.error('Session lookup failed:', error);
+			// Don't crash the app on session lookup failures
 		}
 	}
 

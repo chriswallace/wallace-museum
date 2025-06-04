@@ -1,10 +1,12 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { MinimalNFTData, MinimalCollectionData, MinimalCreatorData } from './types/minimal-nft';
 import { detectBlockchainFromContract, detectBlockchain } from '$lib/utils/walletUtils.js';
+import { cachedArtworkQueries, cachedCollectionQueries, cachedSystemQueries } from '$lib/cache/db-cache.js';
 
 /**
  * Minimal database operations - direct mapping from minimal data to Prisma schema
  * Eliminates complex transformation layers and redundant data storage
+ * Now includes Redis caching for read operations
  */
 export class MinimalDBOperations {
   private prisma: PrismaClient;
@@ -300,22 +302,28 @@ export class MinimalDBOperations {
   }
   
   /**
-   * Get NFT by contract and token ID
+   * Get NFT by contract and token ID with caching
    */
-  async getNFT(contractAddress: string, tokenId: string) {
+  async getNFT(contractAddress: string, tokenId: string, skipCache = false) {
     const uid = `${contractAddress.toLowerCase()}:${tokenId}`;
     
-    return this.prisma.artwork.findUnique({
-      where: { uid },
-      include: {
-        collection: true,
-        indexData: true
-      }
-    });
+    return cachedArtworkQueries.getByUid(
+      uid,
+      async () => {
+        return this.prisma.artwork.findUnique({
+          where: { uid },
+          include: {
+            collection: true,
+            indexData: true
+          }
+        });
+      },
+      { skipCache }
+    );
   }
   
   /**
-   * Search NFTs by various criteria
+   * Search NFTs by various criteria with caching
    */
   async searchNFTs(params: {
     title?: string;
@@ -324,7 +332,7 @@ export class MinimalDBOperations {
     blockchain?: string;
     limit?: number;
     offset?: number;
-  }) {
+  }, skipCache = false) {
     const where: any = {};
     
     if (params.title) {
@@ -338,39 +346,83 @@ export class MinimalDBOperations {
     if (params.collectionSlug) {
       where.collection = { slug: params.collectionSlug };
     }
+
+    // Create cache key based on search parameters
+    const page = Math.floor((params.offset || 0) / (params.limit || 50)) + 1;
+    const limit = params.limit || 50;
     
-    return this.prisma.artwork.findMany({
-      where,
-      include: {
-        collection: true
+    return cachedArtworkQueries.getPaginated(
+      page,
+      limit,
+      params,
+      async () => {
+        const results = await this.prisma.artwork.findMany({
+          where,
+          include: {
+            collection: true
+          },
+          take: params.limit || 50,
+          skip: params.offset || 0,
+          orderBy: { id: 'desc' }
+        });
+        
+        return {
+          artworks: results,
+          totalCount: await this.prisma.artwork.count({ where }),
+          page,
+          limit
+        };
       },
-      take: params.limit || 50,
-      skip: params.offset || 0,
-      orderBy: { id: 'desc' }
-    });
+      { skipCache }
+    );
   }
   
   /**
-   * Get indexing statistics
+   * Get indexing statistics with caching
    */
-  async getIndexingStats() {
-    const [
-      totalArtworks,
-      totalCollections,
-      pendingIndexes,
-      failedIndexes
-    ] = await Promise.all([
-      this.prisma.artwork.count(),
-      this.prisma.collection.count(),
-      this.prisma.artworkIndex.count({ where: { importStatus: 'pending' } }),
-      this.prisma.artworkIndex.count({ where: { importStatus: 'failed' } })
-    ]);
-    
-    return {
-      totalArtworks,
-      totalCollections,
-      pendingIndexes,
-      failedIndexes
-    };
+  async getIndexingStats(skipCache = false) {
+    return cachedSystemQueries.getIndexStats(
+      async () => {
+        const [
+          totalArtworks,
+          totalCollections,
+          pendingIndexes,
+          failedIndexes
+        ] = await Promise.all([
+          this.prisma.artwork.count(),
+          this.prisma.collection.count(),
+          this.prisma.artworkIndex.count({ where: { importStatus: 'pending' } }),
+          this.prisma.artworkIndex.count({ where: { importStatus: 'failed' } })
+        ]);
+
+        return {
+          totalArtworks,
+          totalCollections,
+          pendingIndexes,
+          failedIndexes
+        };
+      },
+      { skipCache }
+    );
+  }
+
+  /**
+   * Invalidate cache after data modifications
+   */
+  async invalidateRelatedCache(type: 'artwork' | 'collection' | 'artist', id?: number | string) {
+    switch (type) {
+      case 'artwork':
+        await cachedArtworkQueries.invalidate(
+          typeof id === 'number' ? id : undefined,
+          typeof id === 'string' ? id : undefined
+        );
+        break;
+      case 'collection':
+        await cachedCollectionQueries.invalidate(
+          typeof id === 'number' ? id : undefined,
+          typeof id === 'string' ? id : undefined
+        );
+        break;
+    }
   }
 } 

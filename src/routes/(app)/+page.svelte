@@ -229,10 +229,10 @@
 				</div>
 			{/if}
 			<OptimizedImage
-				src={hoveredArtist.artworks[0].image_url}
+				src={ipfsToHttpUrl(hoveredArtist.artworks[0].image_url)}
 				alt={hoveredArtist.artworks[0].title || ''}
-				width={previewDimensions.width}
-				height={previewDimensions.height}
+				width={previewDimensions?.width || 320}
+				height={previewDimensions?.height || 240}
 				fit="contain"
 				format="webp"
 				quality={80}

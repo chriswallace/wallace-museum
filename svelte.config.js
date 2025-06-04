@@ -1,10 +1,9 @@
 import vercel from '@sveltejs/adapter-vercel';
-import preprocess from 'svelte-preprocess';
+import { vitePreprocess } from '@sveltejs/kit/vite';
 
 const config = {
-	// Consult https://github.com/sveltejs/svelte-preprocess
-	// for more information about preprocessors
-	preprocess: preprocess({ postcss: true }),
+	// Use the modern vite preprocessor instead of svelte-preprocess
+	preprocess: vitePreprocess(),
 
 	extensions: ['.svelte'], // Add this
 

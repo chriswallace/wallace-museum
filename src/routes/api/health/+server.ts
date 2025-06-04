@@ -1,22 +1,26 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { checkDatabaseConnection, getConnectionPoolMetrics } from '$lib/prisma';
+import { cache } from '$lib/cache/redis.js';
 
 export const GET: RequestHandler = async () => {
 	const startTime = Date.now();
 	
 	try {
-		// Check database connection
-		const dbConnected = await checkDatabaseConnection();
-		
-		// Get connection pool metrics
-		const poolMetrics = await getConnectionPoolMetrics();
+		// Check database connection and cache status in parallel
+		const [dbConnected, poolMetrics, cacheStats] = await Promise.all([
+			checkDatabaseConnection(),
+			getConnectionPoolMetrics(),
+			cache.stats()
+		]);
 		
 		// Calculate response time
 		const responseTime = Date.now() - startTime;
 		
 		// Determine overall health status
-		const isHealthy = dbConnected && (!poolMetrics || poolMetrics.utilization < 90);
+		const isDbHealthy = dbConnected && (!poolMetrics || poolMetrics.utilization < 90);
+		const isCacheHealthy = !cacheStats.enabled || cacheStats.connected; // Cache is healthy if disabled or connected
+		const isHealthy = isDbHealthy && isCacheHealthy;
 		const status = isHealthy ? 'healthy' : 'unhealthy';
 		
 		// Build health response
@@ -37,6 +41,14 @@ export const GET: RequestHandler = async () => {
 				} : {
 					status: 'unknown',
 					message: 'Connection pool metrics unavailable'
+				},
+				cache: {
+					status: cacheStats.enabled ? (cacheStats.connected ? 'up' : 'down') : 'disabled',
+					enabled: cacheStats.enabled,
+					connected: cacheStats.connected,
+					keyCount: cacheStats.keyCount,
+					prefix: cacheStats.prefix,
+					memoryUsage: cacheStats.memoryUsage || 'unknown'
 				}
 			},
 			environment: {
@@ -54,19 +66,20 @@ export const GET: RequestHandler = async () => {
 			}
 		});
 		
-	} catch (error) {
-		console.error('[Health Check] Error:', error);
+	} catch (error: any) {
+		console.error('Health check failed:', error);
+		
+		const responseTime = Date.now() - startTime;
 		
 		return json({
-			status: 'error',
+			status: 'unhealthy',
 			timestamp: new Date().toISOString(),
-			responseTime: `${Date.now() - startTime}ms`,
-			error: error instanceof Error ? error.message : 'Unknown error occurred',
+			responseTime: `${responseTime}ms`,
+			error: error.message || 'Health check failed',
 			checks: {
-				database: {
-					status: 'error',
-					message: 'Failed to check database connection'
-				}
+				database: { status: 'unknown', message: 'Health check failed' },
+				connectionPool: { status: 'unknown', message: 'Health check failed' },
+				cache: { status: 'unknown', message: 'Health check failed' }
 			}
 		}, { 
 			status: 503,

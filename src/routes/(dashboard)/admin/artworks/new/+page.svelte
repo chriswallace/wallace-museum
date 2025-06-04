@@ -280,42 +280,63 @@
 
 <style>
 	h1 {
-		@apply mb-12;
+		margin-bottom: 3rem;
 	}
 
 	.container {
-		@apply max-w-7xl mx-auto;
+		max-width: 80rem;
+		margin-left: auto;
+		margin-right: auto;
 	}
 
 	.edit-form {
-		@apply pb-24 sm:grid sm:grid-cols-2 sm:gap-8;
+		padding-bottom: 6rem;
+	}
+
+	@media (min-width: 640px) {
+		.edit-form {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 2rem;
+		}
 	}
 
 	.artwork {
-		@apply w-full;
+		width: 100%;
 	}
 
 	label,
 	input,
 	select,
 	textarea {
-		@apply block mb-4 w-full p-3;
+		display: block;
+		margin-bottom: 1rem;
+		width: 100%;
+		padding: 0.75rem;
 	}
 
 	label {
-		@apply px-0 mb-0 font-semibold;
+		padding-left: 0;
+		padding-right: 0;
+		margin-bottom: 0;
+		font-weight: 600;
 	}
 
 	textarea {
-		@apply h-32;
+		height: 8rem;
 	}
 
 	fieldset {
-		@apply border border-gray-300 p-4 my-8 rounded-md text-sm;
+		border: 1px solid #d1d5db;
+		padding: 1rem;
+		margin-top: 2rem;
+		margin-bottom: 2rem;
+		border-radius: 0.375rem;
+		font-size: 0.875rem;
+	}
 
-		select {
-			@apply mb-0;
-		}
+	fieldset select {
+		margin-bottom: 0;
 	}
 
 	.error {

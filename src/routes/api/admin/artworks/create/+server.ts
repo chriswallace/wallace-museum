@@ -1,8 +1,9 @@
-import prisma from '$lib/prisma';
+import { prismaRead, prismaWrite } from '$lib/prisma';
 import { uploadToPinata } from '$lib/pinataHelpers';
 import { convertToIpfsUrl } from '$lib/pinataHelpers';
 import slugify from 'slugify';
 import { Prisma } from '@prisma/client';
+import { cachedArtworkQueries } from '$lib/cache/db-cache.js';
 
 // Simple function to guess mime type from URL
 function guessMimeTypeFromUrl(url: string): string | null {
@@ -109,10 +110,11 @@ export async function POST({ request }) {
 					lastIndexed: new Date().toISOString()
 				}];
 
-				const newArtist = await prisma.artist.create({ 
+				const newArtist = await prismaWrite.artist.create({ 
 					data: { 
 						name: newArtistName,
-						walletAddresses: walletAddresses as any
+						walletAddresses: walletAddresses as any,
+						updatedAt: new Date()
 					} 
 				});
 				artistId = newArtist.id;
@@ -122,7 +124,7 @@ export async function POST({ request }) {
 				
 				// First, search all artists to find one with this wallet address
 				let artist: any = null;
-				const allArtists: any[] = await prisma.artist.findMany();
+				const allArtists: any[] = await prismaRead.artist.findMany();
 
 				// Check if any artist has this wallet address
 				artist = allArtists.find(a => {
@@ -135,7 +137,7 @@ export async function POST({ request }) {
 				if (!artist) {
 					// Try to find by exact name match as fallback
 					try {
-						artist = await prisma.artist.findUnique({
+						artist = await prismaRead.artist.findUnique({
 							where: { name: artistName }
 						});
 					} catch (error) {
@@ -158,10 +160,11 @@ export async function POST({ request }) {
 
 					while (createAttempts < maxAttempts) {
 						try {
-							artist = await prisma.artist.create({
+							artist = await prismaWrite.artist.create({
 								data: {
 									name: finalArtistName,
-									walletAddresses: walletAddresses as any
+									walletAddresses: walletAddresses as any,
+									updatedAt: new Date()
 								}
 							});
 							break; // Success, exit the loop
@@ -195,7 +198,7 @@ export async function POST({ request }) {
 							lastIndexed: new Date().toISOString()
 						}];
 
-						artist = await prisma.artist.update({
+						artist = await prismaWrite.artist.update({
 							where: { id: artist.id },
 							data: {
 								updatedAt: new Date(),
@@ -214,7 +217,7 @@ export async function POST({ request }) {
 			collectionId = parseInt(collectionIdStr);
 		} else if (newCollectionTitle) {
 			const collectionSlug = slugify(newCollectionTitle, { lower: true, strict: true });
-			const newCollection = await prisma.collection.create({
+			const newCollection = await prismaWrite.collection.create({
 				data: {
 					title: newCollectionTitle,
 					slug: collectionSlug,
@@ -252,17 +255,20 @@ export async function POST({ request }) {
 		};
 
 		if (collectionId) {
-			newArtworkData.collection = { connect: { id: collectionId } };
+			newArtworkData.Collection = { connect: { id: collectionId } };
 		}
 
-		const newArtwork = await prisma.artwork.create({
+		const newArtwork = await prismaWrite.artwork.create({
 			data: newArtworkData
 		});
+
+		// Invalidate artwork-related cache after creation
+		await cachedArtworkQueries.invalidate();
 
 		// Link artist to artwork if we have one
 		if (artistId) {
 			try {
-				await prisma.artwork.update({
+				await prismaWrite.artwork.update({
 					where: { id: newArtwork.id },
 					data: {
 						artists: {

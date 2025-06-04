@@ -406,7 +406,7 @@ textarea,
 /* Exception for checkboxes */
 input[type='checkbox'],
 input[type='radio'] {
-	@apply inline-block w-auto mr-2;
+	@apply inline-block w-auto mr-2 mb-0;
 }
 
 input[type='checkbox'] + label,

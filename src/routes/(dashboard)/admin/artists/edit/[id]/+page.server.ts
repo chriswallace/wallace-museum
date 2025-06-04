@@ -13,11 +13,11 @@ export const load: PageServerLoad = async ({ request, locals, params }) => {
 	if (sessionId) {
 		const session = await prisma.session.findUnique({
 			where: { sessionId },
-			include: { user: true }
+			include: { User: true }
 		});
 
 		if (session && new Date(session.expiresAt) > new Date()) {
-			user = session.user;
+			user = session.User;
 		}
 	}
 
@@ -35,7 +35,7 @@ export const load: PageServerLoad = async ({ request, locals, params }) => {
 	const artist = await prisma.artist.findUnique({
 		where: { id: artistId },
 		include: {
-			collections: {
+			Collection: {
 				select: {
 					id: true,
 					title: true,

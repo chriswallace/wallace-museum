@@ -224,7 +224,6 @@
 		left: 0;
 		transition: opacity 0.3s ease-in-out;
 		/* Ensure skeleton fills container properly */
-		min-height: 100px; /* Minimum height for visibility */
 	}
 
 	.skeleton-wrapper.hidden {

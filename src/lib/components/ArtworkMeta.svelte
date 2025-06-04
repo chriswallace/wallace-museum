@@ -52,13 +52,13 @@
 
 	.additional-meta {
 		@apply grid grid-cols-2 gap-4 mt-4 text-base;
+	}
 
-		h3 {
-			@apply mb-1 text-sm tracking-wide font-normal uppercase;
-		}
+	.additional-meta h3 {
+		@apply mb-1 text-sm tracking-wide font-normal uppercase;
+	}
 
-		a {
-			@apply text-gray-600;
-		}
+	.additional-meta a {
+		@apply text-gray-600;
 	}
 </style>

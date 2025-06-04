@@ -2,6 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import prisma from '$lib/prisma';
 import { MinimalIndexingWorkflow } from '$lib/minimal-api-helpers';
+import { EnhancedFieldProcessor } from '$lib/enhanced-field-processor';
+import { MediaAnalyzer } from '$lib/utils/mediaAnalyzer.js';
 import { detectBlockchainFromContract } from '$lib/utils/walletUtils';
 import { OPENSEA_API_KEY } from '$env/static/private';
 
@@ -59,13 +61,27 @@ export const POST: RequestHandler = async ({ params }) => {
 		const workflow = new MinimalIndexingWorkflow(OPENSEA_API_KEY!);
 		
 		// Fetch fresh NFT data from external APIs
-		const freshNftData = await workflow.getNFTData(
+		console.log(`[refetch] About to call workflow.getNFTData with contract: ${artwork.contractAddress}, tokenId: ${artwork.tokenId}, blockchain: ${blockchain}`);
+		
+		let freshNftData;
+		try {
+			freshNftData = await workflow.getNFTData(
 			artwork.contractAddress,
 			artwork.tokenId,
 			blockchain as 'ethereum' | 'tezos'
 		);
+			console.log(`[refetch] workflow.getNFTData completed successfully`);
+		} catch (error) {
+			console.error(`[refetch] Error during workflow.getNFTData call:`, error);
+			return json({ 
+				error: `Error fetching NFT data: ${error instanceof Error ? error.message : 'Unknown error'}` 
+			}, { status: 500 });
+		}
+		
+		console.log(`[refetch] workflow.getNFTData returned:`, freshNftData);
 
 		if (!freshNftData) {
+			console.log(`[refetch] No fresh data returned from external API for ${artwork.contractAddress}:${artwork.tokenId}`);
 			return json({ 
 				error: 'Could not fetch fresh data from external API - NFT may not exist or API may be unavailable' 
 			}, { status: 404 });
@@ -73,68 +89,93 @@ export const POST: RequestHandler = async ({ params }) => {
 
 		console.log(`[refetch] Successfully fetched fresh data for ${artwork.contractAddress}:${artwork.tokenId}`);
 
-		// Prepare update data from fresh NFT data
+		// Use our enhanced field processor and media analyzer for better data processing
+		const fieldProcessor = new EnhancedFieldProcessor();
+		
+		// Process the raw data with enhanced field extraction
+		const enhancedData = await fieldProcessor.processArtworkFields(freshNftData, blockchain);
+		
+		// Use MediaAnalyzer for more reliable URL and MIME type detection
+		const mediaUrlSet = await MediaAnalyzer.analyzeUrlSet(freshNftData, blockchain);
+		
+		// Merge the enhanced data with media analysis results
+		const processedData = {
+			...enhancedData,
+			...mediaUrlSet, // This will override URLs with better analyzed ones
+			title: enhancedData.title || freshNftData.title || artwork.title,
+			description: enhancedData.description || freshNftData.description,
+			tokenStandard: enhancedData.tokenStandard || freshNftData.tokenStandard,
+			blockchain: blockchain,
+			contractAddress: artwork.contractAddress,
+			tokenId: artwork.tokenId
+		};
+
+		console.log(`[refetch] Enhanced data processing complete for ${artwork.contractAddress}:${artwork.tokenId}`);
+		console.log(`[refetch] Media URLs - Image: ${mediaUrlSet.imageUrl ? 'found' : 'none'}, Animation: ${mediaUrlSet.animationUrl ? 'found' : 'none'}, Generator: ${mediaUrlSet.generatorUrl ? 'found' : 'none'}`);
+		console.log(`[refetch] Primary MIME type: ${mediaUrlSet.primaryMime || 'not detected'}`);
+
+		// Prepare update data from processed NFT data
 		const updateData: any = {};
 
 		// Update basic fields
-		if (freshNftData.title && freshNftData.title !== artwork.title) {
-			updateData.title = freshNftData.title;
+		if (processedData.title && processedData.title !== artwork.title) {
+			updateData.title = processedData.title;
 		}
-		if (freshNftData.description) {
-			updateData.description = freshNftData.description;
+		if (processedData.description) {
+			updateData.description = processedData.description;
 		}
 
-		// Update media URLs
-		if (freshNftData.imageUrl) {
-			updateData.imageUrl = freshNftData.imageUrl;
+		// Update media URLs with enhanced analysis results
+		if (processedData.imageUrl) {
+			updateData.imageUrl = processedData.imageUrl;
 		}
-		if (freshNftData.animationUrl) {
-			updateData.animationUrl = freshNftData.animationUrl;
+		if (processedData.animationUrl) {
+			updateData.animationUrl = processedData.animationUrl;
 		}
-		if (freshNftData.thumbnailUrl) {
-			updateData.thumbnailUrl = freshNftData.thumbnailUrl;
+		if (processedData.thumbnailUrl) {
+			updateData.thumbnailUrl = processedData.thumbnailUrl;
 		}
-		if (freshNftData.generatorUrl) {
-			updateData.generatorUrl = freshNftData.generatorUrl;
+		if (processedData.generatorUrl) {
+			updateData.generatorUrl = processedData.generatorUrl;
 		}
 
 		// Update metadata
-		if (freshNftData.metadataUrl) {
-			updateData.metadataUrl = freshNftData.metadataUrl;
+		if (processedData.metadataUrl) {
+			updateData.metadataUrl = processedData.metadataUrl;
 		}
 
-		// Update technical fields
-		if (freshNftData.mime) {
-			updateData.mime = freshNftData.mime;
+		// Update technical fields with enhanced MIME detection
+		if (processedData.primaryMime) {
+			updateData.mime = processedData.primaryMime;
 		}
-		if (freshNftData.dimensions) {
-			updateData.dimensions = freshNftData.dimensions;
+		if (processedData.dimensions) {
+			updateData.dimensions = processedData.dimensions;
 		}
-		if (freshNftData.supply) {
-			updateData.supply = freshNftData.supply;
+		if (processedData.supply) {
+			updateData.supply = processedData.supply;
 		}
 
 		// Update attributes if available
-		if (freshNftData.attributes) {
-			updateData.attributes = freshNftData.attributes;
+		if (processedData.attributes) {
+			updateData.attributes = processedData.attributes;
 		}
 
 		// Update features if available
-		if (freshNftData.features) {
-			updateData.features = freshNftData.features;
+		if (processedData.features) {
+			updateData.features = processedData.features;
 		}
 
 		// Update mint date if available
-		if (freshNftData.mintDate) {
-			updateData.mintDate = new Date(freshNftData.mintDate);
+		if (processedData.mintDate) {
+			updateData.mintDate = new Date(processedData.mintDate);
 		}
 
 		// Update blockchain and token standard
 		if (blockchain) {
 			updateData.blockchain = blockchain;
 		}
-		if (freshNftData.tokenStandard) {
-			updateData.tokenStandard = freshNftData.tokenStandard;
+		if (processedData.tokenStandard) {
+			updateData.tokenStandard = processedData.tokenStandard;
 		}
 
 		// Only update if we have changes
@@ -153,8 +194,8 @@ export const POST: RequestHandler = async ({ params }) => {
 			where: { id: artworkId },
 			data: updateData,
 			include: {
-				collection: true,
-				artists: true
+				Collection: true,
+				Artist: true
 			}
 		});
 
@@ -194,13 +235,13 @@ export const POST: RequestHandler = async ({ params }) => {
 			...updatedArtwork,
 			tokenID: updatedArtwork.tokenId,
 			contractAddr: updatedArtwork.contractAddress,
-			artists: updatedArtwork.artists || [],
-			artist: updatedArtwork.artists && updatedArtwork.artists.length > 0 ? updatedArtwork.artists[0] : null
+			artists: updatedArtwork.Artist || [],
+			artist: updatedArtwork.Artist && updatedArtwork.Artist.length > 0 ? updatedArtwork.Artist[0] : null
 		};
 
 		return json({
 			success: true,
-			message: `Successfully refetched and updated artwork data`,
+			message: `Successfully refetched and updated artwork data with enhanced media analysis`,
 			updatedFields: Object.keys(updateData),
 			artwork: transformedResponse
 		});

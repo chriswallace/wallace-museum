@@ -92,8 +92,8 @@ export class EnhancedFieldProcessor {
    */
   private static readonly IPFS_GATEWAYS = [
     'https://ipfs.wallacemuseum.com/ipfs/',
-    'https://ipfs.io/ipfs/',
-    'https://dweb.link/ipfs/'
+    'https://dweb.link/ipfs/',
+    'https://ipfs.io/ipfs/'
   ];
   
   /**

@@ -5,6 +5,13 @@ import { defineConfig } from 'vite';
 /** @type {import('vite').UserConfig} */
 const config = {
 	plugins: [sveltekit()],
+	css: {
+		preprocessorOptions: {
+			scss: {
+				api: 'modern-compiler'
+			}
+		}
+	},
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}'],
 		// Add environment setup if needed, e.g., for DOM or testing library

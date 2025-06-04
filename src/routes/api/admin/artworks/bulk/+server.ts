@@ -1,5 +1,6 @@
-import prisma from '$lib/prisma';
+import { prismaRead, prismaWrite } from '$lib/prisma';
 import type { RequestHandler } from './$types';
+import { cachedArtworkQueries } from '$lib/cache/db-cache.js';
 
 export const POST: RequestHandler = async ({ request }): Promise<Response> => {
 	try {
@@ -45,11 +46,12 @@ export const POST: RequestHandler = async ({ request }): Promise<Response> => {
 
 async function handleBulkDelete(artworkIds: number[]): Promise<Response> {
 	try {
-		// Get artworks to unpin their files
-		const artworks = await prisma.artwork.findMany({
+		// First, get the artworks to unpin their files and get their UIDs for cache invalidation
+		const artworks = await prismaRead.artwork.findMany({
 			where: { id: { in: artworkIds } },
-			select: {
+			select: { 
 				id: true,
+				uid: true,
 				title: true,
 				imageUrl: true,
 				thumbnailUrl: true,
@@ -77,7 +79,7 @@ async function handleBulkDelete(artworkIds: number[]): Promise<Response> {
 		}
 
 		// Disconnect ArtworkIndex records
-		await prisma.artworkIndex.updateMany({
+		await prismaWrite.artworkIndex.updateMany({
 			where: { artworkId: { in: artworkIds } },
 			data: { 
 				artworkId: null,
@@ -86,15 +88,20 @@ async function handleBulkDelete(artworkIds: number[]): Promise<Response> {
 		});
 
 		// Delete the artworks
-		const deleteResult = await prisma.artwork.deleteMany({
+		const deletedArtworks = await prismaWrite.artwork.deleteMany({
 			where: { id: { in: artworkIds } }
 		});
+
+		// Invalidate cache for all affected artworks
+		for (const artwork of artworks) {
+			await cachedArtworkQueries.invalidate(artwork.id, artwork.uid || undefined);
+		}
 
 		return new Response(
 			JSON.stringify({ 
 				success: true, 
-				deletedCount: deleteResult.count,
-				message: `Successfully deleted ${deleteResult.count} artwork(s)`
+				deletedCount: deletedArtworks.count,
+				message: `Successfully deleted ${deletedArtworks.count} artwork(s)`
 			}),
 			{
 				status: 200,
@@ -149,13 +156,18 @@ async function handleBulkEdit(artworkIds: number[], data: any): Promise<Response
 
 		// Update artworks one by one to handle the many-to-many relationship properly
 		const updatePromises = artworkIds.map(id => 
-			prisma.artwork.update({
+			prismaWrite.artwork.update({
 				where: { id },
 				data: updateData
 			})
 		);
 
 		const updatedArtworks = await Promise.all(updatePromises);
+
+		// Invalidate cache for all affected artworks
+		for (const artworkId of artworkIds) {
+			await cachedArtworkQueries.invalidate(artworkId);
+		}
 
 		// Update artwork indexes
 		try {

@@ -1,13 +1,13 @@
-import prisma from '$lib/prisma';
+import { prismaRead, prismaWrite } from '$lib/prisma';
 
 // GET: Fetch Collection Details
 export async function GET({ params }) {
 	const { collectionId } = params;
-	const collection = await prisma.collection.findUnique({
+	const collection = await prismaRead.collection.findUnique({
 		where: { id: parseInt(collectionId, 10) },
 		include: {
-			artworks: true,
-			artists: true
+			Artwork: true,
+			Artist: true
 		}
 	});
 
@@ -40,7 +40,7 @@ export async function PUT({ params, request }) {
 		if (data.artistIds && Array.isArray(data.artistIds)) {
 			updateData.artists = { set: data.artistIds.map((id: number) => ({ id })) };
 		}
-		const updatedCollection = await prisma.collection.update({
+		const updatedCollection = await prismaWrite.collection.update({
 			where: { id: parseInt(collectionId, 10) },
 			data: updateData
 		});
@@ -61,7 +61,7 @@ export async function DELETE({ params }) {
 	const { collectionId } = params;
 
 	try {
-		await prisma.collection.delete({
+		await prismaWrite.collection.delete({
 			where: { id: parseInt(collectionId, 10) }
 		});
 

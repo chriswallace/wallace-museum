@@ -1,4 +1,4 @@
-import prisma from '$lib/prisma';
+import { prismaWrite } from '$lib/prisma';
 import { uploadAvatarImage } from '$lib/avatarUpload';
 
 export async function POST({ request }) {
@@ -25,10 +25,11 @@ export async function POST({ request }) {
 			websiteUrl,
 			twitterHandle,
 			instagramHandle,
-			avatarUrl
+			avatarUrl,
+			updatedAt: new Date()
 		};
 
-		const newArtist = await prisma.artist.create({
+		const newArtist = await prismaWrite.artist.create({
 			data: newArtistData
 		});
 

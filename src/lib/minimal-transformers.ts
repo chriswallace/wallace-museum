@@ -9,6 +9,7 @@ import { fetchCreatorInfo } from './openseaHelpers.js';
 import { WRAPPED_TEZOS_CONTRACT, isProblematicThumbnail } from './constants/tezos';
 import { detectBlockchainFromContract } from './utils/walletUtils';
 import { EnhancedFieldProcessor } from './enhanced-field-processor';
+import { fileTypeFromBuffer } from 'file-type';
 
 /**
  * Minimal data transformer - only extracts fields we actually store in the database
@@ -37,6 +38,10 @@ export class MinimalNFTTransformer {
     // Use enhanced field processor for better field extraction
     const enhancedFields = await this.fieldProcessor.processArtworkFields(nft, blockchain);
     
+    // Parse metadata to extract media URLs if available
+    // The metadata field should only contain a metadata URL, not JSON data
+    // We don't need to parse it - just use it as the metadata URL
+    
     // Basic fields
     const title = nft.name || nft.title || 'Untitled';
     const description = nft.description || undefined;
@@ -54,11 +59,23 @@ export class MinimalNFTTransformer {
       }
     }
     
+    // Enhanced media URL extraction with enhanced fields only
+    // Priority: enhanced fields > top-level NFT fields
+    const imageUrl = enhancedFields.imageUrl || 
+                     nft.image_url || 
+                     nft.display_image_url;
+                     
+    const animationUrl = enhancedFields.animationUrl || 
+                         nft.animation_url || 
+                         nft.display_animation_url;
+                         
+    const thumbnailUrl = enhancedFields.thumbnailUrl || 
+                         nft.image_url;
+                         
+    const metadataUrl = enhancedFields.metadataUrl || nft.metadata_url || nft.metadata;
+    
     // Use enhanced fields with fallbacks to original data
-    const imageUrl = enhancedFields.imageUrl || nft.image_url || nft.display_image_url;
-    const animationUrl = enhancedFields.animationUrl || nft.animation_url || nft.display_animation_url;
-    const thumbnailUrl = enhancedFields.thumbnailUrl || nft.image_url;
-    const metadataUrl = enhancedFields.metadataUrl || nft.metadata_url;
+    const generatorUrl = enhancedFields.generatorUrl || nft.artifact_uri;
     
     // Enhanced creator extraction
     let creator: MinimalNFTData['creator'] = undefined;
@@ -94,7 +111,20 @@ export class MinimalNFTTransformer {
     };
     
     const tokenStandard = nft.token_standard || 'ERC721';
-    const mime = enhancedFields.mime || nft.mime;
+    let mime = enhancedFields.mime || nft.mime;
+    
+    // If no MIME type is available, detect it from the best media URL
+    if (!mime) {
+      const bestMediaUrl = animationUrl || imageUrl || generatorUrl;
+      if (bestMediaUrl) {
+        console.log(`[MinimalNFTTransformer] No MIME type provided for OpenSea NFT ${contractAddress}:${tokenId}, analyzing ${bestMediaUrl}`);
+        mime = await this.detectMimeTypeFromUrl(bestMediaUrl);
+        if (mime) {
+          console.log(`[MinimalNFTTransformer] Detected MIME type: ${mime} for ${contractAddress}:${tokenId}`);
+        }
+      }
+    }
+    
     const symbol = nft.symbol;
     const supply = enhancedFields.supply || nft.supply || 1;
     const dimensions = enhancedFields.dimensions;
@@ -111,7 +141,7 @@ export class MinimalNFTTransformer {
       imageUrl,
       thumbnailUrl,
       animationUrl,
-      generatorUrl: enhancedFields.generatorUrl,
+      generatorUrl,
       metadataUrl,
       tokenStandard,
       mime,
@@ -169,17 +199,23 @@ export class MinimalNFTTransformer {
       }
     }
     
-    // Use enhanced fields with fallbacks to original data
-    const imageUrl = enhancedFields.imageUrl || actualToken.display_uri || actualToken.artifact_uri;
+    // Enhanced media URL extraction with enhanced fields only
+    // Priority: enhanced fields > top-level token fields
+    const imageUrl = enhancedFields.imageUrl || 
+                     actualToken.display_uri || 
+                     actualToken.artifact_uri;
     
-    // Enhanced thumbnail URL processing with problematic thumbnail detection
-    let thumbnailUrl = enhancedFields.thumbnailUrl || actualToken.thumbnail_uri || actualToken.display_uri;
+    // Enhanced thumbnail URL processing
+    let thumbnailUrl = enhancedFields.thumbnailUrl || 
+                       actualToken.thumbnail_uri || 
+                       actualToken.display_uri;
     
     // Check for problematic platform-specific thumbnails (Versum, Hic et Nunc)
     if (isProblematicThumbnail(thumbnailUrl)) {
       console.log(`[MinimalNFTTransformer] Detected problematic thumbnail for Tezos token ${contractAddress}:${tokenId}, using display/artifact image instead`);
       // Use display_uri or artifact_uri as fallback when problematic thumbnail is detected
-      thumbnailUrl = actualToken.display_uri || actualToken.artifact_uri;
+      thumbnailUrl = actualToken.display_uri || 
+                     actualToken.artifact_uri;
     }
     
     // Don't store thumbnail URL if it's the same as the main image URL to avoid duplication
@@ -187,9 +223,15 @@ export class MinimalNFTTransformer {
       console.log(`[MinimalNFTTransformer] Thumbnail URL is same as image URL for Tezos token ${contractAddress}:${tokenId}, storing null to avoid duplication`);
       thumbnailUrl = undefined;
     }
+
+    // Enhanced animation URL extraction
+    // If it's in an animation_url field, trust that it's animation content
+    const animationUrl = enhancedFields.animationUrl || 
+                         actualToken.animation_url ||
+                         // Also check artifact_uri as it's often used for animations in Tezos
+                         actualToken.artifact_uri;
     
-    const animationUrl = enhancedFields.animationUrl || actualToken.animation_url;
-    const metadataUrl = enhancedFields.metadataUrl || actualToken.metadata_url;
+    const metadataUrl = enhancedFields.metadataUrl || actualToken.metadata_url || actualToken.metadata;
     
     // Enhanced generator URL detection for Tezos
     let generatorUrl: string | undefined;
@@ -198,7 +240,7 @@ export class MinimalNFTTransformer {
     } else if (actualToken.artifact_uri && this.isGenerativeArtifact(actualToken.artifact_uri)) {
       generatorUrl = actualToken.artifact_uri;
     }
-    
+
     // Use enhanced dimensions with fallback to Tezos-specific extraction
     const dimensions = enhancedFields.dimensions || this.extractTezosSpecificDimensions(actualToken);
     
@@ -208,18 +250,8 @@ export class MinimalNFTTransformer {
       value: attr.value || attr.attribute?.value
     })) || [];
     
-    // Enhanced features extraction from metadata
+    // Enhanced features extraction
     let features = enhancedFields.features;
-    if (!features && actualToken.metadata) {
-      try {
-        const metadata = typeof actualToken.metadata === 'string' 
-          ? JSON.parse(actualToken.metadata) 
-          : actualToken.metadata;
-        features = metadata.features || metadata.attributes;
-      } catch (error) {
-        // Ignore parsing errors for features
-      }
-    }
     
     // Enhanced creator extraction for Tezos
     let creator: MinimalNFTData['creator'] = undefined;
@@ -260,7 +292,20 @@ export class MinimalNFTTransformer {
     };
     
     const tokenStandard = 'FA2'; // Tezos standard
-    const mime = enhancedFields.mime || actualToken.mime;
+    let mime = enhancedFields.mime || actualToken.mime;
+    
+    // If no MIME type is available, detect it from the best media URL
+    if (!mime) {
+      const bestMediaUrl = animationUrl || imageUrl || generatorUrl;
+      if (bestMediaUrl) {
+        console.log(`[MinimalNFTTransformer] No MIME type provided for Tezos token ${contractAddress}:${tokenId}, analyzing ${bestMediaUrl}`);
+        mime = await this.detectMimeTypeFromUrl(bestMediaUrl);
+        if (mime) {
+          console.log(`[MinimalNFTTransformer] Detected MIME type: ${mime} for ${contractAddress}:${tokenId}`);
+        }
+      }
+    }
+    
     const symbol = actualToken.symbol || actualToken.fa?.symbol;
     const supply = enhancedFields.supply || (actualToken.supply ? parseInt(actualToken.supply.toString()) : 1);
     
@@ -790,5 +835,105 @@ export class MinimalNFTTransformer {
     ];
     
     return generativeContracts.includes(contractAddress);
+  }
+
+  /**
+   * Detect MIME type by fetching and analyzing the first chunk of a file
+   */
+  private async detectMimeTypeFromUrl(url: string): Promise<string | null> {
+    if (!url || typeof url !== 'string') {
+      return null;
+    }
+
+    try {
+      // Handle different URL types
+      let fetchUrl = url;
+      
+      // Convert IPFS URLs to HTTP gateway URLs
+      if (url.startsWith('ipfs://')) {
+        const hash = url.replace('ipfs://', '');
+        fetchUrl = `https://ipfs.io/ipfs/${hash}`;
+      } else if (url.includes('/ipfs/') && !url.startsWith('http')) {
+        fetchUrl = `https://ipfs.io/ipfs/${url.split('/ipfs/')[1]}`;
+      }
+
+      // Skip non-HTTP URLs that we can't fetch
+      if (!fetchUrl.startsWith('http')) {
+        return this.guessMimeTypeFromUrl(url);
+      }
+
+      // Fetch only the first chunk of the file for analysis
+      const response = await fetch(fetchUrl, {
+        method: 'GET',
+        headers: {
+          'Range': 'bytes=0-8191' // First 8KB should be enough for file type detection
+        }
+      });
+
+      if (!response.ok) {
+        // If range request fails, try without range but with HEAD request
+        const headResponse = await fetch(fetchUrl, {
+          method: 'HEAD'
+        });
+        
+        if (headResponse.ok) {
+          const contentType = headResponse.headers.get('content-type');
+          if (contentType && contentType !== 'application/octet-stream') {
+            return contentType.split(';')[0].trim();
+          }
+        }
+        
+        return this.guessMimeTypeFromUrl(url);
+      }
+
+      // First try to get MIME type from Content-Type header
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType !== 'application/octet-stream') {
+        const mimeType = contentType.split(';')[0].trim();
+        if (this.isValidMimeType(mimeType)) {
+          return mimeType;
+        }
+      }
+
+      // If Content-Type is not reliable, analyze the buffer
+      const buffer = await response.arrayBuffer();
+      const uint8Array = new Uint8Array(buffer);
+      
+      // Use file-type library to detect from buffer
+      const fileType = await fileTypeFromBuffer(uint8Array);
+      if (fileType?.mime) {
+        return fileType.mime;
+      }
+
+      // Fallback to URL-based guessing
+      return this.guessMimeTypeFromUrl(url);
+
+    } catch (error) {
+      console.warn(`[MinimalNFTTransformer] Error detecting MIME type for ${url}:`, error);
+      return this.guessMimeTypeFromUrl(url);
+    }
+  }
+
+  /**
+   * Check if a MIME type is valid/supported
+   */
+  private isValidMimeType(mimeType: string): boolean {
+    const validMimeTypes = [
+      'image/jpeg',
+      'image/png', 
+      'image/gif',
+      'image/webp',
+      'image/svg+xml',
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+      'video/x-msvideo',
+      'text/html',
+      'application/javascript',
+      'application/json',
+      'application/pdf'
+    ];
+    
+    return validMimeTypes.some(valid => mimeType.startsWith(valid.split('/')[0] + '/'));
   }
 } 

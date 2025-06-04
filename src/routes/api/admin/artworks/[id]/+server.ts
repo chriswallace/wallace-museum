@@ -1,5 +1,6 @@
-import prisma from '$lib/prisma';
+import { prismaRead, prismaWrite } from '$lib/prisma';
 import { Prisma } from '@prisma/client';
+import { cachedArtworkQueries } from '$lib/cache/db-cache.js';
 
 // Simple function to guess mime type from URL
 function guessMimeTypeFromUrl(url: string): string | null {
@@ -31,11 +32,11 @@ function guessMimeTypeFromUrl(url: string): string | null {
 // GET: Fetch Artwork Details
 export async function GET({ params }) {
 	const { id } = params;
-	const artwork = await prisma.artwork.findUnique({
+	const artwork = await prismaRead.artwork.findUnique({
 		where: { id: parseInt(id, 10) },
 		include: {
-			collection: true,
-			artists: true
+			Collection: true,
+			Artist: true
 		}
 	});
 
@@ -50,8 +51,9 @@ export async function GET({ params }) {
 		...artwork,
 		tokenID: artwork.tokenId,
 		contractAddr: artwork.contractAddress,
-		artists: artwork.artists || [],
-		artist: artwork.artists && artwork.artists.length > 0 ? artwork.artists[0] : null
+		artists: artwork.Artist || [],
+		artist: artwork.Artist && artwork.Artist.length > 0 ? artwork.Artist[0] : null,
+		collection: artwork.Collection
 	};
 
 	return new Response(JSON.stringify(transformedArtwork), {
@@ -92,6 +94,7 @@ export async function PUT({ params, request }) {
 		curatorNotes?: string;
 		supply?: number;
 		dimensions?: { width: number; height: number } | null;
+		fullscreen?: boolean;
 	}
 
 	const requestData = (await request.json()) as ArtworkUpdateRequestData;
@@ -139,9 +142,12 @@ export async function PUT({ params, request }) {
 				requestData.dimensions === null ? Prisma.JsonNull : requestData.dimensions;
 		}
 
+		// Fullscreen
+		if (requestData.fullscreen !== undefined) updateData.fullscreen = requestData.fullscreen;
+
 		// Collection linking
 		if (requestData.collectionId !== undefined) {
-			updateData.collection = requestData.collectionId
+			updateData.Collection = requestData.collectionId
 				? { connect: { id: requestData.collectionId } }
 				: { disconnect: true };
 		}
@@ -150,26 +156,29 @@ export async function PUT({ params, request }) {
 		if (requestData.artistIds !== undefined) {
 			if (requestData.artistIds.length > 0) {
 				// Connect the artwork directly to the specified artists
-				updateData.artists = {
+				updateData.Artist = {
 					set: requestData.artistIds.map(id => ({ id }))
 				};
 			} else {
 				// Disconnect all artists if empty array
-				updateData.artists = { set: [] };
+				updateData.Artist = { set: [] };
 			}
 		}
 
 		// Automatically update lastSyncedAt (not in Artwork model)
 		// updateData.lastSyncedAt = new Date();
 
-		const updatedArtwork = await prisma.artwork.update({
+		const updatedArtwork = await prismaWrite.artwork.update({
 			where: { id: artworkId },
 			data: updateData,
 			include: {
-				collection: true,
-				artists: true
+				Collection: true,
+				Artist: true
 			}
 		});
+
+		// Invalidate artwork-related cache
+		await cachedArtworkQueries.invalidate(artworkId, updatedArtwork.uid || undefined);
 
 		// Pin any new IPFS URLs to Pinata
 		try {
@@ -208,8 +217,9 @@ export async function PUT({ params, request }) {
 			...updatedArtwork,
 			tokenID: updatedArtwork.tokenId,
 			contractAddr: updatedArtwork.contractAddress,
-			artists: updatedArtwork.artists || [],
-			artist: updatedArtwork.artists && updatedArtwork.artists.length > 0 ? updatedArtwork.artists[0] : null
+			artists: updatedArtwork.Artist || [],
+			artist: updatedArtwork.Artist && updatedArtwork.Artist.length > 0 ? updatedArtwork.Artist[0] : null,
+			collection: updatedArtwork.Collection
 		};
 
 		// Update the artwork index to reflect changes in the normalized data
@@ -255,7 +265,7 @@ export async function DELETE({ params }) {
 
 	try {
 		// First, get the artwork to unpin its files
-		const artwork = await prisma.artwork.findUnique({
+		const artwork = await prismaRead.artwork.findUnique({
 			where: { id: parseInt(id, 10) }
 		});
 
@@ -289,7 +299,7 @@ export async function DELETE({ params }) {
 		// This preserves the indexing data while breaking the connection
 		// and marks them as pending for potential re-import
 		try {
-			const updatedIndexRecords = await prisma.artworkIndex.updateMany({
+			const updatedIndexRecords = await prismaWrite.artworkIndex.updateMany({
 				where: { artworkId: parseInt(id, 10) },
 				data: { 
 					artworkId: null,
@@ -305,9 +315,12 @@ export async function DELETE({ params }) {
 		}
 
 		// Delete the artwork
-		await prisma.artwork.delete({
+		await prismaWrite.artwork.delete({
 			where: { id: parseInt(id, 10) }
 		});
+
+		// Invalidate artwork-related cache
+		await cachedArtworkQueries.invalidate(parseInt(id, 10), artwork.uid || undefined);
 
 		return new Response(null, { status: 204 });
 	} catch (error) {

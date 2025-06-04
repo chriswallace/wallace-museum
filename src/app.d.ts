@@ -12,9 +12,12 @@ declare global {
 declare namespace App {
 	interface Locals {
 		user: {
-			name: string;
-			role: string;
-		};
+			id: string;
+			username: string;
+			email: string;
+			createdAt: Date;
+			updatedAt: Date;
+		} | null;
 	}
 
 	// interface PageData {}

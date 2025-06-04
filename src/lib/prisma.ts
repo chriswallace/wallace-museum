@@ -8,7 +8,8 @@ if (browser) {
 }
 
 declare global {
-	var prisma: PrismaClient | undefined;
+	var prismaRead: PrismaClient | undefined;
+	var prismaWrite: PrismaClient | undefined;
 }
 
 // Configure logging based on environment
@@ -16,8 +17,8 @@ const logLevels: Prisma.LogLevel[] = dev
 	? ['error', 'warn'] 
 	: ['error'];
 
-// Enhanced connection pool configuration
-const getDatabaseUrl = () => {
+// Enhanced connection pool configuration for read database
+const getReadDatabaseUrl = () => {
 	const baseUrl = process.env.DATABASE_URL;
 	if (!baseUrl) {
 		throw new Error('DATABASE_URL environment variable is not set');
@@ -26,50 +27,91 @@ const getDatabaseUrl = () => {
 	// Parse the URL to add connection pool parameters if not already present
 	const url = new URL(baseUrl);
 	
-	// Set more appropriate connection pool parameters for the application's usage patterns
+	// Add application name for better connection tracking
+	if (!url.searchParams.has('application_name')) {
+		url.searchParams.set('application_name', 'wallace-collection-read');
+	}
+	
+	// Connection pool parameters optimized for read operations
 	if (!url.searchParams.has('connection_limit')) {
-		url.searchParams.set('connection_limit', '15'); // Increased from 10 to handle concurrent operations
+		url.searchParams.set('connection_limit', '15'); // Increased from 10 for better throughput
 	}
 	if (!url.searchParams.has('pool_timeout')) {
-		url.searchParams.set('pool_timeout', '30'); // Increased from 20 to reduce timeout errors
+		url.searchParams.set('pool_timeout', '30'); // Increased timeout
 	}
 	if (!url.searchParams.has('connect_timeout')) {
-		url.searchParams.set('connect_timeout', '15'); // Increased from 10 for better reliability
+		url.searchParams.set('connect_timeout', '15'); // Increased connect timeout
 	}
 	if (!url.searchParams.has('statement_timeout')) {
-		url.searchParams.set('statement_timeout', '45000'); // Increased from 30s to 45s for complex queries
+		url.searchParams.set('statement_timeout', '45000'); // Increased statement timeout
 	}
 	if (!url.searchParams.has('idle_in_transaction_session_timeout')) {
-		url.searchParams.set('idle_in_transaction_session_timeout', '120000'); // Increased from 1 to 2 minutes
+		url.searchParams.set('idle_in_transaction_session_timeout', '30000'); // Reduced idle timeout
 	}
 
 	return url.toString();
 };
 
-const prismaOptions: Prisma.PrismaClientOptions = {
+// Enhanced connection pool configuration for write database
+const getWriteDatabaseUrl = () => {
+	const baseUrl = process.env.WRITE_DATABASE_URL || process.env.DATABASE_URL;
+	if (!baseUrl) {
+		throw new Error('WRITE_DATABASE_URL or DATABASE_URL environment variable is not set');
+	}
+
+	// Parse the URL to add connection pool parameters if not already present
+	const url = new URL(baseUrl);
+	
+	// Add application name for better connection tracking
+	if (!url.searchParams.has('application_name')) {
+		url.searchParams.set('application_name', 'wallace-collection-write');
+	}
+	
+	// Connection pool parameters optimized for write operations
+	if (!url.searchParams.has('connection_limit')) {
+		url.searchParams.set('connection_limit', '8'); // Increased from 6 for better write performance
+	}
+	if (!url.searchParams.has('pool_timeout')) {
+		url.searchParams.set('pool_timeout', '35'); // Increased timeout for writes
+	}
+	if (!url.searchParams.has('connect_timeout')) {
+		url.searchParams.set('connect_timeout', '20'); // Increased timeout for writes
+	}
+	if (!url.searchParams.has('statement_timeout')) {
+		url.searchParams.set('statement_timeout', '60000'); // Increased timeout for complex writes
+	}
+	if (!url.searchParams.has('idle_in_transaction_session_timeout')) {
+		url.searchParams.set('idle_in_transaction_session_timeout', '90000'); // Increased for transactions
+	}
+
+	return url.toString();
+};
+
+const readPrismaOptions: Prisma.PrismaClientOptions = {
 	log: logLevels,
 	datasources: {
 		db: {
-			url: getDatabaseUrl()
+			url: getReadDatabaseUrl()
 		}
 	},
 	// Error formatting for better debugging
 	errorFormat: dev ? 'pretty' : 'minimal'
 };
 
-// Connection pool configuration notes:
-// Connection pool settings are now automatically configured in getDatabaseUrl()
-// 
-// Current settings:
-// - connection_limit: 15 (increased from 10)
-// - pool_timeout: 30 (increased from 20 seconds)
-// - connect_timeout: 15 (seconds to wait for initial connection)
-// - statement_timeout: 45000 (45 seconds for query timeout)
-// - idle_in_transaction_session_timeout: 120000 (2 minutes)
+const writePrismaOptions: Prisma.PrismaClientOptions = {
+	log: logLevels,
+	datasources: {
+		db: {
+			url: getWriteDatabaseUrl()
+		}
+	},
+	// Error formatting for better debugging
+	errorFormat: dev ? 'pretty' : 'minimal'
+};
 
-// Create a singleton instance with retry logic
-const createPrismaClient = () => {
-	const client = new PrismaClient(prismaOptions);
+// Create a Prisma client with retry logic
+const createPrismaClient = (options: Prisma.PrismaClientOptions, type: 'read' | 'write') => {
+	const client = new PrismaClient(options);
 	
 	// Add connection retry middleware
 	client.$use(async (params, next) => {
@@ -83,7 +125,7 @@ const createPrismaClient = () => {
 				// Check if it's a connection pool timeout error
 				if (error?.code === 'P2024' && retries < maxRetries - 1) {
 					retries++;
-					console.warn(`[Prisma] Connection pool timeout, retrying (${retries}/${maxRetries})...`);
+					console.warn(`[Prisma ${type}] Connection pool timeout, retrying (${retries}/${maxRetries})...`);
 					// Wait before retrying with exponential backoff
 					await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
 					continue;
@@ -102,7 +144,7 @@ const createPrismaClient = () => {
 			
 			// Only log slow queries (>1000ms) to reduce noise
 			if (after - before > 1000) {
-				console.log(`[Prisma] Slow query ${params.model}.${params.action} took ${after - before}ms`);
+				console.log(`[Prisma ${type}] Slow query ${params.model}.${params.action} took ${after - before}ms`);
 			}
 			return result;
 		});
@@ -111,12 +153,17 @@ const createPrismaClient = () => {
 	return client;
 };
 
-// Use global variable in development to prevent multiple instances
-const prisma = global.prisma || createPrismaClient();
+// Use global variables in development to prevent multiple instances
+const prismaRead = global.prismaRead || createPrismaClient(readPrismaOptions, 'read');
+const prismaWrite = global.prismaWrite || createPrismaClient(writePrismaOptions, 'write');
 
 if (dev) {
-	global.prisma = prisma;
+	global.prismaRead = prismaRead;
+	global.prismaWrite = prismaWrite;
 }
+
+// Default export for backward compatibility (uses read client)
+const prisma = prismaRead;
 
 // Connection health check function with timeout
 export async function checkDatabaseConnection(): Promise<boolean> {
@@ -126,7 +173,7 @@ export async function checkDatabaseConnection(): Promise<boolean> {
 			setTimeout(() => reject(new Error('Database health check timeout')), 5000)
 		);
 		
-		const healthCheck = prisma.$queryRaw`SELECT 1`;
+		const healthCheck = prismaRead.$queryRaw`SELECT 1`;
 		
 		await Promise.race([healthCheck, timeoutPromise]);
 		return true;
@@ -136,11 +183,11 @@ export async function checkDatabaseConnection(): Promise<boolean> {
 	}
 }
 
-// Get connection pool metrics (if available)
-export async function getConnectionPoolMetrics() {
+// Get connection pool metrics for a specific client
+async function getConnectionPoolMetricsForClient(client: PrismaClient, type: string) {
 	try {
 		// Check current connections (PostgreSQL specific)
-		const poolInfo = await prisma.$queryRaw<Array<{ count: bigint }>>`
+		const poolInfo = await client.$queryRaw<Array<{ count: bigint }>>`
 			SELECT count(*) 
 			FROM pg_stat_activity 
 			WHERE datname = current_database()
@@ -149,7 +196,7 @@ export async function getConnectionPoolMetrics() {
 		const activeConnections = Number(poolInfo[0]?.count || 0);
 		
 		// Get max connections setting
-		const maxConnInfo = await prisma.$queryRaw<Array<{ setting: string }>>`
+		const maxConnInfo = await client.$queryRaw<Array<{ setting: string }>>`
 			SELECT setting 
 			FROM pg_settings 
 			WHERE name = 'max_connections'
@@ -158,9 +205,28 @@ export async function getConnectionPoolMetrics() {
 		const maxConnections = parseInt(maxConnInfo[0]?.setting || '100');
 		
 		return {
+			type,
 			active: activeConnections,
 			max: maxConnections,
 			utilization: Math.round((activeConnections / maxConnections) * 100)
+		};
+	} catch (error) {
+		console.error(`[Prisma ${type}] Failed to get pool metrics:`, error);
+		return null;
+	}
+}
+
+// Get connection pool metrics (if available)
+export async function getConnectionPoolMetrics() {
+	try {
+		const [readMetrics, writeMetrics] = await Promise.all([
+			getConnectionPoolMetricsForClient(prismaRead, 'read'),
+			getConnectionPoolMetricsForClient(prismaWrite, 'write')
+		]);
+		
+		return {
+			read: readMetrics,
+			write: writeMetrics
 		};
 	} catch (error) {
 		console.error('[Prisma] Failed to get pool metrics:', error);
@@ -174,12 +240,18 @@ if (dev && process.env.ENABLE_POOL_MONITORING === 'true') {
 		const metrics = await getConnectionPoolMetrics();
 		if (metrics) {
 			// Log connection pool status more frequently in development
-			console.log(`[Prisma] Connection pool status: ${metrics.active}/${metrics.max} (${metrics.utilization}%)`);
+			if (metrics.read) {
+				console.log(`[Prisma Read] Connection pool status: ${metrics.read.active}/${metrics.read.max} (${metrics.read.utilization}%)`);
+			}
+			if (metrics.write) {
+				console.log(`[Prisma Write] Connection pool status: ${metrics.write.active}/${metrics.write.max} (${metrics.write.utilization}%)`);
+			}
 			
-			if (metrics.utilization > 80) {
-				console.warn(`[Prisma] HIGH connection pool utilization: ${metrics.active}/${metrics.max} (${metrics.utilization}%)`);
-			} else if (metrics.utilization > 60) {
-				console.warn(`[Prisma] Elevated connection pool utilization: ${metrics.active}/${metrics.max} (${metrics.utilization}%)`);
+			if (metrics.read && metrics.read.utilization > 80) {
+				console.warn(`[Prisma Read] HIGH connection pool utilization: ${metrics.read.active}/${metrics.read.max} (${metrics.read.utilization}%)`);
+			}
+			if (metrics.write && metrics.write.utilization > 80) {
+				console.warn(`[Prisma Write] HIGH connection pool utilization: ${metrics.write.active}/${metrics.write.max} (${metrics.write.utilization}%)`);
 			}
 		}
 	}, 15000); // Check every 15 seconds instead of 30
@@ -189,24 +261,32 @@ if (dev && process.env.ENABLE_POOL_MONITORING === 'true') {
 if (!dev) {
 	setInterval(async () => {
 		const metrics = await getConnectionPoolMetrics();
-		if (metrics && metrics.utilization > 85) {
-			console.error(`[Prisma] CRITICAL connection pool utilization in production: ${metrics.active}/${metrics.max} (${metrics.utilization}%)`);
+		if (metrics) {
+			if (metrics.read && metrics.read.utilization > 85) {
+				console.error(`[Prisma Read] CRITICAL connection pool utilization in production: ${metrics.read.active}/${metrics.read.max} (${metrics.read.utilization}%)`);
+			}
+			if (metrics.write && metrics.write.utilization > 85) {
+				console.error(`[Prisma Write] CRITICAL connection pool utilization in production: ${metrics.write.active}/${metrics.write.max} (${metrics.write.utilization}%)`);
+			}
 		}
 	}, 30000); // Check every 30 seconds in production
 }
 
 // Graceful shutdown handling with timeout
 const gracefulShutdown = async () => {
-	console.log('[Prisma] Disconnecting from database...');
+	console.log('[Prisma] Disconnecting from databases...');
 	try {
 		// Set a timeout for disconnection
-		const disconnectPromise = prisma.$disconnect();
+		const disconnectPromises = [
+			prismaRead.$disconnect(),
+			prismaWrite.$disconnect()
+		];
 		const timeoutPromise = new Promise((_, reject) => 
 			setTimeout(() => reject(new Error('Disconnect timeout')), 10000)
 		);
 		
-		await Promise.race([disconnectPromise, timeoutPromise]);
-		console.log('[Prisma] Disconnected from database');
+		await Promise.race([Promise.all(disconnectPromises), timeoutPromise]);
+		console.log('[Prisma] Disconnected from databases');
 	} catch (error) {
 		console.error('[Prisma] Error during disconnect:', error);
 	}
@@ -229,5 +309,18 @@ process.on('unhandledRejection', async (reason, promise) => {
 	await gracefulShutdown();
 	process.exit(1);
 });
+
+// Export both clients and default for backward compatibility
+export { prismaRead, prismaWrite };
+
+// Helper functions for cleaner code
+export const db = {
+	// Read operations
+	read: prismaRead,
+	// Write operations  
+	write: prismaWrite,
+	// Transactions (use write client for transactions)
+	transaction: prismaWrite.$transaction.bind(prismaWrite)
+};
 
 export default prisma;

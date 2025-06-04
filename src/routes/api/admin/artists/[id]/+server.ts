@@ -1,15 +1,15 @@
-import prisma from '$lib/prisma';
+import { prismaRead, prismaWrite } from '$lib/prisma';
 import { Prisma } from '@prisma/client'; // Import Prisma types
 import { unpinArtworkCids } from '$lib/pinataHelpers';
 
 // Define a type for the artist object including relations we expect
 type ArtistWithRelations = Prisma.ArtistGetPayload<{
 	include: {
-		collections: true;
+		Collection: true;
 		walletAddresses: {
 			include: {
-				artworks: true;
-				collections: true;
+				Artwork: true;
+				Collection: true;
 			};
 		};
 	};
@@ -20,10 +20,24 @@ export async function GET({ params }: { params: { id: string } }): Promise<Respo
 	const { id } = params;
 
 	try {
-		const artist = await prisma.artist.findUnique({
+		// Use include instead of raw query for better performance and type safety
+		const artist = await prismaRead.artist.findUnique({
 			where: { id: parseInt(id, 10) },
 			include: {
-				collections: true
+				Collection: true,
+				Artwork: {
+					select: {
+						id: true,
+						title: true,
+						imageUrl: true,
+						description: true,
+						collectionId: true
+					},
+					take: 100, // Limit results to prevent memory issues
+					orderBy: {
+						id: 'desc' // Use id instead of createdAt since Artwork doesn't have createdAt
+					}
+				}
 			}
 		});
 
@@ -34,19 +48,11 @@ export async function GET({ params }: { params: { id: string } }): Promise<Respo
 			});
 		}
 
-		// Get artworks for this artist using a raw query to bypass TypeScript issues
-		const artworks = await prisma.$queryRaw`
-			SELECT a.id, a.title, a."imageUrl", a.description, a."collectionId"
-			FROM "Artwork" a
-			JOIN "_ArtistArtworks" aa ON a.id = aa."B"
-			WHERE aa."A" = ${parseInt(id, 10)}
-		`;
-
 		// Transform the artist data to match the expected format
 		const transformedArtist = {
 			...artist,
 			// Add artworks directly to the artist object
-			artworks: artworks,
+			artworks: artist.Artwork,
 			// Transform walletAddresses JSON to addresses array
 			addresses: Array.isArray((artist as any).walletAddresses) 
 				? ((artist as any).walletAddresses as any[]).map((wallet: any, index: number) => ({
@@ -64,7 +70,7 @@ export async function GET({ params }: { params: { id: string } }): Promise<Respo
 					id: index,
 					address: wallet.address,
 					blockchain: wallet.blockchain || 'ethereum',
-					artworks: index === 0 ? artworks : [], // Only include artworks in the first entry
+					artworks: index === 0 ? artist.Artwork : [], // Only include artworks in the first entry
 					createdAt: new Date(),
 					updatedAt: new Date()
 				}))
@@ -74,7 +80,7 @@ export async function GET({ params }: { params: { id: string } }): Promise<Respo
 						id: 0,
 						address: '',
 						blockchain: 'ethereum',
-						artworks: artworks,
+						artworks: artist.Artwork,
 						createdAt: new Date(),
 						updatedAt: new Date()
 					}
@@ -106,7 +112,7 @@ export async function PUT({
 	const data = await request.json();
 
 	try {
-		const updatedArtist = await prisma.artist.update({
+		const updatedArtist = await prismaWrite.artist.update({
 			where: { id: parseInt(id, 10) },
 			data: {
 				name: data.name,
@@ -117,7 +123,7 @@ export async function PUT({
 				avatarUrl: data.avatarUrl
 			},
 			include: {
-				collections: true
+				Collection: true
 			}
 		});
 
@@ -155,7 +161,7 @@ export async function DELETE({ params }: { params: { id: string } }): Promise<Re
 
 	try {
 		// First, get the artist to check for files to unpin
-		const artist = await prisma.artist.findUnique({
+		const artist = await prismaRead.artist.findUnique({
 			where: { id: artistId }
 		});
 
@@ -193,7 +199,7 @@ export async function DELETE({ params }: { params: { id: string } }): Promise<Re
 		}
 
 		// Delete the artist (cascade will handle related records)
-		await prisma.artist.delete({
+		await prismaWrite.artist.delete({
 			where: { id: artistId }
 		});
 

@@ -346,7 +346,7 @@
 				<a href="/admin/artworks/edit/{artwork.id}" class="artwork-card">
 					<div class="aspect-square relative">
 						<OptimizedImage
-							src={artwork.imageUrl}
+							src={ipfsToHttpUrl(artwork.imageUrl)}
 							alt={artwork.title}
 							width={300}
 							height={300}
@@ -374,6 +374,13 @@
 
 <style>
 	.artwork-card {
-		@apply block transition-transform hover:scale-105;
+		display: block;
+		transition-property: transform;
+		transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+		transition-duration: 150ms;
+	}
+
+	.artwork-card:hover {
+		transform: scale(1.05);
 	}
 </style>

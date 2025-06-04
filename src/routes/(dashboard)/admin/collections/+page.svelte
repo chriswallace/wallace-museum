@@ -4,6 +4,7 @@
 	import { getCloudinaryTransformedUrl } from '$lib/pinataUtils.client';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import ArtistList from '$lib/components/ArtistList.svelte';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 
 	interface Artist {
 		id: number;
@@ -80,18 +81,18 @@
 
 <h1>Collections <button class="ghost" on:click={addNew}>+ Add new</button></h1>
 
+<input
+	type="text"
+	placeholder="Search by Collection Title"
+	class="search"
+	on:input={handleSearchInput}
+/>
+
 {#if collections.length === 0}
 	<div class="empty">
 		<p>No collections found.</p>
 	</div>
 {:else}
-	<input
-		type="text"
-		placeholder="Search by Collection Title"
-		class="search"
-		on:input={handleSearchInput}
-	/>
-
 	<div class="collection-grid">
 		{#each collections as collection}
 			<button class="card" on:click={() => editCollection(collection.id)}>
@@ -100,7 +101,7 @@
 						{#each collection.coverImages as image}
 							{#if isVideoUrl(image)}
 								<video
-									src={image}
+									src={ipfsToHttpUrl(image)}
 									autoplay
 									loop
 									muted
@@ -118,6 +119,7 @@
 									fit="crop"
 									format="webp"
 									quality={80}
+									aspectRatio="1/1"
 									showSkeleton={true}
 									skeletonBorderRadius="4px"
 									className="aspect-square object-cover"
@@ -156,24 +158,48 @@
 
 <style>
 	.collection-grid {
-		@apply w-full grid grid-cols-3 gap-4;
+		width: 100%;
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 1rem;
 	}
 	.card {
-		@apply cursor-pointer rounded-md shadow-md overflow-hidden p-0;
+		cursor: pointer;
+		border-radius: 0.375rem;
+		box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+		overflow: hidden;
+		padding: 0;
 	}
 	.cover-image-wrap {
-		@apply overflow-hidden;
+		overflow: hidden;
 	}
 	.cover-image-grid {
-		@apply w-full aspect-square grid grid-cols-2 transition duration-200 ease-in-out hover:scale-105;
+		width: 100%;
+		aspect-ratio: 1 / 1;
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		transition-property: transform;
+		transition-duration: 200ms;
+		transition-timing-function: ease-in-out;
+	}
+	.cover-image-grid:hover {
+		transform: scale(1.05);
 	}
 	.title {
-		@apply text-lg font-semibold p-4;
+		font-size: 1.125rem;
+		line-height: 1.75rem;
+		font-weight: 600;
+		padding: 1rem;
 	}
 	.pagination {
-		@apply flex justify-center items-center space-x-2 my-4;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		column-gap: 0.5rem;
+		margin-top: 1rem;
+		margin-bottom: 1rem;
 	}
 	.artists-container {
-		@apply pb-2;
+		padding-bottom: 0.5rem;
 	}
 </style>

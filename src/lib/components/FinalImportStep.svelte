@@ -1,5 +1,7 @@
 <script>
 	import Modal from '$lib/components/Modal.svelte';
+	import { createEventDispatcher } from 'svelte';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 
 	export let title;
 	export let nfts = [];
@@ -20,7 +22,7 @@
 		<tbody>
 			{#each nfts as nft}
 				<tr class="nft-card">
-					<td><img src={nft.image_url} alt={nft.name} width="100" /></td>
+					<td><img src={ipfsToHttpUrl(nft.image_url)} alt={nft.name} width="100" /></td>
 					<td>{nft.name}</td>
 					<td>{nft.artist?.username} ({nft.artist?.address})</td>
 					<td>{nft.collection?.name}</td>

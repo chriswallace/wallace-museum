@@ -27,13 +27,11 @@
 	let artworks: Artwork[] = [];
 	let page: number = 1;
 	let totalPages: number = 0;
-	let sortColumn: string = 'title';
-	let sortOrder: 'asc' | 'desc' = 'asc'; // 'asc' for ascending, 'desc' for descending
+	let sortColumn: string = 'id';  // Changed default from 'title' to 'id' to match API
+	let sortOrder: 'asc' | 'desc' = 'desc'; // 'asc' for ascending, 'desc' for descending
 	let searchQuery: string = '';
-	let isLoading: boolean = true;
-	let error: string = '';
-	let searchTimeout: NodeJS.Timeout;
-	let lastFetchParams: string = '';
+	let isLoading: boolean = false;  // Added loading state
+	let error: string = '';  // Added error state
 	
 	// Bulk actions state
 	let selectedArtworks = new Set<number | string>();
@@ -43,52 +41,46 @@
 	let bulkEditArtistIds: number[] = [];
 	let bulkEditCollectionId: number | null = null;
 
+	// Bulk refetch state
+	let isRefetching = false;
+	let refetchProgress = { current: 0, total: 0 };
+	let refetchResults = { success: 0, failed: 0, errors: [] as string[] };
+
 	// Reactive variables for bulk actions
 	$: selectedCount = selectedArtworks.size;
 	$: allSelected = artworks.length > 0 && selectedArtworks.size === artworks.length;
 	$: someSelected = selectedArtworks.size > 0 && selectedArtworks.size < artworks.length;
 
-	async function fetchArtworks(page: number = 1) {
-		// Create a cache key from current parameters
-		const cacheKey = `${page}-${sortColumn}-${sortOrder}-${searchQuery}`;
-		
-		// Skip if we're already loading the same data
-		if (isLoading && lastFetchParams === cacheKey) {
-			return;
-		}
-		
-		lastFetchParams = cacheKey;
+	async function fetchArtworks(pageNum: number = 1) {
 		isLoading = true;
 		error = '';
 		
 		try {
-			let url = `/api/admin/artworks/?page=${page}`;
-			if (sortColumn && sortOrder) {
-				// Fix parameter names to match API endpoint
+			// Fixed parameter names to match API expectations
+			let url = `/api/admin/artworks/?page=${pageNum}&limit=50`;
+		if (sortColumn && sortOrder) {
 				url += `&sortBy=${sortColumn}&sortOrder=${sortOrder}`;
-			}
-			if (searchQuery) {
-				url += `&search=${encodeURIComponent(searchQuery)}`;
-			}
+		}
+		if (searchQuery) {
+			url += `&search=${encodeURIComponent(searchQuery)}`;
+		}
 
-			const response = await fetch(url);
-			if (response.ok) {
-				const data = await response.json();
-				artworks = data.artworks || [];
-				totalPages = data.totalPages || 0;
-				page = data.page || 1;
-				
-				// Log query time for debugging
-				if (data.queryTime && data.queryTime > 500) {
-					console.warn(`Slow query took ${data.queryTime}ms`);
-				}
+		const response = await fetch(url);
+		if (response.ok) {
+			const data = await response.json();
+				// Normalize image URLs to handle both imageUrl and image_url
+				artworks = data.artworks.map((artwork: Artwork) => ({
+					...artwork,
+					imageUrl: artwork.imageUrl || artwork.image_url
+				}));
+			totalPages = data.totalPages;
+			page = data.page;
 			} else {
-				const errorData = await response.json();
-				error = errorData.error || 'Failed to fetch artworks';
+				error = 'Failed to fetch artworks';
 				artworks = [];
 			}
 		} catch (e) {
-			error = (e as Error).message || 'Network error occurred';
+			error = (e as Error).message || 'An error occurred while fetching artworks';
 			artworks = [];
 		} finally {
 			isLoading = false;
@@ -172,7 +164,12 @@
 				toast.push(result.message || 'Artworks deleted successfully');
 				selectedArtworks.clear();
 				selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
+				// If we're on a page that now has no artworks, go to previous page
+				if (artworks.length <= selectedCount && page > 1) {
+					changePage(page - 1);
+				} else {
 				fetchArtworks(page);
+				}
 			} else {
 				const error = await response.json();
 				toast.push(`Failed to delete artworks: ${error.error}`);
@@ -232,16 +229,98 @@
 		}
 	}
 
-	onMount(() => {
-		fetchArtworks(page);
-		fetchArtistsAndCollections();
-		
-		// Cleanup function
-		return () => {
-			if (searchTimeout) {
-				clearTimeout(searchTimeout);
+	async function handleBulkRefetch() {
+		if (selectedCount === 0) {
+			toast.push('Please select at least one artwork');
+			return;
+		}
+
+		if (!confirm(`Are you sure you want to refetch data for ${selectedCount} artwork(s)? This will update metadata from external APIs.`)) {
+			return;
+		}
+
+		isRefetching = true;
+		const artworkIds = Array.from(selectedArtworks);
+		refetchProgress = { current: 0, total: artworkIds.length };
+		refetchResults = { success: 0, failed: 0, errors: [] };
+
+		// Stagger requests to avoid rate limits
+		const DELAY_BETWEEN_REQUESTS = 1000; // 1 second delay between requests
+		const BATCH_SIZE = 3; // Process 3 artworks at a time
+
+		try {
+			for (let i = 0; i < artworkIds.length; i += BATCH_SIZE) {
+				const batch = artworkIds.slice(i, i + BATCH_SIZE);
+				
+				// Process batch in parallel
+				const batchPromises = batch.map(async (artworkId) => {
+					try {
+						const response = await fetch(`/api/admin/artworks/${artworkId}/refetch`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' }
+						});
+
+						if (response.ok) {
+							const result = await response.json();
+							refetchResults.success++;
+							return { success: true, artworkId, result };
+						} else {
+							const errorData = await response.json();
+							const errorMsg = `Artwork ${artworkId}: ${errorData.error || 'Unknown error'}`;
+							refetchResults.errors.push(errorMsg);
+							refetchResults.failed++;
+							return { success: false, artworkId, error: errorMsg };
+						}
+					} catch (error) {
+						const errorMsg = `Artwork ${artworkId}: Network error`;
+						refetchResults.errors.push(errorMsg);
+						refetchResults.failed++;
+						return { success: false, artworkId, error: errorMsg };
+					} finally {
+						refetchProgress.current++;
+						refetchProgress = { ...refetchProgress }; // Trigger reactivity
+					}
+				});
+
+				// Wait for batch to complete
+				await Promise.all(batchPromises);
+
+				// Add delay between batches (except for the last batch)
+				if (i + BATCH_SIZE < artworkIds.length) {
+					await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS));
+				}
 			}
-		};
+
+			// Show results
+			const successMsg = `Refetch completed: ${refetchResults.success} successful, ${refetchResults.failed} failed`;
+			if (refetchResults.failed === 0) {
+				toast.push(successMsg);
+			} else {
+				toast.push(successMsg);
+				// Log errors to console for debugging
+				console.warn('Refetch errors:', refetchResults.errors);
+			}
+
+			// Refresh the artworks list to show updated data
+			await fetchArtworks(page);
+			
+			// Clear selection
+			selectedArtworks.clear();
+			selectedArtworks = new Set(selectedArtworks);
+
+		} catch (error) {
+			console.error('Bulk refetch error:', error);
+			toast.push('Bulk refetch failed: Network error');
+		} finally {
+			isRefetching = false;
+			refetchProgress = { current: 0, total: 0 };
+			refetchResults = { success: 0, failed: 0, errors: [] };
+		}
+	}
+
+	onMount(() => {
+		fetchArtworks(1);
+		fetchArtistsAndCollections();
 	});
 
 	function editArtwork(id: number | string) {
@@ -249,22 +328,11 @@
 	}
 
 	function handleSearchInput(event: Event) {
-		const newSearchQuery = (event.target as HTMLInputElement).value;
-		
-		// Clear existing timeout
-		if (searchTimeout) {
-			clearTimeout(searchTimeout);
-		}
-		
-		// Update search query immediately for UI responsiveness
-		searchQuery = newSearchQuery;
-		
-		// Debounce the actual search
-		searchTimeout = setTimeout(() => {
-			// Reset to page 1 when searching
-			page = 1;
+		searchQuery = (event.target as HTMLInputElement).value;
+		if (searchQuery.length >= 3 || searchQuery.length === 0) {
+			page = 1; // Reset to first page when searching
 			fetchArtworks(1);
-		}, 300); // 300ms delay
+		}
 	}
 
 	function changeSorting(column: string) {
@@ -274,12 +342,13 @@
 			sortColumn = column;
 			sortOrder = 'asc';
 		}
-		fetchArtworks(page);
+		page = 1; // Reset to first page when sorting
+		fetchArtworks(1);
 	}
 
 	function changePage(newPage: number) {
 		page = newPage;
-		fetchArtworks(page);
+		fetchArtworks(newPage);
 
 		// This will scroll the window to the top of the page
 		window.scrollTo(0, 0);
@@ -296,36 +365,61 @@
 
 <h1>Artworks <button class="ghost" on:click={() => addNew()}>+ Add new</button></h1>
 
+<input
+	type="text"
+	placeholder="Search by Title, Artist, or Collection"
+	class="search"
+	bind:value={searchQuery}
+	on:input={handleSearchInput}
+/>
+
 {#if isLoading}
 	<div class="loading">
-		<div class="loading-spinner"></div>
 		<p>Loading artworks...</p>
 	</div>
 {:else if error}
 	<div class="error">
 		<p>Error: {error}</p>
-		<button class="secondary" on:click={() => fetchArtworks(page)}>Retry</button>
+		<button class="primary" on:click={() => fetchArtworks(page)}>Retry</button>
 	</div>
 {:else if artworks.length === 0}
 	<div class="empty">
 		<p>No artworks found.</p>
 		{#if searchQuery}
-			<p class="text-sm text-gray-600">Try adjusting your search terms.</p>
+			<p>Try adjusting your search or <button class="link" on:click={() => { searchQuery = ''; fetchArtworks(1); }}>clear the search</button>.</p>
 		{/if}
 	</div>
 {:else}
-	<input
-		type="text"
-		placeholder="Search by Title, Artist, or Collection"
-		class="search"
-		on:input={handleSearchInput}
-	/>
-
 	<!-- Bulk Actions Bar -->
 	{#if selectedCount > 0}
 		<div class="bulk-actions-bar">
-			<span class="selected-count">{selectedCount} artwork(s) selected</span>
+			<span class="selected-count">
+				{selectedCount} artwork(s) selected
+				{#if isRefetching}
+					<span class="refetch-progress">
+						- Refetching {refetchProgress.current}/{refetchProgress.total}...
+					</span>
+				{/if}
+			</span>
 			<div class="bulk-actions-buttons">
+				<button 
+					class="secondary" 
+					on:click={handleBulkRefetch}
+					disabled={isRefetching}
+				>
+					{#if isRefetching}
+						<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-current inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+						</svg>
+						Refetching...
+					{:else}
+						<svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+						</svg>
+						Refetch Data
+					{/if}
+				</button>
 				<button class="secondary" on:click={openBulkActions}>
 					Bulk Edit
 				</button>
@@ -379,16 +473,17 @@
 					<td>
 						<button class="image" on:click={() => editArtwork(artwork.id)}>
 							<OptimizedImage
-								src={artwork.imageUrl}
-								alt=""
+								src={ipfsToHttpUrl(artwork.imageUrl)}
+								alt={artwork.title}
 								width={80}
 								height={80}
 								fit="cover"
 								format="webp"
-								quality={85}
+								quality={80}
+								aspectRatio="1/1"
 								showSkeleton={true}
 								skeletonBorderRadius="4px"
-								className="aspect-square"
+								className="w-full h-full object-cover"
 							/>
 						</button>
 					</td>
@@ -506,6 +601,10 @@
 		.selected-count {
 			color: rgb(138 69 30);
 			@apply font-medium;
+			
+			.refetch-progress {
+				@apply text-sm font-normal text-gray-600 dark:text-gray-400;
+			}
 		}
 		
 		.bulk-actions-buttons {
@@ -558,30 +657,30 @@
 	}
 
 	.loading {
-		@apply flex flex-col items-center justify-center py-12;
-		
-		.loading-spinner {
-			@apply w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mb-4;
-		}
+		@apply py-12;
 		
 		p {
-			@apply text-gray-600 dark:text-gray-400;
+			@apply text-gray-600 dark:text-gray-400 text-lg text-center;
 		}
 	}
 
 	.error {
-		@apply flex flex-col items-center justify-center py-12 text-center;
+		@apply flex flex-col items-center justify-center py-12 space-y-4;
 		
 		p {
-			@apply text-red-600 dark:text-red-400 mb-4;
+			@apply text-red-600 dark:text-red-400 text-lg;
 		}
 	}
 
 	.empty {
-		@apply text-center py-12;
+		@apply flex flex-col items-center justify-center py-12 space-y-2;
 		
 		p {
-			@apply text-gray-600 dark:text-gray-400;
+			@apply text-gray-600 dark:text-gray-400 text-lg;
+		}
+		
+		button.link {
+			@apply text-blue-600 dark:text-blue-400 underline hover:no-underline bg-transparent border-none cursor-pointer;
 		}
 	}
 </style>

@@ -27,9 +27,75 @@ model Artist {
   resolvedAt       DateTime?
   socialLinks      Json?
   walletAddresses  Json?
-  updatedAt        DateTime     @updatedAt
-  artworks         Artwork[]    @relation("ArtistArtworks")
-  collections      Collection[] @relation("ArtistCollections")
+  updatedAt        DateTime
+  Artwork          Artwork[]    @relation("ArtistArtworks")
+  Collection       Collection[] @relation("ArtistCollections")
+
+  @@index([isVerified])
+  @@index([createdAt])
+  @@index([updatedAt])
+}
+
+model Artwork {
+  id              Int           @id @default(autoincrement())
+  title           String
+  description     String?
+  collectionId    Int?
+  attributes      Json?
+  mintDate        DateTime?
+  blockchain      String?
+  tokenStandard   String?
+  mime            String?
+  metadataUrl     String?
+  animationUrl    String?
+  generatorUrl    String?
+  contractAddress String?
+  dimensions      Json?
+  features        Json?
+  imageUrl        String?
+  supply          Int?
+  thumbnailUrl    String?
+  tokenId         String?
+  uid             String?       @unique
+  fullscreen      Boolean       @default(false)
+  Collection      Collection?   @relation(fields: [collectionId], references: [id])
+  ArtworkIndex    ArtworkIndex?
+  Artist          Artist[]      @relation("ArtistArtworks")
+
+  @@unique([contractAddress, tokenId])
+  @@index([blockchain])
+  @@index([collectionId])
+  @@index([contractAddress])
+  @@index([mintDate])
+  @@index([title])
+  @@index([tokenId])
+}
+
+model ArtworkIndex {
+  id              Int      @id @default(autoincrement())
+  artworkId       Int?     @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  nftUid          String   @unique
+  type            String   @default("owned")
+  blockchain      String
+  contractAddress String
+  tokenId         String
+  dataSource      String
+  importStatus    String   @default("pending")
+  rawResponse     Json     @default("{}")
+  normalizedData  Json     @default("{}")
+  errorMessage    String?
+  lastAttempt     DateTime @default(now())
+  Artwork         Artwork? @relation(fields: [artworkId], references: [id])
+
+  @@unique([contractAddress, tokenId])
+  @@index([blockchain])
+  @@index([dataSource])
+  @@index([importStatus])
+  @@index([type])
+  @@index([lastAttempt])
+  @@index([updatedAt])
 }
 
 model Collection {
@@ -66,53 +132,15 @@ model Collection {
   projectNumber        Int?
   totalSupply          Int?
   volumeTraded         Float?
-  artworks             Artwork[]
-  artists              Artist[]  @relation("ArtistCollections")
+  Artwork              Artwork[]
+  Artist               Artist[]  @relation("ArtistCollections")
 
-  @@index([parentContract])
-  @@index([isGenerativeArt])
-  @@index([projectNumber])
   @@index([curatorAddress])
-}
-
-model Artwork {
-  id              Int           @id @default(autoincrement())
-  title           String
-  description     String?
-  collectionId    Int?
-  attributes      Json?
-  mintDate        DateTime?
-  blockchain      String?
-  tokenStandard   String?
-  mime            String?
-  metadataUrl     String?
-  animationUrl    String?
-  generatorUrl    String?
-  contractAddress String?
-  dimensions      Json?
-  features        Json?
-  imageUrl        String?
-  supply          Int?
-  thumbnailUrl    String?
-  tokenId         String?
-  uid             String?       @unique
-  collection      Collection?   @relation(fields: [collectionId], references: [id])
-  indexData       ArtworkIndex?
-  artists         Artist[]      @relation("ArtistArtworks")
-
-  @@unique([contractAddress, tokenId])
-}
-
-model User {
-  id            String       @id @default(uuid())
-  username      String       @unique
-  passwordHash  String
-  userAuthToken String       @unique
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  email         String       @unique
-  sessions      Session[]
-  userWallets   UserWallet[]
+  @@index([isGenerativeArt])
+  @@index([parentContract])
+  @@index([projectNumber])
+  @@index([enabled])
+  @@index([title])
 }
 
 model Session {
@@ -121,7 +149,10 @@ model Session {
   userId    String
   createdAt DateTime @default(now())
   expiresAt DateTime
-  user      User     @relation(fields: [userId], references: [id])
+  User      User     @relation(fields: [userId], references: [id])
+
+  @@index([expiresAt])
+  @@index([userId])
 }
 
 model Settings {
@@ -130,29 +161,18 @@ model Settings {
   value String
 }
 
-model ArtworkIndex {
-  id              Int      @id @default(autoincrement())
-  artworkId       Int?     @unique
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  nftUid          String   @unique
-  type            String   @default("owned")
-  blockchain      String
-  contractAddress String
-  tokenId         String
-  dataSource      String
-  importStatus    String   @default("pending")
-  rawResponse     Json     @default("{}")
-  normalizedData  Json     @default("{}")
-  errorMessage    String?
-  lastAttempt     DateTime @default(now())
-  artwork         Artwork? @relation(fields: [artworkId], references: [id])
+model User {
+  id            String       @id
+  username      String       @unique
+  passwordHash  String
+  userAuthToken String       @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime
+  email         String       @unique
+  Session       Session[]
+  UserWallet    UserWallet[]
 
-  @@unique([contractAddress, tokenId])
-  @@index([blockchain])
-  @@index([dataSource])
-  @@index([importStatus])
-  @@index([type])
+  @@index([email])
 }
 
 model UserWallet {
@@ -162,9 +182,9 @@ model UserWallet {
   wallets   Json
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
   @@index([enabled])
+  @@index([userId])
 }

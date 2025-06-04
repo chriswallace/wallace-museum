@@ -34,7 +34,7 @@
 
 	// Transform URL for display
 	$: currentArtwork = artworks[currentArtworkIndex];
-	$: displayImageUrl = currentArtwork?.imageUrl || '';
+	$: displayImageUrl = currentArtwork?.imageUrl ? ipfsToHttpUrl(currentArtwork.imageUrl) : '';
 	$: displayAnimationUrl = currentArtwork?.animationUrl ? ipfsToHttpUrl(currentArtwork.animationUrl) : '';
 
 	async function fetchArtworks() {

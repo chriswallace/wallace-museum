@@ -47,6 +47,18 @@ The import system allows you to:
 - Select multiple NFTs to import at once
 - Import NFTs into your official collection
 
+### 4. Redis Caching System
+
+The application includes a comprehensive Redis caching system to improve performance:
+
+- **Automatic Query Caching**: Database read queries are automatically cached
+- **Environment-Based Control**: Cache can be enabled/disabled per environment
+- **Smart Invalidation**: Cache is automatically invalidated when data changes
+- **Admin Controls**: API endpoints for cache management and monitoring
+- **Sitewide Prefixing**: All cache keys use `wallace-collection:` prefix
+
+See [REDIS_CACHE_SETUP.md](REDIS_CACHE_SETUP.md) for detailed configuration and usage.
+
 ## Getting Started
 
 1. Install dependencies:
@@ -62,6 +74,7 @@ The import system allows you to:
    OPENSEA_API_KEY=your_opensea_api_key
    INDEXER_API_KEY=your_secure_key_here
    IPFS_API_KEY=your_ipfs_api_key
+   REDISCLOUD_URL=redis://username:password@host:port  # For caching
    ```
 
 3. Run the development server:
@@ -89,6 +102,17 @@ The import system allows you to:
     - `limit` - Number of results per page (default: 50)
     - `offset` - Pagination offset (default: 0)
 
+### Cache Management
+
+- `GET /api/admin/cache` - Get cache status and statistics
+- `DELETE /api/admin/cache` - Clear all cache entries
+- `DELETE /api/admin/cache?pattern=artworks:*` - Clear specific cache pattern
+- `POST /api/admin/cache` - Invalidate cache patterns
+
+### Health Check
+
+- `GET /api/health` - System health check including cache status
+
 ## Database Schema
 
 The system uses the following key tables:
@@ -98,6 +122,16 @@ The system uses the following key tables:
 - `Artist` - Stores artist information
 - `Collection` - Stores collection information
 - `Settings` - Stores system settings, including wallet addresses
+
+## Testing
+
+Test the caching system with the included test script:
+
+```bash
+node test-cache.js
+```
+
+This will verify cache functionality, hit/miss rates, and API responses.
 
 ## Contributing
 

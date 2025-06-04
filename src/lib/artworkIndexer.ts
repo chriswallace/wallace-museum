@@ -47,8 +47,8 @@ export async function normalizeArtworkData(artworkId: number): Promise<IndexedAr
 	const artwork = await prisma.artwork.findUnique({
 		where: { id: artworkId },
 		include: {
-			collection: true, // Include collection details
-			artists: true // Include the artists directly linked to this artwork
+			Collection: true, // Include collection details
+			Artist: true // Include the artists directly linked to this artwork
 		}
 	});
 
@@ -58,8 +58,8 @@ export async function normalizeArtworkData(artworkId: number): Promise<IndexedAr
 	}
 
 	const artists: ArtistForNormalization[] = [];
-	if (artwork.artists) {
-		for (const artist of artwork.artists) {
+	if (artwork.Artist) {
+		for (const artist of artwork.Artist) {
 			artists.push({
 				id: artist.id,
 				name: artist.name
@@ -67,11 +67,11 @@ export async function normalizeArtworkData(artworkId: number): Promise<IndexedAr
 		}
 	}
 
-	const collectionData = artwork.collection
+	const collectionData = artwork.Collection
 		? {
-				id: artwork.collection.id,
-				name: artwork.collection.title,
-				slug: artwork.collection.slug
+				id: artwork.Collection.id,
+				name: artwork.Collection.title,
+				slug: artwork.Collection.slug
 			}
 		: {
 				id: null,
@@ -114,7 +114,7 @@ export async function normalizeArtworkData(artworkId: number): Promise<IndexedAr
 		attributes,
 		tags,
 		contractAddr: artwork.contractAddress,
-		contractAlias: artwork.collection?.title || null, // Using collection title or null
+		contractAlias: artwork.Collection?.title || null, // Using collection title or null
 		tokenID: artwork.tokenId,
 		mime: artwork.mime,
 		tokenStandard: artwork.tokenStandard,

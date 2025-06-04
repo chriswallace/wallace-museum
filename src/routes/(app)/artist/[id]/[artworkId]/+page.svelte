@@ -9,14 +9,19 @@
 	import ArtworkDisplay from '$lib/components/ArtworkDisplay.svelte';
 	import ArtistNameWithAvatar from '$lib/components/ArtistNameWithAvatar.svelte';
 
-	export let data: { artist?: any; error?: string };
+	export let data: { 
+		artist?: any; 
+		currentArtworkId?: string;
+		currentIndex?: number;
+		error?: string; 
+	};
 
 	interface Attribute {
 		trait_type?: string;
 		value: string;
 	}
 
-	let currentIndex = 0;
+	let currentIndex = data.currentIndex || 0;
 	let iframeEl: HTMLIFrameElement | null = null;
 
 	function formatMintDate(dateStr: string | Date | undefined): string {
@@ -38,12 +43,16 @@
 
 	function nextArtwork() {
 		if (!data.artist) return;
-		currentIndex = (currentIndex + 1) % data.artist.artworks.length;
+		const nextIndex = (currentIndex + 1) % data.artist.artworks.length;
+		const nextArtworkId = data.artist.artworks[nextIndex].id;
+		goto(`/artist/${data.artist.id}/${nextArtworkId}`);
 	}
 
 	function prevArtwork() {
 		if (!data.artist) return;
-		currentIndex = (currentIndex - 1 + data.artist.artworks.length) % data.artist.artworks.length;
+		const prevIndex = (currentIndex - 1 + data.artist.artworks.length) % data.artist.artworks.length;
+		const prevArtworkId = data.artist.artworks[prevIndex].id;
+		goto(`/artist/${data.artist.id}/${prevArtworkId}`);
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
@@ -159,11 +168,11 @@
 					.join(', ')
 			: '';
 
-	$: pageTitle = data.artist
-		? `${data.artist.name} | Wallace Museum`
+	$: pageTitle = data.artist && currentArtwork
+		? `${currentArtwork.title} by ${data.artist.name} | Wallace Museum`
 		: data.error
-			? 'Artist Not Found | Wallace Museum'
-			: 'Loading Artist | Wallace Museum';
+			? 'Artwork Not Found | Wallace Museum'
+			: 'Loading Artwork | Wallace Museum';
 
 	// Transform artwork data to match ArtworkDisplay component interface
 	$: currentArtworkForDisplay = currentArtwork ? {
@@ -173,17 +182,44 @@
 		thumbnailUrl: currentArtwork.thumbnail_url || currentArtwork.thumbnailUrl,
 		mime: currentArtwork.mime,
 		title: currentArtwork.title,
-		dimensions: currentArtwork.dimensions
+		dimensions: currentArtwork.dimensions,
+		fullscreen: currentArtwork.fullscreen
 	} : null;
+
+	let width: number = currentArtwork?.dimensions?.width ?? 0;
+	let height: number = currentArtwork?.dimensions?.height ?? 0;
+
+	$: if (currentArtwork && currentArtwork.dimensions) {
+		width = currentArtwork.dimensions.width ?? 0;
+		height = currentArtwork.dimensions.height ?? 0;
+	}
+
+	// Determine which dimension should be 100% based on aspect ratio
+	$: isWiderThanTall = currentArtwork?.dimensions ? currentArtwork.dimensions.width >= currentArtwork.dimensions.height : true;
+	$: mediaStyle = currentArtwork?.dimensions 
+		? (isWiderThanTall 
+			? `width: 100%; height: auto; max-height: 83svh; aspect-ratio: ${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height};`
+			: `height: 100%; width: auto; max-height: 83svh; aspect-ratio: ${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height};`)
+		: 'max-height: 83svh;';
+
+	// Update currentIndex when data changes (for URL navigation)
+	$: if (data.currentIndex !== undefined && data.currentIndex !== currentIndex) {
+		currentIndex = data.currentIndex;
+	}
+
+	// Check if current artwork is fullscreen
+	$: isFullscreen = currentArtwork?.fullscreen || false;
+	$: hasValidDimensions = currentArtwork?.dimensions && currentArtwork.dimensions.width > 0 && currentArtwork.dimensions.height > 0;
+	$: useExactDimensions = hasValidDimensions && !isFullscreen;
 </script>
 
 <svelte:head>
 	<title>{pageTitle}</title>
 	<meta
 		name="description"
-		content={data.artist
-			? `Explore artworks by ${data.artist.name} at the Wallace Museum`
-			: 'Artist gallery at the Wallace Museum'}
+		content={data.artist && currentArtwork
+			? `${currentArtwork.title} by ${data.artist.name} at the Wallace Museum`
+			: 'Artwork gallery at the Wallace Museum'}
 	/>
 </svelte:head>
 
@@ -193,7 +229,7 @@
 			<button class="close-button" on:click={closeOverlay} aria-label="Close artist gallery"
 				>×</button
 			>
-			<h2 class="artist-overlay-title">Artist Not Found</h2>
+			<h2 class="artist-overlay-title">Artwork Not Found</h2>
 			<p class="text-gray-300 mb-4">{data.error}</p>
 		</div>
 	</div>
@@ -202,27 +238,30 @@
 		<div class="artist-content">
 			<div class="flex flex-col items-center justify-center min-h-[200px]">
 				<div class="loader mb-4" />
-				<p class="text-gray-300">Loading artist...</p>
+				<p class="text-gray-300">Loading artwork...</p>
 			</div>
 		</div>
 	</div>
 {:else}
-	<div class="artist-page" role="main" on:keydown={handleKeyDown} transition:fade>
+	<div class="artist-page" role="application" tabindex="0" on:keydown={handleKeyDown} transition:fade>
 		<button class="close-button" on:click={closeOverlay} aria-label="Close artist gallery">×</button
 		>
 
-		{#if data.artist.artworks.length > 0}
+		{#if data.artist.artworks.length > 0 && currentArtwork}
 			{#key currentIndex}
 				<div class="museum-content">
+					{#if currentArtworkForDisplay}
 					<div class="artwork-container">
-						{#if currentArtworkForDisplay}
-							<ArtworkDisplay 
-								artwork={currentArtworkForDisplay}
-								size="fullscreen"
-								showLoader={true}
-							/>
-						{/if}
+						<ArtworkDisplay 
+							artwork={currentArtworkForDisplay}
+							size="fullscreen"
+							showLoader={true}
+							style={mediaStyle}
+							width={width}
+							height={height}
+						/>
 					</div>
+					{/if}
 
 					<div class="museum-details-wrapper">
 						<div class="museum-details-overlay">
@@ -246,7 +285,7 @@
 											nameClassName="text-yellow-500 text-sm font-medium uppercase tracking-wider"
 										/>
 									</div>
-									<div class="museum-title">{data.artist.artworks[currentIndex].title}</div>
+									<div class="museum-title">{currentArtwork.title}</div>
 								</div>
 
 								{#if data.artist.artworks.length > 1}
@@ -262,20 +301,20 @@
 							</div>
 
 							<div class="content-grid">
-								{#if data.artist.artworks[currentIndex].description}
+								{#if currentArtwork.description}
 									<div class="description-col">
 										<div class="museum-description">
-											{data.artist.artworks[currentIndex].description}
+											{currentArtwork.description}
 										</div>
 									</div>
 								{/if}
 
 								<div class="metadata-col">
-									{#if data.artist.artworks[currentIndex].attributes && data.artist.artworks[currentIndex].attributes.length}
+									{#if currentArtwork.attributes && currentArtwork.attributes.length}
 										<div class="metadata-section">
 											<h3 class="metadata-heading">Attributes</h3>
 											<div class="metadata-grid">
-												{#each parseAttributes(data.artist.artworks[currentIndex].attributes) as attribute}
+												{#each parseAttributes(currentArtwork.attributes) as attribute}
 													<div class="metadata-item">
 														<strong>{attribute.trait_type}</strong>
 														<span>{attribute.value}</span>
@@ -289,10 +328,10 @@
 
 									<div class="metadata-section">
 										<div class="metadata-grid">
-											{#if data.artist.artworks[currentIndex].supply}
+											{#if currentArtwork.supply}
 												<div class="metadata-item">
 													<strong>Edition</strong>
-													<span>1 of {data.artist.artworks[currentIndex].supply}</span>
+													<span>1 of {currentArtwork.supply}</span>
 												</div>
 											{/if}
 											{#if currentDimensions}
@@ -301,70 +340,70 @@
 													<span>{dimensionsObj.width} × {dimensionsObj.height}</span>
 												</div>
 											{/if}
-											{#if data.artist.artworks[currentIndex].contractAddr}
+											{#if currentArtwork.contractAddr}
 												<div class="metadata-item">
 													<strong>Contract</strong>
-													{#if getContractUrl(data.artist.artworks[currentIndex].contractAddr, data.artist.artworks[currentIndex].blockchain, data.artist.artworks[currentIndex].tokenID)}
+													{#if getContractUrl(currentArtwork.contractAddr, currentArtwork.blockchain, currentArtwork.tokenID)}
 														<a
 															href={getContractUrl(
-																data.artist.artworks[currentIndex].contractAddr,
-																data.artist.artworks[currentIndex].blockchain,
-																data.artist.artworks[currentIndex].tokenID
+																currentArtwork.contractAddr,
+																currentArtwork.blockchain,
+																currentArtwork.tokenID
 															)}
 															target="_blank"
 															rel="noopener noreferrer"
 															class="contract-link"
 														>
 															{getContractName(
-																data.artist.artworks[currentIndex].contractAddr,
-																data.artist.artworks[currentIndex].contractAlias
+																currentArtwork.contractAddr,
+																currentArtwork.contractAlias
 															)}
 														</a>
 													{:else}
 														<span>
 															{getContractName(
-																data.artist.artworks[currentIndex].contractAddr,
-																data.artist.artworks[currentIndex].contractAlias
+																currentArtwork.contractAddr,
+																currentArtwork.contractAlias
 															)}
 														</span>
 													{/if}
 												</div>
 											{/if}
-											{#if data.artist.artworks[currentIndex].contractAlias && !data.artist.artworks[currentIndex].contractAddr}
+											{#if currentArtwork.contractAlias && !currentArtwork.contractAddr}
 												<div class="metadata-item">
 													<strong>Contract Alias</strong>
-													<span>{data.artist.artworks[currentIndex].contractAlias}</span>
+													<span>{currentArtwork.contractAlias}</span>
 												</div>
 											{/if}
-											{#if data.artist.artworks[currentIndex].tokenID}
+											{#if currentArtwork.tokenID}
 												<div class="metadata-item">
 													<strong>Token ID</strong>
-													<span>{data.artist.artworks[currentIndex].tokenID}</span>
+													<span>{currentArtwork.tokenID}</span>
 												</div>
 											{/if}
-											{#if data.artist.artworks[currentIndex].tokenStandard}
+											{#if currentArtwork.tokenStandard}
 												<div class="metadata-item">
 													<strong>Token Standard</strong>
-													<span>{data.artist.artworks[currentIndex].tokenStandard?.toUpperCase()}</span>
+													<span>{currentArtwork.tokenStandard?.toUpperCase()}</span>
 												</div>
 											{/if}
 
-											{#if data.artist.artworks[currentIndex].mintDate}
+											{#if currentArtwork.mintDate}
 												<div class="metadata-item">
 													<strong>Mint Date</strong>
-													<span>{formatMintDate(data.artist.artworks[currentIndex].mintDate)}</span>
+													<span>{formatMintDate(currentArtwork.mintDate)}</span>
 												</div>
 											{/if}
-											{#if data.artist.artworks[currentIndex].mime}
+											{#if currentArtwork.mime}
 												<div class="metadata-item">
 													<strong>Medium</strong>
-													<span>{formatMedium(data.artist.artworks[currentIndex].mime)}</span>
+													<span>{formatMedium(currentArtwork.mime)}</span>
 												</div>
 											{/if}
-											{#if data.artist.artworks[currentIndex].tags && data.artist.artworks[currentIndex].tags.length}
+											{#if currentArtwork.tags && currentArtwork.tags.length}
 												<div class="metadata-item">
 													<strong>Tags</strong>
-													<span>{parseAndJoinTags(data.artist.artworks[currentIndex].tags)}</span>
+													<span>{parseAndJoinTags(currentArtwork.tags)}</span>
 												</div>
 											{/if}
 										</div>
@@ -393,16 +432,31 @@
 	}
 
 	.artwork-container {
-		@apply flex items-center justify-center bg-black bg-opacity-50 rounded-lg p-4;
+		@apply flex items-center justify-center bg-black bg-opacity-50 my-12;
 		width: 100%;
-		max-width: 1400px;
-		height: 80svh;
-		margin-bottom: 2rem;
-		overflow: hidden;
+		height: 83svh;
 		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+	}
+
+	.artwork-container.fullscreen {
+		@apply bg-black pt-0;
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		width: 100vw;
+		height: 83svh;
+		max-width: none;
+		margin: 0;
+		padding: 0;
+		border-radius: 0;
+		z-index: 10;
+	}
+
+	.artwork-container.exact-dimensions {
+		height: auto;
+		min-height: 400px;
+		padding: 2rem;
 	}
 
 	.artwork-media {
@@ -448,7 +502,7 @@
 	}
 
 	.museum-title {
-		@apply text-2xl font-bold text-white leading-tight max-w-[900px];
+		@apply text-lg font-bold text-white leading-tight uppercase max-w-prose;
 	}
 
 	.artwork-navigation {
@@ -560,4 +614,4 @@
 		@apply w-full h-px bg-gray-700 my-6;
 	}
 
-</style>
+</style> 

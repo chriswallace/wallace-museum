@@ -71,7 +71,7 @@ export async function GET({ url, request }: RequestEvent) {
 		if (sessionId) {
 			const session = await prisma.session.findUnique({
 				where: { sessionId },
-				include: { user: true }
+				include: { User: true }
 			});
 
 			// Check if the session is valid and not expired

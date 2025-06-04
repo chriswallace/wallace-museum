@@ -541,9 +541,12 @@ export class MinimalObjktAPI {
     contractAddress: string, 
     tokenId: string
   ): Promise<MinimalNFTData | null> {
+    // Convert contract address to proper Tezos format (KT1... format)
+    const properTezosContract = this.formatTezosAddress(contractAddress);
+    
     const query = `
       query {
-        token(where: {fa_contract: {_eq: "${contractAddress}"}, token_id: {_eq: "${tokenId}"}}) {
+        token(where: {fa_contract: {_eq: "${properTezosContract}"}, token_id: {_eq: "${tokenId}"}}) {
           token_id
           name
           description
@@ -588,9 +591,12 @@ export class MinimalObjktAPI {
    * Fetch collection data - only essential fields
    */
   async fetchCollection(contractAddress: string): Promise<MinimalCollectionData | null> {
+    // Convert contract address to proper Tezos format (KT1... format)
+    const properTezosContract = this.formatTezosAddress(contractAddress);
+    
     const query = `
       query {
-        fa(where: {contract: {_eq: "${contractAddress}"}}) {
+        fa(where: {contract: {_eq: "${properTezosContract}"}}) {
           contract
           name
           description
@@ -642,6 +648,60 @@ export class MinimalObjktAPI {
     }
     
     return response.json();
+  }
+
+  /**
+   * Format Tezos contract address to proper case format for API calls
+   * This handles conversion from stored format to API-expected format
+   * without changing how we store addresses in the database
+   */
+  private formatTezosAddress(address: string): string {
+    if (!address) return address;
+    
+    // Handle KT1 contracts (most common for NFTs)
+    if (address.toLowerCase().startsWith('kt1')) {
+      // Known contract addresses with their proper case formats
+      const knownContracts: Record<string, string> = {
+        'kt1rj6pbjhpwc3m5rw5s2nbmefwbuwbdxton': 'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton', // hic et nunc
+        'kt1u6ehmnxjtkvawj4thczg4fsdahc21ssvi': 'KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi', // fxhash v1
+        'kt1kea8z6vwxdjrvqtmraedvzsvxat3khace': 'KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE', // fxhash v2
+        'kt1aaabso5ae6eo8fpen5xhcd4w3khstafxk': 'KT1AaaBSo5AE6Eo8fpEN5xhCD4w3kHStafxk', // fxhash gentk v1
+        'kt1xcoqnfupwk7sp8536efrxcp73lmt68nyr': 'KT1XCoGnfupWk7Sp8536EfrxcP73LmT68Nyr', // fxhash gentk v2
+        'kt1my1wdzhdhgwecrnqji3wcfas67iksirvj': 'KT1My1wDZHDGweCrJnQJi3wcFaS67iksirvj', // Teia Community
+        'kt1ljmadyqclbjwv4s2ofkezyhvkomaf5mrw': 'KT1LjmAdYQCLBjwv4S2oFkEzyHVkomAf5MrW', // Versum
+        'kt1epggjqs73qffjsz7m1mxm5mtnpc2tqse': 'KT1EpGgjQs73QfFJs9z7m1Mxm5MTnpC2tqse', // Kalamint
+        'kt1vozeubjf6vxtlqefmoc4no4vduu1qvwc': 'KT1VoZeuBMJF6vxtLqEFMoc4no4VDuu1QVwc', // Typed
+        'kt1mxdwchidwd6wbvs24g1njerouk622zefp': 'KT1MxDwChiDwd6WBVs24g1NjERUoK622ZEFp', // 8bidou
+        'kt1xtkakbxkjvmhxtlf96mn4wqlqmfggyuky': 'KT1XTKaKBXKJVmhxtLF96mn4WQLqmfGGYuKy' // DNA
+      };
+      
+      const lowerAddress = address.toLowerCase();
+      if (knownContracts[lowerAddress]) {
+        return knownContracts[lowerAddress];
+      }
+      
+      // For unknown KT1 addresses, convert only the prefix to uppercase
+      // This preserves the original case of the rest of the address
+      return 'KT1' + address.slice(3);
+    }
+    
+    // Handle tz1 addresses
+    if (address.toLowerCase().startsWith('tz1')) {
+      return 'tz1' + address.slice(3);
+    }
+    
+    // Handle tz2 addresses
+    if (address.toLowerCase().startsWith('tz2')) {
+      return 'tz2' + address.slice(3);
+    }
+    
+    // Handle tz3 addresses
+    if (address.toLowerCase().startsWith('tz3')) {
+      return 'tz3' + address.slice(3);
+    }
+    
+    // If it doesn't match known patterns, return as-is
+    return address;
   }
 }
 

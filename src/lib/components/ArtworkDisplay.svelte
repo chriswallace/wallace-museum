@@ -16,11 +16,13 @@
 			width: number;
 			height: number;
 		} | null;
+		fullscreen?: boolean;
 	}
 
 	export let artwork: Artwork;
 	export let size: 'small' | 'medium' | 'large' | 'fullscreen' = 'medium';
 	export let showLoader: boolean = true;
+	export let style: string = '';
 
 	let isLoading = true;
 
@@ -43,9 +45,18 @@
 
 	// Calculate aspect ratio for consistent sizing
 	$: aspectRatio = artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1';
+	
+	// Check if artwork should be displayed in fullscreen mode or use exact dimensions
+	$: isFullscreen = artwork.fullscreen || false;
+	$: hasValidDimensions = artwork.dimensions && artwork.dimensions.width > 0 && artwork.dimensions.height > 0;
+	$: useExactDimensions = hasValidDimensions && !isFullscreen;
+	
+	// Calculate exact dimensions for display
+	$: exactWidth = useExactDimensions ? artwork.dimensions!.width : undefined;
+	$: exactHeight = useExactDimensions ? artwork.dimensions!.height : undefined;
 </script>
 
-<div class="artwork-display">
+<div class="artwork-display" class:fullscreen={isFullscreen} class:exact-dimensions={useExactDimensions} {style}>
 	{#if !displayUrl}
 		<!-- No media available -->
 		<div class="no-media">
@@ -54,50 +65,33 @@
 			</div>
 		</div>
 	{:else if mediaType === 'video'}
-		{#if showLoader && isLoading}
-			<div class="media-skeleton" style="aspect-ratio: {aspectRatio};">
-				<SkeletonLoader 
-					width="100%" 
-					height="100%" 
-					borderRadius="4px"
-				/>
-			</div>
-		{/if}
 		<VideoPlayer
 			src={transformedUrl}
 			autoplay={true}
 			loop={true}
 			muted={true}
-			width={artwork.dimensions?.width}
-			height={artwork.dimensions?.height}
+			width={exactWidth}
+			height={exactHeight}
 			className="video-player-artwork"
 			on:loadeddata={handleLoad}
 		/>
 	{:else if mediaType === 'iframe'}
-		{#if showLoader && isLoading}
-			<div class="media-skeleton" style="aspect-ratio: {aspectRatio};">
-				<SkeletonLoader 
-					width="100%" 
-					height="100%" 
-					borderRadius="4px"
-				/>
-			</div>
-		{/if}
+
 		<iframe
 			src={transformedUrl}
 			class="interactive-content"
 			title="Interactive Artwork"
 			on:load={handleLoad}
 			class:hidden={showLoader && isLoading}
-			style="aspect-ratio: {aspectRatio};"
+			style="aspect-ratio: {aspectRatio}; {useExactDimensions ? `width: ${exactWidth}px; height: ${exactHeight}px;` : ''}"
 			allowfullscreen
 		></iframe>
 	{:else if mediaType === 'image'}
 		<OptimizedImage
 			src={displayUrl}
 			alt={artwork.title}
-			width={artwork.dimensions?.width}
-			height={artwork.dimensions?.height}
+			width={exactWidth}
+			height={exactHeight}
 			aspectRatio={aspectRatio}
 			showSkeleton={showLoader}
 			skeletonBorderRadius="0px"
@@ -117,16 +111,34 @@
 		justify-content: center;
 	}
 
-	.media-skeleton {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		width: 100%;
+	.artwork-display.exact-dimensions {
+		width: auto;
 		height: auto;
 		max-width: 100%;
 		max-height: 100%;
-		z-index: 1;
+	}
+
+	.artwork-display.fullscreen {
+		width: 100%;
+		height: 100%;
+	}
+
+	.artwork-display.fullscreen :global(.video-player-artwork),
+	.artwork-display.fullscreen iframe,
+	.artwork-display.fullscreen :global(.artwork-image) {
+		width: 100%;
+		height: 100%;
+		max-width: 100%;
+		max-height: 100%;
+		object-fit: cover;
+	}
+
+	.artwork-display.exact-dimensions :global(.video-player-artwork),
+	.artwork-display.exact-dimensions iframe,
+	.artwork-display.exact-dimensions :global(.artwork-image) {
+		max-width: 100%;
+		max-height: 100%;
+		object-fit: contain;
 	}
 
 	.no-media {

@@ -14,12 +14,8 @@ export async function GET({ url }) {
 				}
 			},
 			include: {
-				ArtistArtworks: {
-					include: {
-						artist: true
-					}
-				},
-				collection: true // Include collection details if needed
+				Artist: true,
+				Collection: true // Include collection details if needed
 			}
 		});
 

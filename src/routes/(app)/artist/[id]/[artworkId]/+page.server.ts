@@ -1,9 +1,12 @@
 import type { PageServerLoad } from './$types';
 import prisma from '$lib/prisma';
-import { redirect } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const artistId = Number(params.id);
+	const artworkId = Number(params.artworkId);
+
+	// Fetch the artist with all artworks
 	const artist = await prisma.artist.findUnique({
 		where: { id: artistId },
 		include: {
@@ -12,16 +15,18 @@ export const load: PageServerLoad = async ({ params }) => {
 	});
 
 	if (!artist) {
-		return { status: 404, error: 'Artist not found' };
+		throw error(404, 'Artist not found');
 	}
 
-	// If artist has artworks, redirect to the first artwork
-	if (artist.Artwork && artist.Artwork.length > 0) {
-		throw redirect(302, `/artist/${artistId}/${artist.Artwork[0].id}`);
+	// Find the specific artwork
+	const currentArtwork = artist.Artwork.find(artwork => artwork.id === artworkId);
+	
+	if (!currentArtwork) {
+		throw error(404, 'Artwork not found');
 	}
 
-	// If no artworks, return the artist data anyway
-	const artworks = (artist.Artwork || []).map((artwork) => {
+	// Transform all artworks for navigation
+	const artworks = artist.Artwork.map((artwork) => {
 		return {
 			id: String(artwork.id),
 			title: artwork.title,
@@ -43,6 +48,9 @@ export const load: PageServerLoad = async ({ params }) => {
 		};
 	});
 
+	// Find the current artwork index for navigation
+	const currentIndex = artworks.findIndex(artwork => artwork.id === String(artworkId));
+
 	return {
 		artist: {
 			id: artist.id,
@@ -54,6 +62,8 @@ export const load: PageServerLoad = async ({ params }) => {
 			instagramHandle: artist.instagramHandle,
 			addresses: artist.walletAddresses,
 			artworks
-		}
+		},
+		currentArtworkId: String(artworkId),
+		currentIndex
 	};
-};
+}; 
