@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import prisma from '$lib/prisma';
+import { prismaRead } from '$lib/prisma';
 
 const createNewSessionId = () => {
 	return uuidv4(); // This generates a unique UUID
@@ -28,7 +28,7 @@ export async function verifyAdminSession(sessionId) {
 		return false; // No session ID provided
 	}
 
-	const session = await prisma.session.findUnique({
+	const session = await prismaRead.session.findUnique({
 		where: { sessionId },
 		include: { User: true }
 	});

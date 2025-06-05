@@ -1,14 +1,14 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { UnifiedIndexer } from '$lib/indexing/unified-indexer';
-import prisma from '$lib/prisma';
+import { prismaWrite } from '$lib/prisma';
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
 		const { status = 'pending', limit = 50 } = body;
 
-		const indexer = new UnifiedIndexer(prisma);
+		const indexer = new UnifiedIndexer(prismaWrite);
 		
 		// Process the import queue for the specified status
 		const results = await indexer.processQueue(status, limit);

@@ -271,7 +271,7 @@ export async function POST({ request }) {
 				await prismaWrite.artwork.update({
 					where: { id: newArtwork.id },
 					data: {
-						artists: {
+						Artist: {
 							connect: { id: artistId }
 						}
 					} as any

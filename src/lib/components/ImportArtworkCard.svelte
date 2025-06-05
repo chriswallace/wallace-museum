@@ -175,6 +175,8 @@
 					src={getDisplayMediaUrl()}
 					class="w-full h-auto object-contain rounded-t-sm"
 					style="aspect-ratio: {artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'};"
+					width={artwork.dimensions?.width || 300}
+					height={artwork.dimensions?.height || 300}
 					autoplay
 					loop
 					muted
@@ -194,8 +196,6 @@
 					format="webp"
 					quality={80}
 					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
-					showSkeleton={true}
-					skeletonBorderRadius="0px"
 					className="w-full h-auto object-contain rounded-t-sm"
 					fallbackSrc="/images/medici-image.png"
 					loading="lazy"
@@ -377,6 +377,8 @@
 						<video
 							src={getDisplayMediaUrl()}
 							class="w-full h-full object-cover"
+							width="48"
+							height="48"
 							autoplay
 							loop
 							muted
@@ -397,8 +399,6 @@
 							format="webp"
 							quality={80}
 							aspectRatio="1/1"
-							showSkeleton={true}
-							skeletonBorderRadius="6px"
 							className="w-full h-full object-cover"
 							fallbackSrc="/images/medici-image.png"
 							loading="lazy"

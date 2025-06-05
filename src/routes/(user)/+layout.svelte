@@ -6,7 +6,7 @@
 <div class="app-frame">
 	<main>
 		<div class="surface">
-			<img class="logo" src="/images/compendium.svg" alt="">
+			<img class="logo" src="/images/compendium.svg" alt="" width="200" height="60">
 			<slot />
 		</div>
 	</main>

@@ -1,14 +1,14 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { UnifiedIndexer } from '$lib/indexing/unified-indexer';
-import prisma from '$lib/prisma';
+import { prismaRead, prismaWrite } from '$lib/prisma';
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const body = await request.json();
 		const { status = 'pending', limit = 50 } = body;
 
-		const indexer = new UnifiedIndexer(prisma);
+		const indexer = new UnifiedIndexer(prismaWrite);
 		
 		// Process the import queue for the specified status
 		const results = await indexer.processQueue(status, limit);
@@ -41,27 +41,27 @@ export const GET: RequestHandler = async ({ url }) => {
 		const status = url.searchParams.get('status') || undefined;
 		
 		// Get queue statistics
-		const pendingCount = await prisma.artworkIndex.count({
+		const pendingCount = await prismaRead.artworkIndex.count({
 			where: { importStatus: 'pending' }
 		});
 		
-		const normalizedCount = await prisma.artworkIndex.count({
+		const normalizedCount = await prismaRead.artworkIndex.count({
 			where: { importStatus: 'normalized' }
 		});
 		
-		const referencedCount = await prisma.artworkIndex.count({
+		const referencedCount = await prismaRead.artworkIndex.count({
 			where: { importStatus: 'referenced' }
 		});
 		
-		const importedCount = await prisma.artworkIndex.count({
+		const importedCount = await prismaRead.artworkIndex.count({
 			where: { importStatus: 'imported' }
 		});
 		
-		const failedCount = await prisma.artworkIndex.count({
+		const failedCount = await prismaRead.artworkIndex.count({
 			where: { importStatus: 'failed' }
 		});
 		
-		const totalCount = await prisma.artworkIndex.count();
+		const totalCount = await prismaRead.artworkIndex.count();
 		
 		// Get recent errors if requested
 		let recentErrors: Array<{
@@ -71,7 +71,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			lastAttempt: Date;
 		}> = [];
 		if (status === 'failed' || !status) {
-			const failedRecords = await prisma.artworkIndex.findMany({
+			const failedRecords = await prismaRead.artworkIndex.findMany({
 				where: { 
 					importStatus: 'failed',
 					errorMessage: { not: null }

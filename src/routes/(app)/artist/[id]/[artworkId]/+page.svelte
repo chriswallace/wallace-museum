@@ -182,25 +182,17 @@
 		thumbnailUrl: currentArtwork.thumbnail_url || currentArtwork.thumbnailUrl,
 		mime: currentArtwork.mime,
 		title: currentArtwork.title,
-		dimensions: currentArtwork.dimensions,
+		dimensions: dimensionsObj,
 		fullscreen: currentArtwork.fullscreen
 	} : null;
 
-	let width: number = currentArtwork?.dimensions?.width ?? 0;
-	let height: number = currentArtwork?.dimensions?.height ?? 0;
+	let width: number = dimensionsObj?.width ?? 0;
+	let height: number = dimensionsObj?.height ?? 0;
 
-	$: if (currentArtwork && currentArtwork.dimensions) {
-		width = currentArtwork.dimensions.width ?? 0;
-		height = currentArtwork.dimensions.height ?? 0;
+	$: if (dimensionsObj) {
+		width = dimensionsObj.width ?? 0;
+		height = dimensionsObj.height ?? 0;
 	}
-
-	// Determine which dimension should be 100% based on aspect ratio
-	$: isWiderThanTall = currentArtwork?.dimensions ? currentArtwork.dimensions.width >= currentArtwork.dimensions.height : true;
-	$: mediaStyle = currentArtwork?.dimensions 
-		? (isWiderThanTall 
-			? `width: 100%; height: auto; max-height: 78svh; aspect-ratio: ${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height};`
-			: `height: 100%; width: auto; max-height: 78svh; aspect-ratio: ${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height};`)
-		: 'max-height: 78svh;';
 
 	// Update currentIndex when data changes (for URL navigation)
 	$: if (data.currentIndex !== undefined && data.currentIndex !== currentIndex) {
@@ -209,8 +201,19 @@
 
 	// Check if current artwork is fullscreen
 	$: isFullscreen = currentArtwork?.fullscreen || false;
-	$: hasValidDimensions = currentArtwork?.dimensions && currentArtwork.dimensions.width > 0 && currentArtwork.dimensions.height > 0;
+	$: hasValidDimensions = dimensionsObj && dimensionsObj.width > 0 && dimensionsObj.height > 0;
 	$: useExactDimensions = hasValidDimensions && !isFullscreen;
+
+	// Temporary debug log to verify dimensions
+	$: if (currentArtworkForDisplay && dimensionsObj) {
+		console.log('✅ Dimensions check:', {
+			dimensionsObj,
+			hasValidDimensions,
+			useExactDimensions,
+			isFullscreen,
+			aspectRatio
+		});
+	}
 </script>
 
 <svelte:head>
@@ -251,14 +254,11 @@
 			{#key currentIndex}
 				<div class="museum-content">
 					{#if currentArtworkForDisplay}
-					<div class="artwork-container">
+					<div class="artwork-container" class:fullscreen={isFullscreen}>
 						<ArtworkDisplay 
 							artwork={currentArtworkForDisplay}
-							size="fullscreen"
-							showLoader={true}
-							style={mediaStyle}
-							width={width}
-							height={height}
+							width={800}
+							dimensions={currentArtworkForDisplay.dimensions}
 						/>
 					</div>
 					{/if}
@@ -432,31 +432,19 @@
 	}
 
 	.artwork-container {
-		@apply flex items-center justify-center bg-black bg-opacity-50 mt-16 mb-8;
+		@apply flex items-center justify-center bg-black bg-opacity-50 md:pt-12 md:pb-4;
 		width: 100%;
-		height: 75svh;
 		position: relative;
+		height: 86svh;
 	}
 
 	.artwork-container.fullscreen {
-		@apply bg-black pt-0;
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
+		@apply bg-black p-0;
 		width: 100vw;
-		height: 73svh;
+		height: 86svh;
 		max-width: none;
-		margin: 0;
-		padding: 0;
 		border-radius: 0;
 		z-index: 10;
-	}
-
-	.artwork-container.exact-dimensions {
-		height: auto;
-		min-height: 400px;
-		padding: 2rem;
 	}
 
 	.artwork-media {

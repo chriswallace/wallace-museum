@@ -10,6 +10,7 @@
 	export let width: number | undefined = undefined;
 	export let height: number | undefined = undefined;
 	export let className: string = '';
+	export let style: string = '';
 
 	const dispatch = createEventDispatcher();
 
@@ -162,6 +163,7 @@
 
 <div 
 	class="video-player {className}"
+	{style}
 	on:mousemove={showControlsTemporarily}
 	on:mouseleave={() => showControls = false}
 	role="application"

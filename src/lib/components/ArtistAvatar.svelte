@@ -52,6 +52,8 @@
 			class={placeholderClasses}
 			src={placeholderAvatar(artist.name)}
 			alt={artist.name}
+			width={sizeConfig.width}
+			height={sizeConfig.height}
 		/>
 	{/if}
 </div> 

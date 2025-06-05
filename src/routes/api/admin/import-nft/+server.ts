@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import prisma from '$lib/prisma';
+import { prismaWrite } from '$lib/prisma';
 import { UnifiedIndexer, type IndexerData } from '$lib/indexing/unified-indexer';
 import type { DataSource, Blockchain } from '$lib/types/indexing';
 import { detectBlockchainFromContract } from '$lib/utils/walletUtils.js';
@@ -139,7 +139,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		console.log('[import-nft] Received request body:', JSON.stringify(body, null, 2));
 		
 		// Initialize the unified indexer
-		const indexer = new UnifiedIndexer(prisma);
+		const indexer = new UnifiedIndexer(prismaWrite);
 		
 		// Handle both single NFT and bulk import formats
 		let nftsToProcess: any[] = [];

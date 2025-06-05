@@ -44,7 +44,8 @@ export const load: PageServerLoad = async ({ params }) => {
 			mime: artwork.mime,
 			tags: null,
 			attributes: artwork.attributes,
-			supply: artwork.supply
+			supply: artwork.supply,
+			fullscreen: artwork.fullscreen
 		};
 	});
 

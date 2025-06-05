@@ -17,7 +17,7 @@
 	<div class="modal-container bg-white dark:bg-gray-800 rounded-lg" style="width: {width};">
 		{#if $isLoading}
 			<div class="loading bg-white dark:bg-gray-900 flex justify-center items-center h-full">
-				<img src="/images/loading.png" alt="Loading" class="w-10 h-10 dark:invert" />
+				<img src="/images/loading.png" alt="Loading" class="w-10 h-10 dark:invert" width="40" height="40" />
 			</div>
 		{:else}
 			<div

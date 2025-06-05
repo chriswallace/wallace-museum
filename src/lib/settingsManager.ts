@@ -1,4 +1,4 @@
-import prisma from '$lib/prisma';
+import { prismaRead, prismaWrite } from '$lib/prisma';
 import type { WalletAddress } from '$lib/types/wallet';
 
 export const SETTINGS_KEYS = {
@@ -49,7 +49,7 @@ async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promis
 export async function getWalletAddresses(): Promise<WalletAddress[]> {
 	try {
 		const setting = await withRetry(async () => {
-			return (await prisma.settings.findUnique({
+			return (await prismaRead.settings.findUnique({
 				where: { key: SETTINGS_KEYS.WALLET_ADDRESSES }
 			})) as SettingsRecord | null;
 		});
@@ -121,7 +121,7 @@ export async function addWalletAddress(
 
 		// Create or update settings record with retry logic
 		await withRetry(async () => {
-			return await prisma.settings.upsert({
+			return await prismaWrite.settings.upsert({
 				where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
 				update: { value: JSON.stringify(updatedAddresses) },
 				create: {
@@ -154,7 +154,7 @@ export async function removeWalletAddress(
 		);
 
 		await withRetry(async () => {
-			return await prisma.settings.update({
+			return await prismaWrite.settings.update({
 				where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
 				data: { value: JSON.stringify(updatedAddresses) }
 			});
@@ -186,7 +186,7 @@ export async function updateWalletAddress(
 		});
 
 		await withRetry(async () => {
-			return await prisma.settings.update({
+			return await prismaWrite.settings.update({
 				where: { key: SETTINGS_KEYS.WALLET_ADDRESSES },
 				data: { value: JSON.stringify(updatedAddresses) }
 			});

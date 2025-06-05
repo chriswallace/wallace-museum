@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import prisma from '$lib/prisma';
+import { prismaWrite } from '$lib/prisma';
 
 // DELETE: Remove an address from an artist
 export async function DELETE({ params }: { params: { id: string, addressId: string } }) {
@@ -9,7 +9,7 @@ export async function DELETE({ params }: { params: { id: string, addressId: stri
 
 	try {
 		// Get the current artist
-		const artist = await prisma.artist.findUnique({
+		const artist = await prismaWrite.artist.findUnique({
 			where: { id: artistId }
 		});
 
@@ -31,7 +31,7 @@ export async function DELETE({ params }: { params: { id: string, addressId: stri
 		const updatedWallets = currentWallets.filter((_, index) => index !== addressIndex);
 
 		// Update the artist with the new wallet addresses
-		await prisma.artist.update({
+		await prismaWrite.artist.update({
 			where: { id: artistId },
 			data: {
 				walletAddresses: updatedWallets as any

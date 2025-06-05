@@ -1,7 +1,6 @@
 import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
-import { checkDatabaseConnection, getConnectionPoolMetrics } from '$lib/prisma';
-import prisma from '$lib/prisma'; // Use the singleton instance
+import type { RequestHandler } from '@sveltejs/kit';
+import { checkDatabaseConnection, getConnectionPoolMetrics, prismaRead } from '$lib/prisma';
 import { performConnectionHealthCheck, getConnectionEvents, getConnectionHealthSummary } from '$lib/utils/connectionMonitor';
 
 export const GET: RequestHandler = async () => {
@@ -9,13 +8,13 @@ export const GET: RequestHandler = async () => {
 		// Perform comprehensive health check
 		const healthCheck = await performConnectionHealthCheck();
 		
-		// Get basic database info using the singleton instance
+		// Get basic database info using the read client
 		let dbInfo = null;
 		try {
 			// Quick count queries to test basic functionality
 			const [artistCount, artworkCount] = await Promise.all([
-				prisma.artist.count(),
-				prisma.artwork.count()
+				prismaRead.artist.count(),
+				prismaRead.artwork.count()
 			]);
 			
 			dbInfo = {

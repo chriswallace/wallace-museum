@@ -60,8 +60,6 @@
 						fit="contain"
 						format="webp"
 						quality={85}
-						showSkeleton={true}
-						skeletonBorderRadius="0px"
 						className="w-full aspect-square object-contain rounded-md mb-3"
 						fallbackSrc="/images/medici-image.png"
 					/>
@@ -88,9 +86,7 @@
 					fit="contain"
 					format="webp"
 					quality={85}
-					showSkeleton={true}
-					skeletonBorderRadius="0px"
-					className="w-full object-contain mb-3"
+					className="w-full aspect-square object-contain rounded-md mb-3"
 					fallbackSrc="/images/medici-image.png"
 				/>
 			{/if}

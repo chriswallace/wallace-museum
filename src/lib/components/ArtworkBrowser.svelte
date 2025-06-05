@@ -169,8 +169,6 @@
 					fit="contain"
 					format="webp"
 					quality={90}
-					showSkeleton={true}
-					skeletonBorderRadius="0px"
 				/>
 			</div>
 			<button

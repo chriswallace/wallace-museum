@@ -1,8 +1,8 @@
-import prisma from '$lib/prisma';
+import { prismaRead } from '$lib/prisma';
 
 export async function GET(): Promise<Response> {
 	try {
-		const collections = await prisma.collection.findMany({
+		const collections = await prismaRead.collection.findMany({
 			orderBy: {
 				title: 'asc' // Sorts by title in ascending order
 			}

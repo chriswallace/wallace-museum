@@ -137,13 +137,15 @@ export class UnifiedIndexer {
     // Store in ArtworkIndex - only create new records
     const indexData = {
       nftUid,
+      type: 'owned' as const,
       blockchain,
       dataSource: source,
       contractAddress: finalContractAddress.toLowerCase(),
       tokenId: finalTokenId,
       rawResponse: JSON.stringify(data),
       normalizedData: JSON.stringify(indexerData),
-      importStatus: 'pending' as ImportStatus
+      importStatus: 'pending' as ImportStatus,
+      updatedAt: new Date()
     };
 
     const indexed = await this.prisma.artworkIndex.create({
@@ -160,7 +162,7 @@ export class UnifiedIndexer {
     const indexRecord = await this.prisma.artworkIndex.findUnique({
       where: { id: indexId },
       include: {
-        artwork: true
+        Artwork: true
       }
     });
 
@@ -281,7 +283,8 @@ export class UnifiedIndexer {
                   resolutionSource: mergedData.creator.resolutionSource,
                   resolvedAt: mergedData.creator.resolutionSource ? new Date() : undefined,
                   socialLinks: mergedData.creator.socialLinks as any,
-                  walletAddresses: walletAddresses as any
+                  walletAddresses: walletAddresses as any,
+                  updatedAt: new Date()
                 }
               });
               
@@ -441,7 +444,7 @@ export class UnifiedIndexer {
           await this.prisma.artist.update({
             where: { id: artistId },
             data: {
-              collections: {
+              Collection: {
                 connect: { id: collectionId }
               }
             }
@@ -599,7 +602,7 @@ export class UnifiedIndexer {
           await this.prisma.artwork.update({
             where: { id: artwork.id },
             data: {
-              artists: {
+              Artist: {
                 connect: { id: artistId }
               }
             } as any

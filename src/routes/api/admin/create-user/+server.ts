@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
-import prisma from '$lib/prisma'; // Ensure this path is correct for your Prisma client
+import { prismaWrite } from '$lib/prisma'; // Ensure this path is correct for your Prisma client
 import type { RequestHandler } from '@sveltejs/kit';
+import { randomUUID } from 'crypto';
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -11,9 +12,20 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Hash the password
 		const passwordHash = await bcrypt.hash(password, 10);
 
+		// Generate unique ID and auth token
+		const userId = randomUUID();
+		const userAuthToken = randomUUID();
+
 		// Create the admin user in the database
-		const user = await prisma.adminUser.create({
-			data: { email, username, passwordHash }
+		const user = await prismaWrite.user.create({
+			data: { 
+				id: userId,
+				email, 
+				username, 
+				passwordHash,
+				userAuthToken,
+				updatedAt: new Date()
+			}
 		});
 
 		return new Response(JSON.stringify({ message: 'Admin user created' }), {
@@ -25,8 +37,9 @@ export const POST: RequestHandler = async ({ request }) => {
 	} catch (error) {
 		console.error('Error while creating admin user:', error);
 
+		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 		return new Response(
-			JSON.stringify({ message: 'Error creating admin user', error: error.message }),
+			JSON.stringify({ message: 'Error creating admin user', error: errorMessage }),
 			{
 				status: 500,
 				headers: {

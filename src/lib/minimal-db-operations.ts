@@ -70,7 +70,8 @@ export class MinimalDBOperations {
       // Record already exists - update the type if it's more specific (created > owned)
       // and update lastAttempt to track that we tried to import this
       const updateData: any = {
-        lastAttempt: new Date()
+        lastAttempt: new Date(),
+        updatedAt: new Date()
       };
       
       // Only update type if we're upgrading from 'owned' to 'created'
@@ -101,7 +102,8 @@ export class MinimalDBOperations {
           tokenId: nftData.tokenId,
           rawResponse: nftData as unknown as Prisma.InputJsonValue,
           normalizedData: nftData as unknown as Prisma.InputJsonValue,
-          importStatus: 'pending' // Set to pending for later import
+          importStatus: 'pending', // Set to pending for later import
+          updatedAt: new Date()
         }
       });
       
@@ -185,7 +187,8 @@ export class MinimalDBOperations {
         where: { name: artistName },
         update: { updatedAt: new Date() },
         create: {
-          name: artistName
+          name: artistName,
+          updatedAt: new Date()
         }
       });
 
@@ -313,8 +316,9 @@ export class MinimalDBOperations {
         return this.prisma.artwork.findUnique({
           where: { uid },
           include: {
-            collection: true,
-            indexData: true
+            Collection: true,
+            ArtworkIndex: true,
+            Artist: true
           }
         });
       },
@@ -344,7 +348,7 @@ export class MinimalDBOperations {
     }
     
     if (params.collectionSlug) {
-      where.collection = { slug: params.collectionSlug };
+      where.Collection = { slug: params.collectionSlug };
     }
 
     // Create cache key based on search parameters
@@ -359,7 +363,7 @@ export class MinimalDBOperations {
         const results = await this.prisma.artwork.findMany({
           where,
           include: {
-            collection: true
+            Collection: true
           },
           take: params.limit || 50,
           skip: params.offset || 0,

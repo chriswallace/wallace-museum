@@ -1,12 +1,12 @@
 import bcrypt from 'bcryptjs';
-import prisma from '$lib/prisma';
+import { prismaRead } from '$lib/prisma';
 import { handleSession } from '$lib/sessionHandler';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const data = await request.json();
-		const user = await prisma.adminUser.findUnique({
+		const user = await prismaRead.user.findUnique({
 			where: { username: data.username }
 		});
 
@@ -18,7 +18,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				status: 200,
 				headers: {
 					'Content-Type': 'application/json',
-					'Set-Cookie': `session=${session.id}; Path=/; HttpOnly` // Set the session cookie
+					'Set-Cookie': `session=${session?.id || 'new-session'}; Path=/; HttpOnly` // Set the session cookie
 				}
 			});
 		} else {

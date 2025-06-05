@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import prisma from '$lib/prisma';
+import { prismaWrite } from '$lib/prisma';
 import { OptimizedIndexingWorkflow } from '$lib/optimized-indexing-workflow';
 import { MinimalDBOperations } from '$lib/minimal-db-operations';
 import { getWalletAddresses } from '$lib/settingsManager';
@@ -113,7 +113,7 @@ export const GET: RequestHandler = async ({ url, request, cookies, locals }) => 
 	try {
 		// Initialize optimized workflow and database operations
 		const indexingWorkflow = new OptimizedIndexingWorkflow(env.OPENSEA_API_KEY);
-		const dbOps = new MinimalDBOperations(prisma);
+		const dbOps = new MinimalDBOperations(prismaWrite);
 
 		// If no wallet address is provided, index all configured wallet addresses
 		if (!walletAddressParam) {

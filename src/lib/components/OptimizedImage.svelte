@@ -2,7 +2,6 @@
 	import { buildOptimizedImageUrl, createResponsiveSrcSet, createRetinaUrls } from '$lib/imageOptimization';
 	import type { ImageOptimizationOptions } from '$lib/imageOptimization';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
-	import SkeletonLoader from './SkeletonLoader.svelte';
 
 	// Props
 	export let src: string | null | undefined;
@@ -32,9 +31,6 @@
 	export let fallbackSrc: string = '/images/medici-image.png';
 	export let showFallbackOnError: boolean = true;
 
-	// Skeleton loader options
-	export let showSkeleton: boolean = true;
-	export let skeletonBorderRadius: string = '4px';
 	export let aspectRatio: string | undefined = undefined;
 
 	// Internal state
@@ -100,7 +96,7 @@
 	$: optimizedSrc = src && canOptimize ? buildOptimizedImageUrl(src, optimizationOptions) : src;
 	$: fallbackUrl = src && isIpfs ? ipfsToHttpUrl(src) : (src || fallbackSrc);
 	
-	// Determine if we should show the image or skeleton
+	// Determine if we should show the image
 	$: shouldShowImage = src && src.trim() !== '';
 	$: imageSrc = shouldShowImage ? (optimizedSrc || fallbackUrl) : '';
 
@@ -129,15 +125,8 @@
 		metadata: optimizationOptions.metadata
 	}) : null;
 
-	// Calculate skeleton dimensions and aspect ratio
-	$: skeletonWidth = width ? `${width}px` : '100%';
-	$: skeletonHeight = height ? `${height}px` : (aspectRatio ? 'auto' : '100%');
+	// Calculate aspect ratio
 	$: calculatedAspectRatio = aspectRatio || (width && height ? `${width}/${height}` : undefined);
-
-	// Improved skeleton visibility logic - show skeleton when:
-	// 1. showSkeleton is enabled AND
-	// 2. Either no image source OR image hasn't loaded yet
-	$: shouldShowSkeleton = showSkeleton && (!shouldShowImage || !isLoaded);
 
 	// Handle image load
 	function handleLoad() {
@@ -172,21 +161,11 @@
 	{style}
 	style:aspect-ratio={calculatedAspectRatio}
 	style:width={width ? `${width}px` : '100%'}
-	style:height={height ? `${height}px` : (calculatedAspectRatio ? 'auto' : '100%')}
+	style:height={calculatedAspectRatio ? 'auto' : (height ? `${height}px` : '100%')}
 	style:max-width="100%"
 	style:max-height="100%"
+	style:object-fit="contain"
 >
-	<!-- Skeleton loader -->
-	{#if shouldShowSkeleton}
-		<div class="skeleton-wrapper" class:hidden={isLoaded && shouldShowImage}>
-			<SkeletonLoader 
-				width="100%"
-				height="100%"
-				borderRadius={skeletonBorderRadius}
-			/>
-		</div>
-	{/if}
-
 	<!-- Main image element -->
 	{#if shouldShowImage}
 		<img
@@ -196,7 +175,9 @@
 			sizes={responsive ? sizes : ''}
 			{alt}
 			{loading}
-			class={`${className} ${!isLoaded ? 'loading' : 'loaded'}`}
+			width={width || ''}
+			height={height || ''}
+			class={className}
 			on:load={handleLoad}
 			on:error={handleError}
 			{...$$restProps}
@@ -210,50 +191,18 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		/* Width and height are now set inline based on props */
-		/* Ensure container maintains aspect ratio when specified */
 		min-height: 0;
-	}
-
-	.skeleton-wrapper {
-		width: 100%;
-		height: 100%;
-		z-index: 1;
-		position: absolute;
-		top: 0;
-		left: 0;
-		transition: opacity 0.3s ease-in-out;
-		/* Ensure skeleton fills container properly */
-	}
-
-	.skeleton-wrapper.hidden {
-		opacity: 0;
-		pointer-events: none;
+		min-width: 0;
+		box-sizing: border-box;
 	}
 
 	img {
 		@apply mx-auto;
 		display: block;
-		position: relative;
-		z-index: 2;
-		transition: opacity 0.3s ease-in-out;
 		max-width: 100%;
 		max-height: 100%;
 		width: auto;
 		height: auto;
 		object-fit: contain;
-	}
-
-	img.loading {
-		opacity: 0;
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-	}
-
-	img.loaded {
-		opacity: 1;
-		position: relative;
 	}
 </style> 

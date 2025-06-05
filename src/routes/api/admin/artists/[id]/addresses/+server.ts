@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import prisma from '$lib/prisma';
+import { prismaWrite } from '$lib/prisma';
 
 // POST: Add a new address to an artist
 export const POST: RequestHandler = async ({ params, request }) => {
@@ -18,7 +18,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		}
 
 		// Check if artist exists
-		const artist = await prisma.artist.findUnique({
+		const artist = await prismaWrite.artist.findUnique({
 			where: { id: artistId }
 		});
 
@@ -52,7 +52,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		const updatedWallets = [...currentWallets, newWallet];
 
 		// Update the artist with the new wallet addresses
-		await prisma.artist.update({
+		await prismaWrite.artist.update({
 			where: { id: artistId },
 			data: {
 				walletAddresses: updatedWallets as any

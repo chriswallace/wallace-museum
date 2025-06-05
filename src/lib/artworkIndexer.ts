@@ -1,4 +1,4 @@
-import prisma from '$lib/prisma';
+import { prismaRead, prismaWrite } from '$lib/prisma';
 import type { Artwork } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
@@ -44,7 +44,7 @@ interface ArtistForNormalization {
  * Generate normalized data for an artwork
  */
 export async function normalizeArtworkData(artworkId: number): Promise<IndexedArtworkData | null> {
-	const artwork = await prisma.artwork.findUnique({
+	const artwork = await prismaRead.artwork.findUnique({
 		where: { id: artworkId },
 		include: {
 			Collection: true, // Include collection details
@@ -130,7 +130,7 @@ export async function normalizeArtworkData(artworkId: number): Promise<IndexedAr
  */
 export async function indexArtwork(artworkId: number): Promise<void> {
 	// Fetch the artwork to get its direct properties for uid and basic info
-	const artworkForUid = await prisma.artwork.findUnique({
+	const artworkForUid = await prismaRead.artwork.findUnique({
 		where: { id: artworkId },
 		select: { contractAddress: true, tokenId: true, blockchain: true, attributes: true }
 	});
@@ -154,7 +154,7 @@ export async function indexArtwork(artworkId: number): Promise<void> {
 	const dataSource = blockchain.toLowerCase() === 'tezos' ? 'teztok' : 'opensea';
 
 	// Look for existing index record for this contract address and token ID
-	const existingIndexRecord = await prisma.artworkIndex.findFirst({
+	const existingIndexRecord = await prismaRead.artworkIndex.findFirst({
 		where: {
 			contractAddress: artworkForUid.contractAddress || 'unknown',
 			tokenId: artworkForUid.tokenId || 'unknown'
@@ -163,7 +163,7 @@ export async function indexArtwork(artworkId: number): Promise<void> {
 
 	if (existingIndexRecord) {
 		// Update the existing index record to link it to the artwork
-		await prisma.artworkIndex.update({
+		await prismaWrite.artworkIndex.update({
 			where: { id: existingIndexRecord.id },
 			data: {
 				artworkId: artworkId,
@@ -188,7 +188,7 @@ export async function indexArtwork(artworkId: number): Promise<void> {
  * Index all artworks
  */
 export async function indexAllArtworks(): Promise<void> {
-	const artworks = await prisma.artwork.findMany({
+	const artworks = await prismaRead.artwork.findMany({
 		select: { id: true } // Only select IDs to avoid fetching large amounts of data
 	});
 
@@ -220,7 +220,7 @@ export async function reindexArtworks(
 		whereClause.collectionId = collectionId;
 	}
 
-	const artworksToReindex = await prisma.artwork.findMany({
+	const artworksToReindex = await prismaRead.artwork.findMany({
 		where: whereClause,
 		select: { id: true }
 	});
@@ -323,13 +323,13 @@ export async function searchIndexedArtworks(params: {
 	const finalWhereClause: Prisma.ArtworkIndexWhereInput =
 		whereConditions.length > 0 ? { AND: whereConditions } : {};
 
-	const totalCount = await prisma.artworkIndex.count({
+	const totalCount = await prismaRead.artworkIndex.count({
 		where: finalWhereClause
 	});
 
 	// Prisma does not directly support orderBy on JSON sub-properties in a generic way for all DBs.
 	// Sorting might need to be done in-memory after fetching, or by denormalizing sortable fields.
-	const artworkIndexes = await prisma.artworkIndex.findMany({
+	const artworkIndexes = await prismaRead.artworkIndex.findMany({
 		where: finalWhereClause,
 		// orderBy: { normalizedData: { path: [sortBy], sort: sortDirection } }, // This specific JSON path ordering is not universally supported
 		skip,

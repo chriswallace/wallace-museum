@@ -127,11 +127,11 @@ async function handleBulkEdit(artworkIds: number[], data: any): Promise<Response
 		// Handle artist assignment
 		if (data.artistIds !== undefined) {
 			if (Array.isArray(data.artistIds) && data.artistIds.length > 0) {
-				updateData.artists = {
+				updateData.Artist = {
 					set: data.artistIds.map((id: number) => ({ id }))
 				};
 			} else {
-				updateData.artists = { set: [] };
+				updateData.Artist = { set: [] };
 			}
 		}
 

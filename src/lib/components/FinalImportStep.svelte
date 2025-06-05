@@ -1,12 +1,24 @@
-<script>
+<script lang="ts">
 	import Modal from '$lib/components/Modal.svelte';
 	import { createEventDispatcher } from 'svelte';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 
-	export let title;
-	export let nfts = [];
-	export let onClose;
-	export let onCompleteImport;
+	interface NFT {
+		image_url: string;
+		name: string;
+		artist?: {
+			username: string;
+			address: string;
+		};
+		collection?: {
+			name: string;
+		};
+	}
+
+	export let title: string;
+	export let nfts: NFT[] = [];
+	export let onClose: () => void;
+	export let onCompleteImport: () => void;
 </script>
 
 <Modal {title} {onClose} width="96%">
@@ -22,7 +34,7 @@
 		<tbody>
 			{#each nfts as nft}
 				<tr class="nft-card">
-					<td><img src={ipfsToHttpUrl(nft.image_url)} alt={nft.name} width="100" /></td>
+					<td><img src={ipfsToHttpUrl(nft.image_url)} alt={nft.name} width="100" height="100" /></td>
 					<td>{nft.name}</td>
 					<td>{nft.artist?.username} ({nft.artist?.address})</td>
 					<td>{nft.collection?.name}</td>

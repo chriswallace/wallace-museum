@@ -82,7 +82,7 @@ export function getMediaDisplayType(
 	// Check MIME type first
 	if (mime) {
 		if (mime.startsWith('video/')) return 'video';
-		if (mime === 'image/gif') return 'video'; // Display GIFs as video for better control
+		if (mime === 'image/gif') return 'image'; // Display GIFs as video for better control
 		if (mime.startsWith('application/') || mime === 'text/html') return 'iframe';
 		if (mime.startsWith('image/')) return 'image';
 	}

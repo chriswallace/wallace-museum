@@ -1,10 +1,10 @@
 // src/routes/api/collections.js
-import prisma from '$lib/prisma';
+import { prismaRead } from '$lib/prisma';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async () => {
 	try {
-		const collections = await prisma.collection.findMany({
+		const collections = await prismaRead.collection.findMany({
 			select: {
 				id: true,
 				title: true,

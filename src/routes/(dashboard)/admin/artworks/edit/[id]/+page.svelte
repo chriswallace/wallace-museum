@@ -335,6 +335,8 @@
 									src={ipfsToHttpUrl(artwork.animationUrl || artwork.generatorUrl)} 
 									title="Interactive Artwork"
 									class="media-content"
+									width={artwork.dimensions?.width || 800}
+									height={artwork.dimensions?.height || 800}
 									style={mediaStyle}
 									allowfullscreen
 								></iframe>
@@ -347,8 +349,6 @@
 									fit="contain"
 									format="webp"
 									quality={85}
-									showSkeleton={true}
-									skeletonBorderRadius="8px"
 									className="media-content"
 									style={mediaStyle}
 								/>
@@ -362,8 +362,6 @@
 								fit="contain"
 								format="webp"
 								quality={85}
-								showSkeleton={true}
-								skeletonBorderRadius="8px"
 								className="media-content"
 								style={mediaStyle}
 							/>
@@ -376,8 +374,6 @@
 								fit="contain"
 								format="webp"
 								quality={85}
-								showSkeleton={true}
-								skeletonBorderRadius="8px"
 								className="media-content"
 								style={mediaStyle}
 							/>

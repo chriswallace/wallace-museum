@@ -1,4 +1,4 @@
-import prisma from '$lib/prisma';
+import { prismaRead, prismaWrite } from '$lib/prisma';
 import { Artist, WalletAddress, Prisma } from '@prisma/client';
 import { indexArtwork } from './artworkIndexer';
 import { convertToIpfsUrl } from '$lib/pinataHelpers';
@@ -166,7 +166,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 
 	// Try to find an existing artist by address first
 	if (artistInfo.address && artistInfo.address !== zeroAddress) {
-		const existingWalletAddress = await prisma.walletAddress.findUnique({
+		const existingWalletAddress = await prismaRead.walletAddress.findUnique({
 			where: {
 				address_blockchain: {
 					address: artistInfo.address,
@@ -246,7 +246,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 				// Only perform update if there are fields to update
 				if (Object.keys(updateData).length > 0) {
 					console.log('[ARTIST_PROCESS] Updating artist with new information:', updateData);
-					artist = (await prisma.artist.update({
+					artist = (await prismaWrite.artist.update({
 						where: { id: artist.id },
 						data: updateData,
 						include: { walletAddresses: true }
@@ -261,7 +261,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					a.address === artistInfo.address && a.blockchain === (artistInfo.blockchain || 'ethereum')
 			);
 			if (!addressExists) {
-				await prisma.walletAddress.create({
+				await prismaWrite.walletAddress.create({
 					data: {
 						artistId: artist.id,
 						address: artistInfo.address,
@@ -269,7 +269,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					}
 				});
 				// Re-fetch artist to include the new address
-				artist = (await prisma.artist.findUnique({
+				artist = (await prismaRead.artist.findUnique({
 					where: { id: artist.id },
 					include: { walletAddresses: true }
 				})) as Artist & { walletAddresses: WalletAddress[] };
@@ -281,7 +281,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 
 	// For ENS names, we should also try to find artist by the ENS name directly
 	if (isEnsName) {
-		const existingArtistByEns = await prisma.artist.findFirst({
+		const existingArtistByEns = await prismaRead.artist.findFirst({
 			where: {
 				OR: [{ name: artistName }, { name: { contains: artistName, mode: 'insensitive' } }]
 			},
@@ -303,7 +303,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 				);
 
 				if (!addressExists) {
-					await prisma.walletAddress.create({
+					await prismaWrite.walletAddress.create({
 						data: {
 							artistId: artist.id,
 							address: artistInfo.address,
@@ -311,7 +311,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 						}
 					});
 					// Re-fetch artist to include the new address
-					artist = (await prisma.artist.findUnique({
+					artist = (await prismaRead.artist.findUnique({
 						where: { id: artist.id },
 						include: { walletAddresses: true }
 					})) as Artist & { walletAddresses: WalletAddress[] };
@@ -325,7 +325,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 	// If no artist found by address or ENS name, try to find by regular name
 	// This is less reliable, so we only do this if no address was provided or no artist was found by address
 	if (!artist) {
-		const existingArtistByName = await prisma.artist.findUnique({
+		const existingArtistByName = await prismaRead.artist.findUnique({
 			where: { name: artistName },
 			include: {
 				walletAddresses: true
@@ -343,7 +343,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 						a.blockchain === (artistInfo.blockchain || 'ethereum')
 				);
 				if (!addressExists) {
-					await prisma.walletAddress.create({
+					await prismaWrite.walletAddress.create({
 						data: {
 							artistId: artist.id,
 							address: artistInfo.address,
@@ -351,7 +351,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 						}
 					});
 					// Re-fetch artist to include the new address
-					artist = (await prisma.artist.findUnique({
+					artist = (await prismaRead.artist.findUnique({
 						where: { id: artist.id },
 						include: { walletAddresses: true }
 					})) as Artist & { walletAddresses: WalletAddress[] };
@@ -369,7 +369,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 				// First check if the wallet address already exists
 				let existingWalletAddress = null;
 				if (artistInfo.address && artistInfo.address !== zeroAddress) {
-					existingWalletAddress = await prisma.walletAddress.findUnique({
+					existingWalletAddress = await prismaRead.walletAddress.findUnique({
 						where: {
 							address_blockchain: {
 								address: artistInfo.address,
@@ -382,19 +382,19 @@ export async function processArtist(artistInfo: ArtistInfo) {
 				if (existingWalletAddress) {
 					// If wallet address exists but has no artist, create artist and link it
 					if (!existingWalletAddress.artistId) {
-						artist = (await prisma.artist.create({
+						artist = (await prismaWrite.artist.create({
 							data: artistData,
 							include: { walletAddresses: true }
 						})) as Artist & { walletAddresses: WalletAddress[] };
 
 						// Link the existing wallet address to the new artist
-						await prisma.walletAddress.update({
+						await prismaWrite.walletAddress.update({
 							where: { id: existingWalletAddress.id },
 							data: { artistId: artist.id }
 						});
 
 						// Re-fetch artist to include the linked address
-						artist = (await prisma.artist.findUnique({
+						artist = (await prismaRead.artist.findUnique({
 							where: { id: artist.id },
 							include: { walletAddresses: true }
 						})) as Artist & { walletAddresses: WalletAddress[] };
@@ -405,7 +405,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					}
 				} else {
 					// Create new artist with new wallet address
-					artist = (await prisma.artist.create({
+					artist = (await prismaWrite.artist.create({
 						data: {
 							...artistData,
 							walletAddresses:
@@ -432,7 +432,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 					// Check again for existing wallet address for the retry
 					let existingWalletAddress = null;
 					if (artistInfo.address && artistInfo.address !== zeroAddress) {
-						existingWalletAddress = await prisma.walletAddress.findUnique({
+						existingWalletAddress = await prismaRead.walletAddress.findUnique({
 							where: {
 								address_blockchain: {
 									address: artistInfo.address,
@@ -444,7 +444,7 @@ export async function processArtist(artistInfo: ArtistInfo) {
 
 					if (existingWalletAddress && !existingWalletAddress.artistId) {
 						// Create artist with unique name and link existing wallet
-						artist = (await prisma.artist.create({
+						artist = (await prismaWrite.artist.create({
 							data: {
 								...artistData,
 								name: `${artistName}_${timestamp}`
@@ -453,19 +453,19 @@ export async function processArtist(artistInfo: ArtistInfo) {
 						})) as Artist & { walletAddresses: WalletAddress[] };
 
 						// Link the existing wallet address to the new artist
-						await prisma.walletAddress.update({
+						await prismaWrite.walletAddress.update({
 							where: { id: existingWalletAddress.id },
 							data: { artistId: artist.id }
 						});
 
 						// Re-fetch artist to include the linked address
-						artist = (await prisma.artist.findUnique({
+						artist = (await prismaRead.artist.findUnique({
 							where: { id: artist.id },
 							include: { walletAddresses: true }
 						})) as Artist & { walletAddresses: WalletAddress[] };
 					} else {
 						// Create artist with unique name and new wallet address
-						artist = (await prisma.artist.create({
+						artist = (await prismaWrite.artist.create({
 							data: {
 								...artistData,
 								name: `${artistName}_${timestamp}`,
@@ -516,7 +516,7 @@ export async function processCollection(collectionInfo: CollectionInfo) {
 		}
 	};
 	//console.log('[processCollection] Upsert params:', JSON.stringify(upsertParams));
-	return await prisma.collection.upsert(upsertParams);
+	return await prismaWrite.collection.upsert(upsertParams);
 }
 
 export async function saveArtwork(
@@ -720,7 +720,7 @@ export async function saveArtwork(
 			
 			// First, search all artists to find one with this wallet address
 			let artist: any = null;
-			const allArtists: any[] = await prisma.artist.findMany();
+			const allArtists: any[] = await prismaRead.artist.findMany();
 
 			// Check if any artist has this wallet address
 			artist = allArtists.find(a => {
@@ -733,7 +733,7 @@ export async function saveArtwork(
 			if (!artist) {
 				// Try to find by exact name match as fallback
 				try {
-					artist = await prisma.artist.findUnique({
+					artist = await prismaRead.artist.findUnique({
 						where: { name: artistName }
 					});
 				} catch (error) {
@@ -756,7 +756,7 @@ export async function saveArtwork(
 
 				while (createAttempts < maxAttempts) {
 					try {
-						artist = await prisma.artist.create({
+						artist = await prismaWrite.artist.create({
 							data: {
 								name: finalArtistName,
 								walletAddresses: walletAddresses as any
@@ -793,7 +793,7 @@ export async function saveArtwork(
 						lastIndexed: new Date().toISOString()
 					}];
 
-					artist = await prisma.artist.update({
+					artist = await prismaWrite.artist.update({
 						where: { id: artist.id },
 						data: {
 							updatedAt: new Date(),
@@ -874,7 +874,7 @@ export async function saveArtwork(
 		uid: uid
 	};
 
-	const artwork = await prisma.artwork.upsert({
+	const artwork = await prismaWrite.artwork.upsert({
 		where: { uid },
 		update: artworkData as Prisma.ArtworkUpdateInput, // Cast to make TS happy with shared object
 		create: artworkData as Prisma.ArtworkCreateInput
@@ -884,10 +884,10 @@ export async function saveArtwork(
 	if (artistId && artwork) {
 		try {
 			// Connect the artwork directly to the artist using the many-to-many relationship
-			await prisma.artwork.update({
+			await prismaWrite.artwork.update({
 				where: { id: artwork.id },
 				data: {
-					artists: {
+					Artist: {
 						connect: { id: artistId }
 					}
 				} as any
