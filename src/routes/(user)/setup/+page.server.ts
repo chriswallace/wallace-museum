@@ -1,57 +1,80 @@
-import { fail, redirect } from '@sveltejs/kit';
-import type { Action, Actions, PageServerLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
+import type { Actions } from './$types';
 import bcrypt from 'bcryptjs';
-import prisma from '$lib/prisma';
+import { db } from '$lib/prisma';
+import crypto from 'crypto';
 
-export const load: PageServerLoad = async () => {
-	const anyUser = await prisma.user.findFirst();
+export const actions: Actions = {
+	default: async ({ request, cookies }) => {
+		const data = await request.formData();
+		const username = data.get('username') as string;
+		const email = data.get('email') as string;
+		const password = data.get('password') as string;
 
-	if (anyUser) {
-		throw redirect(303, '/login');
-	}
-};
-
-const register: Action = async ({ request }) => {
-	const data = await request.formData();
-	const username = data.get('username');
-	const email = data.get('email');
-	const password = data.get('password');
-
-	if (
-		typeof username !== 'string' ||
-		typeof email !== 'string' ||
-		typeof password !== 'string' ||
-		!username ||
-		!email ||
-		!password
-	) {
-		return fail(400, { invalid: true });
-	}
-
-	const anyUser = await prisma.user.findFirst();
-
-	if (anyUser) {
-		throw redirect(303, '/login');
-	}
-
-	const user = await prisma.user.findUnique({
-		where: { username }
-	});
-
-	if (user) {
-		throw fail(400, { user: true });
-	}
-
-	await prisma.user.create({
-		data: {
-			username,
-			email,
-			passwordHash: await bcrypt.hash(password, 10),
-			userAuthToken: crypto.randomUUID()
+		if (!username || !email || !password) {
+			return { error: 'All fields are required' };
 		}
-	});
 
-	throw redirect(303, '/login');
+		try {
+			// Check if user already exists
+			const existingUser = await db.read.user.findFirst({
+				where: {
+					OR: [
+						{ username },
+						{ email }
+					]
+				}
+			});
+
+			if (existingUser) {
+				return { error: 'Username or email already exists' };
+			}
+
+			// Hash password
+			const passwordHash = await bcrypt.hash(password, 12);
+			const userAuthToken = crypto.randomUUID();
+			const userId = crypto.randomUUID();
+
+			// Create user
+			const newUser = await db.write.user.create({
+				data: {
+					id: userId,
+					username,
+					email,
+					passwordHash,
+					userAuthToken,
+					updatedAt: new Date()
+				}
+			});
+
+			// Create session
+			const sessionId = crypto.randomUUID();
+			const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+			await db.write.session.create({
+				data: {
+					sessionId,
+					userId: newUser.id,
+					expiresAt
+				}
+			});
+
+			// Set session cookie
+			cookies.set('session', sessionId, {
+				path: '/',
+				httpOnly: true,
+				secure: true,
+				sameSite: 'strict',
+				expires: expiresAt
+			});
+
+			throw redirect(302, '/admin');
+		} catch (error) {
+			if (error instanceof Response) {
+				throw error; // Re-throw redirect
+			}
+			console.error('Setup error:', error);
+			return { error: 'Failed to create user account' };
+		}
+	}
 };
-
-export const actions: Actions = { register };

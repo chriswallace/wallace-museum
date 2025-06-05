@@ -1,51 +1,63 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
+import type { Actions } from './$types';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto'; // Ensure you import the crypto module
-import type { Action, Actions } from './$types';
-import prisma from '$lib/prisma';
+import { db } from '$lib/prisma';
+import crypto from 'crypto';
 
-const login: Action = async ({ cookies, request }) => {
-	const data = await request.formData();
-	const username = data.get('username');
-	const password = data.get('password');
+export const actions: Actions = {
+	default: async ({ request, cookies }) => {
+		const data = await request.formData();
+		const username = data.get('username') as string;
+		const password = data.get('password') as string;
 
-	if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
-		return fail(400, { invalid: true });
-	}
-
-	const user = await prisma.user.findUnique({ where: { username } });
-
-	if (!user) {
-		return fail(400, { credentials: true });
-	}
-
-	const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-
-	if (!isPasswordValid) {
-		return fail(400, { credentials: true });
-	}
-
-	// Create a new session record in the database
-	const newSession = await prisma.session.create({
-		data: {
-			userId: user.id,
-			sessionId: crypto.randomUUID(),
-			createdAt: new Date(),
-			expiresAt: new Date(Date.now() + 60 * 60 * 24 * 30 * 1000) // Expires in 30 days
+		if (!username || !password) {
+			return { error: 'Username and password are required' };
 		}
-	});
 
-	// Set the session ID as a cookie
-	cookies.set('session', newSession.sessionId, {
-		path: '/',
-		httpOnly: true,
-		sameSite: 'strict',
-		secure: process.env.NODE_ENV === 'production',
-		maxAge: 60 * 60 * 24 * 30 // 30 days
-	});
+		try {
+			// Find user by username
+			const user = await db.read.user.findUnique({
+				where: { username }
+			});
 
-	// Redirect the user
-	throw redirect(302, '/admin');
+			if (!user) {
+				return { error: 'Invalid username or password' };
+			}
+
+			// Verify password
+			const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+			if (!isValidPassword) {
+				return { error: 'Invalid username or password' };
+			}
+
+			// Create session
+			const sessionId = crypto.randomUUID();
+			const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+			const newSession = await db.write.session.create({
+				data: {
+					sessionId,
+					userId: user.id,
+					expiresAt
+				}
+			});
+
+			// Set session cookie
+			cookies.set('session', sessionId, {
+				path: '/',
+				httpOnly: true,
+				secure: true,
+				sameSite: 'strict',
+				expires: expiresAt
+			});
+
+			throw redirect(302, '/admin');
+		} catch (error) {
+			if (error instanceof Response) {
+				throw error; // Re-throw redirect
+			}
+			console.error('Login error:', error);
+			return { error: 'Login failed' };
+		}
+	}
 };
-
-export const actions: Actions = { login };

@@ -1,29 +1,25 @@
-import prisma from '$lib/prisma';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from '@sveltejs/kit';
+import { db } from '$lib/prisma';
 
 // POST: Remove Artwork from a Collection
-export async function DELETE({ params }) {
+export const DELETE: RequestHandler = async ({ params }) => {
 	const { collectionId, artworkId } = params;
-
+	
 	try {
-		// Set collectionId to null for the specified artwork to remove it from the collection
-		const artworkUpdated = await prisma.artwork.update({
-			where: { id: parseInt(artworkId, 10) },
-			data: {
-				collectionId: null
-			}
+		// Remove artwork from collection
+		const artworkUpdated = await db.write.artwork.update({
+			where: { id: parseInt(artworkId!) },
+			data: { collectionId: null }
 		});
-
-		if (artworkUpdated) {
-			return new Response(JSON.stringify({ success: true }), {
-				status: 200,
-				headers: { 'Content-Type': 'application/json' }
-			});
-		}
+		
+		return json({ 
+			success: true, 
+			message: 'Artwork removed from collection',
+			artwork: artworkUpdated
+		});
 	} catch (error) {
 		console.error('Error removing artwork from collection:', error);
-		return new Response(JSON.stringify({ error: 'Error removing artwork from collection' }), {
-			status: 500,
-			headers: { 'Content-Type': 'application/json' }
-		});
+		return json({ error: 'Failed to remove artwork from collection' }, { status: 500 });
 	}
-}
+};

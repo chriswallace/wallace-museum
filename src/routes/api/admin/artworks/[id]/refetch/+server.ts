@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import prisma from '$lib/prisma';
+import { db } from '$lib/prisma';
 import { MinimalIndexingWorkflow } from '$lib/minimal-api-helpers';
 import { EnhancedFieldProcessor } from '$lib/enhanced-field-processor';
 import { MediaAnalyzer } from '$lib/utils/mediaAnalyzer.js';
@@ -18,7 +18,7 @@ export const POST: RequestHandler = async ({ params }) => {
 
 	try {
 		// First, fetch the current artwork to get contract address and token ID
-		const artwork = await prisma.artwork.findUnique({
+		const artwork = await db.read.artwork.findUnique({
 			where: { id: artworkId },
 			select: {
 				id: true,
@@ -189,8 +189,8 @@ export const POST: RequestHandler = async ({ params }) => {
 
 		console.log(`[refetch] Updating artwork ${artworkId} with ${Object.keys(updateData).length} fields:`, Object.keys(updateData));
 
-		// Update the artwork in the database
-		const updatedArtwork = await prisma.artwork.update({
+		// Update the artwork in the database using write client
+		const updatedArtwork = await db.write.artwork.update({
 			where: { id: artworkId },
 			data: updateData,
 			include: {

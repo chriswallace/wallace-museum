@@ -1,49 +1,44 @@
-import prisma from '$lib/prisma';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from '@sveltejs/kit';
+import { db } from '$lib/prisma';
 
 // POST: Add Multiple Artworks to a Collection
-export async function POST({ request }) {
+export const POST: RequestHandler = async ({ params, request }) => {
+	const { collectionId } = params;
+	
 	try {
-		// Parse the incoming request to get the JSON body
-		const body = await request.json();
-		const { collectionId, artworkIds } = body;
-
-		// Validate input
-		if (!collectionId || !artworkIds || !Array.isArray(artworkIds) || artworkIds.length === 0) {
-			return new Response(
-				JSON.stringify({
-					error: 'Missing collection ID or artwork IDs, or artwork IDs is not an array'
-				}),
-				{
-					status: 400,
-					headers: { 'Content-Type': 'application/json' }
-				}
-			);
+		const { artworkIds } = await request.json();
+		
+		if (!artworkIds || !Array.isArray(artworkIds)) {
+			return json({ error: 'Artwork IDs array is required' }, { status: 400 });
 		}
-
-		// Update the specified artworks to set the collectionId to add them to the collection
-		const promises = artworkIds.map((artworkId) =>
-			prisma.artwork.update({
-				where: { id: parseInt(artworkId, 10) },
-				data: {
-					collectionId: parseInt(collectionId, 10) // Assuming collectionId is also an integer
-				}
+		
+		// Validate collection exists
+		const collection = await db.read.collection.findUnique({
+			where: { id: parseInt(collectionId!) }
+		});
+		
+		if (!collection) {
+			return json({ error: 'Collection not found' }, { status: 404 });
+		}
+		
+		// Update artworks to add them to the collection
+		const updatePromises = artworkIds.map(artworkId =>
+			db.write.artwork.update({
+				where: { id: parseInt(artworkId) },
+				data: { collectionId: parseInt(collectionId!) }
 			})
 		);
-
-		// Wait for all the updates to complete
-		const artworksUpdated = await Promise.all(promises);
-
-		// Respond with success if the artworks were updated successfully
-		return new Response(JSON.stringify({ success: true, updatedArtworks: artworksUpdated }), {
-			status: 200,
-			headers: { 'Content-Type': 'application/json' }
+		
+		const updatedArtworks = await Promise.all(updatePromises);
+		
+		return json({ 
+			success: true, 
+			message: `${updatedArtworks.length} artworks added to collection`,
+			artworks: updatedArtworks
 		});
 	} catch (error) {
-		// Log and respond with error if something goes wrong
 		console.error('Error adding artworks to collection:', error);
-		return new Response(JSON.stringify({ error: 'Error adding artworks to collection' }), {
-			status: 500,
-			headers: { 'Content-Type': 'application/json' }
-		});
+		return json({ error: 'Failed to add artworks to collection' }, { status: 500 });
 	}
-}
+};

@@ -396,7 +396,7 @@
 		@apply flex items-center justify-center bg-black bg-opacity-50 rounded-lg p-4;
 		width: 100%;
 		max-width: 1400px;
-		height: 80svh;
+		height: 73svh;
 		margin-bottom: 2rem;
 		overflow: hidden;
 		position: relative;

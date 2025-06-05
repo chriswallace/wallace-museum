@@ -198,9 +198,9 @@
 	$: isWiderThanTall = currentArtwork?.dimensions ? currentArtwork.dimensions.width >= currentArtwork.dimensions.height : true;
 	$: mediaStyle = currentArtwork?.dimensions 
 		? (isWiderThanTall 
-			? `width: 100%; height: auto; max-height: 83svh; aspect-ratio: ${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height};`
-			: `height: 100%; width: auto; max-height: 83svh; aspect-ratio: ${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height};`)
-		: 'max-height: 83svh;';
+			? `width: 100%; height: auto; max-height: 78svh; aspect-ratio: ${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height};`
+			: `height: 100%; width: auto; max-height: 78svh; aspect-ratio: ${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height};`)
+		: 'max-height: 78svh;';
 
 	// Update currentIndex when data changes (for URL navigation)
 	$: if (data.currentIndex !== undefined && data.currentIndex !== currentIndex) {
@@ -432,9 +432,9 @@
 	}
 
 	.artwork-container {
-		@apply flex items-center justify-center bg-black bg-opacity-50 my-12;
+		@apply flex items-center justify-center bg-black bg-opacity-50 mt-16 mb-8;
 		width: 100%;
-		height: 83svh;
+		height: 75svh;
 		position: relative;
 	}
 
@@ -445,7 +445,7 @@
 		left: 0;
 		right: 0;
 		width: 100vw;
-		height: 83svh;
+		height: 73svh;
 		max-width: none;
 		margin: 0;
 		padding: 0;

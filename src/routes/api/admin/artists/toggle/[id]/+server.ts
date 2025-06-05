@@ -1,44 +1,40 @@
-import prisma from '$lib/prisma';
-import type { RequestHandler } from './$types';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from '@sveltejs/kit';
+import { db } from '$lib/prisma';
 
-export const POST: RequestHandler = async ({
-	params
-}: {
-	params: { id: string };
-}): Promise<Response> => {
-	const artistId = parseInt(params.id);
-
+export const POST: RequestHandler = async ({ params }) => {
+	const { id } = params;
+	
+	if (!id) {
+		return json({ error: 'Artist ID is required' }, { status: 400 });
+	}
+	
+	const artistId = parseInt(id, 10);
+	
 	try {
-		const artist = await prisma.artist.findUnique({
-			where: { id: artistId }
-		});
-
-		if (!artist) {
-			return new Response(JSON.stringify({ error: 'Artist not found' }), {
-				status: 404,
-				headers: {
-					'Content-Type': 'application/json'
-				}
-			});
-		}
-
-		const updatedArtist = await prisma.artist.update({
+		// Get current artist state
+		const currentArtist = await db.read.artist.findUnique({
 			where: { id: artistId },
-			data: { enabled: !artist.enabled }
+			select: { isVerified: true }
 		});
-
-		return new Response(JSON.stringify(updatedArtist), {
-			status: 200,
-			headers: {
-				'Content-Type': 'application/json'
-			}
+		
+		if (!currentArtist) {
+			return json({ error: 'Artist not found' }, { status: 404 });
+		}
+		
+		// Toggle the isVerified status
+		const updatedArtist = await db.write.artist.update({
+			where: { id: artistId },
+			data: { isVerified: !currentArtist.isVerified }
 		});
-	} catch (error: any) {
-		return new Response(JSON.stringify({ error: 'An error occurred while updating the artist' }), {
-			status: 500,
-			headers: {
-				'Content-Type': 'application/json'
-			}
+		
+		return json({ 
+			success: true, 
+			artist: updatedArtist,
+			message: `Artist ${updatedArtist.isVerified ? 'verified' : 'unverified'} successfully`
 		});
+	} catch (error) {
+		console.error('Error toggling artist verification:', error);
+		return json({ error: 'Failed to toggle artist verification' }, { status: 500 });
 	}
 };

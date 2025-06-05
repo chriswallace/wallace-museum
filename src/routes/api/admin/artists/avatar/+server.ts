@@ -1,37 +1,37 @@
-import prisma from '$lib/prisma';
-import { uploadAvatarImage } from '$lib/avatarUpload';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from '@sveltejs/kit';
+import { db } from '$lib/prisma';
 
-export async function POST({ request }) {
+export const POST: RequestHandler = async ({ request }) => {
 	try {
-		const formData = await request.formData();
-		const image = formData.get('image') as File;
-		const artistId = parseInt(formData.get('artistId') as string, 10);
-
-		if (!image || !artistId) {
-			return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-				status: 400,
-				headers: { 'Content-Type': 'application/json' }
-			});
+		const { artistId, avatarUrl } = await request.json();
+		
+		if (!artistId || !avatarUrl) {
+			return json({ error: 'Artist ID and avatar URL are required' }, { status: 400 });
 		}
-
-		// Upload image to Pinata using our new function
-		const uploadResult = await uploadAvatarImage(image);
-
-		// Update artist with new avatar URL
-		const updatedArtist = await prisma.artist.update({
-			where: { id: artistId },
-			data: { avatarUrl: uploadResult.url }
+		
+		// Validate that the artist exists
+		const existingArtist = await db.read.artist.findUnique({
+			where: { id: parseInt(artistId) }
 		});
-
-		return new Response(JSON.stringify({ avatarUrl: uploadResult.url }), {
-			status: 200,
-			headers: { 'Content-Type': 'application/json' }
+		
+		if (!existingArtist) {
+			return json({ error: 'Artist not found' }, { status: 404 });
+		}
+		
+		// Update the artist's avatar
+		const updatedArtist = await db.write.artist.update({
+			where: { id: parseInt(artistId) },
+			data: { avatarUrl }
+		});
+		
+		return json({ 
+			success: true, 
+			artist: updatedArtist,
+			message: 'Avatar updated successfully'
 		});
 	} catch (error) {
-		console.error('Error uploading avatar:', error);
-		return new Response(JSON.stringify({ error: 'Failed to upload avatar' }), {
-			status: 500,
-			headers: { 'Content-Type': 'application/json' }
-		});
+		console.error('Error updating artist avatar:', error);
+		return json({ error: 'Failed to update avatar' }, { status: 500 });
 	}
-}
+};
