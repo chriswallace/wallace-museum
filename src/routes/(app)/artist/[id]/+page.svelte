@@ -1,163 +1,103 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { fade } from 'svelte/transition';
-	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import { fade, fly, scale } from 'svelte/transition';
+	import { quintOut } from 'svelte/easing';
 	import { getContractUrl, getContractName, truncateAddress } from '$lib/utils';
-	import { linear } from 'svelte/easing';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
-	import ArtworkDisplay from '$lib/components/ArtworkDisplay.svelte';
-	import ArtistNameWithAvatar from '$lib/components/ArtistNameWithAvatar.svelte';
 
 	export let data: { artist?: any; error?: string };
 
-	interface Attribute {
-		trait_type?: string;
-		value: string;
-	}
+	// Modal state for description
+	let isDescriptionModalOpen = false;
 
-	let currentIndex = 0;
-	let iframeEl: HTMLIFrameElement | null = null;
+	// Character limit for truncating descriptions
+	const DESCRIPTION_LIMIT = 200;
 
-	function formatMintDate(dateStr: string | Date | undefined): string {
+	function formatDate(dateStr: string | Date | undefined): string {
 		if (!dateStr) return '';
 		const date = new Date(dateStr);
 		return new Intl.DateTimeFormat('en-US', {
 			year: 'numeric',
 			month: 'long',
-			day: 'numeric',
-			hour: 'numeric',
-			minute: 'numeric',
-			timeZoneName: 'short'
+			day: 'numeric'
 		}).format(date);
 	}
 
-	function closeOverlay() {
-		goto('/');
+	function formatSocialHandle(handle: string | null): string {
+		if (!handle) return '';
+		return handle.startsWith('@') ? handle : `@${handle}`;
 	}
 
-	function nextArtwork() {
-		if (!data.artist) return;
-		currentIndex = (currentIndex + 1) % data.artist.artworks.length;
-	}
-
-	function prevArtwork() {
-		if (!data.artist) return;
-		currentIndex = (currentIndex - 1 + data.artist.artworks.length) % data.artist.artworks.length;
-	}
-
-	function handleKeyDown(event: KeyboardEvent) {
-		if (event.key === 'Escape') closeOverlay();
-		if (event.key === 'ArrowRight') nextArtwork();
-		if (event.key === 'ArrowLeft') prevArtwork();
-	}
-
-	function handleIframeLoad() {
-		if (iframeEl && iframeEl.contentWindow) {
-			try {
-				const styleElement = iframeEl.contentDocument?.createElement('style');
-				if (styleElement) {
-					styleElement.textContent = `
-					html, body {
-						overflow: hidden !important;
-						margin: 0 !important;
-						padding: 0 !important;
-						height: 100% !important;
-						width: 100% !important;
-					}
-					::-webkit-scrollbar {
-						display: none !important;
-					}
-					* {
-						scrollbar-width: none !important;
-					}
-				`;
-					iframeEl.contentDocument?.head?.appendChild(styleElement);
-				}
-			} catch (e) {
-				console.log('Could not modify iframe content due to cross-origin restrictions');
-			}
-		}
-	}
-
-	function formatMedium(mime?: string): string {
-		if (!mime) return 'Digital Artwork';
-
-		// Handle image types
-		if (mime.startsWith('image/')) {
-			return 'Digital Image';
-		}
-
-		// Handle video types
-		if (mime.startsWith('video/')) {
-			return 'Digital Video';
-		}
-
-		// Handle interactive/code works
-		if (
-			mime === 'application/x-directory' ||
-			mime.startsWith('text/') ||
-			mime.includes('javascript') ||
-			mime.includes('html')
-		) {
-			return 'Interactive Digital Artwork';
-		}
-
-		// Handle other application types
-		if (mime.startsWith('application/')) {
-			return 'Digital Artwork';
-		}
-
-		return 'Digital Artwork';
-	}
-
-	function parseAttributes(
-		attributes: string | any[] | null | undefined
-	): { trait_type: string; value: string }[] {
-		if (!attributes) return [];
-		if (Array.isArray(attributes)) return attributes;
+	function parseWalletAddresses(addresses: any): Array<{blockchain: string, address: string}> {
+		if (!addresses) return [];
+		if (Array.isArray(addresses)) return addresses;
 		try {
-			const parsed = JSON.parse(attributes);
+			const parsed = JSON.parse(addresses);
 			return Array.isArray(parsed) ? parsed : [];
 		} catch {
 			return [];
 		}
 	}
 
-	function parseAndJoinTags(tags: any): string {
-		if (typeof tags === 'string') {
-			try {
-				const parsedTags = JSON.parse(tags);
-				if (Array.isArray(parsedTags)) {
-					return parsedTags.join(', ');
-				}
-			} catch (e) {
-				console.error('Error parsing tags:', e);
-				return ''; // Or return the original string, or some error indicator
-			}
-		} else if (Array.isArray(tags)) {
-			return tags.join(', '); // Already an array
+	function parseSocialLinks(links: any): Record<string, string> {
+		if (!links) return {};
+		if (typeof links === 'object') return links;
+		try {
+			const parsed = JSON.parse(links);
+			return typeof parsed === 'object' ? parsed : {};
+		} catch {
+			return {};
 		}
-		return ''; // Not a string or an array
 	}
 
-	$: currentArtwork = data.artist?.artworks?.[currentIndex];
-	$: currentDimensions = currentArtwork?.dimensions;
-	$: dimensionsObj = currentDimensions
-		? typeof currentDimensions === 'string'
-			? JSON.parse(currentDimensions)
-			: currentDimensions
-		: { width: 16, height: 9 };
-	$: aspectRatio = `${dimensionsObj.width} / ${dimensionsObj.height}`;
+	function shouldTruncateDescription(description: string | null): boolean {
+		return description ? description.length > DESCRIPTION_LIMIT : false;
+	}
 
-	$: currentAttributes =
-		data.artist &&
-		data.artist.artworks[currentIndex] &&
-		data.artist.artworks[currentIndex].attributes
-			? parseAttributes(data.artist.artworks[currentIndex].attributes)
-					.map((a) => `${a.trait_type}: ${a.value}`)
-					.join(', ')
-			: '';
+	function getTruncatedDescription(description: string | null): string {
+		if (!description) return '';
+		if (description.length <= DESCRIPTION_LIMIT) return description;
+		return description.substring(0, DESCRIPTION_LIMIT).trim() + '...';
+	}
+
+	function openDescriptionModal() {
+		isDescriptionModalOpen = true;
+	}
+
+	function closeDescriptionModal() {
+		isDescriptionModalOpen = false;
+	}
+
+	function handleModalKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			closeDescriptionModal();
+		}
+	}
+
+	function handleModalBackdropClick(event: MouseEvent) {
+		if (event.target === event.currentTarget) {
+			closeDescriptionModal();
+		}
+	}
+
+	// Disable body scroll when modal is open
+	$: if (typeof document !== 'undefined') {
+		if (isDescriptionModalOpen) {
+			document.body.style.overflow = 'hidden';
+		} else {
+			document.body.style.overflow = '';
+		}
+	}
+
+	// Clean up on component destroy
+	onMount(() => {
+		return () => {
+			if (typeof document !== 'undefined') {
+				document.body.style.overflow = '';
+			}
+		};
+	});
 
 	$: pageTitle = data.artist
 		? `${data.artist.name} | Wallace Museum`
@@ -165,16 +105,13 @@
 			? 'Artist Not Found | Wallace Museum'
 			: 'Loading Artist | Wallace Museum';
 
-	// Transform artwork data to match ArtworkDisplay component interface
-	$: currentArtworkForDisplay = currentArtwork ? {
-		generatorUrl: currentArtwork.generator_url || currentArtwork.generatorUrl,
-		animationUrl: currentArtwork.animation_url || currentArtwork.animationUrl,
-		imageUrl: currentArtwork.image_url || currentArtwork.imageUrl,
-		thumbnailUrl: currentArtwork.thumbnail_url || currentArtwork.thumbnailUrl,
-		mime: currentArtwork.mime,
-		title: currentArtwork.title,
-		dimensions: currentArtwork.dimensions
-	} : null;
+	$: walletAddresses = data.artist ? parseWalletAddresses(data.artist.walletAddresses) : [];
+	$: socialLinks = data.artist ? parseSocialLinks(data.artist.socialLinks) : {};
+
+	// Get the primary description (bio or description)
+	$: primaryDescription = data.artist?.bio || data.artist?.description || '';
+	$: shouldShowReadMore = shouldTruncateDescription(primaryDescription);
+	$: truncatedDescription = getTruncatedDescription(primaryDescription);
 </script>
 
 <svelte:head>
@@ -182,412 +119,572 @@
 	<meta
 		name="description"
 		content={data.artist
-			? `Explore artworks by ${data.artist.name} at the Wallace Museum`
-			: 'Artist gallery at the Wallace Museum'}
+			? `${data.artist.name} - ${data.artist.bio || 'Digital artist at the Wallace Museum'}`
+			: 'Artist profile at the Wallace Museum'}
 	/>
 </svelte:head>
 
 {#if !data.artist && data.error}
-	<div class="artist-page" transition:fade>
-		<div class="artist-content">
-			<button class="close-button" on:click={closeOverlay} aria-label="Close artist gallery"
-				>×</button
-			>
-			<h2 class="artist-overlay-title">Artist Not Found</h2>
-			<p class="text-gray-300 mb-4">{data.error}</p>
+	<div class="page-container" transition:fade>
+		<div class="error-container">
+			<button class="close-button" on:click={() => goto('/')} aria-label="Return to homepage">×</button>
+			<h2>Artist Not Found</h2>
+			<p>{data.error}</p>
+			<button class="return-button" on:click={() => goto('/')}>Return to Gallery</button>
 		</div>
 	</div>
 {:else if !data.artist}
-	<div class="artist-page" transition:fade>
-		<div class="artist-content">
-			<div class="flex flex-col items-center justify-center min-h-[200px]">
-				<div class="loader mb-4" />
-				<p class="text-gray-300">Loading artist...</p>
-			</div>
+	<div class="page-container" transition:fade>
+		<div class="loading-container">
+			<div class="loader" />
+			<p>Loading artist profile...</p>
 		</div>
 	</div>
 {:else}
-	<div class="artist-page" role="main" on:keydown={handleKeyDown} transition:fade>
-		<!-- Small header with museum name -->
-		<header class="museum-header-nav">
-			<button class="museum-name-link" on:click={() => goto('/')} aria-label="Return to homepage">
+	<div class="page-container" transition:fade>
+		<!-- Header Navigation -->
+		<header class="header-nav">
+			<button class="museum-link" on:click={() => goto('/')} aria-label="Return to homepage">
 				The Wallace Museum
 			</button>
 		</header>
 
-		<button class="close-button" on:click={closeOverlay} aria-label="Close artist gallery">×</button
-		>
+		<button class="close-button" on:click={() => goto('/')} aria-label="Return to homepage">×</button>
 
-		{#if data.artist.artworks.length > 0}
-			{#key currentIndex}
-				<div class="museum-content">
-					<div class="artwork-container">
-						{#if currentArtworkForDisplay}
-							<ArtworkDisplay 
-								artwork={currentArtworkForDisplay}
-								dimensions={currentArtworkForDisplay.dimensions}
-							/>
+		<div class="content-container">
+			<div class="layout-grid">
+				<!-- Left Column - Artist Details -->
+				<aside class="artist-sidebar">
+					<div class="artist-header">
+						{#if data.artist.avatarUrl}
+							<div class="avatar-container">
+								<OptimizedImage
+									src={data.artist.avatarUrl}
+									alt={data.artist.name}
+									width={120}
+									height={120}
+									fit="crop"
+									gravity="auto"
+									format="webp"
+									quality={90}
+									className="artist-avatar"
+									fallbackSrc="/images/medici-image.png"
+								/>
+							</div>
+						{/if}
+
+						<div class="artist-title">
+							<h1>
+								{data.artist.displayName || data.artist.name}
+								{#if data.artist.isVerified}
+									<span class="verification-badge" title="Verified Artist">✓</span>
+								{/if}
+							</h1>
+							{#if data.artist.ensName}
+								<p class="ens-name">{data.artist.ensName}</p>
+							{/if}
+						</div>
+						{#if primaryDescription}
+							<div class="bio-section">
+								<p>{shouldShowReadMore ? truncatedDescription : primaryDescription}</p>
+								{#if shouldShowReadMore}
+									<button 
+										class="read-more-button"
+										on:click={openDescriptionModal}
+									>
+										Read more
+									</button>
+								{/if}
+							</div>
+						{/if}
+						{#if data.artist.description && data.artist.description !== data.artist.bio && !primaryDescription.includes(data.artist.description)}
+							<div class="description-section">
+								<p>{data.artist.description}</p>
+							</div>
 						{/if}
 					</div>
 
-					<div class="museum-details-wrapper">
-						<div class="museum-details-overlay">
-							<div class="museum-header">
-								<div class="museum-artist-title">
-									<div class="museum-artist">
-										<ArtistNameWithAvatar 
-											artist={{
-												id: data.artist.id,
-												name: data.artist.name,
-												bio: data.artist.bio,
-												avatarUrl: data.artist.avatarUrl,
-												websiteUrl: data.artist.websiteUrl,
-												twitterHandle: data.artist.twitterHandle,
-												instagramHandle: data.artist.instagramHandle,
-												addresses: data.artist.addresses
-											}}
-											showPopover={true}
-											showAvatar={false}
-											size="lg"
-											nameClassName="text-yellow-500 text-sm font-medium uppercase tracking-wider"
-										/>
-									</div>
-									<div class="museum-title">{data.artist.artworks[currentIndex].title}</div>
-								</div>
-
-								{#if data.artist.artworks.length > 1}
-									<div class="artwork-navigation">
-										<button class="nav-button" on:click={prevArtwork} aria-label="Previous artwork"
-											>←</button
-										>
-										<button class="nav-button" on:click={nextArtwork} aria-label="Next artwork"
-											>→</button
-										>
-									</div>
+					<!-- Social Links -->
+					{#if data.artist.websiteUrl || data.artist.twitterHandle || data.artist.instagramHandle || data.artist.profileUrl}
+						<div class="detail-section">
+							<h3>Links</h3>
+							<ul class="links-list">
+								{#if data.artist.websiteUrl}
+									<li><a href={data.artist.websiteUrl} target="_blank" rel="noopener noreferrer">Website</a></li>
 								{/if}
-							</div>
-
-							<div class="content-grid">
-								{#if data.artist.artworks[currentIndex].description}
-									<div class="description-col">
-										<div class="museum-description">
-											{data.artist.artworks[currentIndex].description}
-										</div>
-									</div>
+								{#if data.artist.twitterHandle}
+									<li><a href={data.artist.twitterHandle} target="_blank" rel="noopener noreferrer">Twitter</a></li>
 								{/if}
-
-								<div class="metadata-col">
-									{#if data.artist.artworks[currentIndex].attributes && data.artist.artworks[currentIndex].attributes.length}
-										<div class="metadata-section">
-											<h3 class="metadata-heading">Attributes</h3>
-											<div class="metadata-grid">
-												{#each parseAttributes(data.artist.artworks[currentIndex].attributes) as attribute}
-													<div class="metadata-item">
-														<strong>{attribute.trait_type}</strong>
-														<span>{attribute.value}</span>
-													</div>
-												{/each}
-											</div>
-										</div>
-
-										<div class="divider" />
-									{/if}
-
-									<div class="metadata-section">
-										<div class="metadata-grid">
-											{#if data.artist.artworks[currentIndex].supply}
-												<div class="metadata-item">
-													<strong>Edition</strong>
-													<span>1 of {data.artist.artworks[currentIndex].supply}</span>
-												</div>
-											{/if}
-											{#if currentDimensions}
-												<div class="metadata-item">
-													<strong>Dimensions</strong>
-													<span>{dimensionsObj.width} × {dimensionsObj.height}</span>
-												</div>
-											{/if}
-											{#if data.artist.artworks[currentIndex].contractAddr}
-												<div class="metadata-item">
-													<strong>Contract</strong>
-													{#if getContractUrl(data.artist.artworks[currentIndex].contractAddr, data.artist.artworks[currentIndex].blockchain, data.artist.artworks[currentIndex].tokenID)}
-														<a
-															href={getContractUrl(
-																data.artist.artworks[currentIndex].contractAddr,
-																data.artist.artworks[currentIndex].blockchain,
-																data.artist.artworks[currentIndex].tokenID
-															)}
-															target="_blank"
-															rel="noopener noreferrer"
-															class="contract-link"
-														>
-															{getContractName(
-																data.artist.artworks[currentIndex].contractAddr,
-																data.artist.artworks[currentIndex].contractAlias
-															)}
-														</a>
-													{:else}
-														<span>
-															{getContractName(
-																data.artist.artworks[currentIndex].contractAddr,
-																data.artist.artworks[currentIndex].contractAlias
-															)}
-														</span>
-													{/if}
-												</div>
-											{/if}
-											{#if data.artist.artworks[currentIndex].contractAlias && !data.artist.artworks[currentIndex].contractAddr}
-												<div class="metadata-item">
-													<strong>Contract Alias</strong>
-													<span>{data.artist.artworks[currentIndex].contractAlias}</span>
-												</div>
-											{/if}
-											{#if data.artist.artworks[currentIndex].tokenID}
-												<div class="metadata-item">
-													<strong>Token ID</strong>
-													<span>{data.artist.artworks[currentIndex].tokenID}</span>
-												</div>
-											{/if}
-											{#if data.artist.artworks[currentIndex].tokenStandard}
-												<div class="metadata-item">
-													<strong>Token Standard</strong>
-													<span>{data.artist.artworks[currentIndex].tokenStandard?.toUpperCase()}</span>
-												</div>
-											{/if}
-
-											{#if data.artist.artworks[currentIndex].mintDate}
-												<div class="metadata-item">
-													<strong>Mint Date</strong>
-													<span>{formatMintDate(data.artist.artworks[currentIndex].mintDate)}</span>
-												</div>
-											{/if}
-											{#if data.artist.artworks[currentIndex].mime}
-												<div class="metadata-item">
-													<strong>Medium</strong>
-													<span>{formatMedium(data.artist.artworks[currentIndex].mime)}</span>
-												</div>
-											{/if}
-											{#if data.artist.artworks[currentIndex].tags && data.artist.artworks[currentIndex].tags.length}
-												<div class="metadata-item">
-													<strong>Tags</strong>
-													<span>{parseAndJoinTags(data.artist.artworks[currentIndex].tags)}</span>
-												</div>
-											{/if}
-										</div>
-									</div>
-								</div>
-							</div>
+								{#if data.artist.instagramHandle}
+									<li><a href={`https://instagram.com/${data.artist.instagramHandle.replace('@', '')}`} target="_blank" rel="noopener noreferrer">Instagram {formatSocialHandle(data.artist.instagramHandle)}</a></li>
+								{/if}
+								{#if data.artist.profileUrl}
+									<li><a href={data.artist.profileUrl} target="_blank" rel="noopener noreferrer">Profile</a></li>
+								{/if}
+							</ul>
 						</div>
+					{/if}
+
+					<!-- Wallet Addresses -->
+					{#if walletAddresses.length > 0}
+						<div class="detail-section">
+							<h3>Wallet Addresses</h3>
+							<ul class="addresses-list">
+								{#each walletAddresses as wallet}
+									<li>
+										<span class="blockchain">{wallet.blockchain}:</span>
+										<code class="address">{truncateAddress(wallet.address)}</code>
+										{#if getContractUrl(wallet.address, wallet.blockchain)}
+											<a
+												href={getContractUrl(wallet.address, wallet.blockchain)}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="view-link"
+											>
+												View
+											</a>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/if}
+
+					<!-- Profile Information -->
+					<div class="detail-section">
+						<h3>Profile</h3>
+						<dl class="profile-list">
+							{#if data.artist.username}
+								<dt>Username</dt>
+								<dd>{data.artist.username}</dd>
+							{/if}
+							{#if data.artist.createdAt}
+								<dt>Joined</dt>
+								<dd>{formatDate(data.artist.createdAt)}</dd>
+							{/if}
+							{#if data.artist.resolutionSource}
+								<dt>Source</dt>
+								<dd>{data.artist.resolutionSource}</dd>
+							{/if}
+							{#if data.artist.resolvedAt}
+								<dt>Last Updated</dt>
+								<dd>{formatDate(data.artist.resolvedAt)}</dd>
+							{/if}
+						</dl>
 					</div>
+				</aside>
+
+				<!-- Right Column - Artworks -->
+				<main class="artworks-main">
+					{#if data.artist.artworks && data.artist.artworks.length > 0}
+						<div class="artworks-header">
+							<h2>Artworks ({data.artist.artworks.length})</h2>
+						</div>
+						<div class="artworks-grid">
+							{#each data.artist.artworks as artwork}
+								<button class="artwork-container" on:click={() => goto(`/artist/${data.artist.id}/${artwork.id}`)}>
+									<div class="artwork-thumbnail">
+										{#if artwork.image_url}
+											<OptimizedImage
+												src={artwork.image_url}
+												alt={artwork.title}
+												width={800}
+												height={800}
+												fit="contain"
+												format="webp"
+												quality={70}
+												className="thumbnail-image"
+												fallbackSrc="/images/medici-image.png"
+											/>
+										{:else}
+											<div class="thumbnail-placeholder">
+												<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
+													<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+												</svg>
+											</div>
+										{/if}
+									</div>
+								</button>
+							{/each}
+						</div>
+					{:else}
+						<div class="no-artworks">
+							<p>No artworks available for this artist.</p>
+						</div>
+					{/if}
+				</main>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Description Modal -->
+{#if isDescriptionModalOpen}
+	<div 
+		class="modal-backdrop"
+		on:click={handleModalBackdropClick}
+		on:keydown={handleModalKeydown}
+		transition:fade={{ duration: 200 }}
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="modal-artist-name"
+		tabindex="-1"
+	>
+		<div 
+			class="modal-content"
+			transition:scale={{ duration: 300, easing: quintOut, start: 0.9 }}
+		>
+			<!-- Close Button -->
+			<button 
+				class="modal-close-button"
+				on:click={closeDescriptionModal}
+				aria-label="Close description"
+			>
+				×
+			</button>
+
+			<!-- Modal Content -->
+			<div class="modal-scroll">
+				<!-- Artist Header -->
+				<div class="modal-artist-header">
+					{#if data.artist.avatarUrl}
+						<div class="modal-avatar-container">
+							<OptimizedImage
+								src={data.artist.avatarUrl}
+								alt={data.artist.name}
+								width={120}
+								height={120}
+								fit="crop"
+								gravity="auto"
+								format="webp"
+								quality={90}
+								className="modal-artist-avatar"
+								fallbackSrc="/images/medici-image.png"
+							/>
+						</div>
+					{/if}
+					<h2 id="modal-artist-name" class="modal-artist-name">{data.artist.displayName || data.artist.name}</h2>
 				</div>
-			{/key}
-		{/if}
+
+				<!-- Full Description -->
+				<div class="modal-description">
+					<p>{primaryDescription}</p>
+				</div>
+			</div>
+		</div>
 	</div>
 {/if}
 
 <style lang="scss">
-	.artist-page {
-		@apply w-full min-h-screen bg-black bg-opacity-80;
+	.page-container {
+		@apply min-h-screen bg-white text-black;
+	}
+
+	.header-nav {
+		@apply p-4;
+	}
+
+	.museum-link {
+		@apply text-sm font-medium text-gray-600 hover:text-black bg-transparent border-none cursor-pointer transition-colors duration-200;
 	}
 
 	.close-button {
-		@apply text-3xl text-gray-400 hover:text-white bg-transparent border-none cursor-pointer absolute top-3 right-6 z-50;
+		@apply text-2xl text-gray-400 hover:text-black bg-transparent border-none cursor-pointer absolute top-4 right-4 z-50 transition-colors duration-200;
 	}
 
-	.museum-content {
-		@apply flex flex-col w-full items-center justify-start;
+	.content-container {
+		@apply w-full px-4;
+	}
+
+	.layout-grid {
+		@apply flex flex-col lg:flex-row;
+	}
+
+	.artist-sidebar {
+		@apply w-full lg:w-80 lg:flex-shrink-0 space-y-6 py-8;
+	}
+
+	.artist-header {
+		@apply flex flex-col items-start text-left gap-4 mb-0;
+	}
+
+	.avatar-container {
+		@apply w-16 h-16 rounded-sm overflow-hidden flex-shrink-0;
+	}
+
+	.artist-avatar {
+		@apply w-full h-full object-cover;
+	}
+
+	.artist-title h1 {
+		@apply text-base font-semibold mb-0;
+	}
+
+	.verification-badge {
+		@apply text-blue-600 ml-1 text-sm;
+	}
+
+	.ens-name {
+		@apply text-gray-600 text-xs;
+	}
+
+	.bio-section,
+	.description-section {
+		@apply mb-4;
+	}
+
+	.bio-section p {
+		@apply mt-0 text-sm leading-relaxed;
+	}
+
+	.read-more-button {
+		@apply text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 bg-transparent border-none cursor-pointer mt-2 transition-colors duration-200;
+		text-decoration: underline;
+	}
+
+	.description-section p {
+		@apply mt-0 text-xs text-gray-700 leading-relaxed;
+	}
+
+	.detail-section {
+		@apply mb-4;
+	}
+
+	.detail-section h3 {
+		@apply text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2;
+	}
+
+	.links-list,
+	.addresses-list {
+		@apply list-none p-0 space-y-1;
+	}
+
+	.links-list a {
+		@apply text-black/60 hover:text-black text-xs transition-colors duration-200;
+		text-decoration: none;
+	}
+
+	.addresses-list li {
+		@apply flex flex-col gap-0.5 text-xs;
+	}
+
+	.blockchain {
+		@apply font-medium text-gray-600 text-xs;
+	}
+
+	.address {
+		@apply text-xs font-mono bg-gray-100 px-1 py-0.5;
+	}
+
+	.view-link {
+		@apply text-black/60 hover:text-black text-xs transition-colors duration-200;
+		text-decoration: none;
+	}
+
+	.profile-list {
+		@apply space-y-1;
+	}
+
+	.profile-list dt {
+		@apply text-xs font-medium text-gray-600 uppercase tracking-wider;
+	}
+
+	.profile-list dd {
+		@apply text-xs text-gray-900 mb-1;
+	}
+
+	.artworks-main {
+		@apply flex-1 min-h-0;
+		@apply px-0 lg:px-8 py-0 lg:py-8;
+	}
+
+	.artworks-header {
+		@apply px-6 lg:px-0 mb-6 pt-8 lg:pt-0;
+	}
+
+	.artworks-header h2 {
+		@apply text-2xl font-bold;
+	}
+
+	.artworks-grid {
+		@apply grid gap-0 lg:gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4;
 	}
 
 	.artwork-container {
-		@apply flex items-center justify-center bg-black bg-opacity-50 rounded-lg p-4;
-		width: 100%;
-		max-width: 1400px;
-		margin-bottom: 2rem;
-		overflow: hidden;
-		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		@apply cursor-pointer bg-transparent border-none p-0 w-full;
 	}
 
-	/* Apply fixed height only on medium screens and up */
-	@media (min-width: 768px) {
-		.artwork-container {
-			height: 80svh;
-		}
+	.artwork-thumbnail {
+		@apply aspect-square bg-gray-50 overflow-hidden rounded-sm flex items-center justify-center;
 	}
 
-	.artwork-media {
-		@apply object-contain m-auto;
-		max-width: 100%;
-		max-height: 100%;
+	.thumbnail-image {
+		@apply w-full h-full object-cover;
 	}
 
-	.iframe-container {
-		height: 100%;
-		width: auto;
-		position: relative;
-		overflow: hidden;
+	.thumbnail-placeholder {
+		@apply w-full h-full flex items-center justify-center;
 	}
 
-	.artwork-iframe {
-		@apply mx-auto;
-		border: none;
-		display: block;
-		overflow: hidden;
+	.placeholder-icon {
+		@apply w-8 h-8 text-gray-400;
 	}
 
-	.museum-details-wrapper {
-		@apply px-4 md:px-6 w-full mx-auto;
-		max-width: 1400px;
-		min-height: 300px;
+	.no-artworks {
+		@apply flex items-center justify-center h-64 text-gray-500;
 	}
 
-	.museum-details-overlay {
-		@apply flex flex-col gap-6 w-full md:px-6 py-6 mx-auto bg-black bg-opacity-50 rounded-lg relative mt-0;
+	.error-container,
+	.loading-container {
+		@apply flex flex-col items-center justify-center min-h-screen p-8;
 	}
 
-	.museum-header {
-		@apply flex justify-between items-start mb-0 min-h-[70px];
-	}
-
-	.museum-artist-title {
-		@apply flex-1 pr-4;
-	}
-
-	.museum-artist {
-		@apply text-sm font-medium uppercase tracking-wider text-yellow-500 mb-1;
-	}
-
-	.museum-title {
-		@apply text-2xl font-bold text-white leading-tight max-w-[900px];
-	}
-
-	.artwork-navigation {
-		@apply flex items-center gap-2 ml-4;
-	}
-
-	.nav-button {
-		@apply flex items-center justify-center w-10 h-10 text-white bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full border-none cursor-pointer;
-	}
-
-	.content-grid {
-		@apply grid grid-cols-1 gap-8;
-		@apply md:grid-cols-[minmax(600px,800px)_minmax(300px,400px)];
-	}
-
-	.description-col {
-		@apply md:pr-12 w-full;
-	}
-
-	.metadata-col {
-		@apply flex flex-col gap-8 w-full;
-	}
-
-	.museum-description {
-		@apply text-base text-gray-300;
-		max-width: 65ch;
-	}
-
-	.museum-meta {
-		@apply text-sm text-gray-400 list-none m-0 flex flex-col gap-4 rounded-lg;
-	}
-
-	.metadata-grid {
-		@apply grid gap-6;
-		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-	}
-
-	.metadata-item {
-		@apply flex flex-col gap-1;
-		min-width: 0;
-
-		&.full-width {
-			grid-column: 1 / -1;
-		}
-
-		strong {
-			@apply text-xs uppercase tracking-wider text-gray-400;
-		}
-
-		span,
-		a {
-			@apply text-sm text-gray-100;
-			word-break: break-word;
-		}
-	}
-
-	.attributes-list {
-		@apply gap-0.5 grid grid-cols-3 border border-gray-700 rounded-md p-4 w-full;
-	}
-
-	.attribute-item {
-		@apply rounded-md p-0.5 flex flex-col items-start;
-
-		dt {
-			@apply text-xs uppercase tracking-wider text-gray-400 min-w-[170px];
-		}
-
-		dd {
-			@apply text-sm text-gray-200 m-0 text-left;
-		}
-	}
-
-	.contract-link {
-		@apply text-yellow-500 hover:text-yellow-400 transition-colors;
-		text-decoration: none;
-
-		&:hover {
-			text-decoration: underline;
-		}
+	.return-button {
+		@apply px-4 py-2 bg-black text-white font-medium hover:bg-gray-800 transition-colors duration-200;
 	}
 
 	.loader {
-		border: 4px solid #444;
-		border-top: 4px solid #fff;
-		border-radius: 50%;
-		width: 36px;
-		height: 36px;
+		@apply w-8 h-8 border-2 border-gray-300 border-t-black rounded-full;
 		animation: spin 1s linear infinite;
 	}
 
-	@keyframes spin {
-		0% {
-			transform: rotate(0deg);
-		}
-		100% {
-			transform: rotate(360deg);
-		}
+	/* Modal Styles */
+	.modal-backdrop {
+		@apply fixed inset-0 z-50 flex items-center justify-center p-4;
+		background: rgba(0, 0, 0, 0.5);
+		backdrop-filter: blur(8px);
 	}
 
-	.metadata-section {
-		@apply flex flex-col gap-4;
-	}
-
-	.metadata-heading {
-		@apply text-lg font-semibold text-white;
-	}
-
-	.divider {
-		@apply w-full h-px bg-gray-700 my-6;
-	}
-
-	.museum-header-nav {
-		@apply flex items-center justify-start p-4;
-		background-color: rgba(0, 0, 0, 0.5);
-		position: relative;
-		z-index: 40;
+	.modal-content {
+		@apply relative bg-white dark:bg-black rounded-sm shadow-2xl max-w-[600px];
 		width: 100%;
+		max-height: 88svh;
 	}
 
-	.museum-name-link {
-		@apply text-yellow-500 text-sm font-bold uppercase tracking-wider;
-		@apply bg-transparent border-none cursor-pointer;
-		@apply hover:text-yellow-400 transition-colors duration-200;
-		@apply focus:text-yellow-400 focus:outline-none;
-		text-decoration: none;
-		padding: 0;
-		margin: 0;
+	.modal-close-button {
+		@apply absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 bg-transparent border-none cursor-pointer rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors;
+		font-size: 20px;
+		z-index: 10;
 	}
 
+	.modal-scroll {
+		@apply overflow-y-auto p-6;
+		max-height: calc(88svh - 2rem);
+	}
+
+	.modal-artist-header {
+		@apply flex flex-col items-center text-center mb-6;
+	}
+
+	.modal-avatar-container {
+		@apply mb-4 w-24 h-24 rounded-sm overflow-hidden flex-shrink-0;
+	}
+
+	.modal-artist-avatar {
+		@apply w-full h-full object-cover;
+	}
+
+	.modal-artist-name {
+		@apply text-2xl font-bold text-gray-900 dark:text-white m-0;
+	}
+
+	.modal-description {
+		@apply text-gray-700 dark:text-gray-300 leading-relaxed;
+	}
+
+	.modal-description p {
+		@apply text-base leading-relaxed m-0;
+	}
+
+	@keyframes spin {
+		0% { transform: rotate(0deg); }
+		100% { transform: rotate(360deg); }
+	}
+
+	/* Dark mode support */
+	@media (prefers-color-scheme: dark) {
+		.page-container {
+			@apply bg-black text-white;
+		}
+
+		.header-nav {
+			@apply border-gray-800;
+		}
+
+		.artist-sidebar {
+			@apply border-gray-800;
+		}
+
+		.museum-link {
+			@apply text-gray-400 hover:text-white;
+		}
+
+		.close-button {
+			@apply text-gray-400 hover:text-white;
+		}
+
+		.ens-name {
+			@apply text-gray-400;
+		}
+
+		.description-section p {
+			@apply text-gray-300;
+		}
+
+		.detail-section h3 {
+			@apply text-gray-400;
+		}
+
+		.links-list a {
+			@apply text-white/60 hover:text-white;
+		}
+
+		.blockchain {
+			@apply text-gray-400;
+		}
+
+		.address {
+			@apply bg-gray-800 text-gray-300;
+		}
+
+		.view-link {
+			@apply text-white/60 hover:text-white;
+		}
+
+		.profile-list dt {
+			@apply text-gray-400;
+		}
+
+		.profile-list dd {
+			@apply text-gray-100;
+		}
+
+		.artwork-thumbnail {
+			@apply bg-gray-900;
+		}
+
+		.no-artworks {
+			@apply text-gray-400;
+		}
+
+		.return-button {
+			@apply bg-white text-black hover:bg-gray-200;
+		}
+
+		.loader {
+			@apply border-gray-700 border-t-white;
+		}
+	}
+
+	/* Responsive adjustments */
+	@media (max-width: 640px) {
+		.modal-content {
+			margin: 1rem;
+			max-width: calc(100vw - 2rem);
+		}
+		
+		.modal-scroll {
+			@apply p-4;
+		}
+	}
 </style>

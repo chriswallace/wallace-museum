@@ -1,6 +1,5 @@
 import type { PageServerLoad } from './$types';
 import prisma from '$lib/prisma';
-import { redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const artistId = Number(params.id);
@@ -15,12 +14,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		return { status: 404, error: 'Artist not found' };
 	}
 
-	// If artist has artworks, redirect to the first artwork
-	if (artist.Artwork && artist.Artwork.length > 0) {
-		throw redirect(302, `/artist/${artistId}/${artist.Artwork[0].id}`);
-	}
-
-	// If no artworks, return the artist data anyway
+	// Transform artwork data
 	const artworks = (artist.Artwork || []).map((artwork) => {
 		return {
 			id: String(artwork.id),
@@ -47,12 +41,24 @@ export const load: PageServerLoad = async ({ params }) => {
 		artist: {
 			id: artist.id,
 			name: artist.name,
+			displayName: artist.displayName,
+			username: artist.username,
 			bio: artist.bio,
+			description: artist.description,
 			avatarUrl: artist.avatarUrl,
 			websiteUrl: artist.websiteUrl,
 			twitterHandle: artist.twitterHandle,
 			instagramHandle: artist.instagramHandle,
-			addresses: artist.walletAddresses,
+			profileUrl: artist.profileUrl,
+			ensName: artist.ensName,
+			isVerified: artist.isVerified,
+			walletAddresses: artist.walletAddresses,
+			socialLinks: artist.socialLinks,
+			profileData: artist.profileData,
+			resolutionSource: artist.resolutionSource,
+			resolvedAt: artist.resolvedAt,
+			createdAt: artist.createdAt,
+			updatedAt: artist.updatedAt,
 			artworks
 		}
 	};

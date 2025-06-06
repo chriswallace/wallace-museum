@@ -8,9 +8,11 @@
 	import { goto } from '$app/navigation';
 	import LoaderWrapper from '$lib/components/LoaderWrapper.svelte';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import ArtworkFeed from '$lib/components/ArtworkFeed.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
+	import { VideoPresets } from '$lib/utils/mediaHelpers';
 
 	let hoveredArtist: Artist | null = null;
 	let mouseX = 0;
@@ -226,6 +228,11 @@
 		</div>
 	</div>
 
+	<hr class="mb-1.5 border-gray-800" />
+
+	<!-- Artwork Feed -->
+	<ArtworkFeed />
+
 	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && previewMedia}
 		<div
 			class="floating-artwork-preview"
@@ -254,16 +261,20 @@
 					}}
 				/>
 			{:else if previewMedia.type === 'video'}
+				{@const videoAttrs = VideoPresets.preview(ipfsToHttpUrl(previewMedia.url))}
 				<video
-					src={ipfsToHttpUrl(previewMedia.url)}
-					autoplay
-					loop
-					muted
-					playsinline
+					src={videoAttrs.src}
+					autoplay={videoAttrs.autoplay}
+					loop={videoAttrs.loop}
+					muted={videoAttrs.muted}
+					playsinline={videoAttrs.playsinline}
+					preload={videoAttrs.preload}
 					class="preview-video"
-					width={previewDimensions?.width || 320}
-					height={previewDimensions?.height || 240}
+					width={videoAttrs.width}
+					height={videoAttrs.height}
+					style={videoAttrs.style}
 				>
+					<track kind="captions" />
 					Your browser does not support the video tag.
 				</video>
 			{/if}
@@ -281,7 +292,7 @@
 	}
 
 	.content {
-		@apply w-full p-4 py-10 max-w-[calc(100%-4rem)];
+		@apply w-full p-4 py-10;
 	}
 
 	.title {
@@ -295,7 +306,7 @@
 	.title,
 	.inline-content p,
 	.inline-content button {
-		@apply text-3xl 2xl:text-4xl;
+		@apply text-lg md:text-3xl 2xl:text-4xl;
 	}
 
 	.description {

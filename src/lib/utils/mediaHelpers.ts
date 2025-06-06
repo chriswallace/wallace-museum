@@ -95,4 +95,122 @@ export function getMediaDisplayType(
 	
 	// Default to image
 	return 'image';
-} 
+}
+
+/**
+ * Video optimization options for feed display
+ * 
+ * Note: Unlike images, we don't currently have a video transformation service,
+ * so these utilities focus on applying optimal sizing constraints and playback
+ * attributes for different contexts (feed, thumbnail, preview, fullscreen).
+ * 
+ * The optimization primarily works by:
+ * - Setting reasonable max dimensions to prevent oversized videos
+ * - Using appropriate preload strategies to balance performance and UX
+ * - Configuring autoplay, loop, and muted attributes for feed contexts
+ * - Applying CSS constraints for consistent sizing
+ */
+export interface VideoOptimizationOptions {
+	maxWidth?: number;
+	maxHeight?: number;
+	quality?: 'low' | 'medium' | 'high';
+	preload?: 'none' | 'metadata' | 'auto';
+	autoplay?: boolean;
+	loop?: boolean;
+	muted?: boolean;
+	playsinline?: boolean;
+}
+
+/**
+ * Get optimized video attributes for feed display
+ */
+export function getOptimizedVideoAttributes(
+	videoUrl: string,
+	options: VideoOptimizationOptions = {}
+): {
+	src: string;
+	width: string;
+	height: string;
+	style: string;
+	preload: string;
+	autoplay: boolean;
+	loop: boolean;
+	muted: boolean;
+	playsinline: boolean;
+} {
+	const {
+		maxWidth = 600,
+		maxHeight = 600,
+		quality = 'medium',
+		preload = 'metadata',
+		autoplay = true,
+		loop = true,
+		muted = true,
+		playsinline = true
+	} = options;
+
+	// For now, we don't have video transformation service, so we use the original URL
+	// but apply sizing constraints via CSS
+	const style = `max-width: ${maxWidth}px; max-height: ${maxHeight}px; object-fit: contain; background: #000;`;
+
+	return {
+		src: videoUrl,
+		width: maxWidth.toString(),
+		height: maxHeight.toString(),
+		style,
+		preload,
+		autoplay,
+		loop,
+		muted,
+		playsinline
+	};
+}
+
+/**
+ * Video optimization presets for different contexts
+ */
+export const VideoPresets = {
+	feed: (videoUrl: string) => getOptimizedVideoAttributes(videoUrl, {
+		maxWidth: 600,
+		maxHeight: 600,
+		quality: 'medium',
+		preload: 'metadata',
+		autoplay: true,
+		loop: true,
+		muted: true,
+		playsinline: true
+	}),
+	
+	thumbnail: (videoUrl: string) => getOptimizedVideoAttributes(videoUrl, {
+		maxWidth: 300,
+		maxHeight: 300,
+		quality: 'low',
+		preload: 'metadata',
+		autoplay: true,
+		loop: true,
+		muted: true,
+		playsinline: true
+	}),
+	
+	preview: (videoUrl: string) => getOptimizedVideoAttributes(videoUrl, {
+		maxWidth: 400,
+		maxHeight: 400,
+		quality: 'medium',
+		preload: 'metadata',
+		autoplay: true,
+		loop: true,
+		muted: true,
+		playsinline: true
+	}),
+	
+	fullscreen: (videoUrl: string) => getOptimizedVideoAttributes(videoUrl, {
+		maxWidth: 1920,
+		maxHeight: 1080,
+		quality: 'high',
+		preload: 'auto',
+		autoplay: true,
+		loop: true,
+		muted: false,
+		playsinline: true
+	})
+}; 

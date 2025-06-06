@@ -314,6 +314,9 @@
 		border-radius: 4px;
 		overflow: hidden;
 		outline: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.video-element {
@@ -321,6 +324,8 @@
 		height: 100%;
 		object-fit: contain;
 		cursor: pointer;
+		display: block;
+		margin: 0 auto;
 	}
 
 	.loading-state,

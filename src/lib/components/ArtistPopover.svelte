@@ -196,7 +196,7 @@
 	.popover-content {
 		@apply relative bg-white dark:bg-black rounded-sm shadow-2xl max-w-[780px];
 		width: 100%;
-		max-height: 90svh;
+		max-height: 88svh;
 	}
 
 	.close-button {
@@ -210,7 +210,7 @@
 
 	.popover-scroll {
 		@apply overflow-y-auto p-6;
-		max-height: calc(90svh - 2rem);
+		max-height: calc(88svh - 2rem);
 	}
 
 	.artist-header {

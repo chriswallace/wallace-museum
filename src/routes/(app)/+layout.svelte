@@ -16,7 +16,7 @@
 	<footer class="site-footer">
 		<div class="footer-content">
 			<div class="copyright">
-				<p class="text-white font-bold">Wallace Museum</p>
+				<p class="text-white font-bold">The Wallace Museum</p>
 				<p>
 					{new Date().getFullYear()} &copy; Chris Wallace. All rights reserved. All artworks remain the
 					property of their respective creators.
@@ -52,10 +52,10 @@
 	}
 
 	a {
-		color: rgb(29, 199, 74);
+		@apply text-yellow-500;
 
 		&:hover {
-			color: rgb(68, 240, 114);
+			@apply text-yellow-400;
 		}
 	}
 

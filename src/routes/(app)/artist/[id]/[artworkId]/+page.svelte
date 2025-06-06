@@ -7,7 +7,6 @@
 	import { linear } from 'svelte/easing';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import ArtworkDisplay from '$lib/components/ArtworkDisplay.svelte';
-	import ArtistNameWithAvatar from '$lib/components/ArtistNameWithAvatar.svelte';
 
 	export let data: { 
 		artist?: any; 
@@ -23,6 +22,63 @@
 
 	let currentIndex = data.currentIndex || 0;
 	let iframeEl: HTMLIFrameElement | null = null;
+	let isInBrowserFullscreen = false;
+	let keyboardHelpVisible = false;
+	let fullscreenHintVisible = false;
+	let fullscreenHintTimeout: ReturnType<typeof setTimeout>;
+	let mainContainer: HTMLElement;
+
+	// Track fullscreen state
+	function handleFullscreenChange() {
+		const wasFullscreen = isInBrowserFullscreen;
+		isInBrowserFullscreen = !!document.fullscreenElement;
+		
+		// Show hint when entering fullscreen
+		if (!wasFullscreen && isInBrowserFullscreen) {
+			showFullscreenHint();
+		}
+		
+		// Restore focus after fullscreen change
+		setTimeout(() => {
+			if (mainContainer) {
+				mainContainer.focus();
+			}
+		}, 100);
+	}
+
+	function showFullscreenHint() {
+		fullscreenHintVisible = true;
+		clearTimeout(fullscreenHintTimeout);
+		fullscreenHintTimeout = setTimeout(() => {
+			fullscreenHintVisible = false;
+		}, 3000);
+	}
+
+	// Ensure focus is maintained after navigation
+	function restoreFocus() {
+		setTimeout(() => {
+			if (mainContainer) {
+				mainContainer.focus();
+			}
+		}, 100);
+	}
+
+	onMount(() => {
+		// Listen for fullscreen changes
+		document.addEventListener('fullscreenchange', handleFullscreenChange);
+		
+		// Set initial focus
+		setTimeout(() => {
+			if (mainContainer) {
+				mainContainer.focus();
+			}
+		}, 100);
+		
+		return () => {
+			document.removeEventListener('fullscreenchange', handleFullscreenChange);
+			clearTimeout(fullscreenHintTimeout);
+		};
+	});
 
 	function formatMintDate(dateStr: string | Date | undefined): string {
 		if (!dateStr) return '';
@@ -45,20 +101,122 @@
 		if (!data.artist) return;
 		const nextIndex = (currentIndex + 1) % data.artist.artworks.length;
 		const nextArtworkId = data.artist.artworks[nextIndex].id;
-		goto(`/artist/${data.artist.id}/${nextArtworkId}`);
+		goto(`/artist/${data.artist.id}/${nextArtworkId}`).then(() => {
+			restoreFocus();
+		});
 	}
 
 	function prevArtwork() {
 		if (!data.artist) return;
 		const prevIndex = (currentIndex - 1 + data.artist.artworks.length) % data.artist.artworks.length;
 		const prevArtworkId = data.artist.artworks[prevIndex].id;
-		goto(`/artist/${data.artist.id}/${prevArtworkId}`);
+		goto(`/artist/${data.artist.id}/${prevArtworkId}`).then(() => {
+			restoreFocus();
+		});
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
-		if (event.key === 'Escape') closeOverlay();
-		if (event.key === 'ArrowRight') nextArtwork();
-		if (event.key === 'ArrowLeft') prevArtwork();
+		// Prevent default behavior for our handled keys
+		const handledKeys = ['Escape', 'ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'KeyF', 'KeyH', 'Space', 'Home', 'End'];
+		if (handledKeys.includes(event.code)) {
+			event.preventDefault();
+		}
+
+		// Don't handle keys if user is typing in an input field
+		const activeElement = document.activeElement;
+		if (activeElement && (
+			activeElement.tagName === 'INPUT' || 
+			activeElement.tagName === 'TEXTAREA' || 
+			(activeElement as HTMLElement).contentEditable === 'true'
+		)) {
+			return;
+		}
+
+		switch (event.key) {
+			case 'Escape':
+				if (keyboardHelpVisible) {
+					keyboardHelpVisible = false;
+				} else if (isInBrowserFullscreen) {
+					// Exit fullscreen if in fullscreen mode
+					document.exitFullscreen?.();
+				} else {
+					closeOverlay();
+				}
+				break;
+			
+			case 'ArrowRight':
+			case 'ArrowDown':
+				nextArtwork();
+				break;
+			
+			case 'ArrowLeft':
+			case 'ArrowUp':
+				prevArtwork();
+				break;
+			
+			case 'f':
+			case 'F':
+				// Toggle fullscreen for images and iframes
+				if (currentArtworkForDisplay && !isInBrowserFullscreen) {
+					const artworkContainer = document.querySelector('.artwork-container');
+					if (artworkContainer && artworkContainer.requestFullscreen) {
+						artworkContainer.requestFullscreen();
+					}
+				} else if (isInBrowserFullscreen) {
+					document.exitFullscreen?.();
+				}
+				break;
+			
+			case ' ':
+				// Space bar - toggle play/pause for videos or next artwork for images
+				const videoElement = document.querySelector('video');
+				if (videoElement) {
+					if (videoElement.paused) {
+						videoElement.play();
+					} else {
+						videoElement.pause();
+					}
+				} else {
+					nextArtwork();
+				}
+				break;
+			
+			case 'Home':
+				// Go to first artwork
+				if (data.artist && data.artist.artworks.length > 0) {
+					const firstArtworkId = data.artist.artworks[0].id;
+					goto(`/artist/${data.artist.id}/${firstArtworkId}`).then(() => {
+						restoreFocus();
+					});
+				}
+				break;
+			
+			case 'End':
+				// Go to last artwork
+				if (data.artist && data.artist.artworks.length > 0) {
+					const lastIndex = data.artist.artworks.length - 1;
+					const lastArtworkId = data.artist.artworks[lastIndex].id;
+					goto(`/artist/${data.artist.id}/${lastArtworkId}`).then(() => {
+						restoreFocus();
+					});
+				}
+				break;
+			
+			case 'h':
+			case 'H':
+			case '?':
+				// Toggle keyboard help
+				keyboardHelpVisible = !keyboardHelpVisible;
+				break;
+			
+			case 'b':
+			case 'B':
+				// Go back to artist page
+				if (data.artist) {
+					goto(`/artist/${data.artist.id}`);
+				}
+				break;
+		}
 	}
 
 	function handleIframeLoad() {
@@ -197,6 +355,12 @@
 	// Update currentIndex when data changes (for URL navigation)
 	$: if (data.currentIndex !== undefined && data.currentIndex !== currentIndex) {
 		currentIndex = data.currentIndex;
+		restoreFocus();
+	}
+
+	// Restore focus when artwork changes
+	$: if (currentArtwork && mainContainer) {
+		restoreFocus();
 	}
 
 	// Check if current artwork is fullscreen
@@ -246,12 +410,29 @@
 		</div>
 	</div>
 {:else}
-	<div class="artist-page" role="application" tabindex="0" on:keydown={handleKeyDown} transition:fade>
+	<div class="artist-page" role="application" tabindex="0" on:keydown={handleKeyDown} on:click={() => mainContainer?.focus()} transition:fade bind:this={mainContainer}>
 		<!-- Small header with museum name -->
 		<header class="museum-header-nav">
 			<button class="museum-name-link" on:click={() => goto('/')} aria-label="Return to homepage">
-				← The Wallace Museum
+				The Wallace Museum
 			</button>
+			
+			<!-- Keyboard navigation indicator -->
+			<div class="keyboard-indicator">
+				<button 
+					class="keyboard-help-trigger"
+					on:click={() => keyboardHelpVisible = true}
+					aria-label="Show keyboard shortcuts"
+					title="Press H for keyboard shortcuts"
+				>
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+						<line x1="8" y1="21" x2="16" y2="21"/>
+						<line x1="12" y1="17" x2="12" y2="21"/>
+					</svg>
+					<span class="keyboard-help-text">Press H for shortcuts</span>
+				</button>
+			</div>
 		</header>
 
 		{#if data.artist.artworks.length > 0 && currentArtwork}
@@ -272,34 +453,39 @@
 							<div class="museum-header">
 								<div class="museum-artist-title">
 									<div class="museum-artist">
-										<ArtistNameWithAvatar 
-											artist={{
-												id: data.artist.id,
-												name: data.artist.name,
-												bio: data.artist.bio,
-												avatarUrl: data.artist.avatarUrl,
-												websiteUrl: data.artist.websiteUrl,
-												twitterHandle: data.artist.twitterHandle,
-												instagramHandle: data.artist.instagramHandle,
-												addresses: data.artist.addresses
-											}}
-											showPopover={true}
-											showAvatar={false}
-											size="lg"
-											nameClassName="text-yellow-500 text-sm font-medium uppercase tracking-wider"
-										/>
+										<button 
+											class="artist-back-button"
+											on:click={() => goto(`/artist/${data.artist.id}`)}
+											aria-label="Back to artist profile (B)"
+											title="Back to artist profile (B)"
+										>
+											<svg class="back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+												<path d="m15 18-6-6 6-6"/>
+											</svg>
+											<span class="artist-name">{data.artist.name}</span>
+										</button>
 									</div>
 									<div class="museum-title">{currentArtwork.title}</div>
 								</div>
 
 								{#if data.artist.artworks.length > 1}
 									<div class="artwork-navigation">
-										<button class="nav-button" on:click={prevArtwork} aria-label="Previous artwork"
-											>←</button
+										<button 
+											class="nav-button" 
+											on:click={prevArtwork} 
+											aria-label="Previous artwork (← or ↑)"
+											title="Previous artwork (← or ↑)"
 										>
-										<button class="nav-button" on:click={nextArtwork} aria-label="Next artwork"
-											>→</button
+											←
+										</button>
+										<button 
+											class="nav-button" 
+											on:click={nextArtwork} 
+											aria-label="Next artwork (→ or ↓)"
+											title="Next artwork (→ or ↓)"
 										>
+											→
+										</button>
 									</div>
 								{/if}
 							</div>
@@ -419,12 +605,97 @@
 				</div>
 			{/key}
 		{/if}
+
+		<!-- Keyboard Help Overlay -->
+		{#if keyboardHelpVisible}
+			<div class="keyboard-help-overlay" transition:fade>
+				<div class="keyboard-help-content">
+					<div class="keyboard-help-header">
+						<h3>Keyboard Shortcuts</h3>
+						<button 
+							class="help-close-button"
+							on:click={() => keyboardHelpVisible = false}
+							aria-label="Close keyboard help"
+						>
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<line x1="18" y1="6" x2="6" y2="18"></line>
+								<line x1="6" y1="6" x2="18" y2="18"></line>
+							</svg>
+						</button>
+					</div>
+					
+					<div class="keyboard-help-grid">
+						<div class="help-section">
+							<h4>Navigation</h4>
+							<div class="help-item">
+								<kbd>←</kbd><kbd>↑</kbd>
+								<span>Previous artwork</span>
+							</div>
+							<div class="help-item">
+								<kbd>→</kbd><kbd>↓</kbd>
+								<span>Next artwork</span>
+							</div>
+							<div class="help-item">
+								<kbd>Home</kbd>
+								<span>First artwork</span>
+							</div>
+							<div class="help-item">
+								<kbd>End</kbd>
+								<span>Last artwork</span>
+							</div>
+							<div class="help-item">
+								<kbd>B</kbd>
+								<span>Back to artist</span>
+							</div>
+						</div>
+
+						<div class="help-section">
+							<h4>Display</h4>
+							<div class="help-item">
+								<kbd>F</kbd>
+								<span>Toggle fullscreen</span>
+							</div>
+							<div class="help-item">
+								<kbd>Space</kbd>
+								<span>Play/pause video or next artwork</span>
+							</div>
+							<div class="help-item">
+								<kbd>Esc</kbd>
+								<span>Exit fullscreen or close</span>
+							</div>
+						</div>
+
+						<div class="help-section">
+							<h4>Help</h4>
+							<div class="help-item">
+								<kbd>H</kbd><kbd>?</kbd>
+								<span>Show/hide this help</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Fullscreen Navigation Hint -->
+		{#if fullscreenHintVisible && isInBrowserFullscreen}
+			<div class="fullscreen-hint" transition:fade>
+				<div class="fullscreen-hint-content">
+					<p>Use ← → arrow keys to navigate • Press H for help • Press Esc to exit</p>
+				</div>
+			</div>
+		{/if}
 	</div>
 {/if}
 
 <style lang="scss">
 	.artist-page {
 		@apply w-full min-h-screen bg-black bg-opacity-80;
+		outline: none;
+	}
+
+	.artist-page:focus {
+		outline: 2px solid transparent;
 	}
 
 	.museum-content {
@@ -435,19 +706,22 @@
 		@apply flex items-center justify-center bg-black bg-opacity-50 md:pt-0 md:pb-4;
 		width: 100%;
 		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	/* Apply fixed height only on medium screens and up */
 	@media (min-width: 768px) {
 		.artwork-container {
-			height: 80svh;
+			height: 88svh;
 		}
 	}
 
 	.artwork-container.fullscreen {
 		@apply bg-black p-0;
 		width: 100vw;
-		height: 80svh;
+		height: 88svh;
 		max-width: none;
 		border-radius: 0;
 		margin-left: calc(-50vw + 50%);
@@ -497,7 +771,7 @@
 	}
 
 	.museum-title {
-		@apply text-lg font-bold text-white leading-tight uppercase max-w-prose;
+		@apply text-lg font-bold text-white leading-tight uppercase max-w-prose truncate;
 	}
 
 	.artwork-navigation {
@@ -610,19 +884,99 @@
 	}
 
 	.museum-header-nav {
-		@apply bg-black bg-opacity-50 w-full p-4;
-		@apply flex items-center justify-start;
-		position: relative;
-		z-index: 40;
+		@apply bg-black bg-opacity-50 w-full p-4 flex items-center justify-start relative;
 	}
 
 	.museum-name-link {
-		@apply text-yellow-500 text-sm font-bold uppercase tracking-wider;
-		@apply bg-transparent border-none cursor-pointer;
-		@apply hover:text-yellow-400 transition-colors duration-200;
-		@apply focus:text-yellow-400 focus:outline-none;
-		padding: 0;
-		margin: 0;
+		@apply m-0 p-0 text-yellow-500 text-sm font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer hover:text-yellow-400 transition-colors duration-200 focus:text-yellow-400 focus:outline-none;
 	}
 
+	.artist-back-button {
+		@apply flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors;
+		@apply bg-transparent border-none cursor-pointer p-0 m-0;
+		text-decoration: none;
+		
+		&:hover {
+			.back-icon {
+				transform: translateX(-2px);
+			}
+		}
+	}
+
+	.back-icon {
+		@apply w-4 h-4 transition-transform duration-200;
+	}
+
+	.artist-name {
+		@apply text-sm font-medium uppercase tracking-wider;
+	}
+
+	.keyboard-help-overlay {
+		@apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+	}
+
+	.keyboard-help-content {
+		@apply bg-white dark:bg-gray-950 p-8 rounded-lg shadow-xl max-w-2xl max-h-[80vh] overflow-y-auto;
+	}
+
+	.keyboard-help-header {
+		@apply flex justify-between items-center mb-6;
+	}
+
+	.keyboard-help-header h3 {
+		@apply text-lg font-bold text-gray-900 dark:text-white;
+	}
+
+	.help-close-button {
+		@apply relative -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-200 dark:bg-gray-950 text-gray-500 dark:text-white rounded-full hover:bg-gray-300 dark:hover:bg-gray-800 transition-colors;
+	}
+
+	.keyboard-help-grid {
+		@apply grid grid-cols-1 md:grid-cols-3 gap-6;
+	}
+
+	.help-section {
+		@apply flex flex-col gap-3;
+	}
+
+	.help-section h4 {
+		@apply text-base font-semibold text-gray-800 dark:text-gray-200 mb-2;
+	}
+
+	.help-item {
+		@apply flex items-center gap-3;
+	}
+
+	.help-item kbd {
+		@apply inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-mono rounded-md border border-gray-300 dark:border-gray-600 min-w-[2rem] justify-center;
+	}
+
+	.help-item span {
+		@apply text-sm text-gray-700 dark:text-gray-300;
+	}
+
+	.keyboard-indicator {
+		@apply ml-4;
+	}
+
+	.keyboard-help-trigger {
+		@apply flex items-center gap-2 text-gray-400 hover:text-gray-200 transition-colors;
+		@apply bg-transparent border-none cursor-pointer p-0 m-0;
+	}
+
+	.keyboard-help-text {
+		@apply text-sm font-medium;
+	}
+
+	.fullscreen-hint {
+		@apply fixed top-4 left-1/2 transform -translate-x-1/2 z-50;
+	}
+
+	.fullscreen-hint-content {
+		@apply bg-black bg-opacity-80 text-white px-4 py-2 rounded-lg shadow-lg;
+	}
+
+	.fullscreen-hint-content p {
+		@apply text-sm font-medium m-0;
+	}
 </style> 

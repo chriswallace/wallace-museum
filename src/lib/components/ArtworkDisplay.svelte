@@ -121,7 +121,7 @@
 	}
 
 	// Check if fullscreen is supported and if this is an image (only in browser)
-	$: canFullscreen = browser && mediaType === 'image' && typeof document !== 'undefined' && 'requestFullscreen' in document.documentElement;
+	$: canFullscreen = browser && (mediaType === 'image' || mediaType === 'iframe') && typeof document !== 'undefined' && 'requestFullscreen' in document.documentElement;
 
 	// Disable skeleton loaders in fullscreen mode
 	$: shouldShowSkeleton = showSkeleton && !isInFullscreen;
@@ -149,7 +149,7 @@
 			{style}
 		/>
 	{:else if mediaType === 'iframe'}
-		<div class="iframe-container">
+		<div class="iframe-container" bind:this={fullscreenElement}>
 			{#if shouldShowSkeleton && isIframeLoading}
 				<IframeSkeleton
 					width={dimensions?.width}
@@ -168,6 +168,19 @@
 				allowfullscreen
 				on:load={handleIframeLoad}
 			></iframe>
+			
+			{#if canFullscreen && !isInFullscreen}
+				<button 
+					class="fullscreen-button"
+					on:click={toggleFullscreen}
+					aria-label="View fullscreen"
+					title="View fullscreen"
+				>
+					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+					</svg>
+				</button>
+			{/if}
 		</div>
 	{:else if mediaType === 'image'}
 		<div class="image-container" bind:this={fullscreenElement}>
@@ -198,53 +211,44 @@
 	{/if}
 </div>
 
-<style>
+<style lang="scss">
 	.artwork-display {
-		position: relative;
-		overflow: hidden;
-		height: 100%;
+		@apply relative overflow-hidden h-full flex items-center justify-center xl:p-24;
 		/* Remove flexbox for iframe compatibility */
 	}
 
 	.artwork-display.fullscreen {
-		width: 100vw;
-		height: 80svh;
+		@apply w-screen;
+		height: 88svh;
 		aspect-ratio: unset;
 	}
 
-	.artwork-display.fullscreen :global(.artwork-image),
+	.artwork-display.fullscreen :global(.artwork-image) {
+		@apply w-screen object-contain;
+		height: 88svh;
+	}
+
 	.artwork-display.fullscreen .interactive-content {
-		width: 100vw;
-		height: 80svh;
-		object-fit: contain;
+		/* Keep iframe at its original size and center it */
+		@apply w-auto h-auto max-w-full;
+		max-height: 88svh;
 	}
 
 	.artwork-display.fullscreen :global(.video-player-artwork) {
-		width: 100vw !important;
-		height: 80svh !important;
-		object-fit: contain !important;
+		@apply w-screen object-contain;
+		height: 88svh !important;
 	}
 
 	.no-media {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--color-surface-secondary, #f5f5f5);
-		border-radius: 4px;
-		width: 100%;
-		height: 100%;
+		@apply flex items-center justify-center bg-gray-100 rounded-sm w-full h-full;
 	}
 
 	.no-media-content {
-		text-align: center;
-		color: var(--color-text-secondary, #666);
-		font-size: 0.875rem;
+		@apply text-center text-gray-600 text-sm;
 	}
 
 	.iframe-container {
-		position: relative;
-		width: 100%;
-		height: 100%;
+		@apply relative w-full h-full flex items-center justify-center;
 	}
 
 	/* Ensure iframe container maintains aspect ratio on small screens when parent doesn't */
@@ -255,72 +259,62 @@
 	}
 
 	.interactive-content {
-		position: relative;
-		border: none;
-		background: transparent;
-		display: block;
-		width: 100%;
-		height: 100%;
-		transition: opacity 0.2s ease-in-out;
+		@apply relative border-none bg-transparent block w-full h-full transition-opacity duration-200 ease-in-out;
 		/* Positioned above the loader */
 	}
 
 	.interactive-content.hidden {
-		opacity: 0;
-		pointer-events: none;
+		@apply opacity-0 pointer-events-none;
 	}
 
 	.image-container {
-		position: relative;
-		width: 100%;
-		height: 100%;
+		@apply relative w-full h-full flex items-center justify-center;
 	}
 
 	.fullscreen-button {
-		position: absolute;
-		top: 12px;
-		right: 12px;
-		background: rgba(0, 0, 0, 0.7);
-		color: white;
-		border: none;
-		border-radius: 6px;
-		padding: 8px;
-		cursor: pointer;
-		opacity: 0;
-		transition: opacity 0.2s ease;
-		z-index: 10;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		@apply absolute top-3 right-3 bg-black bg-opacity-70 text-white border-none rounded-md p-2 cursor-pointer opacity-0 transition-opacity duration-200 ease-linear z-10 flex items-center justify-center;
 	}
 
 	.fullscreen-button:hover {
-		background: rgba(0, 0, 0, 0.9);
+		@apply bg-black bg-opacity-90;
 	}
 
 	.image-container:hover .fullscreen-button {
-		opacity: 1;
+		@apply opacity-100;
 	}
 
+	.iframe-container:hover .fullscreen-button {
+		@apply opacity-100;
+	}
+
+	/* Global styles for artwork images */
+	:global(.artwork-image) {
+		@apply block max-w-full max-h-full w-auto h-auto object-contain mx-auto;
+	}
+
+	/* Global styles for video players */
 	:global(.video-player-artwork) {
-		width: 100%;
-		height: 100%;
-		object-fit: contain;
+		@apply block max-w-full max-h-full w-auto h-auto object-contain mx-auto;
 	}
 
 	/* Fullscreen styles */
 	:global(.image-container:fullscreen) {
-		background: black;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		@apply bg-black flex items-center justify-center;
+	}
+
+	:global(.iframe-container:fullscreen) {
+		@apply bg-black flex items-center justify-center;
 	}
 
 	:global(.image-container:fullscreen .artwork-image) {
+		@apply w-auto h-auto object-contain;
 		max-width: 100vw;
-		max-height: 100vh;
-		width: auto;
-		height: auto;
-		object-fit: contain;
+		max-height: 100svh;
+	}
+
+	:global(.iframe-container:fullscreen .interactive-content) {
+		/* Keep iframe at its original dimensions when in fullscreen */
+		max-width: 100vw;
+		max-height: 100svh;
 	}
 </style>

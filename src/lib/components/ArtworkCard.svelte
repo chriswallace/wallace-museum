@@ -2,7 +2,7 @@
 	import OptimizedImage from './OptimizedImage.svelte';
 	import VideoPlayer from './VideoPlayer.svelte';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
-	import { getBestMediaUrl, getMediaDisplayType } from '$lib/utils/mediaHelpers';
+	import { getBestMediaUrl, getMediaDisplayType, VideoPresets } from '$lib/utils/mediaHelpers';
 	import type { MediaUrls } from '$lib/utils/mediaHelpers';
 
 	export let artwork: {
@@ -47,8 +47,20 @@
 		>
 			<div class="artwork-content">
 				{#if displayAsVideo}
-					<video width="204" height="204" loop muted playsinline>
-						<source src={ipfsToHttpUrl(cardImageUrl)} type="video/mp4" />
+					{@const videoAttrs = VideoPresets.thumbnail(ipfsToHttpUrl(cardImageUrl))}
+					<video 
+						src={videoAttrs.src}
+						width={videoAttrs.width} 
+						height={videoAttrs.height}
+						style={videoAttrs.style}
+						autoplay={videoAttrs.autoplay}
+						loop={videoAttrs.loop} 
+						muted={videoAttrs.muted} 
+						playsinline={videoAttrs.playsinline}
+						preload={videoAttrs.preload}
+					>
+						<track kind="captions" />
+						Your browser does not support the video tag.
 					</video>
 				{:else}
 					<OptimizedImage
@@ -73,8 +85,20 @@
 	{:else}
 		<div class="artwork-content rounded-md bg-gray-500/10 py-5">
 			{#if displayAsVideo}
-				<video width="204" height="204" loop muted playsinline>
-					<source src={ipfsToHttpUrl(cardImageUrl)} type="video/mp4" />
+				{@const videoAttrs = VideoPresets.thumbnail(ipfsToHttpUrl(cardImageUrl))}
+				<video 
+					src={videoAttrs.src}
+					width={videoAttrs.width} 
+					height={videoAttrs.height}
+					style={videoAttrs.style}
+					autoplay={videoAttrs.autoplay}
+					loop={videoAttrs.loop} 
+					muted={videoAttrs.muted} 
+					playsinline={videoAttrs.playsinline}
+					preload={videoAttrs.preload}
+				>
+					<track kind="captions" />
+					Your browser does not support the video tag.
 				</video>
 			{:else}
 				<OptimizedImage
