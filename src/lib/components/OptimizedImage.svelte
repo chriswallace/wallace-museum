@@ -2,6 +2,7 @@
 	import { buildOptimizedImageUrl, createResponsiveSrcSet, createRetinaUrls } from '$lib/imageOptimization';
 	import type { ImageOptimizationOptions } from '$lib/imageOptimization';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import SkeletonLoader from './SkeletonLoader.svelte';
 
 	// Props
 	export let src: string | null | undefined;
@@ -33,10 +34,15 @@
 
 	export let aspectRatio: string | undefined = undefined;
 
+	// Skeleton loading options
+	export let showSkeleton: boolean = true;
+	export let skeletonBorderRadius: string = '4px';
+
 	// Internal state
 	let imageElement: HTMLImageElement;
 	let hasError = false;
 	let isLoaded = false;
+	let isLoading = false;
 
 	/**
 	 * Detect if a URL points to an SVG file
@@ -100,6 +106,9 @@
 	$: shouldShowImage = src && src.trim() !== '';
 	$: imageSrc = shouldShowImage ? (optimizedSrc || fallbackUrl) : '';
 
+	// Show skeleton when loading or when src is empty but showSkeleton is true
+	$: shouldShowSkeleton = showSkeleton && (isLoading || !shouldShowImage);
+
 	// Generate responsive srcset if enabled - only for IPFS URLs that can be optimized
 	$: srcset = responsive && src && canOptimize ? createResponsiveSrcSet(src, responsiveSizes, {
 		height: optimizationOptions.height,
@@ -128,14 +137,23 @@
 	// Calculate aspect ratio
 	$: calculatedAspectRatio = aspectRatio || (width && height ? `${width}/${height}` : undefined);
 
+	// Handle image load start
+	function handleLoadStart() {
+		isLoading = true;
+		isLoaded = false;
+		hasError = false;
+	}
+
 	// Handle image load
 	function handleLoad() {
 		isLoaded = true;
+		isLoading = false;
 		hasError = false;
 	}
 
 	// Handle image error
 	function handleError() {
+		isLoading = false;
 		if (showFallbackOnError && !hasError) {
 			hasError = true;
 			isLoaded = false; // Reset loaded state when switching to fallback
@@ -151,8 +169,16 @@
 		if (imageElement && src) {
 			hasError = false;
 			isLoaded = false; // Reset loaded state when retrying
+			isLoading = true;
 			imageElement.src = fallbackUrl;
 		}
+	}
+
+	// Reset loading state when src changes
+	$: if (src && shouldShowImage) {
+		isLoading = true;
+		isLoaded = false;
+		hasError = false;
 	}
 </script>
 
@@ -166,6 +192,15 @@
 	style:max-height="100%"
 	style:object-fit="contain"
 >
+	<!-- Skeleton loader -->
+	{#if shouldShowSkeleton}
+		<SkeletonLoader
+			width="100%"
+			height="100%"
+			borderRadius={skeletonBorderRadius}
+		/>
+	{/if}
+
 	<!-- Main image element -->
 	{#if shouldShowImage}
 		<img
@@ -178,6 +213,8 @@
 			width={width || ''}
 			height={height || ''}
 			class={className}
+			class:hidden={shouldShowSkeleton}
+			on:loadstart={handleLoadStart}
 			on:load={handleLoad}
 			on:error={handleError}
 			{...$$restProps}
@@ -204,5 +241,11 @@
 		width: auto;
 		height: auto;
 		object-fit: contain;
+		transition: opacity 0.2s ease-in-out;
+	}
+
+	img.hidden {
+		opacity: 0;
+		pointer-events: none;
 	}
 </style> 

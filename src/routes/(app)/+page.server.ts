@@ -7,6 +7,8 @@ export interface PreviewArtwork {
 	id: string; // Assuming artwork IDs might be strings (UUIDs, CUIDs)
 	title: string;
 	image_url: string | null; // Changed to allow null
+	animation_url: string | null; // Add animation URL for video fallback
+	mime: string | null; // Add MIME type for proper media detection
 	dimensions?: {
 		width: number;
 		height: number;
@@ -34,6 +36,8 @@ export const load: ServerLoad = async () => {
 						id: true,
 						title: true,
 						imageUrl: true,
+						animationUrl: true, // Include animation URL
+						mime: true, // Include MIME type
 						dimensions: true
 					},
 					take: 10 // Limit artworks per artist
@@ -50,6 +54,8 @@ export const load: ServerLoad = async () => {
 				id: String(artwork.id),
 				title: artwork.title,
 				image_url: artwork.imageUrl,
+				animation_url: artwork.animationUrl, // Include animation URL
+				mime: artwork.mime,
 				dimensions: artwork.dimensions as { width: number; height: number } | null
 			}));
 

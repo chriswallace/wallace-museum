@@ -247,8 +247,12 @@
 	</div>
 {:else}
 	<div class="artist-page" role="application" tabindex="0" on:keydown={handleKeyDown} transition:fade>
-		<button class="close-button" on:click={closeOverlay} aria-label="Close artist gallery">×</button
-		>
+		<!-- Small header with museum name -->
+		<header class="museum-header-nav">
+			<button class="museum-name-link" on:click={() => goto('/')} aria-label="Return to homepage">
+				← The Wallace Museum
+			</button>
+		</header>
 
 		{#if data.artist.artworks.length > 0 && currentArtwork}
 			{#key currentIndex}
@@ -257,8 +261,8 @@
 					<div class="artwork-container" class:fullscreen={isFullscreen}>
 						<ArtworkDisplay 
 							artwork={currentArtworkForDisplay}
-							width={800}
 							dimensions={currentArtworkForDisplay.dimensions}
+							fullscreen={isFullscreen}
 						/>
 					</div>
 					{/if}
@@ -423,28 +427,31 @@
 		@apply w-full min-h-screen bg-black bg-opacity-80;
 	}
 
-	.close-button {
-		@apply text-3xl text-gray-400 hover:text-white bg-transparent border-none cursor-pointer absolute top-3 right-6 z-50;
-	}
-
 	.museum-content {
 		@apply flex flex-col w-full items-center justify-start;
 	}
 
 	.artwork-container {
-		@apply flex items-center justify-center bg-black bg-opacity-50 md:pt-12 md:pb-4;
+		@apply flex items-center justify-center bg-black bg-opacity-50 md:pt-0 md:pb-4;
 		width: 100%;
 		position: relative;
-		height: 86svh;
+	}
+
+	/* Apply fixed height only on medium screens and up */
+	@media (min-width: 768px) {
+		.artwork-container {
+			height: 80svh;
+		}
 	}
 
 	.artwork-container.fullscreen {
 		@apply bg-black p-0;
 		width: 100vw;
-		height: 86svh;
+		height: 80svh;
 		max-width: none;
 		border-radius: 0;
-		z-index: 10;
+		margin-left: calc(-50vw + 50%);
+		margin-right: calc(-50vw + 50%);
 	}
 
 	.artwork-media {
@@ -600,6 +607,22 @@
 
 	.divider {
 		@apply w-full h-px bg-gray-700 my-6;
+	}
+
+	.museum-header-nav {
+		@apply bg-black bg-opacity-50 w-full p-4;
+		@apply flex items-center justify-start;
+		position: relative;
+		z-index: 40;
+	}
+
+	.museum-name-link {
+		@apply text-yellow-500 text-sm font-bold uppercase tracking-wider;
+		@apply bg-transparent border-none cursor-pointer;
+		@apply hover:text-yellow-400 transition-colors duration-200;
+		@apply focus:text-yellow-400 focus:outline-none;
+		padding: 0;
+		margin: 0;
 	}
 
 </style> 

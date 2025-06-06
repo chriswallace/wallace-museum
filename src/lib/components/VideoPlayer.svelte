@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { createEventDispatcher } from 'svelte';
+	import SkeletonLoader from './SkeletonLoader.svelte';
 
 	export let src: string;
 	export let poster: string = '';
@@ -11,6 +12,8 @@
 	export let height: number | undefined = undefined;
 	export let className: string = '';
 	export let style: string = '';
+	export let showSkeleton: boolean = true;
+	export let aspectRatio: string | undefined = undefined;
 
 	const dispatch = createEventDispatcher();
 
@@ -25,6 +28,12 @@
 	let isDragging = false;
 	let isLoading = true;
 	let hasError = false;
+
+	// Calculate aspect ratio
+	$: calculatedAspectRatio = aspectRatio || (width && height ? `${width}/${height}` : undefined);
+
+	// Show skeleton when loading and showSkeleton is enabled
+	$: shouldShowSkeleton = showSkeleton && isLoading && !hasError;
 
 	// Format time in MM:SS format
 	function formatTime(seconds: number): string {
@@ -164,12 +173,22 @@
 <div 
 	class="video-player {className}"
 	{style}
+	style:aspect-ratio={calculatedAspectRatio}
 	on:mousemove={showControlsTemporarily}
 	on:mouseleave={() => showControls = false}
 	role="application"
 	tabindex="0"
 	on:keydown={handleKeyDown}
 >
+	<!-- Skeleton loader -->
+	{#if shouldShowSkeleton}
+		<SkeletonLoader
+			width="100%"
+			height="100%"
+			borderRadius="4px"
+		/>
+	{/if}
+
 	{#if hasError}
 		<!-- Error state -->
 		<div class="error-state">
@@ -178,14 +197,6 @@
 					<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
 				</svg>
 				<p>Unable to load video</p>
-			</div>
-		</div>
-	{:else if isLoading}
-		<!-- Loading state -->
-		<div class="loading-state">
-			<div class="loading-content">
-				<div class="loading-spinner"></div>
-				<p>Loading video...</p>
 			</div>
 		</div>
 	{/if}
@@ -208,13 +219,13 @@
 		on:error={handleError}
 		on:loadstart={handleLoadStart}
 		class="video-element"
-		class:hidden={isLoading || hasError}
+		class:hidden={shouldShowSkeleton || hasError}
 	>
 		Your browser does not support the video tag.
 	</video>
 
 	<!-- Controls overlay -->
-	<div class="controls-overlay" class:visible={showControls && !isLoading && !hasError}>
+	<div class="controls-overlay" class:visible={showControls && !shouldShowSkeleton && !hasError}>
 		<!-- Progress bar -->
 		<div class="progress-container">
 			<input

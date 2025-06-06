@@ -208,6 +208,13 @@
 	</div>
 {:else}
 	<div class="artist-page" role="main" on:keydown={handleKeyDown} transition:fade>
+		<!-- Small header with museum name -->
+		<header class="museum-header-nav">
+			<button class="museum-name-link" on:click={() => goto('/')} aria-label="Return to homepage">
+				The Wallace Museum
+			</button>
+		</header>
+
 		<button class="close-button" on:click={closeOverlay} aria-label="Close artist gallery">×</button
 		>
 
@@ -218,7 +225,6 @@
 						{#if currentArtworkForDisplay}
 							<ArtworkDisplay 
 								artwork={currentArtworkForDisplay}
-								width={800}
 								dimensions={currentArtworkForDisplay.dimensions}
 							/>
 						{/if}
@@ -396,13 +402,19 @@
 		@apply flex items-center justify-center bg-black bg-opacity-50 rounded-lg p-4;
 		width: 100%;
 		max-width: 1400px;
-		height: 86svh;
 		margin-bottom: 2rem;
 		overflow: hidden;
 		position: relative;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+	}
+
+	/* Apply fixed height only on medium screens and up */
+	@media (min-width: 768px) {
+		.artwork-container {
+			height: 80svh;
+		}
 	}
 
 	.artwork-media {
@@ -558,6 +570,24 @@
 
 	.divider {
 		@apply w-full h-px bg-gray-700 my-6;
+	}
+
+	.museum-header-nav {
+		@apply flex items-center justify-start p-4;
+		background-color: rgba(0, 0, 0, 0.5);
+		position: relative;
+		z-index: 40;
+		width: 100%;
+	}
+
+	.museum-name-link {
+		@apply text-yellow-500 text-sm font-bold uppercase tracking-wider;
+		@apply bg-transparent border-none cursor-pointer;
+		@apply hover:text-yellow-400 transition-colors duration-200;
+		@apply focus:text-yellow-400 focus:outline-none;
+		text-decoration: none;
+		padding: 0;
+		margin: 0;
 	}
 
 </style>

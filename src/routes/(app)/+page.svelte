@@ -19,51 +19,48 @@
 	let loadingStates: Record<string, boolean> = {};
 	let isLargeScreen = false;
 
+	// Helper function to detect if content is a video based on MIME type
+	function isVideoMime(mime: string | null): boolean {
+		if (!mime) return false;
+		return mime.startsWith('video/');
+	}
+
 	// Calculate preview dimensions based on artwork dimensions
 	$: previewDimensions = (() => {
-		if (!hoveredArtist?.artworks[0]?.dimensions) {
-			// Fallback to default dimensions if no artwork dimensions available
+		if (!hoveredArtist?.artworks?.[0]?.dimensions) {
 			return { width: 320, height: 240 };
 		}
 
 		const artwork = hoveredArtist.artworks[0];
-		const { width: originalWidth, height: originalHeight } = artwork.dimensions;
+		const dimensions = artwork.dimensions;
 		
-		// Adjust max size based on screen size
-		let maxSize = 340;
-		if (typeof window !== 'undefined') {
-			if (window.innerWidth <= 480) {
-				maxSize = 200;
-			} else if (window.innerWidth <= 600) {
-				maxSize = 250;
+		// Add null check for dimensions
+		if (!dimensions) {
+			return { width: 320, height: 240 };
+		}
+		
+		const originalWidth = dimensions.width;
+		const originalHeight = dimensions.height;
+
+		// Use the artwork's natural dimensions, but scale down if too large
+		const maxSize = isLargeScreen ? 300 : 250;
+		
+		let previewWidth = originalWidth;
+		let previewHeight = originalHeight;
+
+		// Only scale down if the artwork is larger than our max size
+		if (previewWidth > maxSize || previewHeight > maxSize) {
+			const aspectRatio = originalWidth / originalHeight;
+			
+			if (previewWidth > previewHeight) {
+				// Landscape: constrain by width
+				previewWidth = maxSize;
+				previewHeight = previewWidth / aspectRatio;
+			} else {
+				// Portrait or square: constrain by height
+				previewHeight = maxSize;
+				previewWidth = previewHeight * aspectRatio;
 			}
-		}
-
-		// Calculate aspect ratio
-		const aspectRatio = originalWidth / originalHeight;
-
-		let previewWidth: number;
-		let previewHeight: number;
-
-		// Scale down to fit within maxSize while maintaining aspect ratio
-		if (originalWidth > originalHeight) {
-			// Landscape: limit by width
-			previewWidth = Math.min(originalWidth, maxSize);
-			previewHeight = previewWidth / aspectRatio;
-		} else {
-			// Portrait or square: limit by height
-			previewHeight = Math.min(originalHeight, maxSize);
-			previewWidth = previewHeight * aspectRatio;
-		}
-
-		// Ensure neither dimension exceeds maxSize
-		if (previewWidth > maxSize) {
-			previewWidth = maxSize;
-			previewHeight = previewWidth / aspectRatio;
-		}
-		if (previewHeight > maxSize) {
-			previewHeight = maxSize;
-			previewWidth = previewHeight * aspectRatio;
 		}
 
 		return {
@@ -164,6 +161,31 @@
 		
 		return Math.max(0, top);
 	})();
+
+	// Determine what media to show in the preview
+	$: previewMedia = (() => {
+		if (!hoveredArtist?.artworks?.[0]) return null;
+		
+		const artwork = hoveredArtist.artworks[0];
+		
+		// If we have an image, use it
+		if (artwork.image_url) {
+			return {
+				type: 'image',
+				url: artwork.image_url
+			};
+		}
+		
+		// If no image but we have animation URL and it's a video (based on MIME type), use it
+		if (artwork.animation_url && isVideoMime(artwork.mime)) {
+			return {
+				type: 'video',
+				url: artwork.animation_url
+			};
+		}
+		
+		return null;
+	})();
 </script>
 
 <svelte:head>
@@ -174,77 +196,77 @@
 	/>
 </svelte:head>
 
-<div class="homepage-container">
-	<div class="homepage-intro">
-		<div class="intro-content">
-			<h1 class="collection-title">Wallace Museum</h1>
-			<p class="collection-description">
-				The Wallace Museum showcases pioneering works from bleeding-edge artists pushing the
+<div class="homepage-container" on:mousemove={handleMouseMove}>
+	<div class="content">
+		
+		<div class="inline-content">
+			<h1 class="title inline">The Wallace Museum</h1>
+			<p class="description inline">
+				showcases pioneering works from bleeding-edge artists pushing the
 				boundaries of computational aesthetics and algorithmic expression. Each piece in the
 				collection represents an evolving dialogue between human imagination and digital
 				innovation—where mathematics becomes poetry and algorithms transform into art.
-			</p>
-		</div>
-	</div>
-
-	<div class="artists-section">
-		<h2 class="artist-title">Featuring</h2>
-		{#if data.artists && data.artists.length > 0}
-			<ul class="artist-list" on:mousemove={handleMouseMove}>
-				{#each data.artists as artist (artist.id)}
-					<li>
-						<button
+				{#if data.artists && data.artists.length > 0}
+					{#each data.artists as artist, index (artist.id)}<!--
+						--><button
 							type="button"
-							tabindex="0"
-							class="artist-row"
+							class="artist-link"
 							on:mouseenter={() => handleArtistHover(artist)}
 							on:mouseleave={clearArtistHover}
 							on:focus={() => handleArtistHover(artist)}
 							on:blur={clearArtistHover}
 							on:click={() => goto(`/artist/${artist.id}`)}
 							aria-label={`View artworks by ${artist.name}`}
-						>
-							<span class="artist-name">{artist.name}</span>
-							<span class="artwork-count"
-								>{artist.artworks.length}
-								{artist.artworks.length === 1 ? 'artwork' : 'artworks'}</span
-							>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		{:else}
-			<p>No artists found.</p>
-		{/if}
+						>{artist.name}</button> {#if index < data.artists.length - 2} {:else if index === data.artists.length - 2} {/if}
+					{/each}
+				{:else}
+					no artists currently.
+				{/if}
+			</p>
+		</div>
 	</div>
 
-	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && hoveredArtist.artworks[0]?.image_url}
+	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && previewMedia}
 		<div
 			class="floating-artwork-preview"
 			style="left: {safeLeft}px; top: {safeTop}px; width: {previewDimensions.width}px; height: {previewDimensions.height}px;"
 		>
-			{#if hoveredArtist.artworks[0].image_url && loadingStates[hoveredArtist.artworks[0].image_url]}
-				<div class="preview-loader">
-					<LoaderWrapper width="100%" height="200px" />
-				</div>
+			{#if previewMedia.type === 'image'}
+				{#if loadingStates[previewMedia.url]}
+					<div class="preview-loader">
+						<LoaderWrapper width="100%" height="200px" />
+					</div>
+				{/if}
+				<OptimizedImage
+					src={ipfsToHttpUrl(previewMedia.url)}
+					alt={hoveredArtist.artworks[0].title || ''}
+					width={previewDimensions?.width || 320}
+					height={previewDimensions?.height || 240}
+					fit="contain"
+					format="webp"
+					quality={80}
+					className={loadingStates[previewMedia.url] ? 'hidden preview-image' : 'preview-image'}
+					on:load={() => {
+						if (previewMedia?.url) {
+							loadingStates[previewMedia.url] = false;
+							loadingStates = loadingStates;
+						}
+					}}
+				/>
+			{:else if previewMedia.type === 'video'}
+				<video
+					src={ipfsToHttpUrl(previewMedia.url)}
+					autoplay
+					loop
+					muted
+					playsinline
+					class="preview-video"
+					width={previewDimensions?.width || 320}
+					height={previewDimensions?.height || 240}
+				>
+					Your browser does not support the video tag.
+				</video>
 			{/if}
-			<OptimizedImage
-				src={ipfsToHttpUrl(hoveredArtist.artworks[0].image_url)}
-				alt={hoveredArtist.artworks[0].title || ''}
-				width={previewDimensions?.width || 320}
-				height={previewDimensions?.height || 240}
-				fit="contain"
-				format="webp"
-				quality={80}
-				className={hoveredArtist.artworks[0].image_url && loadingStates[hoveredArtist.artworks[0].image_url] ? 'hidden preview-image' : 'preview-image'}
-				on:load={() => {
-					const imageUrl = hoveredArtist?.artworks[0]?.image_url;
-					if (imageUrl) {
-						loadingStates[imageUrl] = false;
-						loadingStates = loadingStates;
-					}
-				}}
-			/>
 		</div>
 	{/if}
 </div>
@@ -255,75 +277,49 @@
 	}
 
 	.homepage-container {
-		@apply w-full min-h-screen;
+		@apply w-full min-h-screen bg-black;
 	}
 
-	.homepage-intro {
-		@apply relative w-full p-4 bg-black;
+	.content {
+		@apply w-full p-4 py-10 max-w-[calc(100%-4rem)];
 	}
 
-	.intro-content {
-		@apply py-10;
+	.title {
+		@apply text-base font-bold text-yellow-500 tracking-tight mb-8;
 	}
 
-	.artists-section {
-		@apply w-full p-4;
+	.inline-content {
+		@apply space-y-0;
 	}
 
-	.collection-title {
-		@apply text-2xl font-bold text-yellow-500 tracking-tight;
+	.title,
+	.inline-content p,
+	.inline-content button {
+		@apply text-3xl 2xl:text-4xl;
 	}
 
-	.collection-description {
-		@apply mb-8 pb-8 max-w-prose text-base text-gray-100 font-semibold m-0 leading-normal tracking-tight;
+	.description {
+		@apply text-sm text-gray-100 font-semibold leading-normal tracking-tight mb-4;
 		overflow-wrap: break-word;
 		word-wrap: break-word;
 	}
 
-	.artist-title {
-		@apply text-sm font-normal uppercase tracking-widest mb-10 text-gray-100;
+	.featuring-text {
+		@apply text-sm text-gray-100 font-semibold leading-normal tracking-tight;
+		overflow-wrap: break-word;
+		word-wrap: break-word;
 	}
 
-	.artist-list {
-		@apply list-none p-0 flex flex-col items-stretch gap-2 m-0 pb-24 w-full lg:max-w-[min(800px,55vw)];
+	.artist-link {
+		@apply inline text-sm text-yellow-500 font-semibold bg-none border-none p-0 cursor-pointer outline-none leading-normal tracking-tight;
+		@apply hover:text-yellow-400 transition-colors duration-200;
+		@apply focus:text-yellow-400 focus:outline-none;
+		text-decoration: underline;
+		text-underline-offset: 2px;
 	}
 
-	.artist-list > li {
-		@apply m-0 p-0 w-full;
-	}
-
-	.artist-row {
-		@apply w-full text-xl text-white font-semibold no-underline bg-none border-none p-0 cursor-pointer outline-none leading-[1.4] hover:text-white opacity-100 rounded-md flex justify-between items-center;
-		overflow: hidden;
-
-		@media (min-width: 768px) {
-			@apply text-[1.75rem];
-		}
-	}
-
-	.artist-row:focus-visible {
-		@apply outline-none;
-	}
-
-	.artist-list .artist-row {
-		@apply duration-300 text-gray-600;
-	}
-
-	.artist-list:hover .artist-row:hover {
-		@apply text-yellow-500;
-	}
-
-	.artist-name {
-		@apply text-left overflow-hidden text-ellipsis whitespace-nowrap;
-		max-width: calc(100% - 120px);
-	}
-
-	.artwork-count {
-		@apply text-base font-medium whitespace-nowrap text-right;
-
-		@media (min-width: 768px) {
-			@apply text-base;
-		}
+	.artist-link:hover {
+		text-decoration: none;
 	}
 
 	.floating-artwork-preview {
@@ -342,40 +338,39 @@
 		max-height: 100%;
 	}
 
-	@media (max-width: 600px) {
-		/* Remove fixed constraints for mobile - dynamic sizing will handle this */
+	.preview-video {
+		@apply w-full h-full rounded-lg bg-black object-contain shadow-lg m-0;
+		max-width: 100%;
+		max-height: 100%;
+	}
+
+	/* Hide artwork previews on touch devices */
+	@media (hover: none) and (pointer: coarse) {
+		.floating-artwork-preview {
+			display: none !important;
+		}
 	}
 
 	@media (max-width: 480px) {
-		.homepage-container {
-			@apply pt-0;
-		}
-
-		.homepage-intro {
-			@apply p-0;
-		}
-
-		.intro-content {
+		.content {
 			@apply py-5 px-4;
 		}
 
-		.artists-section {
-			@apply px-4;
+		.title {
+			@apply text-lg mb-6;
 		}
 
-		.collection-title {
+		.title,
+		.inline-content p,
+		.inline-content button {
 			@apply text-xl;
 		}
 
-		.collection-description {
-			@apply text-lg mt-6 mb-6 pb-6;
+		.description,
+		.featuring-text,
+		.artist-link {
+			@apply text-xs;
 		}
-
-		.artist-row {
-			@apply text-lg;
-		}
-
-		/* Remove fixed constraints for mobile - dynamic sizing will handle this */
 	}
 
 	.hidden {
