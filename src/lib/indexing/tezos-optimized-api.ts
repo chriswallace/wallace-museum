@@ -176,9 +176,35 @@ export class OptimizedTezosAPI {
 
   /**
    * Extract collection information from token data
+   * Prioritizes gallery information over parent smart contract when available
    */
   private extractCollection(token: any): IndexerData['collection'] | undefined {
+    // First, check if there's gallery information available
+    if (token.galleries && Array.isArray(token.galleries) && token.galleries.length > 0) {
+      const gallery = token.galleries[0].gallery;
+      
+      if (gallery) {
+        console.log(`[OptimizedTezosAPI] Using gallery information for collection: ${gallery.name} (${gallery.slug})`);
+        
+        return {
+          slug: gallery.slug || gallery.gallery_id,
+          title: gallery.name || 'Unknown Collection',
+          description: undefined, // Gallery data doesn't typically include description
+          contractAddress: token.fa?.contract || '', // Keep the contract address from fa
+          websiteUrl: undefined, // Gallery data doesn't typically include website
+          imageUrl: gallery.logo,
+          isGenerativeArt: this.detectGenerativeArt(token),
+          isSharedContract: false, // Tezos doesn't have shared contracts like OpenSea
+          // Store gallery-specific information in externalCollectionId
+          externalCollectionId: gallery.gallery_id
+        };
+      }
+    }
+    
+    // Fallback to FA (parent smart contract) information if no gallery data
     if (!token.fa) return undefined;
+
+    console.log(`[OptimizedTezosAPI] Using FA contract information for collection: ${token.fa.name} (${token.fa.contract})`);
 
     return {
       slug: token.fa.contract,

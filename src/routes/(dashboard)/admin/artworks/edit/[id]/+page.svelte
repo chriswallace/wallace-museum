@@ -544,7 +544,7 @@
 						</label>
 						<small class="text-gray-600 dark:text-gray-400 block mt-1">
 							Enable this for artworks that can be stretched to any dimensions and still render beautifully. 
-							Fullscreen artworks will be displayed with full bleed to the browser edges at 88svh height.
+							Fullscreen artworks will be displayed with full bleed to the browser edges at 82svh height.
 						</small>
 					</div>
 					<div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">

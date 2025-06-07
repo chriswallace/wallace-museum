@@ -51,6 +51,30 @@
 		}
 	}
 
+	// New utility functions for wallet display
+	function formatWalletAddress(address: string): string {
+		if (!address || address.length <= 10) return address;
+		return `${address.substring(0, 4)}...${address.substring(address.length - 4)}`;
+	}
+
+	function getProfileUrl(address: string, blockchain: string): string {
+		if (blockchain.toLowerCase() === 'tezos') {
+			return `https://objkt.com/profile/${address}`;
+		} else if (blockchain.toLowerCase() === 'ethereum') {
+			return `https://opensea.io/${address}`;
+		}
+		return '';
+	}
+
+	function getChainIcon(blockchain: string): string {
+		if (blockchain.toLowerCase() === 'tezos') {
+			return 'tezos';
+		} else if (blockchain.toLowerCase() === 'ethereum') {
+			return 'ethereum';
+		}
+		return 'unknown';
+	}
+
 	function shouldTruncateDescription(description: string | null): boolean {
 		return description ? description.length > DESCRIPTION_LIMIT : false;
 	}
@@ -228,18 +252,32 @@
 					<!-- Wallet Addresses -->
 					{#if walletAddresses.length > 0}
 						<div class="detail-section">
-							<h3>Wallet Addresses</h3>
-							<ul class="addresses-list">
+							<h3>Wallets</h3>
+							<ul class="wallets-list">
 								{#each walletAddresses as wallet}
-									<li>
-										<span class="blockchain">{wallet.blockchain}:</span>
-										<code class="address">{truncateAddress(wallet.address)}</code>
-										{#if getContractUrl(wallet.address, wallet.blockchain)}
+									<li class="wallet-item">
+										<div class="wallet-info">
+											<div class="chain-icon">
+												{#if getChainIcon(wallet.blockchain) === 'ethereum'}
+													<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+														<path d="M11.944 17.97L4.58 13.62 11.943 24l7.37-10.38-7.372 4.35h.003zM12.056 0L4.69 12.223l7.365 4.354 7.365-4.35L12.056 0z"/>
+													</svg>
+												{:else if getChainIcon(wallet.blockchain) === 'tezos'}
+													<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+														<path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm6.066 9.645c.183 4.04-2.83 8.544-8.164 8.544-5.334 0-9.92-4.504-9.737-8.544C.348 5.645 5.718 3.321 12 3.321s11.652 2.324 6.066 6.324z"/>
+													</svg>
+												{:else}
+													<div class="unknown-chain"></div>
+												{/if}
+											</div>
+											<code class="wallet-address">{formatWalletAddress(wallet.address)}</code>
+										</div>
+										{#if getProfileUrl(wallet.address, wallet.blockchain)}
 											<a
-												href={getContractUrl(wallet.address, wallet.blockchain)}
+												href={getProfileUrl(wallet.address, wallet.blockchain)}
 												target="_blank"
 												rel="noopener noreferrer"
-												class="view-link"
+												class="profile-link"
 											>
 												View
 											</a>
@@ -249,29 +287,6 @@
 							</ul>
 						</div>
 					{/if}
-
-					<!-- Profile Information -->
-					<div class="detail-section">
-						<h3>Profile</h3>
-						<dl class="profile-list">
-							{#if data.artist.username}
-								<dt>Username</dt>
-								<dd>{data.artist.username}</dd>
-							{/if}
-							{#if data.artist.createdAt}
-								<dt>Joined</dt>
-								<dd>{formatDate(data.artist.createdAt)}</dd>
-							{/if}
-							{#if data.artist.resolutionSource}
-								<dt>Source</dt>
-								<dd>{data.artist.resolutionSource}</dd>
-							{/if}
-							{#if data.artist.resolvedAt}
-								<dt>Last Updated</dt>
-								<dd>{formatDate(data.artist.resolvedAt)}</dd>
-							{/if}
-						</dl>
-					</div>
 				</aside>
 
 				<!-- Right Column - Artworks -->
@@ -455,7 +470,7 @@
 	}
 
 	.links-list,
-	.addresses-list {
+	.wallets-list {
 		@apply list-none p-0 space-y-1;
 	}
 
@@ -464,33 +479,33 @@
 		text-decoration: none;
 	}
 
-	.addresses-list li {
-		@apply flex flex-col gap-0.5 text-xs;
+	.wallets-list {
+		@apply list-none p-0 space-y-1;
 	}
 
-	.blockchain {
-		@apply font-medium text-gray-600 text-xs;
+	.wallet-item {
+		@apply flex items-center justify-between text-xs;
 	}
 
-	.address {
-		@apply text-xs font-mono bg-gray-100 px-1 py-0.5;
+	.wallet-info {
+		@apply flex items-center gap-2;
 	}
 
-	.view-link {
+	.chain-icon {
+		@apply w-4 h-4 text-gray-600;
+	}
+
+	.wallet-address {
+		@apply text-xs font-mono bg-gray-100 px-2 py-1 rounded-sm;
+	}
+
+	.profile-link {
 		@apply text-black/60 hover:text-black text-xs transition-colors duration-200;
 		text-decoration: none;
 	}
 
-	.profile-list {
-		@apply space-y-1;
-	}
-
-	.profile-list dt {
-		@apply text-xs font-medium text-gray-600 uppercase tracking-wider;
-	}
-
-	.profile-list dd {
-		@apply text-xs text-gray-900 mb-1;
+	.unknown-chain {
+		@apply w-4 h-4 bg-gray-300 rounded-sm;
 	}
 
 	.artworks-main {
@@ -558,7 +573,7 @@
 	.modal-content {
 		@apply relative bg-white dark:bg-black rounded-sm shadow-2xl max-w-[600px];
 		width: 100%;
-		max-height: 88svh;
+		max-height: 82svh;
 	}
 
 	.modal-close-button {
@@ -569,7 +584,7 @@
 
 	.modal-scroll {
 		@apply overflow-y-auto p-6;
-		max-height: calc(88svh - 2rem);
+		max-height: calc(82svh - 2rem);
 	}
 
 	.modal-artist-header {
@@ -639,24 +654,20 @@
 			@apply text-white/60 hover:text-white;
 		}
 
-		.blockchain {
+		.chain-icon {
 			@apply text-gray-400;
 		}
 
-		.address {
+		.wallet-address {
 			@apply bg-gray-800 text-gray-300;
 		}
 
-		.view-link {
+		.profile-link {
 			@apply text-white/60 hover:text-white;
 		}
 
-		.profile-list dt {
-			@apply text-gray-400;
-		}
-
-		.profile-list dd {
-			@apply text-gray-100;
+		.unknown-chain {
+			@apply bg-gray-700;
 		}
 
 		.artwork-thumbnail {

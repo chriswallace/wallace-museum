@@ -1,6 +1,8 @@
 import { fileTypeFromBuffer } from 'file-type';
 import { fetchWithRetry } from './mediaHelpers';
 import { ipfsToHttpUrl } from './mediaUtils';
+import { detectMintDateFromOpenSeaEvents } from './indexing/mintDateHelpers.js';
+import { fetchMintDateFromEtherscan } from './etherscanHelpers.js';
 
 export interface EnhancedArtworkData {
   // Core identification
@@ -1078,9 +1080,131 @@ export class EnhancedFieldProcessor {
   }
   
   /**
-   * Process all artwork fields with enhanced extraction
+   * Enhanced mint date extraction using multiple sources with OpenSea Events API
    */
-  async processArtworkFields(rawData: any, blockchain: string): Promise<Partial<EnhancedArtworkData>> {
+  private async extractMintDate(
+    rawData?: any, 
+    metadata?: any, 
+    contractAddress?: string, 
+    tokenId?: string, 
+    blockchain?: string
+  ): Promise<string | null> {
+    console.log(`[EnhancedFieldProcessor] Extracting mint date for ${contractAddress}:${tokenId}`);
+
+    // Strategy 1: Try OpenSea Events API for Ethereum NFTs (most reliable)
+    if (contractAddress && tokenId && blockchain === 'ethereum') {
+      try {
+        console.log(`[EnhancedFieldProcessor] Trying OpenSea Events API for ${contractAddress}:${tokenId}`);
+        const openSeaResult = await detectMintDateFromOpenSeaEvents(
+          contractAddress,
+          tokenId,
+          blockchain
+        );
+
+        if (openSeaResult.mintDate) {
+          console.log(`[EnhancedFieldProcessor] Found mint date from OpenSea Events: ${openSeaResult.mintDate}`);
+          
+          // Validate the date
+          const mintDate = new Date(openSeaResult.mintDate);
+          const currentDate = new Date();
+          
+          // Reject future dates
+          if (mintDate > currentDate) {
+            console.warn(`[EnhancedFieldProcessor] Rejecting future mint date from OpenSea Events: ${openSeaResult.mintDate}`);
+          } else {
+            return openSeaResult.mintDate;
+          }
+        }
+      } catch (error) {
+        console.warn(`[EnhancedFieldProcessor] OpenSea Events API failed for ${contractAddress}:${tokenId}:`, error);
+      }
+    }
+
+    // Strategy 2: Try Etherscan API for Ethereum NFTs (fallback for older NFTs)
+    if (contractAddress && tokenId && blockchain === 'ethereum' && process.env.ETHERSCAN_API_KEY) {
+      try {
+        console.log(`[EnhancedFieldProcessor] Trying Etherscan API fallback for ${contractAddress}:${tokenId}`);
+        const etherscanResult = await fetchMintDateFromEtherscan(
+          contractAddress,
+          tokenId,
+          process.env.ETHERSCAN_API_KEY
+        );
+
+        if (etherscanResult) {
+          console.log(`[EnhancedFieldProcessor] Found mint date from Etherscan: ${etherscanResult}`);
+          
+          // Validate the date
+          const mintDate = new Date(etherscanResult);
+          const currentDate = new Date();
+          
+          // Reject future dates
+          if (mintDate > currentDate) {
+            console.warn(`[EnhancedFieldProcessor] Rejecting future mint date from Etherscan: ${etherscanResult}`);
+          } else {
+            return etherscanResult;
+          }
+        }
+      } catch (error) {
+        console.warn(`[EnhancedFieldProcessor] Etherscan API failed for ${contractAddress}:${tokenId}:`, error);
+      }
+    }
+
+    // Strategy 3: Extract from API data with validation (fallback)
+    const mintDateSources = [
+      rawData?.mint_date,
+      rawData?.mintDate,
+      rawData?.created_date,
+      rawData?.created_at,
+      rawData?.timestamp,
+      metadata?.mint_date,
+      metadata?.mintDate,
+      metadata?.created_date,
+      metadata?.created_at,
+      metadata?.timestamp
+    ];
+
+    for (const dateSource of mintDateSources) {
+      if (dateSource) {
+        try {
+          const parsedDate = new Date(dateSource);
+          if (!isNaN(parsedDate.getTime())) {
+            const currentDate = new Date();
+            
+            // Reject obviously wrong dates
+            if (parsedDate > currentDate) {
+              console.warn(`[EnhancedFieldProcessor] Rejecting future date from API data: ${dateSource}`);
+              continue;
+            }
+            
+            // Be suspicious of very recent dates for older contracts
+            if (parsedDate > new Date('2024-01-01')) {
+              console.warn(`[EnhancedFieldProcessor] Suspicious recent date from API data: ${dateSource}`);
+              // Don't reject, but continue looking for better sources
+              continue;
+            }
+            
+            console.log(`[EnhancedFieldProcessor] Using mint date from API data: ${parsedDate.toISOString()}`);
+            return parsedDate.toISOString();
+          }
+        } catch (error) {
+          // Continue to next source
+        }
+      }
+    }
+
+    console.log(`[EnhancedFieldProcessor] No reliable mint date found for ${contractAddress}:${tokenId}`);
+    return null;
+  }
+  
+  /**
+   * Enhanced processArtworkFields method with mint date detection
+   */
+  async processArtworkFields(
+    rawData: any, 
+    blockchain: string, 
+    contractAddress?: string, 
+    tokenId?: string
+  ): Promise<Partial<EnhancedArtworkData>> {
     const result: Partial<EnhancedArtworkData> = {};
     
     // Extract basic media URLs
@@ -1101,6 +1225,9 @@ export class EnhancedFieldProcessor {
     result.thumbnailUrl = thumbnailUrl || undefined;
     result.metadataUrl = metadataUrl || undefined;
     result.generatorUrl = this.extractGeneratorUrl(rawData, metadata) || undefined;
+    
+    // Enhanced mint date extraction with OpenSea Events API
+    result.mintDate = await this.extractMintDate(rawData, metadata, contractAddress, tokenId, blockchain) || undefined;
     
     // Technical details with enhanced detection
     // Always prioritize animation URL if it's clearly a video

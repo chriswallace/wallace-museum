@@ -161,6 +161,25 @@ function isSvgUrl(url: string): boolean {
 }
 
 /**
+ * Detect if a URL points to a GIF file
+ */
+function isGifUrl(url: string): boolean {
+	if (!url) return false;
+	
+	// Check for .gif extension (case insensitive)
+	if (url.toLowerCase().includes('.gif')) {
+		return true;
+	}
+	
+	// Check for GIF MIME type in data URLs
+	if (url.startsWith('data:image/gif')) {
+		return true;
+	}
+	
+	return false;
+}
+
+/**
  * Check if a URL is an IPFS URL that can be optimized
  */
 function isIpfsUrl(url: string): boolean {
@@ -188,6 +207,12 @@ export function buildOptimizedImageUrl(
 	// For SVG files, bypass optimization and serve directly to preserve vector format
 	if (isSvgUrl(imageUrl)) {
 		// If it's an IPFS SVG, use direct IPFS URL, otherwise use the original URL
+		return isIpfsUrl(imageUrl) ? buildDirectImageUrl(imageUrl) : imageUrl;
+	}
+
+	// For GIF files, bypass optimization and serve directly to preserve animation
+	if (isGifUrl(imageUrl)) {
+		// If it's an IPFS GIF, use direct IPFS URL, otherwise use the original URL
 		return isIpfsUrl(imageUrl) ? buildDirectImageUrl(imageUrl) : imageUrl;
 	}
 
@@ -272,6 +297,12 @@ export function createResponsiveSrcSet(
 		return '';
 	}
 
+	// For GIFs, don't create responsive variants to preserve animation
+	// The browser will use the main src attribute
+	if (isGifUrl(imageUrl)) {
+		return '';
+	}
+
 	const srcsetEntries = sizes.map(size => {
 		const optimizedUrl = buildOptimizedImageUrl(imageUrl, {
 			...options,
@@ -296,6 +327,13 @@ export function createRetinaUrls(
 	// For non-IPFS URLs, we can't create retina variants, so return the original URL for both
 	if (!isIpfsUrl(imageUrl)) {
 		return { src1x: imageUrl, src2x: imageUrl };
+	}
+
+	// For GIFs, don't create retina variants to preserve animation
+	// Return the original URL for both
+	if (isGifUrl(imageUrl)) {
+		const directUrl = buildDirectImageUrl(imageUrl);
+		return { src1x: directUrl, src2x: directUrl };
 	}
 
 	const src1x = buildOptimizedImageUrl(imageUrl, {
@@ -323,21 +361,21 @@ export const ImagePresets = {
 			width: 32,
 			height: 32,
 			fit: 'cover',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 85
 		}),
 		medium: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
 			width: 64,
 			height: 64,
 			fit: 'cover',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 85
 		}),
 		large: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
 			width: 128,
 			height: 128,
 			fit: 'cover',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 85
 		})
 	},
@@ -348,21 +386,21 @@ export const ImagePresets = {
 			width: 200,
 			height: 200,
 			fit: 'cover',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 80
 		}),
 		medium: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
 			width: 300,
 			height: 300,
 			fit: 'cover',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 85
 		}),
 		large: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
 			width: 400,
 			height: 400,
 			fit: 'cover',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 85
 		})
 	},
@@ -372,25 +410,25 @@ export const ImagePresets = {
 		small: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
 			width: 400,
 			fit: 'contain',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 85
 		}),
 		medium: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
 			width: 800,
 			fit: 'contain',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 90
 		}),
 		large: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
 			width: 1200,
 			fit: 'contain',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 90
 		}),
 		fullscreen: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
 			width: 1920,
 			fit: 'contain',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 95
 		})
 	},
@@ -401,14 +439,14 @@ export const ImagePresets = {
 			width: 250,
 			height: 250,
 			fit: 'cover',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 80
 		}),
 		medium: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
 			width: 350,
 			height: 350,
 			fit: 'cover',
-			format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 			quality: 85
 		})
 	},
@@ -418,7 +456,7 @@ export const ImagePresets = {
 		width: 320,
 		height: 220,
 		fit: 'cover',
-		format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+		format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
 		quality: 80
 	})
 };

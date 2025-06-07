@@ -213,30 +213,34 @@
 
 <style lang="scss">
 	.artwork-display {
-		@apply relative overflow-hidden h-full flex items-center justify-center xl:p-24;
+		@apply relative overflow-hidden h-full flex items-center justify-center;
 		/* Remove flexbox for iframe compatibility */
+	}
+
+	.artwork-display:not(.fullscreen) {
+		@apply xl:max-h-[90%];
 	}
 
 	.artwork-display.fullscreen {
 		@apply w-screen;
-		height: 88svh;
+		height: 82svh;
 		aspect-ratio: unset;
 	}
 
 	.artwork-display.fullscreen :global(.artwork-image) {
 		@apply w-screen object-contain;
-		height: 88svh;
+		height: 82svh;
 	}
 
 	.artwork-display.fullscreen .interactive-content {
 		/* Keep iframe at its original size and center it */
 		@apply w-auto h-auto max-w-full;
-		max-height: 88svh;
+		max-height: 82svh;
 	}
 
 	.artwork-display.fullscreen :global(.video-player-artwork) {
 		@apply w-screen object-contain;
-		height: 88svh !important;
+		height: 82svh !important;
 	}
 
 	.no-media {
@@ -268,7 +272,7 @@
 	}
 
 	.image-container {
-		@apply relative w-full h-full flex items-center justify-center;
+		@apply relative w-full h-full ;
 	}
 
 	.fullscreen-button {

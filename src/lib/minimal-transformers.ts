@@ -46,16 +46,73 @@ export class MinimalNFTTransformer {
     const title = nft.name || nft.title || 'Untitled';
     const description = nft.description || undefined;
     
-    // Enhanced mint date extraction
+    // Enhanced mint date extraction - prioritize actual mint dates over updated_at
     let mintDate: string | undefined;
-    if (nft.updated_at) {
+    
+    // First, try to get mint date from various NFT fields
+    const mintDateSources = [
+      nft.mint_date,
+      nft.created_date,
+      nft.created_at,
+      enhancedFields.mintDate
+    ];
+    
+    for (const dateSource of mintDateSources) {
+      if (dateSource) {
+        try {
+          const parsedDate = new Date(dateSource);
+          if (!isNaN(parsedDate.getTime())) {
+            mintDate = parsedDate.toISOString();
+            console.log(`[MinimalNFTTransformer] Found mint date from NFT data for ${contractAddress}:${tokenId}: ${mintDate}`);
+            break;
+          }
+        } catch (error) {
+          console.warn(`[MinimalNFTTransformer] Failed to parse mint date from NFT data for ${contractAddress}:${tokenId}: ${dateSource}`, error);
+        }
+      }
+    }
+    
+    // If no mint date found in NFT data, try to fetch from blockchain events
+    // This is more accurate as it gets the actual mint transaction timestamp
+    if (!mintDate) {
+      try {
+        const { detectMintDateFromOpenSeaEvents } = await import('./indexing/mintDateHelpers.js');
+        // Try to get API key from environment, but don't fail if not available
+        const apiKey = process.env.OPENSEA_API_KEY || '';
+        if (apiKey) {
+          const blockchainResult = await detectMintDateFromOpenSeaEvents(contractAddress, tokenId, 'ethereum');
+          if (blockchainResult && blockchainResult.mintDate) {
+            // Validate the date
+            const parsedDate = new Date(blockchainResult.mintDate);
+            const currentDate = new Date();
+            
+            // Reject future dates
+            if (parsedDate <= currentDate) {
+              mintDate = blockchainResult.mintDate;
+              console.log(`[MinimalNFTTransformer] Found mint date from OpenSea Events for ${contractAddress}:${tokenId}: ${mintDate}`);
+            } else {
+              console.warn(`[MinimalNFTTransformer] Rejecting future mint date from OpenSea Events for ${contractAddress}:${tokenId}: ${blockchainResult.mintDate}`);
+            }
+          }
+        } else {
+          console.warn(`[MinimalNFTTransformer] No OpenSea API key available for blockchain mint date lookup for ${contractAddress}:${tokenId}`);
+        }
+      } catch (error) {
+        console.warn(`[MinimalNFTTransformer] Failed to fetch mint date from blockchain for ${contractAddress}:${tokenId}:`, error);
+      }
+    }
+    
+    // Only fall back to updated_at as a last resort, and only if it seems reasonable
+    // (updated_at is not the mint date, it's when metadata was last updated)
+    if (!mintDate && nft.updated_at) {
       try {
         const parsedDate = new Date(nft.updated_at);
         if (!isNaN(parsedDate.getTime())) {
           mintDate = parsedDate.toISOString();
+          console.warn(`[MinimalNFTTransformer] Using updated_at as fallback mint date for ${contractAddress}:${tokenId}: ${mintDate} (this may not be accurate)`);
         }
       } catch (error) {
-        console.warn(`[MinimalNFTTransformer] Failed to parse mint date for OpenSea NFT ${contractAddress}:${tokenId}: ${nft.updated_at}`, error);
+        console.warn(`[MinimalNFTTransformer] Failed to parse updated_at for OpenSea NFT ${contractAddress}:${tokenId}: ${nft.updated_at}`, error);
       }
     }
     
@@ -279,17 +336,54 @@ export class MinimalNFTTransformer {
       };
     }
     
-    // Enhanced collection extraction
-    const collection = {
-      slug: actualToken.fa.contract,
-      title: actualToken.fa.name || 'Unknown Collection',
-      description: actualToken.fa.description,
-      contractAddress: actualToken.fa.contract,
-      websiteUrl: actualToken.fa.website,
-      imageUrl: actualToken.fa.logo,
-      isGenerativeArt: this.isGenerativeCollection(actualToken.fa.contract),
-      isSharedContract: false // Tezos doesn't have shared contracts like OpenSea
-    };
+    // Enhanced collection extraction - prioritize gallery information over FA contract
+    let collection: MinimalNFTData['collection'];
+    
+    // First, check if there's gallery information available
+    if (actualToken.galleries && Array.isArray(actualToken.galleries) && actualToken.galleries.length > 0) {
+      const gallery = actualToken.galleries[0].gallery;
+      
+      if (gallery) {
+        console.log(`[MinimalNFTTransformer] Using gallery information for collection: ${gallery.name} (${gallery.slug})`);
+        
+        collection = {
+          slug: gallery.slug || gallery.gallery_id,
+          title: gallery.name || 'Unknown Collection',
+          description: undefined, // Gallery data doesn't typically include description
+          contractAddress: actualToken.fa?.contract || '', // Keep the contract address from fa
+          websiteUrl: undefined, // Gallery data doesn't typically include website
+          imageUrl: gallery.logo,
+          isGenerativeArt: this.isGenerativeCollection(actualToken.fa?.contract || ''),
+          isSharedContract: false // Tezos doesn't have shared contracts like OpenSea
+        };
+      } else {
+        // Fallback to FA contract information
+        collection = {
+          slug: actualToken.fa.contract,
+          title: actualToken.fa.name || 'Unknown Collection',
+          description: actualToken.fa.description,
+          contractAddress: actualToken.fa.contract,
+          websiteUrl: actualToken.fa.website,
+          imageUrl: actualToken.fa.logo,
+          isGenerativeArt: this.isGenerativeCollection(actualToken.fa.contract),
+          isSharedContract: false // Tezos doesn't have shared contracts like OpenSea
+        };
+      }
+    } else {
+      // Fallback to FA contract information if no gallery data
+      console.log(`[MinimalNFTTransformer] Using FA contract information for collection: ${actualToken.fa?.name} (${actualToken.fa?.contract})`);
+      
+      collection = {
+        slug: actualToken.fa.contract,
+        title: actualToken.fa.name || 'Unknown Collection',
+        description: actualToken.fa.description,
+        contractAddress: actualToken.fa.contract,
+        websiteUrl: actualToken.fa.website,
+        imageUrl: actualToken.fa.logo,
+        isGenerativeArt: this.isGenerativeCollection(actualToken.fa.contract),
+        isSharedContract: false // Tezos doesn't have shared contracts like OpenSea
+      };
+    }
     
     const tokenStandard = 'FA2'; // Tezos standard
     let mime = enhancedFields.mime || actualToken.mime;

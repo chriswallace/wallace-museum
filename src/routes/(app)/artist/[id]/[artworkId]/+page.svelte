@@ -712,16 +712,16 @@
 	}
 
 	/* Apply fixed height only on medium screens and up */
-	@media (min-width: 768px) {
+	@media (min-width: 1024px) {
 		.artwork-container {
-			height: 88svh;
+			height: 82svh;
 		}
 	}
 
 	.artwork-container.fullscreen {
 		@apply bg-black p-0;
 		width: 100vw;
-		height: 88svh;
+		height: 82svh;
 		max-width: none;
 		border-radius: 0;
 		margin-left: calc(-50vw + 50%);
@@ -884,7 +884,7 @@
 	}
 
 	.museum-header-nav {
-		@apply bg-black bg-opacity-50 w-full p-4 flex items-center justify-start relative;
+		@apply bg-black bg-opacity-50 w-full p-4 flex items-center justify-between relative;
 	}
 
 	.museum-name-link {
@@ -956,7 +956,22 @@
 	}
 
 	.keyboard-indicator {
-		@apply ml-4;
+		/* Remove left margin since it's now positioned on the right */
+		
+		/* Hide on smaller screens (mobile/tablet) */
+		@media (max-width: 1023px) {
+			display: none;
+		}
+		
+		/* Hide on touch devices */
+		@media (hover: none) and (pointer: coarse) {
+			display: none;
+		}
+		
+		/* Hide on devices that don't support hover */
+		@media (hover: none) {
+			display: none;
+		}
 	}
 
 	.keyboard-help-trigger {

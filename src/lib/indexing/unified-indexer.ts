@@ -189,7 +189,9 @@ export class UnifiedIndexer {
       try {
         enhancedFields = await this.fieldProcessor.processArtworkFields(
           indexRecord.rawResponse, 
-          indexRecord.blockchain
+          indexRecord.blockchain,
+          indexRecord.contractAddress,
+          indexRecord.tokenId
         );
       } catch (enhancedError) {
         console.warn(`[UnifiedIndexer] Enhanced field processing failed for index ${indexId}:`, enhancedError);

@@ -42,6 +42,20 @@
 		return null;
 	}
 
+	// Format mint date for display
+	function formatMintDate(mintDate: Date | null): string | null {
+		if (!mintDate) return null;
+		
+		const date = new Date(mintDate);
+		if (isNaN(date.getTime())) return null;
+		
+		return date.toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
+	}
+
 	async function loadArtworks(reset = false) {
 		if (loading || (!hasMore && !reset)) return;
 
@@ -194,49 +208,54 @@
 							{:else}
 								<div class="thumbnail-placeholder">
 									<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-										<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+										<path d="M21 19V5c0-1.1-.9-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
 									</svg>
 								</div>
 							{/if}
 						</div>
-					</button>
-					
-					<div class="artwork-info-container">
-						<div class="artwork-info">
-							<h3 class="artwork-title">{artwork.title}</h3>
-							<div class="artwork-artists">
-								{#each artwork.artists as artist, index}
-									<div class="artist-info">
-										{#if artist.avatarUrl}
-											<div class="artist-avatar">
-												<OptimizedImage
-													src={ipfsToHttpUrl(artist.avatarUrl)}
-													alt="{artist.name} avatar"
-													width={32}
-													height={32}
-													fit="cover"
-													format="webp"
-													quality={85}
-													className="avatar-image"
-													fallbackSrc="/images/medici-image.png"
-												/>
-											</div>
-										{:else}
-											<div class="artist-avatar-placeholder">
-												<svg viewBox="0 0 24 24" fill="currentColor" class="avatar-icon">
-													<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-												</svg>
-											</div>
-										{/if}
-										<span class="artist-name">{artist.name}</span>
+						
+						<div class="artwork-info-container">
+							<div class="artwork-info">
+								{#if formatMintDate(artwork.mintDate)}
+									<div class="artwork-mint-date">
+										{formatMintDate(artwork.mintDate)}
 									</div>
-									{#if index < artwork.artists.length - 1}
-										<span class="artist-separator"> </span>
-									{/if}
-								{/each}
+								{/if}
+								<h3 class="artwork-title">{artwork.title}</h3>
+								<div class="artwork-artists">
+									{#each artwork.artists as artist, index}
+										<div class="artist-info">
+											{#if artist.avatarUrl}
+												<div class="artist-avatar">
+													<OptimizedImage
+														src={ipfsToHttpUrl(artist.avatarUrl)}
+														alt="{artist.name} avatar"
+														width={32}
+														height={32}
+														fit="cover"
+														format="webp"
+														quality={85}
+														className="avatar-image"
+														fallbackSrc="/images/medici-image.png"
+													/>
+												</div>
+											{:else}
+												<div class="artist-avatar-placeholder">
+													<svg viewBox="0 0 24 24" fill="currentColor" class="avatar-icon">
+														<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+													</svg>
+												</div>
+											{/if}
+											<span class="artist-name">{artist.name}</span>
+										</div>
+										{#if index < artwork.artists.length - 1}
+											<span class="artist-separator"> </span>
+										{/if}
+									{/each}
+								</div>
 							</div>
 						</div>
-					</div>
+					</button>
 				</div>
 			{/if}
 		{/each}
@@ -265,7 +284,7 @@
 
 <style lang="scss">
 	.artwork-feed {
-		@apply max-w-2xl mx-auto px-4 py-8;
+		@apply w-full max-w-[760px] mx-auto px-4 py-8;
 	}
 
 	.feed-title {
@@ -339,6 +358,10 @@
 		@apply text-lg font-semibold text-white mb-3;
 	}
 
+	.artwork-mint-date {
+		@apply text-gray-400 text-sm mt-3;
+	}
+
 	.artwork-artists {
 		@apply flex flex-wrap items-center gap-3;
 	}
@@ -398,7 +421,7 @@
 
 	@media (max-width: 640px) {
 		.artwork-feed {
-			@apply px-2 py-6;
+			@apply px-4 py-6;
 		}
 
 		.feed-title {

@@ -11,6 +11,7 @@ import { WRAPPED_TEZOS_CONTRACT } from '../constants/tezos';
  * - Token details (name, description, URIs, metadata)
  * - Creator/artist information with profile data
  * - Collection (FA) information
+ * - Gallery information for collection resolution
  * - Mint date (timestamp)
  * - All display media URLs
  * - Dimensions data
@@ -47,6 +48,23 @@ export const FETCH_WALLET_NFTS_QUERY = `
           description
           logo
           website
+        }
+        galleries {
+          gallery {
+            gallery_id
+            logo
+            name
+            slug
+            pk
+            registry {
+              type
+              name
+              slug
+              __typename
+            }
+            __typename
+          }
+          __typename
         }
         creators {
           creator_address
@@ -103,6 +121,23 @@ export const FETCH_CREATED_NFTS_QUERY = `
         description
         logo
         website
+      }
+      galleries {
+        gallery {
+          gallery_id
+          logo
+          name
+          slug
+          pk
+          registry {
+            type
+            name
+            slug
+            __typename
+          }
+          __typename
+        }
+        __typename
       }
       creators {
         creator_address
@@ -177,6 +212,23 @@ export const FETCH_TOKEN_DETAILS_QUERY = `
           twitter
           instagram
         }
+      }
+      galleries {
+        gallery {
+          gallery_id
+          logo
+          name
+          slug
+          pk
+          registry {
+            type
+            name
+            slug
+            __typename
+          }
+          __typename
+        }
+        __typename
       }
       creators {
         creator_address

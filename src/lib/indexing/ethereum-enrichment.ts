@@ -1,5 +1,7 @@
 import type { IndexerData } from './unified-indexer';
-import { fetchMintDate, fetchCreatorInfo, fetchCollection, fetchEnhancedNFTData } from '../openseaHelpers.js';
+import { fetchCreatorInfo, fetchCollection, fetchEnhancedNFTData } from '../openseaHelpers.js';
+import { detectMintDateFromOpenSeaEvents } from './mintDateHelpers.js';
+import { fetchMintDateFromEtherscan } from '../etherscanHelpers.js';
 import { IntelligentRateLimiter } from '../intelligent-rate-limiter';
 
 interface EnhancedNFTData {
@@ -111,13 +113,58 @@ export class EthereumNFTEnricher {
 
       // Fetch mint date from blockchain events if still missing
       if (!enrichedData.mintDate) {
-        const mintDateResult = await this.rateLimiter.executeCall(
-          () => fetchMintDate(contractAddress, tokenId, this.apiKey),
-          `Mint date for ${contractAddress}:${tokenId}`
-        );
+        console.log(`[EthereumNFTEnricher] Trying enhanced mint date detection for ${contractAddress}:${tokenId}`);
         
-        if (mintDateResult.success && mintDateResult.data) {
-          enrichedData.mintDate = mintDateResult.data;
+        // Strategy 1: Try OpenSea Events API with pagination (most reliable)
+        try {
+          const openSeaResult = await this.rateLimiter.executeCall(
+            () => detectMintDateFromOpenSeaEvents(contractAddress, tokenId, 'ethereum'),
+            `OpenSea Events mint date for ${contractAddress}:${tokenId}`
+          );
+          
+          if (openSeaResult.success && openSeaResult.data && openSeaResult.data.mintDate) {
+            console.log(`[EthereumNFTEnricher] Found mint date from OpenSea Events: ${openSeaResult.data.mintDate}`);
+            
+            // Validate the date
+            const mintDate = new Date(openSeaResult.data.mintDate);
+            const currentDate = new Date();
+            
+            // Reject future dates
+            if (mintDate <= currentDate) {
+              enrichedData.mintDate = openSeaResult.data.mintDate;
+            } else {
+              console.warn(`[EthereumNFTEnricher] Rejecting future mint date: ${openSeaResult.data.mintDate}`);
+            }
+          }
+        } catch (error) {
+          console.warn(`[EthereumNFTEnricher] OpenSea Events API failed for ${contractAddress}:${tokenId}:`, error);
+        }
+
+        // Strategy 2: Try Etherscan API as fallback (for older NFTs)
+        if (!enrichedData.mintDate && process.env.ETHERSCAN_API_KEY) {
+          try {
+            const etherscanResult = await this.rateLimiter.executeCall(
+              () => fetchMintDateFromEtherscan(contractAddress, tokenId, process.env.ETHERSCAN_API_KEY!),
+              `Etherscan mint date for ${contractAddress}:${tokenId}`
+            );
+            
+            if (etherscanResult.success && etherscanResult.data) {
+              console.log(`[EthereumNFTEnricher] Found mint date from Etherscan: ${etherscanResult.data}`);
+              
+              // Validate the date
+              const mintDate = new Date(etherscanResult.data);
+              const currentDate = new Date();
+              
+              // Reject future dates
+              if (mintDate <= currentDate) {
+                enrichedData.mintDate = etherscanResult.data;
+              } else {
+                console.warn(`[EthereumNFTEnricher] Rejecting future mint date from Etherscan: ${etherscanResult.data}`);
+              }
+            }
+          } catch (error) {
+            console.warn(`[EthereumNFTEnricher] Etherscan API failed for ${contractAddress}:${tokenId}:`, error);
+          }
         }
       }
 

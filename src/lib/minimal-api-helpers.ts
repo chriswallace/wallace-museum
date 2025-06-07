@@ -440,6 +440,23 @@ export class MinimalObjktAPI {
                 description
                 website
               }
+              galleries {
+                gallery {
+                  gallery_id
+                  logo
+                  name
+                  slug
+                  pk
+                  registry {
+                    type
+                    name
+                    slug
+                    __typename
+                  }
+                  __typename
+                }
+                __typename
+              }
               creators {
                 creator_address
                 holder {
@@ -480,6 +497,23 @@ export class MinimalObjktAPI {
                   name
                   description
                   website
+                }
+                galleries {
+                  gallery {
+                    gallery_id
+                    logo
+                    name
+                    slug
+                    pk
+                    registry {
+                      type
+                      name
+                      slug
+                      __typename
+                    }
+                    __typename
+                  }
+                  __typename
                 }
                 creators {
                   creator_address
@@ -564,6 +598,23 @@ export class MinimalObjktAPI {
             name
             description
             website
+          }
+          galleries {
+            gallery {
+              gallery_id
+              logo
+              name
+              slug
+              pk
+              registry {
+                type
+                name
+                slug
+                __typename
+              }
+              __typename
+            }
+            __typename
           }
           creators {
             creator_address

@@ -113,6 +113,23 @@ export interface MinimalTezosToken {
     description?: string;
     website?: string;
   };
+  galleries?: Array<{
+    gallery: {
+      gallery_id: string;
+      logo?: string;
+      name: string;
+      slug: string;
+      pk: number;
+      registry: {
+        type: string;
+        name: string;
+        slug: string;
+        __typename: string;
+      };
+      __typename: string;
+    };
+    __typename: string;
+  }>;
   creators?: Array<{
     creator_address?: string;
     holder?: {

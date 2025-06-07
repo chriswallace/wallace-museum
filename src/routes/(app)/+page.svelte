@@ -199,39 +199,43 @@
 </svelte:head>
 
 <div class="homepage-container" on:mousemove={handleMouseMove}>
-	<div class="content">
-		
-		<div class="inline-content">
-			<h1 class="title inline">The Wallace Museum</h1>
-			<p class="description inline">
-				showcases pioneering works from bleeding-edge artists pushing the
-				boundaries of computational aesthetics and algorithmic expression. Each piece in the
-				collection represents an evolving dialogue between human imagination and digital
-				innovation—where mathematics becomes poetry and algorithms transform into art.
-				{#if data.artists && data.artists.length > 0}
-					{#each data.artists as artist, index (artist.id)}<!--
-						--><button
-							type="button"
-							class="artist-link"
-							on:mouseenter={() => handleArtistHover(artist)}
-							on:mouseleave={clearArtistHover}
-							on:focus={() => handleArtistHover(artist)}
-							on:blur={clearArtistHover}
-							on:click={() => goto(`/artist/${artist.id}`)}
-							aria-label={`View artworks by ${artist.name}`}
-						>{artist.name}</button> {#if index < data.artists.length - 2} {:else if index === data.artists.length - 2} {/if}
-					{/each}
-				{:else}
-					no artists currently.
-				{/if}
-			</p>
+	<div class="two-column-layout">
+		<!-- Left Column: Intro and Artists -->
+		<div class="left-column">
+			<div class="left-content">
+				<div class="inline-content">
+					<h1 class="title inline">The Wallace Museum</h1>
+					<p class="description inline">
+						showcases pioneering works from bleeding-edge artists pushing the
+						boundaries of computational aesthetics and algorithmic expression. Each piece in the
+						collection represents an evolving dialogue between human imagination and digital
+						innovation—where mathematics becomes poetry and algorithms transform into art.
+						{#if data.artists && data.artists.length > 0}
+							{#each data.artists as artist, index (artist.id)}<!--
+								--><button
+									type="button"
+									class="artist-link"
+									on:mouseenter={() => handleArtistHover(artist)}
+									on:mouseleave={clearArtistHover}
+									on:focus={() => handleArtistHover(artist)}
+									on:blur={clearArtistHover}
+									on:click={() => goto(`/artist/${artist.id}`)}
+									aria-label={`View artworks by ${artist.name}`}
+								>{artist.name}</button>{#if index < data.artists.length - 2}, {:else if index === data.artists.length - 2} and {/if}
+							{/each}.
+						{:else}
+							No artists currently.
+						{/if}
+					</p>
+				</div>
+			</div>
+		</div>
+
+		<!-- Right Column: Artwork Feed -->
+		<div class="right-column">
+			<ArtworkFeed />
 		</div>
 	</div>
-
-	<hr class="mb-1.5 border-gray-800" />
-
-	<!-- Artwork Feed -->
-	<ArtworkFeed />
 
 	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && previewMedia}
 		<div
@@ -283,46 +287,54 @@
 </div>
 
 <style lang="scss">
-	:global(body) {
-		@apply overflow-x-hidden;
-	}
 
 	.homepage-container {
 		@apply w-full min-h-screen bg-black;
 	}
 
-	.content {
-		@apply w-full p-4 py-10;
+	.two-column-layout {
+		@apply flex;
 	}
 
-	.title {
-		@apply text-base font-bold text-yellow-500 tracking-tight mb-8;
+	.left-column {
+		@apply w-1/3;
+	}
+
+	.right-column {
+		@apply w-2/3;
+		padding-top: 2rem; /* Align with left column content */
+	}
+
+	.right-column::-webkit-scrollbar {
+		display: none; /* Chrome, Safari, Opera */
+	}
+
+	.left-content {
+		@apply p-8 py-16;
 	}
 
 	.inline-content {
 		@apply space-y-0;
 	}
 
+	.title {
+		@apply text-2xl md:text-4xl 2xl:text-5xl font-bold text-yellow-500 tracking-tight mb-8;
+	}
+
 	.title,
 	.inline-content p,
 	.inline-content button {
-		@apply text-lg md:text-3xl 2xl:text-4xl;
+		@apply text-sm md:text-lg 2xl:text-2xl;
 	}
 
 	.description {
-		@apply text-sm text-gray-100 font-semibold leading-normal tracking-tight mb-4;
-		overflow-wrap: break-word;
-		word-wrap: break-word;
-	}
-
-	.featuring-text {
-		@apply text-sm text-gray-100 font-semibold leading-normal tracking-tight;
+		@apply text-gray-100 font-semibold leading-relaxed tracking-tight;
 		overflow-wrap: break-word;
 		word-wrap: break-word;
 	}
 
 	.artist-link {
-		@apply inline text-sm text-yellow-500 font-semibold bg-none border-none p-0 cursor-pointer outline-none leading-normal tracking-tight;
+		@apply inline text-yellow-500 font-semibold bg-none border-none p-0 cursor-pointer outline-none leading-normal tracking-tight;
 		@apply hover:text-yellow-400 transition-colors duration-200;
 		@apply focus:text-yellow-400 focus:outline-none;
 		text-decoration: underline;
@@ -362,25 +374,37 @@
 		}
 	}
 
-	@media (max-width: 480px) {
-		.content {
-			@apply py-5 px-4;
+	@media (max-width: 768px) {
+		.two-column-layout {
+			@apply flex-col;
+		}
+
+		.left-column,
+		.right-column {
+			@apply w-full h-auto;
+		}
+
+		.left-column {
+			@apply max-h-screen;
+		}
+
+		.left-content {
+			@apply p-4 py-8;
 		}
 
 		.title {
-			@apply text-lg mb-6;
+			@apply text-xl mb-6;
 		}
 
 		.title,
 		.inline-content p,
 		.inline-content button {
-			@apply text-xl;
+			@apply text-base;
 		}
 
 		.description,
-		.featuring-text,
 		.artist-link {
-			@apply text-xs;
+			@apply text-sm;
 		}
 	}
 

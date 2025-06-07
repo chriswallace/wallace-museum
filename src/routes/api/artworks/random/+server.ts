@@ -12,6 +12,7 @@ export interface FeedArtwork {
 		width: number;
 		height: number;
 	} | null;
+	mintDate: Date | null;
 	artists: {
 		id: number;
 		name: string;
@@ -70,6 +71,7 @@ export const GET: RequestHandler = async ({ url }) => {
 			animationUrl: artwork.animationUrl,
 			mime: artwork.mime,
 			dimensions: artwork.dimensions as { width: number; height: number } | null,
+			mintDate: artwork.mintDate,
 			artists: artwork.Artist
 		}));
 
