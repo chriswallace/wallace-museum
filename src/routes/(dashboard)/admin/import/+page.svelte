@@ -206,33 +206,68 @@
 			const params = new URLSearchParams({
 				q: searchTerm,
 				limit: '48',
-				offset: currentOffset.toString(),
-				type: activeTab // Use the new type parameter instead of filter
+				offset: reset ? '0' : currentOffset.toString(),
+				type: activeTab // Use the new type parameter
 			});
 
 			const response = await fetch(`/api/admin/search?${params}`);
 			const data = await response.json();
 
-			if (data.results) {
-				if (reset) {
-					// Now replace the results after getting new data
-					searchResults = data.results;
-				} else {
-					// Deduplicate when appending new results
-					const combinedResults = [...searchResults, ...data.results];
-					searchResults = deduplicateArtworks(combinedResults);
-				}
-
-				totalResults = data.total;
-				currentOffset = data.offset + data.results.length;
-				hasMore = data.results.length === 48; // If we got a full page, there might be more
+			if (data.error) {
+				console.error('Search error:', data.error);
+				return;
 			}
+
+			const newResults = data.results || [];
+			
+			// Detect MIME types for the new results to properly display videos vs images
+			if (newResults.length > 0) {
+				try {
+					const mimeResponse = await fetch('/api/admin/detect-mime', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							artworks: newResults.map((artwork: ExtendedArtwork) => ({
+								id: artwork.id,
+								image_url: artwork.image_url,
+								animation_url: artwork.animation_url,
+								thumbnailUrl: artwork.thumbnailUrl
+							}))
+						})
+					});
+
+					if (mimeResponse.ok) {
+						const mimeData = await mimeResponse.json();
+						const mimeMap = new Map(mimeData.results.map((result: any) => [result.id, result.mime]));
+						
+						// Update the results with detected MIME types by creating new objects
+						for (let i = 0; i < newResults.length; i++) {
+							const artwork = newResults[i];
+							const detectedMime = mimeMap.get(artwork.id);
+							if (detectedMime) {
+								newResults[i] = { ...artwork, mime: detectedMime };
+							}
+						}
+					}
+				} catch (mimeError) {
+					console.warn('Failed to detect MIME types:', mimeError);
+					// Continue without MIME types - the UI will fall back to URL-based detection
+				}
+			}
+
+			if (reset) {
+				searchResults = newResults;
+			} else {
+				searchResults = [...searchResults, ...newResults];
+			}
+
+			totalResults = data.total || 0;
+			hasMore = searchResults.length < totalResults;
+			currentOffset = reset ? newResults.length : currentOffset + newResults.length;
 		} catch (error) {
 			console.error('Error searching artworks:', error);
-			// On error, only clear results if this was a reset search
-			if (reset) {
-				searchResults = [];
-			}
 		} finally {
 			isSearching = false;
 		}
