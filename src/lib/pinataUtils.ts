@@ -6,7 +6,58 @@
  * 
  * For client-side usage, use $lib/pinataUtils.client instead.
  */
-import { getPinataTransformedUrl, extractCidFromUrl } from './pinataHelpers';
+import { extractCidFromUrl, getPinataGateway } from './pinataHelpers';
+
+/**
+ * Get a Pinata transformed URL (server-side version)
+ * @param cid - The IPFS CID
+ * @param options - Transformation options
+ * @returns Transformed URL
+ */
+function getPinataTransformedUrl(
+	cid: string,
+	options: {
+		width?: number;
+		height?: number;
+		quality?: number;
+		format?: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png';
+		fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad';
+		gravity?: 'auto' | 'side' | string;
+		dpr?: number;
+		sharpen?: number;
+		animation?: boolean;
+		metadata?: 'keep' | 'copyright' | 'none';
+	} = {}
+): string {
+	// Get the base gateway URL with token
+	const baseUrl = getPinataGateway(true); // This already includes the token
+	
+	// Build query parameters for transformations using correct Pinata naming conventions
+	const params = new URLSearchParams();
+	
+	// Extract existing query params from baseUrl if any
+	const urlParts = baseUrl.split('?');
+	if (urlParts.length > 1) {
+		const existingParams = new URLSearchParams(urlParts[1]);
+		existingParams.forEach((value, key) => {
+			params.append(key, value);
+		});
+	}
+	
+	if (options.width) params.append('img-width', options.width.toString());
+	if (options.height) params.append('img-height', options.height.toString());
+	if (options.quality) params.append('img-quality', options.quality.toString());
+	if (options.format) params.append('img-format', options.format);
+	if (options.fit) params.append('img-fit', options.fit);
+	if (options.gravity) params.append('img-gravity', options.gravity);
+	if (options.dpr) params.append('img-dpr', options.dpr.toString());
+	if (options.sharpen) params.append('img-sharpen', options.sharpen.toString());
+	if (options.animation !== undefined) params.append('img-anim', options.animation ? 'true' : 'false');
+	if (options.metadata) params.append('img-metadata', options.metadata);
+	
+	const queryString = params.toString();
+	return `${urlParts[0]}${cid}?${queryString}`;
+}
 
 /**
  * Get a Pinata transformed URL equivalent to Cloudinary transformations

@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 const IPFS_GATEWAY = 'https://ipfs.wallacemuseum.com/ipfs/';
+const PINATA_GATEWAY_TOKEN = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
 
 export const GET: RequestHandler = async ({ params, url, fetch }) => {
 	const { cid } = params;
@@ -20,8 +21,11 @@ export const GET: RequestHandler = async ({ params, url, fetch }) => {
 	const fullPath = path ? `${cid}/${path}` : cid;
 
 	try {
-		// Forward the request to the Wallace Museum IPFS gateway
-		const response = await fetch(`${IPFS_GATEWAY}${fullPath}`, {
+		// Forward the request to the Wallace Museum IPFS gateway with token
+		const gatewayUrl = new URL(`${IPFS_GATEWAY}${fullPath}`);
+		gatewayUrl.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+		
+		const response = await fetch(gatewayUrl.toString(), {
 			headers: {
 				'User-Agent': 'Wallace Museum Collection'
 			}

@@ -41,7 +41,7 @@ export function extractCidFromUrl(url: string): string | null {
 }
 
 /**
- * Get a Pinata transformed URL (client-safe version using public gateway)
+ * Get a Pinata transformed URL (client-safe version using Wallace Museum gateway)
  * @param cid - The IPFS CID
  * @param options - Transformation options
  * @returns Transformed URL
@@ -61,11 +61,15 @@ export function getPinataTransformedUrl(
 		metadata?: 'keep' | 'copyright' | 'none';
 	} = {}
 ): string {
-	// Use public gateway for client-side transformations
-	const baseUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
+	// Use Wallace Museum custom gateway that routes to Pinata with authentication token
+	const gatewayToken = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
+	const baseUrl = `https://ipfs.wallacemuseum.com/ipfs/${cid}`;
 	
 	// Build query parameters for transformations using correct Pinata naming conventions
 	const params = new URLSearchParams();
+	
+	// Add the gateway token first
+	params.append('pinataGatewayToken', gatewayToken);
 	
 	if (options.width) params.append('img-width', options.width.toString());
 	if (options.height) params.append('img-height', options.height.toString());
@@ -79,7 +83,7 @@ export function getPinataTransformedUrl(
 	if (options.metadata) params.append('img-metadata', options.metadata);
 	
 	const queryString = params.toString();
-	return queryString ? `${baseUrl}?${queryString}` : baseUrl;
+	return `${baseUrl}?${queryString}`;
 }
 
 /**

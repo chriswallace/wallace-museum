@@ -99,22 +99,37 @@ export function extractCidFromUrl(url: string): string | null {
 }
 
 /**
- * Get the Pinata gateway URL from environment variables
- * @returns The configured Pinata gateway URL
+ * Get the Pinata gateway URL from environment variables with authentication token
+ * @param includePath - Whether to include the /ipfs/ path (default: true)
+ * @returns The configured Pinata gateway URL with authentication token
  */
-export function getPinataGateway(): string {
+export function getPinataGateway(includePath: boolean = true): string {
 	const gateway = env.PINATA_GATEWAY;
+	const gatewayToken = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
+	
+	let baseUrl: string;
+	
 	if (gateway) {
 		// Support both subdomain format and full URL format
 		if (gateway.startsWith('http')) {
 			// Full URL provided (e.g., 'https://my-gateway.mypinata.cloud/ipfs/')
-			return gateway.endsWith('/') ? gateway : `${gateway}/`;
+			baseUrl = gateway.endsWith('/') ? gateway : `${gateway}/`;
 		} else {
 			// Subdomain format (e.g., 'my-gateway')
-			return `https://${gateway}.mypinata.cloud/ipfs/`;
+			baseUrl = `https://${gateway}.mypinata.cloud/ipfs/`;
 		}
+	} else {
+		baseUrl = 'https://gateway.pinata.cloud/ipfs/';
 	}
-	return 'https://gateway.pinata.cloud/ipfs/';
+	
+	// Remove /ipfs/ if includePath is false
+	if (!includePath && baseUrl.endsWith('/ipfs/')) {
+		baseUrl = baseUrl.replace('/ipfs/', '/');
+	}
+	
+	// Add the gateway token as a query parameter
+	const separator = baseUrl.includes('?') ? '&' : '?';
+	return `${baseUrl}${separator}pinataGatewayToken=${gatewayToken}`;
 }
 
 /**

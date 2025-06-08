@@ -182,11 +182,13 @@
 >
 	<!-- Skeleton loader -->
 	{#if shouldShowSkeleton}
-		<SkeletonLoader
-			width="100%"
-			height="100%"
-			borderRadius="4px"
-		/>
+		<div class="skeleton-overlay">
+			<SkeletonLoader
+				width="100%"
+				height="100%"
+				borderRadius="4px"
+			/>
+		</div>
 	{/if}
 
 	{#if hasError}
@@ -326,6 +328,20 @@
 		cursor: pointer;
 		display: block;
 		margin: 0 auto;
+		position: relative;
+		z-index: 2;
+	}
+
+	.skeleton-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1;
 	}
 
 	.loading-state,

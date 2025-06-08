@@ -192,13 +192,15 @@
 	style:max-height="100%"
 	style:object-fit="contain"
 >
-	<!-- Skeleton loader -->
+	<!-- Skeleton loader positioned to exactly match the image -->
 	{#if shouldShowSkeleton}
-		<SkeletonLoader
-			width="100%"
-			height="100%"
-			borderRadius={skeletonBorderRadius}
-		/>
+		<div class="skeleton-overlay">
+			<SkeletonLoader
+				width="100%"
+				height="100%"
+				borderRadius={skeletonBorderRadius}
+			/>
+		</div>
 	{/if}
 
 	<!-- Main image element -->
@@ -233,6 +235,18 @@
 		box-sizing: border-box;
 	}
 
+	.skeleton-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1;
+	}
+
 	img {
 		@apply mx-auto;
 		display: block;
@@ -242,6 +256,8 @@
 		height: auto;
 		object-fit: contain;
 		transition: opacity 0.2s ease-in-out;
+		position: relative;
+		z-index: 2;
 	}
 
 	img.hidden {

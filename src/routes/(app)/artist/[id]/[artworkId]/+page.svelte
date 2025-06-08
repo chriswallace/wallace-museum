@@ -722,10 +722,12 @@
 		@apply bg-black p-0;
 		width: 100vw;
 		height: 82svh;
-		max-width: none;
+		max-width: 100vw;
+		max-height: 82svh;
 		border-radius: 0;
 		margin-left: calc(-50vw + 50%);
 		margin-right: calc(-50vw + 50%);
+		overflow: hidden;
 	}
 
 	.artwork-media {

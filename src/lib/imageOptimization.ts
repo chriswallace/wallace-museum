@@ -7,7 +7,8 @@ import { ipfsToHttpUrl } from './mediaUtils';
 
 // The Wallace Museum IPFS microservice endpoint with image optimization
 const IPFS_IMAGE_ENDPOINT = 'https://ipfs.wallacemuseum.com/api/image';
-const IPFS_DIRECT_ENDPOINT = 'https://ipfs.wallacemuseum.com';
+const IPFS_DIRECT_ENDPOINT = 'https://ipfs.wallacemuseum.com/ipfs';
+const PINATA_GATEWAY_TOKEN = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
 
 export interface ImageOptimizationOptions {
 	width?: number;
@@ -236,9 +237,18 @@ export function buildOptimizedImageUrl(
 		return ipfsToHttpUrl(imageUrl);
 	}
 
+	// Since the /api/image endpoint is having issues, fall back to direct IPFS gateway
+	// TODO: Re-enable image optimization once the /api/image endpoint is fixed
+	console.log(`[buildOptimizedImageUrl] Image optimization endpoint unavailable, serving directly: ${imageUrl}`);
+	return buildDirectImageUrl(imageUrl);
+
+	// The following code would be used when the /api/image endpoint is working:
+	/*
 	// Build query parameters for image optimization
 	const params = new URLSearchParams();
 	params.append('hash', cid);
+	// Note: The /api/image endpoint might not support pinataGatewayToken
+	// Authentication may be handled differently for image optimization
 
 	if (options.width) params.append('width', options.width.toString());
 	if (options.height) params.append('height', options.height.toString());
@@ -252,6 +262,7 @@ export function buildOptimizedImageUrl(
 	if (options.metadata) params.append('metadata', options.metadata);
 
 	return `${IPFS_IMAGE_ENDPOINT}?${params.toString()}`;
+	*/
 }
 
 /**
@@ -269,7 +280,9 @@ export function buildDirectImageUrl(imageUrl: string | null | undefined): string
 	const cidAndPath = extractCidAndPath(imageUrl);
 	if (cidAndPath) {
 		const { cid, path } = cidAndPath;
-		return `${IPFS_DIRECT_ENDPOINT}/${cid}${path ? `/${path}` : ''}`;
+		const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}${path ? `/${path}` : ''}`);
+		url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+		return url.toString();
 	}
 
 	// Fallback: extract just the CID (for backwards compatibility)
@@ -278,7 +291,9 @@ export function buildDirectImageUrl(imageUrl: string | null | undefined): string
 		return ipfsToHttpUrl(imageUrl);
 	}
 
-	return `${IPFS_DIRECT_ENDPOINT}/${cid}`;
+	const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}`);
+	url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+	return url.toString();
 }
 
 /**

@@ -41,11 +41,6 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		min-height: 0;
-		min-width: 0;
-		box-sizing: border-box;
-		background: var(--color-surface-secondary, #f5f5f5);
-		border-radius: 4px;
 		overflow: hidden;
 	}
 
@@ -58,32 +53,33 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		text-align: center;
+		gap: 12px;
 		z-index: 2;
 		pointer-events: none;
 	}
 
 	.iframe-skeleton-icon {
-		margin-bottom: 8px;
-		color: var(--color-text-secondary, #666);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: rgba(0, 0, 0, 0.3);
 	}
 
 	.iframe-skeleton-text {
-		font-size: 0.875rem;
-		color: var(--color-text-secondary, #666);
+		font-size: 14px;
+		color: rgba(0, 0, 0, 0.5);
 		margin: 0;
-		opacity: 0.7;
+		text-align: center;
+		font-weight: 500;
 	}
 
-	/* Dark mode support */
 	@media (prefers-color-scheme: dark) {
-		.iframe-skeleton {
-			background: var(--color-surface-secondary-dark, #374151);
+		.iframe-skeleton-icon {
+			color: rgba(255, 255, 255, 0.3);
 		}
 
-		.iframe-skeleton-icon,
 		.iframe-skeleton-text {
-			color: var(--color-text-secondary-dark, #9CA3AF);
+			color: rgba(255, 255, 255, 0.5);
 		}
 	}
 </style> 

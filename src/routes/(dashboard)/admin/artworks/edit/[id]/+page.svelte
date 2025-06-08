@@ -332,7 +332,7 @@
 								</video>
 							{:else if artwork.mime === 'text/html' || artwork.mime === 'application/javascript' || artwork.generatorUrl}
 								<iframe 
-									src={ipfsToHttpUrl(artwork.animationUrl || artwork.generatorUrl)} 
+									src={ipfsToHttpUrl(artwork.animationUrl || artwork.generatorUrl, undefined, true, artwork.mime)} 
 									title="Interactive Artwork"
 									class="media-content"
 									width={artwork.dimensions?.width || 800}

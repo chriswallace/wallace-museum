@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import { ipfsToHttpUrl, IPFS_GATEWAYS } from '$lib/mediaUtils';
 	import { getBestMediaUrl, getMediaDisplayType } from '$lib/utils/mediaHelpers';
 	import { buildOptimizedImageUrl, buildDirectImageUrl } from '$lib/imageOptimization';
 	import VideoPlayer from './VideoPlayer.svelte';
@@ -61,7 +61,7 @@
 	$: bestMedia = getBestMediaUrl(artworkMediaUrls, 'fullscreen', artwork.mime);
 	$: mediaType = getMediaDisplayType(bestMedia, artwork.mime);
 	$: displayUrl = bestMedia?.url || '';
-	$: transformedUrl = displayUrl ? ipfsToHttpUrl(displayUrl) : '';
+	$: transformedUrl = displayUrl ? ipfsToHttpUrl(displayUrl, IPFS_GATEWAYS[0], true, artwork.mime || undefined) : '';
 
 	// Calculate optimal display size for images (max 1200px width for performance)
 	$: displayWidth = actualDimensions ? Math.min(actualDimensions.width, 1200) : 1200;
@@ -192,7 +192,7 @@
 				aspectRatio={aspectRatio}
 				showSkeleton={shouldShowSkeleton}
 				className="artwork-image"
-				style={isInFullscreen ? 'width: 100vw !important; height: 100vh !important; object-fit: contain !important; background: black;' : style}
+				style={isInFullscreen ? 'max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain;' : style}
 			/>
 			
 			{#if canFullscreen && !isInFullscreen}
@@ -222,25 +222,34 @@
 	}
 
 	.artwork-display.fullscreen {
-		@apply w-screen min-h-[340px];
+		@apply w-full max-w-full min-h-[340px];
 		height: 82svh;
+		max-height: 82svh;
 		aspect-ratio: unset;
+		overflow: hidden;
 	}
 
 	.artwork-display.fullscreen :global(.artwork-image) {
-		@apply w-screen min-h-[340px] object-contain;
-		height: 82svh;
+		@apply object-contain;
+		max-width: 100vw;
+		max-height: 82svh;
+		width: auto;
+		height: auto;
 	}
 
 	.artwork-display.fullscreen .interactive-content {
 		/* Keep iframe at its original size and center it */
 		@apply w-auto h-auto max-w-full min-h-[340px];
 		max-height: 82svh;
+		max-width: 100vw;
 	}
 
 	.artwork-display.fullscreen :global(.video-player-artwork) {
-		@apply w-screen object-contain min-h-[340px];
-		height: 82svh;
+		@apply object-contain;
+		max-width: 100vw;
+		max-height: 82svh;
+		width: auto;
+		height: auto;
 	}
 
 	.no-media {
@@ -304,21 +313,29 @@
 	/* Fullscreen styles */
 	:global(.image-container:fullscreen) {
 		@apply bg-black flex items-center justify-center;
+		width: 100vw !important;
+		height: 100vh !important;
+		max-width: 100vw !important;
+		max-height: 100vh !important;
 	}
 
 	:global(.iframe-container:fullscreen) {
 		@apply bg-black flex items-center justify-center;
+		width: 100vw !important;
+		height: 100vh !important;
+		max-width: 100vw !important;
+		max-height: 100vh !important;
 	}
 
 	:global(.image-container:fullscreen .artwork-image) {
 		@apply w-auto h-auto object-contain;
-		max-width: 100vw;
-		max-height: 100svh;
+		max-width: 100vw !important;
+		max-height: 100vh !important;
 	}
 
 	:global(.iframe-container:fullscreen .interactive-content) {
 		/* Keep iframe at its original dimensions when in fullscreen */
-		max-width: 100vw;
-		max-height: 100svh;
+		max-width: 100vw !important;
+		max-height: 100vh !important;
 	}
 </style>

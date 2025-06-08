@@ -16,6 +16,7 @@ const ARWEAVE_GATEWAY = 'https://arweave.net/';
 // Note: IPFS content will be handled by the Wallace Museum IPFS microservice
 // The client-side code will use the external microservice for IPFS access
 const IPFS_MICROSERVICE_ENDPOINT = 'https://ipfs.wallacemuseum.com/ipfs/';
+const PINATA_GATEWAY_TOKEN = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
 
 /**
  * A set of reliable IPFS gateways to try in sequence
@@ -158,6 +159,81 @@ export function removeQueryString(url: string | null | undefined): string {
 }
 
 /**
+ * Converts IPFS URIs to HTTP URLs specifically for HTML content using ipfs.io gateway
+ * This ensures HTML content loads properly without authentication issues
+ * @param uri - The URI to convert (IPFS URI)
+ * @param mimeType - Optional MIME type to determine if this is HTML content
+ * @returns A full HTTPS URL using ipfs.io gateway for HTML content
+ */
+export function ipfsToHttpUrlForHtml(
+	uri: string | null | undefined,
+	mimeType?: string
+): string {
+	if (!uri || typeof uri !== 'string') return '';
+
+	// Clean and sanitize input
+	let cleanUri = uri.trim();
+
+	// Remove any @ symbol that might have gotten prepended
+	if (cleanUri.startsWith('@')) {
+		cleanUri = cleanUri.substring(1);
+	}
+
+	// Handle data URIs
+	if (cleanUri.startsWith('data:')) {
+		return cleanUri;
+	}
+
+	// For HTML content, always use ipfs.io gateway (no authentication needed)
+	const IPFS_IO_GATEWAY = 'https://ipfs.io/ipfs/';
+
+	// Handle existing IPFS gateway URLs - extract CID and route through ipfs.io
+	if (cleanUri.startsWith('http://') || cleanUri.startsWith('https://')) {
+		const ipfsGatewayPatterns = [
+			/https?:\/\/w3s\.link\/ipfs\/(.+)/,
+			/https?:\/\/dweb\.link\/ipfs\/(.+)/,
+			/https?:\/\/.*\.ipfs\.w3s\.link\/(.+)/,
+			/https?:\/\/.*\.ipfs\.dweb\.link\/(.+)/,
+			/https?:\/\/gateway\.pinata\.cloud\/ipfs\/(.+)/,
+			/https?:\/\/.*\.mypinata\.cloud\/ipfs\/(.+)/,
+			/https?:\/\/nftstorage\.link\/ipfs\/(.+)/,
+			/https?:\/\/cloudflare-ipfs\.com\/ipfs\/(.+)/,
+			/https?:\/\/ipfs\.io\/ipfs\/(.+)/,
+			/https?:\/\/ipfs\.wallacemuseum\.com\/ipfs\/(.+)/,
+			/https?:\/\/.*\/ipfs\/(.+)/
+		];
+
+		for (const pattern of ipfsGatewayPatterns) {
+			const match = cleanUri.match(pattern);
+			if (match && match[1]) {
+				const cidAndPath = match[1];
+				// Remove any query parameters for clean URL
+				const cleanCidAndPath = cidAndPath.split('?')[0];
+				return IPFS_IO_GATEWAY + cleanCidAndPath;
+			}
+		}
+
+		// If it's already an HTTP/HTTPS URL but not an IPFS gateway, return as-is
+		return cleanUri;
+	}
+
+	// Handle IPFS URIs
+	if (cleanUri.startsWith('ipfs://') || cleanUri.startsWith('ipfs:/')) {
+		// Remove ipfs:// or ipfs:/ prefix
+		let cleaned = cleanUri.replace(/^ipfs:\/\//, '').replace(/^ipfs:\//, '');
+		return IPFS_IO_GATEWAY + cleaned;
+	}
+
+	// Handle IPFS paths without protocol (raw CIDs or CID/path)
+	if (cleanUri.startsWith('Qm') || cleanUri.startsWith('bafy')) {
+		return IPFS_IO_GATEWAY + cleanUri;
+	}
+
+	// If nothing matched, return as is
+	return cleanUri;
+}
+
+/**
  * Converts any IPFS or Arweave style URI to a full HTTP(S) URL using the appropriate gateway.
  * - Accepts ipfs://[cid]/foo or ipfs:/[cid]/foo and returns gateway + [cid]/foo
  * - Accepts onchfs://[cid]/foo and returns onchfs gateway + [cid]/foo
@@ -168,14 +244,21 @@ export function removeQueryString(url: string | null | undefined): string {
  * @param uri - The URI to convert (IPFS, Arweave, or existing HTTP/S URL)
  * @param gateway - Optional gateway to use for IPFS (default: fallback gateway)
  * @param useProxy - Whether to use the IPFS microservice for IPFS (default: true)
+ * @param mimeType - Optional MIME type to determine special handling (e.g., HTML content)
  * @returns A full HTTPS URL for the content, or the original HTTP/S/data URI.
  */
 export function ipfsToHttpUrl(
 	uri: string | null | undefined,
 	gateway: string = IPFS_GATEWAYS[0],
-	useProxy: boolean = true
+	useProxy: boolean = true,
+	mimeType?: string
 ): string {
 	if (!uri || typeof uri !== 'string') return '';
+
+	// For HTML content, always use ipfs.io gateway to avoid authentication issues
+	if (mimeType === 'text/html' || mimeType === 'text/javascript' || mimeType === 'application/javascript') {
+		return ipfsToHttpUrlForHtml(uri, mimeType);
+	}
 
 	// Clean and sanitize input - remove any leading/trailing whitespace and special characters
 	let cleanUri = uri.trim();
@@ -247,7 +330,12 @@ export function ipfsToHttpUrl(
 					}
 
 					// Build microservice URL
-					return `${IPFS_MICROSERVICE_ENDPOINT}${cid}${path ? `/${path}` : ''}`;
+					const baseUrl = new URL(IPFS_MICROSERVICE_ENDPOINT + cid);
+					if (path) {
+						baseUrl.pathname += `/${path}`;
+					}
+					baseUrl.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+					return baseUrl.toString();
 				}
 
 				return gateway + cidAndPath;
@@ -278,7 +366,12 @@ export function ipfsToHttpUrl(
 			}
 
 			// Build microservice URL
-			return `${IPFS_MICROSERVICE_ENDPOINT}${cid}${path ? `/${path}` : ''}`;
+			const baseUrl = new URL(IPFS_MICROSERVICE_ENDPOINT + cid);
+			if (path) {
+				baseUrl.pathname += `/${path}`;
+			}
+			baseUrl.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+			return baseUrl.toString();
 		}
 
 		return gateway + cleaned;
@@ -293,7 +386,12 @@ export function ipfsToHttpUrl(
 			const path = pathParts.slice(1).join('/');
 
 			// Build microservice URL
-			return `${IPFS_MICROSERVICE_ENDPOINT}${cid}${path ? `/${path}` : ''}`;
+			const baseUrl = new URL(IPFS_MICROSERVICE_ENDPOINT + cid);
+			if (path) {
+				baseUrl.pathname += `/${path}`;
+			}
+			baseUrl.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+			return baseUrl.toString();
 		}
 
 		return gateway + cleanUri;

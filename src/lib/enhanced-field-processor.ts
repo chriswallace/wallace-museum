@@ -93,7 +93,7 @@ export class EnhancedFieldProcessor {
    * Unified list of reliable IPFS gateways
    */
   private static readonly IPFS_GATEWAYS = [
-    'https://ipfs.wallacemuseum.com/ipfs/',
+    'https://ipfs.wallacemuseum.com/ipfs/?pinataGatewayToken=ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6',
     'https://dweb.link/ipfs/',
     'https://ipfs.io/ipfs/'
   ];

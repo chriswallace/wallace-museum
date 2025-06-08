@@ -21,7 +21,7 @@ import {
 } from './mediaUtils';
 
 // Import Pinata helpers
-import { uploadToPinata as pinataUpload, getPinataTransformedUrl } from './pinataHelpers';
+import { uploadToPinata as pinataUpload } from './pinataHelpers';
 
 // Helper function to dynamically import Sharp with error handling
 async function getSharp() {
@@ -50,7 +50,7 @@ if (typeof ffprobePath?.path === 'string') {
 
 // Add a list of IPFS gateways to try
 const IPFS_GATEWAYS = [
-	'https://gateway.pinata.cloud/ipfs/', // Added Pinata
+	'https://ipfs.wallacemuseum.com/ipfs/?pinataGatewayToken=ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6', // Wallace Museum custom gateway with auth token
 	'https://nftstorage.link/ipfs/', // Added NFT.Storage
 	'https://dweb.link/ipfs/', // Added Dweb
 	'https://ipfs.io/ipfs/' // Kept ipfs.io
