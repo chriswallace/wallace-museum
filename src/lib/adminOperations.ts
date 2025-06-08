@@ -3,7 +3,7 @@ import { Artist, WalletAddress, Prisma } from '@prisma/client';
 import { indexArtwork } from './artworkIndexer';
 import { convertToIpfsUrl } from '$lib/pinataHelpers';
 import { detectBlockchainFromContract } from '$lib/utils/walletUtils.js';
-import { isProblematicThumbnail } from '$lib/constants/tezos';
+import { isProblematicThumbnail, isVersumOrHicEtNuncContract, generateObjktThumbnailUrl } from '$lib/constants/tezos';
 
 // Define interfaces for expected data structures
 interface SocialMediaAccounts {
@@ -845,8 +845,13 @@ export async function saveArtwork(
 				? (nft.metadata?.thumbnail_uri || nft.thumbnail_uri || nft.metadata?.display_uri || nft.display_uri || null)
 				: (nft.metadata?.display_uri || nft.display_uri || nft.metadata?.thumbnail_uri || nft.thumbnail_uri || null);
 			
+			// Check if this is a Versum or Hic et Nunc contract - use objkt.com thumbnail
+			if (artworkBlockchain?.toLowerCase() === 'tezos' && isVersumOrHicEtNuncContract(nft.collection.contract)) {
+				console.log(`[saveArtwork] Detected Versum/Hic et Nunc contract ${nft.collection.contract}, using objkt.com thumbnail for token ${nft.tokenID}`);
+				thumbnailUrl = generateObjktThumbnailUrl(nft.collection.contract, nft.tokenID);
+			}
 			// If we have a problematic thumbnail, use the main image instead
-			if (isProblematicThumbnail(thumbnailUrl)) {
+			else if (isProblematicThumbnail(thumbnailUrl)) {
 				console.log(`[saveArtwork] Detected problematic thumbnail for ${nft.collection.contract}:${nft.tokenID}, using display/artifact image instead`);
 				thumbnailUrl = final_image_url;
 			}

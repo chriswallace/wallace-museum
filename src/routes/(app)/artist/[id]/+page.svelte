@@ -66,6 +66,15 @@
 		return '';
 	}
 
+	function getProfileLinkText(blockchain: string): string {
+		if (blockchain.toLowerCase() === 'tezos') {
+			return 'Objkt.com Profile';
+		} else if (blockchain.toLowerCase() === 'ethereum') {
+			return 'OpenSea Profile';
+		}
+		return 'View Profile';
+	}
+
 	function getChainIcon(blockchain: string): string {
 		if (blockchain.toLowerCase() === 'tezos') {
 			return 'tezos';
@@ -263,25 +272,23 @@
 														<path d="M11.944 17.97L4.58 13.62 11.943 24l7.37-10.38-7.372 4.35h.003zM12.056 0L4.69 12.223l7.365 4.354 7.365-4.35L12.056 0z"/>
 													</svg>
 												{:else if getChainIcon(wallet.blockchain) === 'tezos'}
-													<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-														<path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm6.066 9.645c.183 4.04-2.83 8.544-8.164 8.544-5.334 0-9.92-4.504-9.737-8.544C.348 5.645 5.718 3.321 12 3.321s11.652 2.324 6.066 6.324z"/>
-													</svg>
+													<svg height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1169.87 1593" fill="currentColor"><g id="Layer_2" data-name="Layer 2"><path d="M755.68,1593q-170.51,0-248.91-82.14a253.6,253.6,0,0,1-78.15-177,117.39,117.39,0,0,1,13.69-58.5A101.21,101.21,0,0,1,479.64,1238a130.22,130.22,0,0,1,116.24,0A99.55,99.55,0,0,1,633,1275.36a115,115,0,0,1,14.18,58.5,111.73,111.73,0,0,1-19.91,68.45a92.78,92.78,0,0,1-47.31,34.62,129.18,129.18,0,0,0,74.67,46.55,370,370,0,0,0,101.8,14.68,226.91,226.91,0,0,0,128.19-38.33,224,224,0,0,0,83.63-113.25,492,492,0,0,0,27.38-169.5,465.07,465.07,0,0,0-29.87-176.23,217.54,217.54,0,0,0-86.37-109.52,229.68,229.68,0,0,0-124.43-35.59,236.75,236.75,0,0,0-107.78,36.59L567.26,932.4V892.33L926.43,410.5H428.62v500A178.9,178.9,0,0,0,456,1012.8a94.34,94.34,0,0,0,83.63,40.07a139.85,139.85,0,0,0,82.63-29.12,298.38,298.38,0,0,0,69.2-71.19a24.86,24.86,0,0,1,9-11.94,18.4,18.4,0,0,1,12-4.48,41.55,41.55,0,0,1,23.4,9.95,49.82,49.82,0,0,1,12.69,33.85,197.86,197.86,0,0,1-4.48,24.89,241,241,0,0,1-85.38,106,211.78,211.78,0,0,1-119.76,36.38q-161.67,0-224-63.72A238.67,238.67,0,0,1,253.2,909.25V410.5H0V317.6H254.38V105.78L196.14,47.5V0h169l63.48,32.86V317.6l657.6-2,65.47,65.71L748.46,786.5a271,271,0,0,1,76.16-18.42A330.1,330.1,0,0,1,972,810.15a302.7,302.7,0,0,1,126.95,113.29,399.78,399.78,0,0,1,57.25,136.65,575.65,575.65,0,0,1,13.69,117,489.39,489.39,0,0,1-49.78,216.79,317.92,317.92,0,0,1-149.35,149.35A483.27,483.27,0,0,1,755.68,1593Z"/></g></svg>
 												{:else}
 													<div class="unknown-chain"></div>
 												{/if}
 											</div>
 											<code class="wallet-address">{formatWalletAddress(wallet.address)}</code>
+											{#if getProfileUrl(wallet.address, wallet.blockchain)}
+												<a
+													href={getProfileUrl(wallet.address, wallet.blockchain)}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="profile-link"
+												>
+													{getProfileLinkText(wallet.blockchain)}
+												</a>
+											{/if}
 										</div>
-										{#if getProfileUrl(wallet.address, wallet.blockchain)}
-											<a
-												href={getProfileUrl(wallet.address, wallet.blockchain)}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="profile-link"
-											>
-												View
-											</a>
-										{/if}
 									</li>
 								{/each}
 							</ul>
@@ -484,7 +491,7 @@
 	}
 
 	.wallet-item {
-		@apply flex items-center justify-between text-xs;
+		@apply flex items-center text-xs;
 	}
 
 	.wallet-info {
@@ -522,7 +529,7 @@
 	}
 
 	.artworks-grid {
-		@apply grid gap-0 lg:gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4;
+		@apply grid gap-0 lg:gap-6 grid-cols-1 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4;
 	}
 
 	.artwork-container {

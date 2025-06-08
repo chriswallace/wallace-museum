@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/prisma';
+import { cachedArtworkQueries, cachedCollectionQueries } from '$lib/cache/db-cache';
 
 // POST: Add Multiple Artworks to a Collection
 export const POST: RequestHandler = async ({ params, request }) => {
@@ -21,6 +22,12 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		if (!collection) {
 			return json({ error: 'Collection not found' }, { status: 404 });
 		}
+
+		// Get artwork UIDs for cache invalidation
+		const artworks = await db.read.artwork.findMany({
+			where: { id: { in: artworkIds.map(id => parseInt(id)) } },
+			select: { id: true, uid: true }
+		});
 		
 		// Update artworks to add them to the collection
 		const updatePromises = artworkIds.map(artworkId =>
@@ -31,6 +38,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		);
 		
 		const updatedArtworks = await Promise.all(updatePromises);
+
+		// Invalidate artwork cache for all affected artworks since their collection relationship changed
+		for (const artwork of artworks) {
+			await cachedArtworkQueries.invalidate(artwork.id, artwork.uid || undefined);
+		}
+
+		// Invalidate collection cache since its artwork list changed
+		await cachedCollectionQueries.invalidate(parseInt(collectionId!), collection.slug);
 		
 		return json({ 
 			success: true, 

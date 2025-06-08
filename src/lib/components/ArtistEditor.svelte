@@ -121,7 +121,16 @@
 				artist.avatarUrl = data.avatarUrl;
 				showToast('Avatar updated successfully.', 'success');
 			} else {
-				throw new Error('Failed to upload avatar');
+				// Try to get detailed error message from server
+				let errorMessage = 'Failed to upload avatar';
+				try {
+					const errorData = await response.json();
+					console.error('Server error response:', errorData);
+					errorMessage = errorData.details || errorData.error || errorMessage;
+				} catch (e) {
+					console.error('Could not parse error response');
+				}
+				throw new Error(errorMessage);
 			}
 		} catch (error) {
 			console.error('Error uploading avatar:', error);
@@ -205,15 +214,15 @@
 					<OptimizedImage
 						src={artist.avatarUrl}
 						alt={artist.name}
-						width={300}
-						height={300}
 						fit="crop"
 						gravity="auto"
 						format="webp"
+						height={2000}
+						width={2000}
 						quality={85}
 						showSkeleton={true}
 						skeletonBorderRadius="6px"
-						className="avatar-image w-full h-full object-cover border-2 border-gray-300 dark:border-gray-600 rounded-md"
+						className="avatar-image w-full h-full object-cover border-2 border-gray-300 dark:border-gray-600 rounded-full"
 						fallbackSrc="/images/medici-image.png"
 					/>
 				{:else}
@@ -227,7 +236,7 @@
 					type="button"
 					on:click={() => fileInputRef?.click()}
 					disabled={isUploadingAvatar}
-					class="absolute inset-0 bg-black bg-opacity-50 rounded-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed z-10"
+					class="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed z-10"
 				>
 					{#if !isUploadingAvatar}
 						<svg

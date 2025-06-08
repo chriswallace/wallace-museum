@@ -6,8 +6,11 @@ import type {
   ImportResult 
 } from '../types/indexing';
 import { pinCidToPinata, extractCidsFromArtwork, convertToIpfsUrl } from '$lib/pinataHelpers';
-import { isProblematicThumbnail } from '$lib/constants/tezos';
+import { isProblematicThumbnail, isVersumOrHicEtNuncContract, generateObjktThumbnailUrl } from '$lib/constants/tezos';
 import { EnhancedFieldProcessor } from '../enhanced-field-processor';
+import { MinimalNFTTransformer } from '$lib/minimal-transformers';
+import { handleMediaUpload } from '$lib/mediaHelpers';
+import { detectBlockchainFromContract } from '$lib/utils/walletUtils.js';
 
 // Unified indexer format (stored as json string in database)
 export interface IndexerData {
@@ -553,6 +556,12 @@ export class UnifiedIndexer {
 
       // Handle thumbnail URL with special logic
       const thumbnailUrl = (() => {
+        // Check if this is a Versum or Hic et Nunc contract - use objkt.com thumbnail
+        if (indexRecord.blockchain === 'tezos' && isVersumOrHicEtNuncContract(indexRecord.contractAddress)) {
+          console.log(`[UnifiedIndexer] Detected Versum/Hic et Nunc contract ${indexRecord.contractAddress}, using objkt.com thumbnail for token ${indexRecord.tokenId}`);
+          return generateObjktThumbnailUrl(indexRecord.contractAddress, indexRecord.tokenId);
+        }
+        
         // If we have a problematic thumbnail, use the display/artifact image instead
         if (isProblematicThumbnail(processedThumbnailUrl) || 
             isProblematicThumbnail(mergedData.thumbnailUrl)) {

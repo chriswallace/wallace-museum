@@ -94,7 +94,6 @@
 		
 		for (let i = 0; i < totalItems; i++) {
 			const artwork = artworks[i];
-			const skeletonRatio = skeletonAspectRatios[i % skeletonAspectRatios.length];
 			
 			if (artwork) {
 				// Real artwork
@@ -106,12 +105,28 @@
 					height: calculateHeight(artwork)
 				});
 			} else {
-				// Skeleton placeholder
+				// Skeleton placeholder - use dimensions from a future artwork if available
+				// or fall back to varied aspect ratios for visual diversity
+				const futureArtwork = artworks[i % artworks.length]; // Cycle through existing artworks for dimensions
+				let skeletonAspectRatio: string;
+				let skeletonHeight: number;
+				
+				if (futureArtwork && futureArtwork.dimensions?.width && futureArtwork.dimensions?.height) {
+					// Use dimensions from an existing artwork to maintain consistency
+					skeletonAspectRatio = getAspectRatio(futureArtwork);
+					skeletonHeight = calculateHeight(futureArtwork);
+				} else {
+					// Fall back to pre-defined ratios only when no artwork dimensions are available
+					const skeletonRatio = skeletonAspectRatios[i % skeletonAspectRatios.length];
+					skeletonAspectRatio = `${skeletonRatio.width}/${skeletonRatio.height}`;
+					skeletonHeight = Math.round((imageWidth * skeletonRatio.height) / skeletonRatio.width);
+				}
+				
 				items.push({
 					id: `skeleton-${i}`,
 					type: 'skeleton' as const,
-					aspectRatio: `${skeletonRatio.width}/${skeletonRatio.height}`,
-					height: Math.round((imageWidth * skeletonRatio.height) / skeletonRatio.width)
+					aspectRatio: skeletonAspectRatio,
+					height: skeletonHeight
 				});
 			}
 		}

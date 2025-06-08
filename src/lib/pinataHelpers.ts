@@ -349,14 +349,13 @@ export async function uploadToPinata(
 		// Set filename on the stream
 		(stream as any).path = fileName;
 
-		// Create options object
-		const options: any = {};
-		if (metadata) {
-			options.pinataMetadata = {
+		// Create options object with required metadata
+		const options: any = {
+			pinataMetadata: {
 				name: fileName,
-				keyvalues: metadata
-			};
-		}
+				keyvalues: metadata || {}
+			}
+		};
 
 		// Upload using legacy API
 		const result = await pinata.pinFileToIPFS(stream, options);

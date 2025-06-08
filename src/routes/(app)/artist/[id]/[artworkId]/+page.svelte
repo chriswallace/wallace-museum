@@ -763,7 +763,7 @@
 	}
 
 	.museum-artist-title {
-		@apply flex-1 pr-4;
+		@apply flex-1 pr-4 min-w-0;
 	}
 
 	.museum-artist {
@@ -771,11 +771,11 @@
 	}
 
 	.museum-title {
-		@apply text-lg font-bold text-white leading-tight uppercase max-w-prose truncate;
+		@apply text-lg font-bold text-white leading-tight uppercase;
 	}
 
 	.artwork-navigation {
-		@apply flex items-center gap-2 ml-4;
+		@apply flex items-center gap-2 ml-4 flex-shrink-0;
 	}
 
 	.nav-button {
@@ -893,7 +893,7 @@
 
 	.artist-back-button {
 		@apply flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors;
-		@apply bg-transparent border-none cursor-pointer p-0 m-0;
+		@apply bg-transparent border-none cursor-pointer p-0 m-0 min-w-0;
 		text-decoration: none;
 		
 		&:hover {
@@ -904,7 +904,7 @@
 	}
 
 	.back-icon {
-		@apply w-4 h-4 transition-transform duration-200;
+		@apply w-4 h-4 transition-transform duration-200 flex-shrink-0;
 	}
 
 	.artist-name {

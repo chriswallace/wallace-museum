@@ -6,7 +6,7 @@ import type {
   MinimalCreatorData 
 } from './types/minimal-nft';
 import { fetchCreatorInfo } from './openseaHelpers.js';
-import { WRAPPED_TEZOS_CONTRACT, isProblematicThumbnail } from './constants/tezos';
+import { WRAPPED_TEZOS_CONTRACT, isProblematicThumbnail, isVersumOrHicEtNuncContract, generateObjktThumbnailUrl } from './constants/tezos';
 import { detectBlockchainFromContract } from './utils/walletUtils';
 import { EnhancedFieldProcessor } from './enhanced-field-processor';
 import { fileTypeFromBuffer } from 'file-type';
@@ -267,8 +267,13 @@ export class MinimalNFTTransformer {
                        actualToken.thumbnail_uri || 
                        actualToken.display_uri;
     
-    // Check for problematic platform-specific thumbnails (Versum, Hic et Nunc)
-    if (isProblematicThumbnail(thumbnailUrl)) {
+    // Check if this is a Versum or Hic et Nunc contract - use objkt.com thumbnail
+    if (isVersumOrHicEtNuncContract(contractAddress)) {
+      console.log(`[MinimalNFTTransformer] Detected Versum/Hic et Nunc contract ${contractAddress}, using objkt.com thumbnail for token ${tokenId}`);
+      thumbnailUrl = generateObjktThumbnailUrl(contractAddress, tokenId);
+    }
+    // Check for problematic platform-specific thumbnails (other cases)
+    else if (isProblematicThumbnail(thumbnailUrl)) {
       console.log(`[MinimalNFTTransformer] Detected problematic thumbnail for Tezos token ${contractAddress}:${tokenId}, using display/artifact image instead`);
       // Use display_uri or artifact_uri as fallback when problematic thumbnail is detected
       thumbnailUrl = actualToken.display_uri || 

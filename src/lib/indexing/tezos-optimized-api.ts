@@ -176,21 +176,56 @@ export class OptimizedTezosAPI {
 
   /**
    * Extract collection information from token data
-   * Prioritizes gallery information over parent smart contract when available
+   * For fxhash contracts, prioritizes the FIRST gallery as the collection
+   * For other contracts, uses gallery information when available, otherwise falls back to FA contract
    */
   private extractCollection(token: any): IndexerData['collection'] | undefined {
-    // First, check if there's gallery information available
-    if (token.galleries && Array.isArray(token.galleries) && token.galleries.length > 0) {
+    const contractAddress = token.fa?.contract;
+    
+    // fxhash contract addresses
+    const fxhashContracts = [
+      'KT1U6EHmNxJTkvaWJ4ThczG4FSDaHC21ssvi', // fxhash v1
+      'KT1KEa8z6vWXDJrVqtMrAeDVzsvxat3kHaCE', // fxhash v2
+      'KT1AaaBSo5AE6Eo8fpEN5xhCD4w3kHStafxk', // fxhash gentk v1
+      'KT1XCoGnfupWk7Sp8536EfrxcP73LmT68Nyr'  // fxhash gentk v2
+    ];
+    
+    const isFxhashContract = contractAddress && fxhashContracts.includes(contractAddress);
+    
+    // For fxhash contracts, ALWAYS use the first gallery if available
+    if (isFxhashContract && token.galleries && Array.isArray(token.galleries) && token.galleries.length > 0) {
+      const firstGallery = token.galleries[0].gallery;
+      
+      if (firstGallery) {
+        console.log(`[OptimizedTezosAPI] fxhash token - using FIRST gallery for collection: ${firstGallery.name} (${firstGallery.slug})`);
+        
+        return {
+          slug: firstGallery.slug || firstGallery.gallery_id,
+          title: firstGallery.name || 'Unknown Collection',
+          description: undefined, // Gallery data doesn't typically include description
+          contractAddress: contractAddress || '', // Keep the contract address from fa
+          websiteUrl: undefined, // Gallery data doesn't typically include website
+          imageUrl: firstGallery.logo,
+          isGenerativeArt: true, // fxhash is always generative art
+          isSharedContract: false, // Tezos doesn't have shared contracts like OpenSea
+          // Store gallery-specific information in externalCollectionId
+          externalCollectionId: firstGallery.gallery_id
+        };
+      }
+    }
+    
+    // For non-fxhash contracts, check if there's gallery information available
+    if (!isFxhashContract && token.galleries && Array.isArray(token.galleries) && token.galleries.length > 0) {
       const gallery = token.galleries[0].gallery;
       
       if (gallery) {
-        console.log(`[OptimizedTezosAPI] Using gallery information for collection: ${gallery.name} (${gallery.slug})`);
+        console.log(`[OptimizedTezosAPI] Non-fxhash token - using gallery information for collection: ${gallery.name} (${gallery.slug})`);
         
         return {
           slug: gallery.slug || gallery.gallery_id,
           title: gallery.name || 'Unknown Collection',
           description: undefined, // Gallery data doesn't typically include description
-          contractAddress: token.fa?.contract || '', // Keep the contract address from fa
+          contractAddress: contractAddress || '', // Keep the contract address from fa
           websiteUrl: undefined, // Gallery data doesn't typically include website
           imageUrl: gallery.logo,
           isGenerativeArt: this.detectGenerativeArt(token),
@@ -201,7 +236,7 @@ export class OptimizedTezosAPI {
       }
     }
     
-    // Fallback to FA (parent smart contract) information if no gallery data
+    // Fallback to FA (parent smart contract) information if no gallery data or not applicable
     if (!token.fa) return undefined;
 
     console.log(`[OptimizedTezosAPI] Using FA contract information for collection: ${token.fa.name} (${token.fa.contract})`);

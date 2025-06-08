@@ -1,6 +1,7 @@
 import { prismaRead, prismaWrite } from '$lib/prisma';
 import { Prisma } from '@prisma/client'; // Import Prisma types
 import { unpinArtworkCids } from '$lib/pinataHelpers';
+import { cachedArtistQueries, cachedArtworkQueries, cachedCollectionQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 // Define a type for the artist object including relations we expect
 type ArtistWithRelations = Prisma.ArtistGetPayload<{
@@ -127,6 +128,12 @@ export async function PUT({
 			}
 		});
 
+		// Invalidate artist-related cache after update
+		await cachedArtistQueries.invalidate(parseInt(id, 10));
+
+		// Invalidate search cache since artist data has changed
+		await cachedSearchQueries.invalidate();
+
 		// Transform the artist data to match the expected format
 		const transformedArtist = {
 			...updatedArtist,
@@ -160,9 +167,17 @@ export async function DELETE({ params }: { params: { id: string } }): Promise<Re
 	const artistId = parseInt(id, 10);
 
 	try {
-		// First, get the artist to check for files to unpin
+		// First, get the artist and related data for cache invalidation
 		const artist = await prismaRead.artist.findUnique({
-			where: { id: artistId }
+			where: { id: artistId },
+			include: {
+				Artwork: {
+					select: { id: true, uid: true }
+				},
+				Collection: {
+					select: { id: true, slug: true }
+				}
+			}
 		});
 
 		if (!artist) {
@@ -202,6 +217,24 @@ export async function DELETE({ params }: { params: { id: string } }): Promise<Re
 		await prismaWrite.artist.delete({
 			where: { id: artistId }
 		});
+
+		// Invalidate artist-related cache
+		await cachedArtistQueries.invalidate(artistId);
+
+		// Invalidate artwork cache for all artworks that were associated with this artist
+		// since their artist relationship has changed
+		for (const artwork of artist.Artwork) {
+			await cachedArtworkQueries.invalidate(artwork.id, artwork.uid || undefined);
+		}
+
+		// Invalidate collection cache for all collections that were associated with this artist
+		// since their artist relationship has changed
+		for (const collection of artist.Collection) {
+			await cachedCollectionQueries.invalidate(collection.id, collection.slug);
+		}
+
+		// Invalidate search cache since artist data has changed
+		await cachedSearchQueries.invalidate();
 
 		return new Response(null, { status: 204 });
 	} catch (error) {

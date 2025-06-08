@@ -16,6 +16,15 @@ export const EXCLUDED_TEZOS_CONTRACTS = [
 ];
 
 /**
+ * Versum and Hic et Nunc contract addresses that should use objkt.com thumbnails
+ */
+export const VERSUM_HIC_ET_NUNC_CONTRACTS = [
+  'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton', // hic et nunc main
+  'KT1Hkg5qeNhfwpKW4fXvq7HGZB9z2EnmCCA9', // hic et nunc v2
+  'KT1LjmAdYQCLBjwv4S2oFkEzyHVkomAf5MrW'  // Versum
+];
+
+/**
  * Problematic thumbnail IPFS hashes that should be filtered out
  * These are generic/default thumbnails that don't represent the actual artwork
  */
@@ -29,6 +38,22 @@ export const PROBLEMATIC_THUMBNAIL_HASHES = [
  */
 export function shouldExcludeTezosContract(contractAddress: string): boolean {
   return EXCLUDED_TEZOS_CONTRACTS.includes(contractAddress);
+}
+
+/**
+ * Check if a contract is from Versum or Hic et Nunc and should use objkt.com thumbnails
+ */
+export function isVersumOrHicEtNuncContract(contractAddress: string): boolean {
+  if (!contractAddress) return false;
+  return VERSUM_HIC_ET_NUNC_CONTRACTS.includes(contractAddress);
+}
+
+/**
+ * Generate objkt.com thumbnail URL for Versum and Hic et Nunc NFTs
+ * Format: https://assets.objkt.media/file/assets-003/{contractAddress}/{tokenId}/thumb288
+ */
+export function generateObjktThumbnailUrl(contractAddress: string, tokenId: string | number): string {
+  return `https://assets.objkt.media/file/assets-003/${contractAddress}/${tokenId}/thumb288`;
 }
 
 /**

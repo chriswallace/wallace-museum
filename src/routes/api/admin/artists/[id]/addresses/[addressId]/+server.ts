@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { prismaWrite } from '$lib/prisma';
+import { cachedArtistQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 // DELETE: Remove an address from an artist
 export async function DELETE({ params }: { params: { id: string, addressId: string } }) {
@@ -37,6 +38,12 @@ export async function DELETE({ params }: { params: { id: string, addressId: stri
 				walletAddresses: updatedWallets as any
 			}
 		});
+
+		// Invalidate artist-related cache since address data changed
+		await cachedArtistQueries.invalidate(artistId);
+
+		// Invalidate search cache since artist data has changed
+		await cachedSearchQueries.invalidate();
 
 		return json({ success: true });
 	} catch (error) {

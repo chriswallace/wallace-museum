@@ -1,7 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { MinimalNFTData, MinimalCollectionData, MinimalCreatorData } from './types/minimal-nft';
 import { detectBlockchainFromContract, detectBlockchain } from '$lib/utils/walletUtils.js';
-import { cachedArtworkQueries, cachedCollectionQueries, cachedSystemQueries } from '$lib/cache/db-cache.js';
+import { cachedArtworkQueries, cachedCollectionQueries, cachedSystemQueries, cachedArtistQueries } from '$lib/cache/db-cache.js';
 
 /**
  * Minimal database operations - direct mapping from minimal data to Prisma schema
@@ -425,6 +425,11 @@ export class MinimalDBOperations {
         await cachedCollectionQueries.invalidate(
           typeof id === 'number' ? id : undefined,
           typeof id === 'string' ? id : undefined
+        );
+        break;
+      case 'artist':
+        await cachedArtistQueries.invalidate(
+          typeof id === 'number' ? id : undefined
         );
         break;
     }

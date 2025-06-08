@@ -218,29 +218,29 @@
 	}
 
 	.artwork-display:not(.fullscreen) {
-		@apply xl:max-h-[90%];
+		@apply xl:max-h-[90%] flex;
 	}
 
 	.artwork-display.fullscreen {
-		@apply w-screen;
+		@apply w-screen min-h-[340px];
 		height: 82svh;
 		aspect-ratio: unset;
 	}
 
 	.artwork-display.fullscreen :global(.artwork-image) {
-		@apply w-screen object-contain;
+		@apply w-screen min-h-[340px] object-contain;
 		height: 82svh;
 	}
 
 	.artwork-display.fullscreen .interactive-content {
 		/* Keep iframe at its original size and center it */
-		@apply w-auto h-auto max-w-full;
+		@apply w-auto h-auto max-w-full min-h-[340px];
 		max-height: 82svh;
 	}
 
 	.artwork-display.fullscreen :global(.video-player-artwork) {
-		@apply w-screen object-contain;
-		height: 82svh !important;
+		@apply w-screen object-contain min-h-[340px];
+		height: 82svh;
 	}
 
 	.no-media {
@@ -272,7 +272,7 @@
 	}
 
 	.image-container {
-		@apply relative w-full h-full ;
+		@apply relative w-full h-full flex;
 	}
 
 	.fullscreen-button {
