@@ -141,7 +141,6 @@
 </script>
 
 <div class="artwork-feed" bind:this={feedContainer}>
-	<h2 class="feed-title">Latest Artworks</h2>
 	
 	<div class="artworks-stack">
 		{#each artworks as artwork (artwork.id)}
@@ -284,7 +283,7 @@
 
 <style lang="scss">
 	.artwork-feed {
-		@apply w-full max-w-[760px] mx-auto px-4 py-8;
+		@apply w-full max-w-[560px] mx-auto px-4 py-8;
 	}
 
 	.feed-title {
@@ -438,6 +437,10 @@
 
 		.artwork-info {
 			@apply px-4 py-3;
+		}
+
+		.artwork-container {
+			aspect-ratio: 1 / 1;
 		}
 	}
 </style> 

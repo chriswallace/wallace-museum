@@ -169,6 +169,16 @@
 		opacity: 0.4;
 	}
 
+	.artwork-display.fullscreen,
+	.artwork-display.fullscreen .artwork-image,
+	.artwork-display.fullscreen .interactive-content {
+		@apply !w-full;
+	}
+
+	.artwork-image{
+		@apply h-full flex items-center justify-center;
+	}
+
 	dl {
 		@apply text-sm grid grid-cols-5;
 	}

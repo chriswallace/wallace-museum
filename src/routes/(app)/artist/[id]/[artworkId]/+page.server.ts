@@ -6,27 +6,42 @@ export const load: PageServerLoad = async ({ params }) => {
 	const artistId = Number(params.id);
 	const artworkId = Number(params.artworkId);
 
-	// Fetch the artist with all artworks
-	const artist = await prisma.artist.findUnique({
-		where: { id: artistId },
+	// First, fetch the specific artwork with all its artists
+	const artwork = await prisma.artwork.findUnique({
+		where: { id: artworkId },
 		include: {
-			Artwork: true
+			Artist: true // Include all artists associated with this artwork
 		}
 	});
 
-	if (!artist) {
-		throw error(404, 'Artist not found');
-	}
-
-	// Find the specific artwork
-	const currentArtwork = artist.Artwork.find(artwork => artwork.id === artworkId);
-	
-	if (!currentArtwork) {
+	if (!artwork) {
 		throw error(404, 'Artwork not found');
 	}
 
-	// Transform all artworks for navigation
-	const artworks = artist.Artwork.map((artwork) => {
+	// Verify that the artist from the URL is one of the artwork's artists
+	const isValidArtist = artwork.Artist.some(artist => artist.id === artistId);
+	if (!isValidArtist) {
+		throw error(404, 'Artist not associated with this artwork');
+	}
+
+	// Get the primary artist (from URL) for navigation context
+	const primaryArtist = await prisma.artist.findUnique({
+		where: { id: artistId },
+		include: {
+			Artwork: {
+				include: {
+					Artist: true // Include all artists for each artwork
+				}
+			}
+		}
+	});
+
+	if (!primaryArtist) {
+		throw error(404, 'Artist not found');
+	}
+
+	// Transform all artworks for navigation, including their artists
+	const artworks = primaryArtist.Artwork.map((artwork) => {
 		return {
 			id: String(artwork.id),
 			title: artwork.title,
@@ -45,7 +60,16 @@ export const load: PageServerLoad = async ({ params }) => {
 			tags: null,
 			attributes: artwork.attributes,
 			supply: artwork.supply,
-			fullscreen: artwork.fullscreen
+			fullscreen: artwork.fullscreen,
+			artists: artwork.Artist.map(artist => ({
+				id: artist.id,
+				name: artist.name,
+				avatarUrl: artist.avatarUrl,
+				websiteUrl: artist.websiteUrl,
+				bio: artist.bio,
+				twitterHandle: artist.twitterHandle,
+				instagramHandle: artist.instagramHandle
+			}))
 		};
 	});
 
@@ -54,17 +78,27 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	return {
 		artist: {
-			id: artist.id,
-			name: artist.name,
-			bio: artist.bio,
-			avatarUrl: artist.avatarUrl,
-			websiteUrl: artist.websiteUrl,
-			twitterHandle: artist.twitterHandle,
-			instagramHandle: artist.instagramHandle,
-			addresses: artist.walletAddresses,
+			id: primaryArtist.id,
+			name: primaryArtist.name,
+			bio: primaryArtist.bio,
+			avatarUrl: primaryArtist.avatarUrl,
+			websiteUrl: primaryArtist.websiteUrl,
+			twitterHandle: primaryArtist.twitterHandle,
+			instagramHandle: primaryArtist.instagramHandle,
+			addresses: primaryArtist.walletAddresses,
 			artworks
 		},
 		currentArtworkId: String(artworkId),
-		currentIndex
+		currentIndex,
+		// Include the current artwork's artists for display
+		currentArtworkArtists: artwork.Artist.map(artist => ({
+			id: artist.id,
+			name: artist.name,
+			avatarUrl: artist.avatarUrl,
+			websiteUrl: artist.websiteUrl,
+			bio: artist.bio,
+			twitterHandle: artist.twitterHandle,
+			instagramHandle: artist.instagramHandle
+		}))
 	};
 }; 

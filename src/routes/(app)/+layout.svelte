@@ -1,5 +1,5 @@
 <script>
-	import Header from '$lib/components/Header.svelte';
+	import TopNav from '$lib/components/TopNav.svelte';
 	import '../../app.css';
 </script>
 
@@ -9,6 +9,7 @@
 </svelte:head>
 
 <div class="page-container">
+	<TopNav />
 	<div class="content">
 		<slot />
 	</div>

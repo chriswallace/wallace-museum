@@ -7,16 +7,31 @@
 	export let style: string = '';
 	export let className: string = '';
 
-	// Calculate aspect ratio
-	$: calculatedAspectRatio = aspectRatio || (width && height ? `${width}/${height}` : '1/1');
+	// Calculate dimensions based on container constraints
+	// Use height-based scaling like the actual iframe to prevent overflow
+	$: containerStyle = (() => {
+		// If we have explicit width and height, use them
+		if (width && height) {
+			return `width: ${width}px; height: ${height}px;`;
+		}
+		
+		// If we have aspect ratio, calculate dimensions that fit the container
+		if (aspectRatio) {
+			const [w, h] = aspectRatio.split('/').map(Number);
+			if (w && h) {
+				// Use height-based scaling to match iframe behavior
+				return `width: auto; height: 100%; aspect-ratio: ${w}/${h}; max-width: 100%;`;
+			}
+		}
+		
+		// Default to container-fitting behavior
+		return 'width: auto; height: 100%; max-width: 100%;';
+	})();
 </script>
 
 <div 
 	class="iframe-skeleton {className}"
-	{style}
-	style:aspect-ratio={calculatedAspectRatio}
-	style:width={width ? `${width}px` : '100%'}
-	style:height={calculatedAspectRatio ? 'auto' : (height ? `${height}px` : '100%')}
+	style="{containerStyle} {style}"
 >
 	<SkeletonLoader
 		width="100%"
@@ -42,13 +57,15 @@
 		align-items: center;
 		justify-content: center;
 		overflow: hidden;
+		/* Remove aspect-ratio from here since it's now handled in the style attribute */
 	}
 
 	.iframe-skeleton-overlay {
 		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
 		display: flex;
 		flex-direction: column;
 		align-items: center;

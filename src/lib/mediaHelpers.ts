@@ -331,7 +331,55 @@ export async function fetchMedia(
 	let httpUrlUsed: string | undefined = undefined; // Track the URL used for fetching
 
 	try {
-		const sanitizedUri = removeQueryString(uri);
+		// Only remove query strings for certain types of URLs that don't need them
+		// Preserve query strings for:
+		// - Animation URLs (may have playback parameters)
+		// - Generator URLs (may have rendering parameters)
+		// - Interactive content URLs
+		// - URLs with authentication tokens
+		// - URLs that explicitly look like they need query parameters
+		const shouldPreserveQueryString = (url: string): boolean => {
+			const lowerUrl = url.toLowerCase();
+			
+			// Check for animation/video content indicators
+			if (lowerUrl.includes('animation') || 
+				lowerUrl.includes('video') || 
+				lowerUrl.includes('generator') || 
+				lowerUrl.includes('interactive') ||
+				lowerUrl.includes('player') ||
+				lowerUrl.includes('viewer') ||
+				lowerUrl.includes('embed')) {
+				return true;
+			}
+			
+			// Check for file extensions that might be dynamic
+			if (lowerUrl.includes('.html') || 
+				lowerUrl.includes('.htm') ||
+				lowerUrl.includes('.js')) {
+				return true;
+			}
+			
+			// Check for authentication or API tokens
+			if (lowerUrl.includes('token') || 
+				lowerUrl.includes('auth') || 
+				lowerUrl.includes('key') ||
+				lowerUrl.includes('api')) {
+				return true;
+			}
+			
+			// Check for known platforms that use query parameters
+			if (lowerUrl.includes('fxhash') ||
+				lowerUrl.includes('artblocks') ||
+				lowerUrl.includes('opensea') ||
+				lowerUrl.includes('pinata') ||
+				lowerUrl.includes('gateway')) {
+				return true;
+			}
+			
+			return false;
+		};
+		
+		const sanitizedUri = shouldPreserveQueryString(uri) ? uri : removeQueryString(uri);
 		//console.log(`[MEDIA_DEBUG] Processing URI: ${sanitizedUri}`);
 
 		// Check if the URL is an Arweave URL with or without prefix

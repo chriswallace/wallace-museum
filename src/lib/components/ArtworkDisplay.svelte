@@ -41,11 +41,21 @@
 		? `${actualDimensions.width} / ${actualDimensions.height}`
 		: '1 / 1'; // Square fallback
 
+	// Calculate artwork orientation and sizing
+	$: artworkOrientation = actualDimensions 
+		? actualDimensions.width > actualDimensions.height 
+			? 'landscape' 
+			: actualDimensions.width < actualDimensions.height 
+				? 'portrait' 
+				: 'square'
+		: 'square';
+
 	// Debug logging
 	$: if (actualDimensions) {
 		console.log('ArtworkDisplay dimensions:', {
 			actualDimensions,
 			aspectRatio,
+			artworkOrientation,
 			mediaType
 		});
 	}
@@ -63,18 +73,12 @@
 	$: displayUrl = bestMedia?.url || '';
 	$: transformedUrl = displayUrl ? ipfsToHttpUrl(displayUrl, IPFS_GATEWAYS[0], true, artwork.mime || undefined) : '';
 
-	// Calculate optimal display size for images (max 1200px width for performance)
-	$: displayWidth = actualDimensions ? Math.min(actualDimensions.width, 1200) : 1200;
-	$: displayHeight = actualDimensions && actualDimensions.width > 1200 
-		? Math.round((displayWidth * actualDimensions.height) / actualDimensions.width)
-		: actualDimensions?.height;
-
 	// Get optimized image URL for display
 	$: optimizedImageUrl = mediaType === 'image' && displayUrl 
 		? buildOptimizedImageUrl(displayUrl, {
-			width: displayWidth,
-			height: displayHeight,
-			quality: 90,
+			width: actualDimensions?.width,
+			height: actualDimensions?.height,
+			quality: 70,
 			format: 'webp',
 			fit: 'contain'
 		})
@@ -129,7 +133,7 @@
 
 <svelte:window on:fullscreenchange={handleFullscreenChange} />
 
-<div class="artwork-display" class:fullscreen style="aspect-ratio: {aspectRatio}; --artwork-aspect-ratio: {aspectRatio}">
+<div class="artwork-display" class:fullscreen bind:this={fullscreenElement}>
 	{#if !displayUrl}
 		<div class="no-media">
 			<div class="no-media-content">
@@ -143,28 +147,17 @@
 			loop={true}
 			muted={true}
 			className="video-player-artwork"
-			width={dimensions?.width}
 			aspectRatio={aspectRatio}
 			showSkeleton={shouldShowSkeleton}
-			{style}
 		/>
 	{:else if mediaType === 'iframe'}
-		<div class="iframe-container" bind:this={fullscreenElement}>
-			{#if shouldShowSkeleton && isIframeLoading}
-				<IframeSkeleton
-					width={dimensions?.width}
-					height={dimensions?.height}
-					aspectRatio={aspectRatio}
-					className="iframe-skeleton-overlay"
-				/>
-			{/if}
+		<div class="iframe-container">
 			<iframe
 				src={transformedUrl}
 				class="interactive-content"
-				class:hidden={shouldShowSkeleton && isIframeLoading}
 				title="Interactive Artwork"
-				width={dimensions?.width}
-				{style}
+				height={actualDimensions?.height}
+				style="aspect-ratio: {aspectRatio};"
 				allowfullscreen
 				on:load={handleIframeLoad}
 			></iframe>
@@ -183,16 +176,14 @@
 			{/if}
 		</div>
 	{:else if mediaType === 'image'}
-		<div class="image-container" bind:this={fullscreenElement}>
+		<div class="image-container">
 			<OptimizedImage
 				src={isInFullscreen ? fullSizeImageUrl : optimizedImageUrl}
 				alt={artwork.title}
-				width={dimensions?.width}
-				height={dimensions?.height}
 				aspectRatio={aspectRatio}
 				showSkeleton={shouldShowSkeleton}
-				className="artwork-image"
-				style={isInFullscreen ? 'max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain;' : style}
+				className="artwork-image {isInFullscreen ? 'fullscreen-image' : 'normal-image'}"
+				style="aspect-ratio: {aspectRatio};"
 			/>
 			
 			{#if canFullscreen && !isInFullscreen}
@@ -213,47 +204,12 @@
 
 <style lang="scss">
 	.artwork-display {
-		@apply relative overflow-hidden h-full flex items-center justify-center;
-		/* Remove flexbox for iframe compatibility */
-	}
-
-	.artwork-display:not(.fullscreen) {
-		@apply xl:max-h-[90%] flex;
-	}
-
-	.artwork-display.fullscreen {
-		@apply w-full max-w-full min-h-[340px];
-		height: 82svh;
-		max-height: 82svh;
-		aspect-ratio: unset;
-		overflow: hidden;
-	}
-
-	.artwork-display.fullscreen :global(.artwork-image) {
-		@apply object-contain;
-		max-width: 100vw;
-		max-height: 82svh;
-		width: auto;
-		height: auto;
-	}
-
-	.artwork-display.fullscreen .interactive-content {
-		/* Keep iframe at its original size and center it */
-		@apply w-auto h-auto max-w-full min-h-[340px];
-		max-height: 82svh;
-		max-width: 100vw;
-	}
-
-	.artwork-display.fullscreen :global(.video-player-artwork) {
-		@apply object-contain;
-		max-width: 100vw;
-		max-height: 82svh;
-		width: auto;
-		height: auto;
+		@apply relative overflow-hidden h-full max-h-[82svh] w-full flex items-center justify-center;
+		/* Use flexbox to center content properly */
 	}
 
 	.no-media {
-		@apply flex items-center justify-center bg-gray-100 rounded-sm w-full h-full;
+		@apply flex items-center justify-center bg-gray-100 rounded-sm;
 	}
 
 	.no-media-content {
@@ -264,16 +220,10 @@
 		@apply relative w-full h-full flex items-center justify-center;
 	}
 
-	/* Ensure iframe container maintains aspect ratio on small screens when parent doesn't */
-	@media (max-width: 767px) {
-		.iframe-container {
-			aspect-ratio: var(--artwork-aspect-ratio, 1/1);
-		}
-	}
-
 	.interactive-content {
-		@apply relative border-none bg-transparent block w-full h-full transition-opacity duration-200 ease-in-out;
+		@apply relative border-none bg-transparent transition-opacity duration-200 ease-in-out max-h-full max-w-full;
 		/* Positioned above the loader */
+		aspect-ratio: var(--artwork-aspect-ratio);
 	}
 
 	.interactive-content.hidden {
@@ -281,61 +231,55 @@
 	}
 
 	.image-container {
-		@apply relative w-full h-full flex;
+		@apply relative w-full h-full flex items-center justify-center;
 	}
 
 	.fullscreen-button {
-		@apply absolute top-3 right-3 bg-black bg-opacity-70 text-white border-none rounded-md p-2 cursor-pointer opacity-0 transition-opacity duration-200 ease-linear z-10 flex items-center justify-center;
+		@apply absolute bottom-3 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white border-none rounded-md p-2 cursor-pointer transition-opacity duration-200 ease-linear z-10 flex items-center justify-center;
+		opacity: 0; /* Hidden by default, show on hover */
 	}
 
 	.fullscreen-button:hover {
 		@apply bg-black bg-opacity-90;
+		opacity: 1;
 	}
 
-	.image-container:hover .fullscreen-button {
-		@apply opacity-100;
-	}
-
+	.image-container:hover .fullscreen-button,
 	.iframe-container:hover .fullscreen-button {
-		@apply opacity-100;
+		opacity: 1;
 	}
 
-	/* Global styles for artwork images */
+	/* Show button on mobile/touch devices */
+	@media (hover: none) {
+		.fullscreen-button {
+			opacity: 0.8;
+		}
+	}
+
+	/* Ensure video and iframe elements are properly centered */
+	:global(.video-player-artwork),
+	.interactive-content,
 	:global(.artwork-image) {
-		@apply block max-w-full max-h-full w-auto h-auto object-contain mx-auto;
+		display: block;
+		margin: 0 auto;
+		max-width: 100%;
+		max-height: 100%;
+		object-fit: contain;
 	}
 
-	/* Global styles for video players */
-	:global(.video-player-artwork) {
-		@apply block max-w-full max-h-full w-auto h-auto object-contain mx-auto;
+	/* Image styling for normal display */
+	:global(.artwork-image.normal-image) {
+		max-height: 100% !important;
+		max-width: 100% !important;
+		width: auto !important;
+		height: auto !important;
 	}
 
-	/* Fullscreen styles */
-	:global(.image-container:fullscreen) {
-		@apply bg-black flex items-center justify-center;
-		width: 100vw !important;
-		height: 100vh !important;
-		max-width: 100vw !important;
-		max-height: 100vh !important;
-	}
-
-	:global(.iframe-container:fullscreen) {
-		@apply bg-black flex items-center justify-center;
-		width: 100vw !important;
-		height: 100vh !important;
-		max-width: 100vw !important;
-		max-height: 100vh !important;
-	}
-
-	:global(.image-container:fullscreen .artwork-image) {
-		@apply w-auto h-auto object-contain;
-		max-width: 100vw !important;
-		max-height: 100vh !important;
-	}
-
-	:global(.iframe-container:fullscreen .interactive-content) {
-		/* Keep iframe at its original dimensions when in fullscreen */
-		max-width: 100vw !important;
-		max-height: 100vh !important;
+	/* Image styling for fullscreen display */
+	:global(.artwork-image.fullscreen-image) {
+		max-width: 100% !important;
+		max-height: 100% !important;
+		width: auto !important;
+		height: auto !important;
 	}
 </style>

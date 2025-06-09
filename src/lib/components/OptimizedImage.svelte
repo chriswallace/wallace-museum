@@ -183,14 +183,11 @@
 </script>
 
 <div 
-	class="optimized-image-container {className}" 
+	class="{className} image-container" 
 	{style}
 	style:aspect-ratio={calculatedAspectRatio}
-	style:width={width ? `${width}px` : '100%'}
+	style:width="100%"
 	style:height={calculatedAspectRatio ? 'auto' : (height ? `${height}px` : '100%')}
-	style:max-width="100%"
-	style:max-height="100%"
-	style:object-fit="contain"
 >
 	<!-- Skeleton loader positioned to exactly match the image -->
 	{#if shouldShowSkeleton}
@@ -225,13 +222,8 @@
 </div>
 
 <style>
-	.optimized-image-container {
+	.image-container {
 		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		min-height: 0;
-		min-width: 0;
 		box-sizing: border-box;
 	}
 
@@ -248,16 +240,7 @@
 	}
 
 	img {
-		@apply mx-auto;
-		display: block;
-		max-width: 100%;
-		max-height: 100%;
-		width: auto;
-		height: auto;
-		object-fit: contain;
-		transition: opacity 0.2s ease-in-out;
-		position: relative;
-		z-index: 2;
+		@apply mx-auto block object-contain transition-opacity duration-200 ease-in-out relative z-10;
 	}
 
 	img.hidden {

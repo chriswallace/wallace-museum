@@ -160,7 +160,6 @@
 {#if !data.artist && data.error}
 	<div class="page-container" transition:fade>
 		<div class="error-container">
-			<button class="close-button" on:click={() => goto('/')} aria-label="Return to homepage">×</button>
 			<h2>Artist Not Found</h2>
 			<p>{data.error}</p>
 			<button class="return-button" on:click={() => goto('/')}>Return to Gallery</button>
@@ -181,8 +180,6 @@
 				The Wallace Museum
 			</button>
 		</header>
-
-		<button class="close-button" on:click={() => goto('/')} aria-label="Return to homepage">×</button>
 
 		<div class="content-container">
 			<div class="layout-grid">
@@ -356,15 +353,6 @@
 			class="modal-content"
 			transition:scale={{ duration: 300, easing: quintOut, start: 0.9 }}
 		>
-			<!-- Close Button -->
-			<button 
-				class="modal-close-button"
-				on:click={closeDescriptionModal}
-				aria-label="Close description"
-			>
-				×
-			</button>
-
 			<!-- Modal Content -->
 			<div class="modal-scroll">
 				<!-- Artist Header -->
@@ -529,11 +517,11 @@
 	}
 
 	.artworks-grid {
-		@apply grid gap-0 lg:gap-6 grid-cols-1 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4;
+		@apply grid gap-4 lg:gap-6 grid-cols-1 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4;
 	}
 
 	.artwork-container {
-		@apply cursor-pointer bg-transparent border-none p-0 w-full;
+		@apply cursor-pointer bg-transparent border-none p-0 h-full;
 	}
 
 	.artwork-thumbnail {

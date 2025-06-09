@@ -7,11 +7,13 @@
 	import { linear } from 'svelte/easing';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import ArtworkDisplay from '$lib/components/ArtworkDisplay.svelte';
+	import ArtistList from '$lib/components/ArtistList.svelte';
 
 	export let data: { 
 		artist?: any; 
 		currentArtworkId?: string;
 		currentIndex?: number;
+		currentArtworkArtists?: any[];
 		error?: string; 
 	};
 
@@ -202,19 +204,11 @@
 				}
 				break;
 			
+			case '?':
 			case 'h':
 			case 'H':
-			case '?':
 				// Toggle keyboard help
 				keyboardHelpVisible = !keyboardHelpVisible;
-				break;
-			
-			case 'b':
-			case 'B':
-				// Go back to artist page
-				if (data.artist) {
-					goto(`/artist/${data.artist.id}`);
-				}
 				break;
 		}
 	}
@@ -326,8 +320,8 @@
 					.join(', ')
 			: '';
 
-	$: pageTitle = data.artist && currentArtwork
-		? `${currentArtwork.title} by ${data.artist.name} | Wallace Museum`
+	$: pageTitle = data.currentArtworkArtists && currentArtwork
+		? `${currentArtwork.title} by ${data.currentArtworkArtists.map(a => a.name).join(', ')} | Wallace Museum`
 		: data.error
 			? 'Artwork Not Found | Wallace Museum'
 			: 'Loading Artwork | Wallace Museum';
@@ -384,8 +378,8 @@
 	<title>{pageTitle}</title>
 	<meta
 		name="description"
-		content={data.artist && currentArtwork
-			? `${currentArtwork.title} by ${data.artist.name} at the Wallace Museum`
+		content={data.currentArtworkArtists && currentArtwork
+			? `${currentArtwork.title} by ${data.currentArtworkArtists.map(a => a.name).join(', ')} at the Wallace Museum`
 			: 'Artwork gallery at the Wallace Museum'}
 	/>
 </svelte:head>
@@ -411,30 +405,6 @@
 	</div>
 {:else}
 	<div class="artist-page" role="application" tabindex="0" on:keydown={handleKeyDown} on:click={() => mainContainer?.focus()} transition:fade bind:this={mainContainer}>
-		<!-- Small header with museum name -->
-		<header class="museum-header-nav">
-			<button class="museum-name-link" on:click={() => goto('/')} aria-label="Return to homepage">
-				The Wallace Museum
-			</button>
-			
-			<!-- Keyboard navigation indicator -->
-			<div class="keyboard-indicator">
-				<button 
-					class="keyboard-help-trigger"
-					on:click={() => keyboardHelpVisible = true}
-					aria-label="Show keyboard shortcuts"
-					title="Press H for keyboard shortcuts"
-				>
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-						<line x1="8" y1="21" x2="16" y2="21"/>
-						<line x1="12" y1="17" x2="12" y2="21"/>
-					</svg>
-					<span class="keyboard-help-text">Press H for shortcuts</span>
-				</button>
-			</div>
-		</header>
-
 		{#if data.artist.artworks.length > 0 && currentArtwork}
 			{#key currentIndex}
 				<div class="museum-content">
@@ -453,17 +423,21 @@
 							<div class="museum-header">
 								<div class="museum-artist-title">
 									<div class="museum-artist">
-										<button 
-											class="artist-back-button"
-											on:click={() => goto(`/artist/${data.artist.id}`)}
-											aria-label="Back to artist profile (B)"
-											title="Back to artist profile (B)"
-										>
-											<svg class="back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-												<path d="m15 18-6-6 6-6"/>
-											</svg>
-											<span class="artist-name">{data.artist.name}</span>
-										</button>
+										{#if data.currentArtworkArtists && data.currentArtworkArtists.length > 0}
+											<ArtistList 
+												artists={data.currentArtworkArtists}
+												layout="horizontal"
+												size="sm"
+												showAvatars={false}
+												linkToWebsite={false}
+												linkToArtist={true}
+												showPopover={false}
+												separator=", "
+												className="text-sm font-medium uppercase tracking-wider text-yellow-500"
+											/>
+										{:else}
+											<span class="text-sm font-medium uppercase tracking-wider text-yellow-500">Unknown Artist</span>
+										{/if}
 									</div>
 									<div class="museum-title">{currentArtwork.title}</div>
 								</div>
@@ -494,6 +468,7 @@
 								{#if currentArtwork.description}
 									<div class="description-col">
 										<div class="museum-description">
+											<h3 class="metadata-heading">Description</h3>
 											{currentArtwork.description}
 										</div>
 									</div>
@@ -517,6 +492,7 @@
 									{/if}
 
 									<div class="metadata-section">
+										<h3 class="metadata-heading">Additional Details</h3>
 										<div class="metadata-grid">
 											{#if currentArtwork.supply}
 												<div class="metadata-item">
@@ -602,6 +578,25 @@
 							</div>
 						</div>
 					</div>
+
+					<!-- Keyboard shortcuts section below content -->
+					<div class="keyboard-shortcuts-section">
+						<div class="shortcuts-content">
+							<button 
+								class="keyboard-help-trigger"
+								on:click={() => keyboardHelpVisible = true}
+								aria-label="Show keyboard shortcuts"
+								title="Press H for keyboard shortcuts"
+							>
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+									<line x1="8" y1="21" x2="16" y2="21"/>
+									<line x1="12" y1="17" x2="12" y2="21"/>
+								</svg>
+								<span class="keyboard-help-text">Keyboard shortcuts</span>
+							</button>
+						</div>
+					</div>
 				</div>
 			{/key}
 		{/if}
@@ -642,10 +637,6 @@
 							<div class="help-item">
 								<kbd>End</kbd>
 								<span>Last artwork</span>
-							</div>
-							<div class="help-item">
-								<kbd>B</kbd>
-								<span>Back to artist</span>
 							</div>
 						</div>
 
@@ -703,31 +694,7 @@
 	}
 
 	.artwork-container {
-		@apply flex items-center justify-center bg-black bg-opacity-50 md:pt-0 md:pb-4;
-		width: 100%;
-		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	/* Apply fixed height only on medium screens and up */
-	@media (min-width: 1024px) {
-		.artwork-container {
-			height: 82svh;
-		}
-	}
-
-	.artwork-container.fullscreen {
-		@apply bg-black p-0;
-		width: 100vw;
-		height: 82svh;
-		max-width: 100vw;
-		max-height: 82svh;
-		border-radius: 0;
-		margin-left: calc(-50vw + 50%);
-		margin-right: calc(-50vw + 50%);
-		overflow: hidden;
+		@apply w-full relative flex items-center justify-center bg-black bg-opacity-50 md:pt-0 md:pb-4 aspect-square md:h-[82svh] md:aspect-auto;
 	}
 
 	.artwork-media {
@@ -786,20 +753,32 @@
 
 	.content-grid {
 		@apply grid grid-cols-1 gap-8;
-		@apply md:grid-cols-[minmax(600px,800px)_minmax(300px,400px)];
+		
+		/* Responsive grid layout - more balanced distribution */
+		@media (min-width: 768px) {
+			grid-template-columns: 1fr 1fr;
+		}
+		
+		@media (min-width: 1024px) {
+			grid-template-columns: 1fr 1.5fr;
+		}
+		
+		@media (min-width: 1280px) {
+			grid-template-columns: 1fr 1fr;
+		}
 	}
 
 	.description-col {
-		@apply md:pr-12 w-full;
+		@apply w-full;
 	}
 
 	.metadata-col {
-		@apply flex flex-col gap-8 w-full;
+		@apply flex flex-col gap-2 lg:w-full;
 	}
 
 	.museum-description {
 		@apply text-base text-gray-300;
-		max-width: 65ch;
+		max-width: 55ch;
 	}
 
 	.museum-meta {
@@ -807,8 +786,7 @@
 	}
 
 	.metadata-grid {
-		@apply grid gap-6;
-		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+		@apply grid gap-6 grid-cols-2 lg:grid-cols-3;
 	}
 
 	.metadata-item {
@@ -878,19 +856,30 @@
 	}
 
 	.metadata-heading {
-		@apply text-lg font-semibold text-white;
+		@apply text-base font-semibold text-white;
 	}
 
 	.divider {
 		@apply w-full h-px bg-gray-700 my-6;
 	}
 
-	.museum-header-nav {
-		@apply bg-black bg-opacity-50 w-full p-4 flex items-center justify-between relative;
+	.keyboard-shortcuts-section {
+		@apply w-full px-4 md:px-6 py-8 mt-24;
+		max-width: 1400px;
 	}
 
-	.museum-name-link {
-		@apply m-0 p-0 text-yellow-500 text-sm font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer hover:text-yellow-400 transition-colors duration-200 focus:text-yellow-400 focus:outline-none;
+	.shortcuts-content {
+		@apply flex justify-center;
+	}
+
+	.keyboard-help-trigger {
+		@apply flex items-center gap-2 text-gray-400 hover:text-gray-200 transition-colors;
+		@apply bg-transparent border-none cursor-pointer p-3 rounded-md;
+		@apply border border-gray-700 hover:border-gray-600;
+	}
+
+	.keyboard-help-text {
+		@apply text-sm font-medium;
 	}
 
 	.artist-back-button {
@@ -957,34 +946,6 @@
 		@apply text-sm text-gray-700 dark:text-gray-300;
 	}
 
-	.keyboard-indicator {
-		/* Remove left margin since it's now positioned on the right */
-		
-		/* Hide on smaller screens (mobile/tablet) */
-		@media (max-width: 1023px) {
-			display: none;
-		}
-		
-		/* Hide on touch devices */
-		@media (hover: none) and (pointer: coarse) {
-			display: none;
-		}
-		
-		/* Hide on devices that don't support hover */
-		@media (hover: none) {
-			display: none;
-		}
-	}
-
-	.keyboard-help-trigger {
-		@apply flex items-center gap-2 text-gray-400 hover:text-gray-200 transition-colors;
-		@apply bg-transparent border-none cursor-pointer p-0 m-0;
-	}
-
-	.keyboard-help-text {
-		@apply text-sm font-medium;
-	}
-
 	.fullscreen-hint {
 		@apply fixed top-4 left-1/2 transform -translate-x-1/2 z-50;
 	}
@@ -995,5 +956,18 @@
 
 	.fullscreen-hint-content p {
 		@apply text-sm font-medium m-0;
+	}
+
+	.artwork-container.fullscreen {
+		@apply bg-black p-0;
+		width: 100vw;
+		height: 82svh;
+		max-width: 100vw;
+		max-height: 82svh;
+		border-radius: 0;
+		margin-left: calc(-50vw + 50%);
+		margin-right: calc(-50vw + 50%);
+		overflow: hidden;
+		aspect-ratio: auto;
 	}
 </style> 

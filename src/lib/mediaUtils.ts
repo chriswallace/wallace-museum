@@ -207,9 +207,9 @@ export function ipfsToHttpUrlForHtml(
 			const match = cleanUri.match(pattern);
 			if (match && match[1]) {
 				const cidAndPath = match[1];
-				// Remove any query parameters for clean URL
-				const cleanCidAndPath = cidAndPath.split('?')[0];
-				return IPFS_IO_GATEWAY + cleanCidAndPath;
+				// Preserve query parameters for HTML content as they may be needed for functionality
+				// (e.g., generative art parameters, authentication tokens, etc.)
+				return IPFS_IO_GATEWAY + cidAndPath;
 			}
 		}
 
