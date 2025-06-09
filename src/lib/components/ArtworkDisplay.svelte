@@ -156,8 +156,8 @@
 				src={transformedUrl}
 				class="interactive-content"
 				title="Interactive Artwork"
-				height={actualDimensions?.height}
-				style="aspect-ratio: {aspectRatio};"
+				height={fullscreen ? '100%' : actualDimensions?.height}
+				style={fullscreen ? 'height: 100%; width: 100%;' : `aspect-ratio: ${aspectRatio};`}
 				allowfullscreen
 				on:load={handleIframeLoad}
 			></iframe>
@@ -204,7 +204,7 @@
 
 <style lang="scss">
 	.artwork-display {
-		@apply relative overflow-hidden h-full max-h-[82svh] w-full flex items-center justify-center;
+		@apply relative overflow-hidden h-full max-h-[82svh] md:pt-12 w-full flex items-center justify-center;
 		/* Use flexbox to center content properly */
 	}
 

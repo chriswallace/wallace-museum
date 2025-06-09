@@ -694,7 +694,7 @@
 	}
 
 	.artwork-container {
-		@apply w-full relative flex items-center justify-center bg-black bg-opacity-50 md:pt-0 md:pb-4 aspect-square md:h-[82svh] md:aspect-auto;
+		@apply w-full relative flex items-center justify-center bg-black bg-opacity-50 md:pt-12 md:pb-4 aspect-square md:h-[82svh] md:aspect-auto;
 	}
 
 	.artwork-media {
@@ -737,10 +737,6 @@
 
 	.museum-artist {
 		@apply text-sm font-medium uppercase tracking-wider text-yellow-500 mb-1;
-	}
-
-	.museum-title {
-		@apply text-lg font-bold text-white leading-tight uppercase;
 	}
 
 	.artwork-navigation {
@@ -863,13 +859,8 @@
 		@apply w-full h-px bg-gray-700 my-6;
 	}
 
-	.keyboard-shortcuts-section {
-		@apply w-full px-4 md:px-6 py-8 mt-24;
-		max-width: 1400px;
-	}
-
 	.shortcuts-content {
-		@apply flex justify-center;
+		@apply flex justify-start;
 	}
 
 	.keyboard-help-trigger {

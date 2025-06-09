@@ -5,8 +5,7 @@
 
 import { ipfsToHttpUrl } from './mediaUtils';
 
-// The Wallace Museum IPFS microservice endpoint with image optimization
-const IPFS_IMAGE_ENDPOINT = 'https://ipfs.wallacemuseum.com/api/image';
+// The Wallace Museum IPFS microservice endpoint
 const IPFS_DIRECT_ENDPOINT = 'https://ipfs.wallacemuseum.com/ipfs';
 const PINATA_GATEWAY_TOKEN = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
 
@@ -237,32 +236,25 @@ export function buildOptimizedImageUrl(
 		return ipfsToHttpUrl(imageUrl);
 	}
 
-	// Since the /api/image endpoint is having issues, fall back to direct IPFS gateway
-	// TODO: Re-enable image optimization once the /api/image endpoint is fixed
-	console.log(`[buildOptimizedImageUrl] Image optimization endpoint unavailable, serving directly: ${imageUrl}`);
-	return buildDirectImageUrl(imageUrl);
+	// Build optimized URL using Pinata's image optimization via gateway
+	const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}`);
+	
+	// Add the Pinata gateway token for authentication
+	url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+	
+	// Add image optimization parameters using Pinata's naming conventions
+	if (options.width) url.searchParams.set('img-width', options.width.toString());
+	if (options.height) url.searchParams.set('img-height', options.height.toString());
+	if (options.dpr) url.searchParams.set('img-dpr', options.dpr.toString());
+	if (options.fit) url.searchParams.set('img-fit', options.fit);
+	if (options.gravity) url.searchParams.set('img-gravity', options.gravity);
+	if (options.quality) url.searchParams.set('img-quality', options.quality.toString());
+	if (options.format) url.searchParams.set('img-format', options.format);
+	if (options.animation !== undefined) url.searchParams.set('img-anim', options.animation.toString());
+	if (options.sharpen) url.searchParams.set('img-sharpen', options.sharpen.toString());
+	if (options.metadata) url.searchParams.set('img-metadata', options.metadata);
 
-	// The following code would be used when the /api/image endpoint is working:
-	/*
-	// Build query parameters for image optimization
-	const params = new URLSearchParams();
-	params.append('hash', cid);
-	// Note: The /api/image endpoint might not support pinataGatewayToken
-	// Authentication may be handled differently for image optimization
-
-	if (options.width) params.append('width', options.width.toString());
-	if (options.height) params.append('height', options.height.toString());
-	if (options.dpr) params.append('dpr', options.dpr.toString());
-	if (options.fit) params.append('fit', options.fit);
-	if (options.gravity) params.append('gravity', options.gravity);
-	if (options.quality) params.append('quality', options.quality.toString());
-	if (options.format) params.append('format', options.format);
-	if (options.animation !== undefined) params.append('animation', options.animation.toString());
-	if (options.sharpen) params.append('sharpen', options.sharpen.toString());
-	if (options.metadata) params.append('metadata', options.metadata);
-
-	return `${IPFS_IMAGE_ENDPOINT}?${params.toString()}`;
-	*/
+	return url.toString();
 }
 
 /**
@@ -483,7 +475,7 @@ export class ImageOptimizer {
 	private baseUrl: string;
 	private defaultOptions: ImageOptimizationOptions;
 
-	constructor(baseUrl: string = IPFS_IMAGE_ENDPOINT, defaultOptions: ImageOptimizationOptions = {}) {
+	constructor(baseUrl: string = IPFS_DIRECT_ENDPOINT, defaultOptions: ImageOptimizationOptions = {}) {
 		this.baseUrl = baseUrl;
 		this.defaultOptions = defaultOptions;
 	}
@@ -516,7 +508,7 @@ export class ImageOptimizer {
 /**
  * Default image optimizer instance
  */
-export const defaultImageOptimizer = new ImageOptimizer(IPFS_IMAGE_ENDPOINT, {
+export const defaultImageOptimizer = new ImageOptimizer(IPFS_DIRECT_ENDPOINT, {
 	format: 'webp',
 	quality: 85,
 	metadata: 'copyright'

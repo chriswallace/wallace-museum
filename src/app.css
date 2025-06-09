@@ -164,11 +164,6 @@
 		@apply px-3 py-1;
 	}
 
-	.hidden {
-		transition: opacity 0.4s;
-		opacity: 0.4;
-	}
-
 	.artwork-display.fullscreen,
 	.artwork-display.fullscreen .artwork-image,
 	.artwork-display.fullscreen .interactive-content {

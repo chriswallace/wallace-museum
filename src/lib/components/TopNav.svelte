@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 
 	// Define navigation items
 	const navItems = [
@@ -20,6 +22,11 @@
 		return currentPath.startsWith(item.path);
 	});
 
+	// Scroll hiding state - only for small screens
+	let isNavVisible = true;
+	let lastScrollY = 0;
+	let ticking = false;
+
 	function handleNavClick(path: string) {
 		goto(path);
 	}
@@ -27,12 +34,75 @@
 	function handleTitleClick() {
 		goto('/');
 	}
+
+	function handleScroll() {
+		if (!ticking) {
+			requestAnimationFrame(updateNavVisibility);
+			ticking = true;
+		}
+	}
+
+	function updateNavVisibility() {
+		if (!browser) return;
+		
+		const currentScrollY = window.scrollY;
+		const scrollDifference = currentScrollY - lastScrollY;
+		
+		// Only apply scroll hiding on small screens (below md breakpoint - 768px)
+		if (window.innerWidth < 768) {
+			// Show navbar when scrolling up or at top of page
+			if (scrollDifference < 0 || currentScrollY < 10) {
+				isNavVisible = true;
+			}
+			// Hide navbar when scrolling down and past initial threshold
+			else if (scrollDifference > 0 && currentScrollY > 100) {
+				isNavVisible = false;
+			}
+		} else {
+			// Always show navbar on medium screens and larger
+			isNavVisible = true;
+		}
+		
+		lastScrollY = currentScrollY;
+		ticking = false;
+	}
+
+	function handleResize() {
+		if (!browser) return;
+		
+		// Ensure navbar is always visible on medium screens and larger
+		if (window.innerWidth >= 768) {
+			isNavVisible = true;
+		}
+	}
+
+	onMount(() => {
+		if (!browser) return;
+		
+		// Set initial scroll position
+		lastScrollY = window.scrollY;
+		
+		// Add event listeners
+		window.addEventListener('scroll', handleScroll, { passive: true });
+		window.addEventListener('resize', handleResize);
+		
+		// Handle initial screen size
+		handleResize();
+	});
+
+	onDestroy(() => {
+		if (!browser) return;
+		
+		// Clean up event listeners
+		window.removeEventListener('scroll', handleScroll);
+		window.removeEventListener('resize', handleResize);
+	});
 </script>
 
-<nav class="top-nav">
+<nav class="top-nav" class:nav-hidden={!isNavVisible}>
 	<!-- Museum Title - positioned at left edge -->
 	<button 
-		class="museum-title"
+		class="page-title"
 		on:click={handleTitleClick}
 		aria-label="Return to homepage"
 	>
@@ -61,12 +131,20 @@
 
 <style lang="scss">
 	.top-nav {
-		@apply fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-sm;
-		@apply relative;
+		@apply fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-sm border-b border-gray-700;
+		@apply transition-transform duration-300 ease-in-out;
+		transform: translateY(0);
 	}
 
-	.museum-title {
-		@apply hidden md:block m-0 p-0 text-yellow-500 text-sm font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer hover:text-yellow-400 transition-colors duration-200 focus:text-yellow-400 focus:outline-none;
+	.top-nav.nav-hidden {
+		// Only hide on small screens
+		@media (max-width: 767px) {
+			transform: translateY(-100%);
+		}
+	}
+
+	.page-title {
+		@apply invisible md:visible m-0 p-0 text-yellow-500 text-sm font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer hover:text-yellow-400 transition-colors duration-200 focus:text-yellow-400 focus:outline-none;
 		@apply absolute left-4 top-0 h-12 flex items-center z-10;
 	}
 
@@ -79,11 +157,11 @@
 	}
 
 	.nav-tabs {
-		@apply flex space-x-8;
+		@apply flex space-x-0;
 	}
 
 	.nav-tab {
-		@apply px-3 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors duration-200;
+		@apply px-6 py-2 font-semibold text-gray-500 hover:text-white transition-colors duration-200 text-sm;
 		@apply bg-none border-none cursor-pointer outline-none;
 		@apply relative h-12 flex items-center;
 	}
@@ -100,33 +178,5 @@
 
 	.nav-tab:hover:not(.active) {
 		@apply text-gray-100;
-	}
-
-	@media (max-width: 768px) {
-		.museum-title {
-			@apply hidden;
-		}
-
-		.nav-container {
-			@apply px-4;
-		}
-
-		.nav-tabs {
-			@apply space-x-4;
-		}
-
-		.nav-tab {
-			@apply px-2 py-1 text-xs;
-		}
-	}
-
-	@media (min-width: 769px) and (max-width: 1024px) {
-		.nav-container {
-			@apply px-6;
-		}
-
-		.nav-tabs {
-			@apply space-x-6;
-		}
 	}
 </style> 

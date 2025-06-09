@@ -339,19 +339,19 @@
 
 <!-- Description Modal -->
 {#if isDescriptionModalOpen}
-	<div 
+	<button 
 		class="modal-backdrop"
 		on:click={handleModalBackdropClick}
 		on:keydown={handleModalKeydown}
 		transition:fade={{ duration: 200 }}
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="modal-artist-name"
-		tabindex="-1"
+		aria-label="Close modal"
 	>
 		<div 
 			class="modal-content"
 			transition:scale={{ duration: 300, easing: quintOut, start: 0.9 }}
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="modal-artist-name"
 		>
 			<!-- Modal Content -->
 			<div class="modal-scroll">
@@ -382,7 +382,7 @@
 				</div>
 			</div>
 		</div>
-	</div>
+	</button>
 {/if}
 
 <style lang="scss">
