@@ -47,7 +47,7 @@
 		>
 			<div class="artwork-content">
 				{#if displayAsVideo}
-					{@const videoAttrs = VideoPresets.thumbnail(ipfsToHttpUrl(cardImageUrl))}
+					{@const videoAttrs = VideoPresets.thumbnail(cardImageUrl)}
 					<video 
 						src={videoAttrs.src}
 						width={videoAttrs.width} 
@@ -85,7 +85,7 @@
 	{:else}
 		<div class="artwork-content rounded-md bg-gray-500/10 py-5">
 			{#if displayAsVideo}
-				{@const videoAttrs = VideoPresets.thumbnail(ipfsToHttpUrl(cardImageUrl))}
+				{@const videoAttrs = VideoPresets.thumbnail(cardImageUrl)}
 				<video 
 					src={videoAttrs.src}
 					width={videoAttrs.width} 

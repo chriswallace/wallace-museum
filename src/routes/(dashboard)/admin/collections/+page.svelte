@@ -101,7 +101,7 @@
 						{#each collection.coverImages as image}
 							{#if isVideoUrl(image)}
 								<video
-									src={ipfsToHttpUrl(image)}
+									src={image}
 									autoplay
 									loop
 									muted

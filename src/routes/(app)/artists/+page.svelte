@@ -272,7 +272,7 @@
 					</div>
 				{/if}
 				<OptimizedImage
-					src={ipfsToHttpUrl(previewMedia.url)}
+					src={previewMedia.url}
 					alt={hoveredArtist.artworks[0].title || ''}
 					width={previewDimensions?.width || 320}
 					height={previewDimensions?.height || 240}
@@ -288,7 +288,7 @@
 					}}
 				/>
 			{:else if previewMedia.type === 'video'}
-				{@const videoAttrs = VideoPresets.preview(ipfsToHttpUrl(previewMedia.url))}
+				{@const videoAttrs = VideoPresets.preview(previewMedia.url)}
 				<video
 					src={videoAttrs.src}
 					autoplay={videoAttrs.autoplay}

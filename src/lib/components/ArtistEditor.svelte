@@ -355,7 +355,7 @@
 				<a href="/admin/artworks/edit/{artwork.id}" class="artwork-card">
 					<div class="aspect-square relative">
 						<OptimizedImage
-							src={ipfsToHttpUrl(artwork.imageUrl)}
+							src={artwork.imageUrl}
 							alt={artwork.title}
 							width={300}
 							height={300}

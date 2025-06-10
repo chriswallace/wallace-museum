@@ -156,18 +156,22 @@
 						<div class="artwork-thumbnail">
 							{#if media.type === 'image'}
 								<OptimizedImage
-									src={ipfsToHttpUrl(media.url)}
+									src={media.url}
 									alt={artwork.title}
 									width={800}
 									height={800}
-									fit="contain"
+									quality={85}
 									format="webp"
-									quality={70}
-									className="thumbnail-image"
-									fallbackSrc="/images/medici-image.png"
+									fit="cover"
+									responsive={true}
+									responsiveSizes={[800 * 0.5, 800, 800 * 1.5]}
+									sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+									aspectRatio="1/1"
+									skeletonBorderRadius="0px"
+									className="artwork-image"
 								/>
 							{:else if media.type === 'video'}
-								{@const videoAttrs = VideoPresets.feed(ipfsToHttpUrl(media.url))}
+								{@const videoAttrs = VideoPresets.feed(media.url)}
 								<div class="video-container">
 									{#if videoLoadingStates[artwork.id]}
 										<div class="video-loading">
@@ -227,7 +231,7 @@
 											{#if artist.avatarUrl}
 												<div class="artist-avatar">
 													<OptimizedImage
-														src={ipfsToHttpUrl(artist.avatarUrl)}
+														src={artist.avatarUrl}
 														alt="{artist.name} avatar"
 														width={32}
 														height={32}

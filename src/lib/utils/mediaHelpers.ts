@@ -203,6 +203,17 @@ export const VideoPresets = {
 		playsinline: true
 	}),
 	
+	mobile: (videoUrl: string) => getOptimizedVideoAttributes(videoUrl, {
+		maxWidth: 800,
+		maxHeight: 800,
+		quality: 'medium',
+		preload: 'metadata',
+		autoplay: true,
+		loop: true,
+		muted: true,
+		playsinline: true
+	}),
+	
 	fullscreen: (videoUrl: string) => getOptimizedVideoAttributes(videoUrl, {
 		maxWidth: 1920,
 		maxHeight: 1080,

@@ -329,13 +329,13 @@ export function ipfsToHttpUrl(
 						return cleanUri; // Return original if CID is invalid
 					}
 
-					// Build microservice URL
-					const baseUrl = new URL(IPFS_MICROSERVICE_ENDPOINT + cid);
+					// Build microservice URL manually to preserve existing encoding
+					let microserviceUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
 					if (path) {
-						baseUrl.pathname += `/${path}`;
+						microserviceUrl += `/${path}`;
 					}
-					baseUrl.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
-					return baseUrl.toString();
+					microserviceUrl += `?pinataGatewayToken=${PINATA_GATEWAY_TOKEN}`;
+					return microserviceUrl;
 				}
 
 				return gateway + cidAndPath;
@@ -365,13 +365,13 @@ export function ipfsToHttpUrl(
 				return ''; // Return empty for invalid IPFS URIs
 			}
 
-			// Build microservice URL
-			const baseUrl = new URL(IPFS_MICROSERVICE_ENDPOINT + cid);
+			// Build microservice URL manually to preserve existing encoding
+			let microserviceUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
 			if (path) {
-				baseUrl.pathname += `/${path}`;
+				microserviceUrl += `/${path}`;
 			}
-			baseUrl.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
-			return baseUrl.toString();
+			microserviceUrl += `?pinataGatewayToken=${PINATA_GATEWAY_TOKEN}`;
+			return microserviceUrl;
 		}
 
 		return gateway + cleaned;
@@ -385,13 +385,13 @@ export function ipfsToHttpUrl(
 			const cid = pathParts[0];
 			const path = pathParts.slice(1).join('/');
 
-			// Build microservice URL
-			const baseUrl = new URL(IPFS_MICROSERVICE_ENDPOINT + cid);
+			// Build microservice URL manually to preserve existing encoding
+			let microserviceUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
 			if (path) {
-				baseUrl.pathname += `/${path}`;
+				microserviceUrl += `/${path}`;
 			}
-			baseUrl.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
-			return baseUrl.toString();
+			microserviceUrl += `?pinataGatewayToken=${PINATA_GATEWAY_TOKEN}`;
+			return microserviceUrl;
 		}
 
 		return gateway + cleanUri;

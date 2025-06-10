@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { ipfsToHttpUrl, IPFS_GATEWAYS } from '$lib/mediaUtils';
 	import { getBestMediaUrl, getMediaDisplayType } from '$lib/utils/mediaHelpers';
 	import { buildOptimizedImageUrl, buildDirectImageUrl } from '$lib/imageOptimization';
 	import VideoPlayer from './VideoPlayer.svelte';
+	import MobileVideoPlayer from './MobileVideoPlayer.svelte';
 	import IframeSkeleton from './IframeSkeleton.svelte';
 	import OptimizedImage from './OptimizedImage.svelte';
 	import { browser } from '$app/environment';
@@ -33,6 +35,9 @@
 	// State for iframe loading
 	let isIframeLoading = true;
 
+	// Detect if this is a mobile/touch device
+	let isMobileDevice = false;
+
 	// Use provided dimensions or fall back to artwork dimensions
 	$: actualDimensions = dimensions || artwork.dimensions;
 
@@ -61,26 +66,28 @@
 	}
 
 	// Get the best media URL and display type
-	$: artworkMediaUrls = {
+	$: mediaUrls = {
 		generatorUrl: artwork.generatorUrl,
 		animationUrl: artwork.animationUrl,
 		imageUrl: artwork.imageUrl,
 		thumbnailUrl: artwork.thumbnailUrl
 	};
 
-	$: bestMedia = getBestMediaUrl(artworkMediaUrls, 'fullscreen', artwork.mime);
-	$: mediaType = getMediaDisplayType(bestMedia, artwork.mime);
+	$: bestMedia = getBestMediaUrl(mediaUrls, 'fullscreen', artwork.mime);
 	$: displayUrl = bestMedia?.url || '';
-	$: transformedUrl = displayUrl ? ipfsToHttpUrl(displayUrl, IPFS_GATEWAYS[0], true, artwork.mime || undefined) : '';
+	$: mediaType = getMediaDisplayType(bestMedia, artwork.mime);
 
-	// Get optimized image URL for display
+	// Transform URLs for optimization
+	$: transformedUrl = displayUrl ? ipfsToHttpUrl(displayUrl) : '';
+
+	// Get optimized image URL for normal display
 	$: optimizedImageUrl = mediaType === 'image' && displayUrl 
 		? buildOptimizedImageUrl(displayUrl, {
-			width: actualDimensions?.width,
-			height: actualDimensions?.height,
-			quality: 70,
+			width: actualDimensions?.width || 800,
+			height: actualDimensions?.height || 800,
+			fit: 'contain',
 			format: 'webp',
-			fit: 'contain'
+			quality: 85
 		})
 		: transformedUrl;
 
@@ -129,6 +136,11 @@
 
 	// Disable skeleton loaders in fullscreen mode
 	$: shouldShowSkeleton = showSkeleton && !isInFullscreen;
+
+	// Detect mobile device on mount
+	onMount(() => {
+		isMobileDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+	});
 </script>
 
 <svelte:window on:fullscreenchange={handleFullscreenChange} />
@@ -141,15 +153,32 @@
 			</div>
 		</div>
 	{:else if mediaType === 'video'}
-		<VideoPlayer
-			src={transformedUrl}
-			autoplay={true}
-			loop={true}
-			muted={true}
-			className="video-player-artwork"
-			aspectRatio={aspectRatio}
-			showSkeleton={shouldShowSkeleton}
-		/>
+		{#if isMobileDevice}
+			<MobileVideoPlayer
+				src={transformedUrl}
+				autoplay={true}
+				loop={true}
+				muted={true}
+				className="video-player-artwork"
+				aspectRatio={aspectRatio}
+				showSkeleton={shouldShowSkeleton}
+				width={actualDimensions?.width}
+				height={actualDimensions?.height}
+			/>
+		{:else}
+			<VideoPlayer
+				src={transformedUrl}
+				autoplay={true}
+				loop={true}
+				muted={true}
+				className="video-player-artwork"
+				aspectRatio={aspectRatio}
+				showSkeleton={shouldShowSkeleton}
+				width={actualDimensions?.width}
+				height={actualDimensions?.height}
+				simplifiedControls={false}
+			/>
+		{/if}
 	{:else if mediaType === 'iframe'}
 		<div class="iframe-container">
 			<iframe
@@ -265,6 +294,35 @@
 		max-width: 100%;
 		max-height: 100%;
 		object-fit: contain;
+	}
+
+	/* Video player specific styling */
+	:global(.video-player-artwork) {
+		width: 100%;
+		height: auto;
+		max-width: 100%;
+	}
+
+	/* Ensure video elements maintain aspect ratio */
+	:global(.video-player-artwork .video-element) {
+		width: 100% !important;
+		height: auto !important;
+		max-width: 100% !important;
+		object-fit: contain !important;
+	}
+
+	/* Mobile video player styling */
+	:global(.mobile-video-player) {
+		width: 100%;
+		height: auto;
+		max-width: 100%;
+	}
+
+	:global(.mobile-video-player .video-element) {
+		width: 100% !important;
+		height: auto !important;
+		max-width: 100% !important;
+		object-fit: contain !important;
 	}
 
 	/* Image styling for normal display */

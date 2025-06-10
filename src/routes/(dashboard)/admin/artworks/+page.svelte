@@ -473,7 +473,7 @@
 					<td>
 						<button class="image" on:click={() => editArtwork(artwork.id)}>
 							<OptimizedImage
-								src={ipfsToHttpUrl(artwork.imageUrl)}
+								src={artwork.imageUrl}
 								alt={artwork.title}
 								width={80}
 								height={80}

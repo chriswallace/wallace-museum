@@ -318,7 +318,7 @@
 						{#if artwork.animationUrl || artwork.generatorUrl}
 							{#if artwork.mime?.startsWith('video/')}
 								<video 
-									src={ipfsToHttpUrl(artwork.animationUrl || artwork.generatorUrl)} 
+									src={artwork.animationUrl || artwork.generatorUrl} 
 									controls 
 									muted 
 									autoplay 
@@ -332,7 +332,7 @@
 								</video>
 							{:else if artwork.mime === 'text/html' || artwork.mime === 'application/javascript' || artwork.generatorUrl}
 								<iframe 
-									src={ipfsToHttpUrl(artwork.animationUrl || artwork.generatorUrl, undefined, true, artwork.mime)} 
+									src={artwork.animationUrl || artwork.generatorUrl} 
 									title="Interactive Artwork"
 									class="media-content"
 									width={artwork.dimensions?.width || 800}
