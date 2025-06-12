@@ -3,8 +3,9 @@
 	import { goto } from '$app/navigation';
 	import OptimizedImage from './OptimizedImage.svelte';
 	import LoaderWrapper from './LoaderWrapper.svelte';
-	import { ipfsToHttpUrl } from '$lib/mediaUtils';
-	import { VideoPresets } from '$lib/utils/mediaHelpers';
+	import { ipfsToHttpUrl, IPFS_GATEWAYS } from '$lib/mediaUtils';
+	import { getBestMediaUrl, getMediaDisplayType, VideoPresets } from '$lib/utils/mediaHelpers';
+	import type { MediaUrls } from '$lib/utils/mediaHelpers';
 	import type { FeedArtwork } from '../../routes/api/artworks/random/+server';
 
 	let artworks: FeedArtwork[] = [];
@@ -14,33 +15,6 @@
 	let intersectionTarget: HTMLElement;
 	let currentObserver: IntersectionObserver | null = null;
 	let videoLoadingStates: Record<string, boolean> = {};
-
-	// Helper function to detect if content is a video based on MIME type
-	function isVideoMime(mime: string | null): boolean {
-		if (!mime) return false;
-		return mime.startsWith('video/');
-	}
-
-	// Get media to display for artwork
-	function getArtworkMedia(artwork: FeedArtwork) {
-		// If we have an image, use it
-		if (artwork.imageUrl) {
-			return {
-				type: 'image',
-				url: artwork.imageUrl
-			};
-		}
-
-		// If no image but we have animation URL and it's a video, use it
-		if (artwork.animationUrl && isVideoMime(artwork.mime)) {
-			return {
-				type: 'video',
-				url: artwork.animationUrl
-			};
-		}
-
-		return null;
-	}
 
 	// Format mint date for display
 	function formatMintDate(mintDate: Date | null): string | null {
@@ -144,9 +118,16 @@
 	
 	<div class="artworks-stack">
 		{#each artworks as artwork (artwork.id)}
-			{@const media = getArtworkMedia(artwork)}
+			{@const mediaUrls = {
+				generatorUrl: null,
+				animationUrl: artwork.animationUrl,
+				imageUrl: artwork.imageUrl,
+				thumbnailUrl: null
+			}}
+			{@const bestMedia = getBestMediaUrl(mediaUrls, 'thumbnail', artwork.mime)}
+			{@const mediaType = getMediaDisplayType(bestMedia, artwork.mime)}
 			
-			{#if media}
+			{#if bestMedia}
 				<div class="artwork-card">
 					<button 
 						class="artwork-container" 
@@ -154,24 +135,26 @@
 						aria-label="View {artwork.title} by {artwork.artists.map(a => a.name).join(', ')}"
 					>
 						<div class="artwork-thumbnail">
-							{#if media.type === 'image'}
+							{#if mediaType === 'image'}
 								<OptimizedImage
-									src={media.url}
+									src={bestMedia.url}
 									alt={artwork.title}
-									width={800}
-									height={800}
+									width={artwork.dimensions?.width || 800}
+									height={artwork.dimensions?.height || 800}
+									aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
 									quality={85}
-									format="webp"
-									fit="cover"
+									format="auto"
+									fit="contain"
 									responsive={true}
 									responsiveSizes={[800 * 0.5, 800, 800 * 1.5]}
 									sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-									aspectRatio="1/1"
 									skeletonBorderRadius="0px"
 									className="artwork-image"
+									fallbackSrc="/images/medici-image.png"
 								/>
-							{:else if media.type === 'video'}
-								{@const videoAttrs = VideoPresets.feed(media.url)}
+							{:else if mediaType === 'video'}
+								{@const transformedVideoUrl = ipfsToHttpUrl(bestMedia.url, IPFS_GATEWAYS[0], true, artwork.mime || undefined)}
+								{@const videoAttrs = VideoPresets.feed(transformedVideoUrl)}
 								<div class="video-container">
 									{#if videoLoadingStates[artwork.id]}
 										<div class="video-loading">
@@ -199,7 +182,7 @@
 											videoLoadingStates = videoLoadingStates;
 										}}
 										on:error={(e) => {
-											console.warn('Video failed to load:', media.url);
+											console.warn('Video failed to load:', transformedVideoUrl);
 											videoLoadingStates[artwork.id] = false;
 											videoLoadingStates = videoLoadingStates;
 										}}
@@ -209,6 +192,7 @@
 									</video>
 								</div>
 							{:else}
+								<!-- For feed, we only show images and videos, not iframes -->
 								<div class="thumbnail-placeholder">
 									<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
 										<path d="M21 19V5c0-1.1-.9-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
@@ -236,7 +220,7 @@
 														width={32}
 														height={32}
 														fit="cover"
-														format="webp"
+														format="auto"
 														quality={85}
 														className="avatar-image"
 														fallbackSrc="/images/medici-image.png"
@@ -303,19 +287,15 @@
 	}
 
 	.artwork-container {
-		@apply w-full bg-transparent border-none p-0 cursor-pointer;
+		@apply bg-transparent border-none p-0 cursor-pointer;
 		@apply transition-transform duration-200 focus:outline-none;
 		@apply block text-left;
 	}
 
 	.artwork-thumbnail {
-		@apply w-full aspect-square bg-gray-950/70 rounded-t-sm overflow-hidden;
+		@apply aspect-square bg-gray-950/70 rounded-t-sm overflow-hidden;
 		@apply flex items-center justify-center;
 		margin: 0 auto;
-	}
-
-	:global(.thumbnail-image) {
-		@apply w-full h-full object-contain;
 	}
 
 	.thumbnail-video {

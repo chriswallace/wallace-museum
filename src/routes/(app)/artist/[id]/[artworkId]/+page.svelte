@@ -43,7 +43,7 @@
 		// Restore focus after fullscreen change
 		setTimeout(() => {
 			if (mainContainer) {
-				mainContainer.focus();
+				mainContainer.focus({ preventScroll: true });
 			}
 		}, 100);
 	}
@@ -60,21 +60,30 @@
 	function restoreFocus() {
 		setTimeout(() => {
 			if (mainContainer) {
-				mainContainer.focus();
+				mainContainer.focus({ preventScroll: true });
 			}
 		}, 100);
 	}
 
 	onMount(() => {
+		// Prevent automatic scroll restoration
+		if (typeof window !== 'undefined' && 'scrollRestoration' in history) {
+			history.scrollRestoration = 'manual';
+		}
+
 		// Listen for fullscreen changes
 		document.addEventListener('fullscreenchange', handleFullscreenChange);
 		
-		// Set initial focus
+		// Set initial focus without scrolling
 		setTimeout(() => {
 			if (mainContainer) {
-				mainContainer.focus();
+				mainContainer.focus({ preventScroll: true });
 			}
 		}, 100);
+
+		// Initialize aspect ratio calculation
+		calculateAspectRatio();
+		setupMediaLoadDetection();
 		
 		return () => {
 			document.removeEventListener('fullscreenchange', handleFullscreenChange);
@@ -204,41 +213,35 @@
 				}
 				break;
 			
-			case '?':
 			case 'h':
 			case 'H':
-				// Toggle keyboard help
+			case '?':
 				keyboardHelpVisible = !keyboardHelpVisible;
 				break;
 		}
 	}
 
-	function handleIframeLoad() {
-		if (iframeEl && iframeEl.contentWindow) {
-			try {
-				const styleElement = iframeEl.contentDocument?.createElement('style');
-				if (styleElement) {
-					styleElement.textContent = `
-					html, body {
-						overflow: hidden !important;
-						margin: 0 !important;
-						padding: 0 !important;
-						height: 100% !important;
-						width: 100% !important;
-					}
-					::-webkit-scrollbar {
-						display: none !important;
-					}
-					* {
-						scrollbar-width: none !important;
-					}
-				`;
-					iframeEl.contentDocument?.head?.appendChild(styleElement);
-				}
-			} catch (e) {
-				console.log('Could not modify iframe content due to cross-origin restrictions');
-			}
+	function getProfileUrl(address: string, blockchain: string): string | null {
+		if (blockchain === 'ethereum') {
+			return `https://opensea.io/${address}`;
+		} else if (blockchain === 'tezos') {
+			return `https://objkt.com/profile/${address}`;
 		}
+		return null;
+	}
+
+	function getProfileLinkText(blockchain: string): string {
+		if (blockchain === 'ethereum') {
+			return 'View on OpenSea';
+		} else if (blockchain === 'tezos') {
+			return 'View on Objkt';
+		}
+		return 'View Profile';
+	}
+
+	function formatWalletAddress(address: string): string {
+		if (address.length <= 10) return address;
+		return `${address.slice(0, 6)}...${address.slice(-4)}`;
 	}
 
 	function formatMedium(mime?: string): string {
@@ -362,14 +365,121 @@
 	$: hasValidDimensions = dimensionsObj && dimensionsObj.width > 0 && dimensionsObj.height > 0;
 	$: useExactDimensions = hasValidDimensions && !isFullscreen;
 
-	// Temporary debug log to verify dimensions
-	$: if (currentArtworkForDisplay && dimensionsObj) {
-		console.log('✅ Dimensions check:', {
-			dimensionsObj,
-			hasValidDimensions,
-			useExactDimensions,
-			isFullscreen,
-			aspectRatio
+	// Template layout functions
+	function calculateAspectRatio() {
+		const artworkCanvas = document.querySelector('.artwork-canvas');
+		const nftMediaDiv = document.querySelector('.nft-media');
+
+		if (!artworkCanvas || !nftMediaDiv) {
+			return null;
+		}
+
+		const canvasRect = artworkCanvas.getBoundingClientRect();
+		const canvasWidth = canvasRect.width;
+		const canvasHeight = canvasRect.height;
+
+		if (canvasWidth === 0 || canvasHeight === 0) {
+			return null;
+		}
+
+		const aspectRatio = canvasWidth / canvasHeight;
+		(nftMediaDiv as HTMLElement).style.aspectRatio = `${aspectRatio} / 1`;
+
+		return aspectRatio;
+	}
+
+	function handleLayoutRecalculation() {
+		const nftMediaDiv = document.querySelector('.nft-media');
+		
+		if (nftMediaDiv) {
+			(nftMediaDiv as HTMLElement).style.aspectRatio = '';
+		}
+
+		requestAnimationFrame(() => {
+			setTimeout(() => {
+				calculateAspectRatio();
+			}, 50);
+		});
+	}
+
+	function debounce(func: Function, wait: number) {
+		let timeout: ReturnType<typeof setTimeout>;
+		return function executedFunction(...args: any[]) {
+			const later = () => {
+				clearTimeout(timeout);
+				func(...args);
+			};
+			clearTimeout(timeout);
+			timeout = setTimeout(later, wait);
+		};
+	}
+
+	const debouncedHandleLayoutRecalculation = debounce(handleLayoutRecalculation, 150);
+
+	function setupMediaLoadDetection() {
+		const nftMediaDiv = document.querySelector('.nft-media');
+		
+		if (!nftMediaDiv) {
+			return;
+		}
+
+		nftMediaDiv.classList.add('isMediaLoaded-false');
+		nftMediaDiv.classList.remove('isMediaLoaded-true');
+
+		function handleMediaLoad() {
+			if (nftMediaDiv) {
+				nftMediaDiv.classList.remove('isMediaLoaded-false');
+				nftMediaDiv.classList.add('isMediaLoaded-true');
+			}
+		}
+
+		// Look for media elements within the ArtworkDisplay component
+		const checkForMediaElements = () => {
+			// Check for image elements (from OptimizedImage component)
+			const imageElement = nftMediaDiv.querySelector('img');
+			if (imageElement) {
+				if (imageElement.complete && imageElement.naturalHeight !== 0) {
+					handleMediaLoad();
+				} else {
+					imageElement.addEventListener('load', handleMediaLoad, { once: true });
+				}
+				return;
+			}
+
+			// Check for video elements (from VideoPlayer component)
+			const videoElement = nftMediaDiv.querySelector('video');
+			if (videoElement) {
+				if (videoElement.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+					handleMediaLoad();
+				} else {
+					videoElement.addEventListener('loadeddata', handleMediaLoad, { once: true });
+				}
+				return;
+			}
+
+			// Check for iframe elements
+			const iframeElement = nftMediaDiv.querySelector('iframe');
+			if (iframeElement) {
+				iframeElement.addEventListener('load', handleMediaLoad, { once: true });
+				// Also set a timeout fallback for iframes
+				setTimeout(handleMediaLoad, 2000);
+				return;
+			}
+
+			// If no media elements found yet, try again after a short delay
+			setTimeout(checkForMediaElements, 100);
+		};
+
+		// Start checking for media elements
+		checkForMediaElements();
+	}
+
+	// Handle window resize
+	if (typeof window !== 'undefined') {
+		window.addEventListener('resize', debouncedHandleLayoutRecalculation);
+		window.addEventListener('load', () => {
+			calculateAspectRatio();
+			setupMediaLoadDetection();
 		});
 	}
 </script>
@@ -385,63 +495,57 @@
 </svelte:head>
 
 {#if !data.artist && data.error}
-	<div class="artist-page" transition:fade>
-		<div class="artist-content">
-			<button class="close-button" on:click={closeOverlay} aria-label="Close artist gallery"
-				>×</button
-			>
-			<h2 class="artist-overlay-title">Artwork Not Found</h2>
-			<p class="text-gray-300 mb-4">{data.error}</p>
+	<div class="error-page" transition:fade>
+		<div class="error-content">
+			<h2>Artwork Not Found</h2>
+			<p>{data.error}</p>
+			<button on:click={closeOverlay}>Return Home</button>
 		</div>
 	</div>
 {:else if !data.artist}
-	<div class="artist-page" transition:fade>
-		<div class="artist-content">
-			<div class="flex flex-col items-center justify-center min-h-[200px]">
-				<div class="loader mb-4" />
-				<p class="text-gray-300">Loading artwork...</p>
-			</div>
+	<div class="loading-page" transition:fade>
+		<div class="loading-content">
+			<div class="loader" />
+			<p>Loading artwork...</p>
 		</div>
 	</div>
 {:else}
-	<div class="artist-page" role="application" tabindex="0" on:keydown={handleKeyDown} on:click={() => mainContainer?.focus()} transition:fade bind:this={mainContainer}>
+	<main class="artwork-page" role="application" tabindex="0" on:keydown={handleKeyDown} on:click={() => mainContainer?.focus({ preventScroll: true })} transition:fade bind:this={mainContainer}>
 		{#if data.artist.artworks.length > 0 && currentArtwork}
 			{#key currentIndex}
-				<div class="museum-content">
-					{#if currentArtworkForDisplay}
-					<div class="artwork-container" class:fullscreen={isFullscreen}>
-						<ArtworkDisplay 
-							artwork={currentArtworkForDisplay}
-							dimensions={currentArtworkForDisplay.dimensions}
-							fullscreen={isFullscreen}
-						/>
-					</div>
-					{/if}
-
-					<div class="museum-details-wrapper">
-						<div class="museum-details-overlay">
-							<div class="museum-header">
-								<div class="museum-artist-title">
-									<div class="museum-artist">
-										{#if data.currentArtworkArtists && data.currentArtworkArtists.length > 0}
-											<ArtistList 
-												artists={data.currentArtworkArtists}
-												layout="horizontal"
-												size="sm"
-												showAvatars={false}
-												linkToWebsite={false}
-												linkToArtist={true}
-												showPopover={false}
-												separator=", "
-												className="text-sm font-medium uppercase tracking-wider text-yellow-500"
-											/>
-										{:else}
-											<span class="text-sm font-medium uppercase tracking-wider text-yellow-500">Unknown Artist</span>
+				<div class="artwork-content-container">
+					<div class="artwork-flex-container">
+						<div class="artwork-container">
+							<div class="artwork-canvas">
+								<div class="nft-media">
+										{#if currentArtworkForDisplay}
+											<ArtworkDisplay artwork={currentArtworkForDisplay} />
 										{/if}
-									</div>
-									<div class="museum-title">{currentArtwork.title}</div>
 								</div>
-
+							</div>
+						</div>
+						<div class="info-container">
+							<!-- Artist and Title Header -->
+							<div class="artwork-header">
+								<div class="artist-info">
+									{#if data.currentArtworkArtists && data.currentArtworkArtists.length > 0}
+										<ArtistList 
+											artists={data.currentArtworkArtists}
+											layout="horizontal"
+											size="sm"
+											showAvatars={false}
+											linkToWebsite={false}
+											linkToArtist={true}
+											showPopover={false}
+											separator=", "
+											className="artist-name"
+										/>
+									{:else}
+										<span class="artist-name">Unknown Artist</span>
+									{/if}
+								</div>
+								<h1 class="artwork-title">{currentArtwork.title}</h1>
+								
 								{#if data.artist.artworks.length > 1}
 									<div class="artwork-navigation">
 										<button 
@@ -464,137 +568,116 @@
 								{/if}
 							</div>
 
-							<div class="content-grid">
-								{#if currentArtwork.description}
-									<div class="description-col">
-										<div class="museum-description">
-											<h3 class="metadata-heading">Description</h3>
-											{currentArtwork.description}
-										</div>
-									</div>
-								{/if}
+							<!-- Description -->
+							{#if currentArtwork.description}
+								<div class="artwork-description">
+									<p>{currentArtwork.description}</p>
+								</div>
+							{/if}
 
-								<div class="metadata-col">
-									{#if currentArtwork.attributes && currentArtwork.attributes.length}
-										<div class="metadata-section">
-											<h3 class="metadata-heading">Attributes</h3>
-											<div class="metadata-grid">
-												{#each parseAttributes(currentArtwork.attributes) as attribute}
-													<div class="metadata-item">
-														<strong>{attribute.trait_type}</strong>
-														<span>{attribute.value}</span>
-													</div>
-												{/each}
+							<!-- Attributes -->
+							{#if currentArtwork.attributes && parseAttributes(currentArtwork.attributes).length > 0}
+								<div class="metadata-section">
+									<h3 class="metadata-heading">Attributes</h3>
+									<div class="metadata-grid">
+										{#each parseAttributes(currentArtwork.attributes) as attribute}
+											<div class="metadata-item">
+												<strong>{attribute.trait_type}</strong>
+												<span>{attribute.value}</span>
 											</div>
-										</div>
-
-										<div class="divider" />
-									{/if}
-
-									<div class="metadata-section">
-										<h3 class="metadata-heading">Additional Details</h3>
-										<div class="metadata-grid">
-											{#if currentArtwork.supply}
-												<div class="metadata-item">
-													<strong>Edition</strong>
-													<span>1 of {currentArtwork.supply}</span>
-												</div>
-											{/if}
-											{#if currentDimensions}
-												<div class="metadata-item">
-													<strong>Dimensions</strong>
-													<span>{dimensionsObj.width} × {dimensionsObj.height}</span>
-												</div>
-											{/if}
-											{#if currentArtwork.contractAddr}
-												<div class="metadata-item">
-													<strong>Contract</strong>
-													{#if getContractUrl(currentArtwork.contractAddr, currentArtwork.blockchain, currentArtwork.tokenID)}
-														<a
-															href={getContractUrl(
-																currentArtwork.contractAddr,
-																currentArtwork.blockchain,
-																currentArtwork.tokenID
-															)}
-															target="_blank"
-															rel="noopener noreferrer"
-															class="contract-link"
-														>
-															{getContractName(
-																currentArtwork.contractAddr,
-																currentArtwork.contractAlias
-															)}
-														</a>
-													{:else}
-														<span>
-															{getContractName(
-																currentArtwork.contractAddr,
-																currentArtwork.contractAlias
-															)}
-														</span>
-													{/if}
-												</div>
-											{/if}
-											{#if currentArtwork.contractAlias && !currentArtwork.contractAddr}
-												<div class="metadata-item">
-													<strong>Contract Alias</strong>
-													<span>{currentArtwork.contractAlias}</span>
-												</div>
-											{/if}
-											{#if currentArtwork.tokenID}
-												<div class="metadata-item">
-													<strong>Token ID</strong>
-													<span>{currentArtwork.tokenID}</span>
-												</div>
-											{/if}
-											{#if currentArtwork.tokenStandard}
-												<div class="metadata-item">
-													<strong>Token Standard</strong>
-													<span>{currentArtwork.tokenStandard?.toUpperCase()}</span>
-												</div>
-											{/if}
-
-											{#if currentArtwork.mintDate}
-												<div class="metadata-item">
-													<strong>Mint Date</strong>
-													<span>{formatMintDate(currentArtwork.mintDate)}</span>
-												</div>
-											{/if}
-											{#if currentArtwork.mime}
-												<div class="metadata-item">
-													<strong>Medium</strong>
-													<span>{formatMedium(currentArtwork.mime)}</span>
-												</div>
-											{/if}
-											{#if currentArtwork.tags && currentArtwork.tags.length}
-												<div class="metadata-item">
-													<strong>Tags</strong>
-													<span>{parseAndJoinTags(currentArtwork.tags)}</span>
-												</div>
-											{/if}
-										</div>
+										{/each}
 									</div>
 								</div>
-							</div>
-						</div>
-					</div>
+							{/if}
 
-					<!-- Keyboard shortcuts section below content -->
-					<div class="keyboard-shortcuts-section">
-						<div class="shortcuts-content">
-							<button 
-								class="keyboard-help-trigger"
-								on:click={() => keyboardHelpVisible = true}
-								aria-label="Show keyboard shortcuts"
-								title="Press H for keyboard shortcuts"
-							>
-								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-									<line x1="8" y1="21" x2="16" y2="21"/>
-									<line x1="12" y1="17" x2="12" y2="21"/>
-								</svg>
-								<span class="keyboard-help-text">Keyboard shortcuts</span>
-							</button>
+							<!-- Additional Details -->
+							<div class="metadata-section">
+								<h3 class="metadata-heading">Details</h3>
+								<div class="metadata-grid">
+									{#if currentArtwork.supply}
+										<div class="metadata-item">
+											<strong>Edition</strong>
+											<span>1 of {currentArtwork.supply}</span>
+										</div>
+									{/if}
+									{#if currentDimensions}
+										<div class="metadata-item">
+											<strong>Dimensions</strong>
+											<span>{dimensionsObj.width} × {dimensionsObj.height}</span>
+										</div>
+									{/if}
+									{#if currentArtwork.contractAddr}
+										<div class="metadata-item">
+											<strong>Contract</strong>
+											{#if getContractUrl(currentArtwork.contractAddr, currentArtwork.blockchain, currentArtwork.tokenID)}
+												<a
+													href={getContractUrl(
+														currentArtwork.contractAddr,
+														currentArtwork.blockchain,
+														currentArtwork.tokenID
+													)}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="contract-link"
+												>
+													{getContractName(
+														currentArtwork.contractAddr,
+														currentArtwork.contractAlias
+													)}
+												</a>
+											{:else}
+												<span>
+													{getContractName(
+														currentArtwork.contractAddr,
+														currentArtwork.contractAlias
+													)}
+												</span>
+											{/if}
+										</div>
+									{/if}
+									{#if currentArtwork.tokenID}
+										<div class="metadata-item">
+											<strong>Token ID</strong>
+											<span>{currentArtwork.tokenID}</span>
+										</div>
+									{/if}
+									{#if currentArtwork.tokenStandard}
+										<div class="metadata-item">
+											<strong>Token Standard</strong>
+											<span>{currentArtwork.tokenStandard?.toUpperCase()}</span>
+										</div>
+									{/if}
+									{#if currentArtwork.mintDate}
+										<div class="metadata-item">
+											<strong>Mint Date</strong>
+											<span>{formatMintDate(currentArtwork.mintDate)}</span>
+										</div>
+									{/if}
+									{#if currentArtwork.mime}
+										<div class="metadata-item">
+											<strong>Medium</strong>
+											<span>{formatMedium(currentArtwork.mime)}</span>
+										</div>
+									{/if}
+								</div>
+							</div>
+
+							<!-- Keyboard Shortcuts -->
+							<div class="keyboard-shortcuts-section">
+								<button 
+									class="keyboard-help-trigger"
+									on:click={() => keyboardHelpVisible = true}
+									aria-label="Show keyboard shortcuts"
+									title="Press H for keyboard shortcuts"
+								>
+									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+										<line x1="8" y1="21" x2="16" y2="21"/>
+										<line x1="12" y1="17" x2="12" y2="21"/>
+									</svg>
+									<span>Keyboard shortcuts</span>
+								</button>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -676,157 +759,329 @@
 				</div>
 			</div>
 		{/if}
-	</div>
+	</main>
 {/if}
 
-<style lang="scss">
-	.artist-page {
-		@apply w-full min-h-screen bg-black bg-opacity-80;
+<style>
+	/* Base styles from template */
+	.artwork-page {
+		margin: 0;
+		padding: 0;
+		font-family: Suisse, "Suisse Fallback", -apple-system, "system-ui", "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+		background: black;
+		color: white;
+		min-height: 100vh;
 		outline: none;
 	}
 
-	.artist-page:focus {
-		outline: 2px solid transparent;
+	.artwork-content-container {
+		max-width: 2000px;
+		margin-left: auto;
+		margin-right: auto;
+		flex: 1 1 0%;
+		padding-left: 16px;
+		padding-right: 16px;
 	}
 
-	.museum-content {
-		@apply flex flex-col w-full items-center justify-start;
+	@media (min-width: 640px) {
+		.artwork-content-container {
+			padding-left: 24px;
+			padding-right: 24px;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.artwork-content-container {
+			padding-left: 48px;
+			padding-right: 48px;
+		}
+	}
+
+	.artwork-flex-container {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 0;
+	}
+
+	@media (min-width: 1024px) {
+		.artwork-flex-container {
+			flex-direction: row;
+		}
 	}
 
 	.artwork-container {
-		@apply w-full relative flex items-center justify-center bg-black bg-opacity-50 md:pt-12 md:pb-4 aspect-square md:h-[82svh] md:aspect-auto;
+		display: flex;
+		align-items: flex-start;
+		justify-content: center;
+		flex-grow: 1;
+		box-sizing: inherit;
+		min-width: 0;
 	}
 
-	.artwork-media {
-		@apply object-contain m-auto;
+	.artwork-canvas {
+		align-items: center;
+		box-sizing: border-box;
+		color: rgb(255, 255, 255);
+		display: flex;
+		flex-grow: 1;
+		height: 50vh;
+		justify-content: center;
+		padding: 5%;
+		position: sticky;
+		top: 0;
+		unicode-bidi: isolate;
+		transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+		-webkit-font-smoothing: antialiased;
+		box-sizing: border-box;
+		align-self: flex-start;
+	}
+
+	@media (min-width: 1024px) {
+		.artwork-canvas {
+			height: calc(100vh - var(--navbar-height));
+			padding-left: 0px;
+			padding-right: 48px;
+			top: 0;
+		}
+	}
+
+	.nft-media {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), aspect-ratio 0.4s ease-out;
+		position: relative;
+		box-sizing: inherit;
 		max-width: 100%;
 		max-height: 100%;
-	}
-
-	.iframe-container {
+		width: 100%;
 		height: 100%;
-		width: auto;
+	}
+
+	.info-container {
+		flex-grow: 0;
+		flex-shrink: 0;
+		gap: 24px;
+		display: flex;
+		flex-direction: column;
+		color: white;
+	}
+
+	@media (min-width: 1024px) {
+		.info-container {
+			padding-top: 48px;
+			padding-left: 48px;
+			padding-right: 0;
+			padding-bottom: 48px;
+			min-width: 464px;
+			max-width: 464px;
+			gap: 24px;
+			border-left: 1px solid rgba(255, 255, 255, 0.1);
+		}
+	}
+
+	.media-container {
+		transition: opacity 1000ms cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+		will-change: opacity, transform;
+		cursor: zoom-in;
 		position: relative;
+		max-height: 100%;
+		max-width: 100%;
+		box-sizing: inherit;
 		overflow: hidden;
 	}
 
-	.artwork-iframe {
-		@apply mx-auto;
-		border: none;
-		display: block;
-		overflow: hidden;
+	.isMediaLoaded-false .media-container {
+		opacity: 0;
+		transform: scale(0.8);
 	}
 
-	.museum-details-wrapper {
-		@apply px-4 md:px-6 w-full mx-auto;
-		max-width: 1400px;
-		min-height: 300px;
+	.isMediaLoaded-true .media-container {
+		opacity: 1;
+		transform: scale(1);
 	}
 
-	.museum-details-overlay {
-		@apply flex flex-col gap-6 w-full md:px-6 py-6 mx-auto bg-black bg-opacity-50 rounded-lg relative mt-0;
+	/* Artwork header styles */
+	.artwork-header {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		position: relative;
 	}
 
-	.museum-header {
-		@apply flex justify-between items-start mb-0 min-h-[70px];
+	.artist-info {
+		margin-bottom: 8px;
 	}
 
-	.museum-artist-title {
-		@apply flex-1 pr-4 min-w-0;
+	.artist-name {
+		font-size: 16px;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #fbbf24;
 	}
 
-	.museum-artist {
-		@apply text-sm font-medium uppercase tracking-wider text-yellow-500 mb-1;
+	.artwork-title {
+		font-size: 32px;
+		font-weight: 600;
+		line-height: 1.2;
+		margin: 0;
+		color: white;
 	}
 
 	.artwork-navigation {
-		@apply flex items-center gap-2 ml-4 flex-shrink-0;
+		position: absolute;
+		top: -8px;
+		right: 0;
+		display: flex;
+		gap: 8px;
 	}
 
 	.nav-button {
-		@apply flex items-center justify-center w-10 h-10 text-white bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full border-none cursor-pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		background: rgba(0, 0, 0, 0.6);
+		color: white;
+		border: none;
+		border-radius: 50%;
+		cursor: pointer;
+		transition: background-color 0.2s;
+		font-size: 18px;
 	}
 
-	.content-grid {
-		@apply grid grid-cols-1 gap-8;
-		
-		/* Responsive grid layout - more balanced distribution */
-		@media (min-width: 768px) {
-			grid-template-columns: 1fr 1fr;
-		}
-		
-		@media (min-width: 1024px) {
-			grid-template-columns: 1fr 1.5fr;
-		}
-		
-		@media (min-width: 1280px) {
-			grid-template-columns: 1fr 1fr;
-		}
+	.nav-button:hover {
+		background: rgba(0, 0, 0, 0.8);
 	}
 
-	.description-col {
-		@apply w-full;
+	/* Content styles */
+	.artwork-description {
+		color: #d1d5db;
+		line-height: 1.6;
 	}
 
-	.metadata-col {
-		@apply flex flex-col gap-2 lg:w-full;
+	.artwork-description p {
+		margin: 0;
 	}
 
-	.museum-description {
-		@apply text-base text-gray-300;
-		max-width: 55ch;
+	.metadata-section {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
 	}
 
-	.museum-meta {
-		@apply text-sm text-gray-400 list-none m-0 flex flex-col gap-4 rounded-lg;
+	.metadata-heading {
+		font-size: 18px;
+		font-weight: 600;
+		color: white;
+		margin: 0;
 	}
 
 	.metadata-grid {
-		@apply grid gap-6 grid-cols-2 lg:grid-cols-3;
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 16px;
+	}
+
+	@media (min-width: 768px) {
+		.metadata-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
 	}
 
 	.metadata-item {
-		@apply flex flex-col gap-1;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
 		min-width: 0;
-
-		&.full-width {
-			grid-column: 1 / -1;
-		}
-
-		strong {
-			@apply text-xs uppercase tracking-wider text-gray-400;
-		}
-
-		span,
-		a {
-			@apply text-sm text-gray-100;
-			word-break: break-word;
-		}
 	}
 
-	.attributes-list {
-		@apply gap-0.5 grid grid-cols-3 border border-gray-700 rounded-md p-4 w-full;
+	.metadata-item strong {
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #9ca3af;
+		font-weight: 500;
 	}
 
-	.attribute-item {
-		@apply rounded-md p-0.5 flex flex-col items-start;
-
-		dt {
-			@apply text-xs uppercase tracking-wider text-gray-400 min-w-[170px];
-		}
-
-		dd {
-			@apply text-sm text-gray-200 m-0 text-left;
-		}
+	.metadata-item span,
+	.metadata-item a {
+		font-size: 14px;
+		color: #f3f4f6;
+		word-break: break-word;
 	}
 
 	.contract-link {
-		@apply text-yellow-500 hover:text-yellow-400 transition-colors;
+		color: #fbbf24;
 		text-decoration: none;
+		transition: color 0.2s;
+	}
 
-		&:hover {
-			text-decoration: underline;
-		}
+	.contract-link:hover {
+		color: #f59e0b;
+		text-decoration: underline;
+	}
+
+	/* Keyboard shortcuts */
+	.keyboard-shortcuts-section {
+		margin-top: 32px;
+		padding-top: 24px;
+		border-top: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.keyboard-help-trigger {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background: transparent;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		color: #9ca3af;
+		padding: 12px 16px;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: all 0.2s;
+		font-size: 14px;
+	}
+
+	.keyboard-help-trigger:hover {
+		color: #d1d5db;
+		border-color: rgba(255, 255, 255, 0.3);
+	}
+
+	/* Error and loading states */
+	.error-page,
+	.loading-page {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 100vh;
+		background: black;
+		color: white;
+	}
+
+	.error-content,
+	.loading-content {
+		text-align: center;
+		padding: 32px;
+	}
+
+	.error-content h2 {
+		font-size: 24px;
+		margin-bottom: 16px;
+	}
+
+	.error-content button {
+		background: #fbbf24;
+		color: black;
+		border: none;
+		padding: 12px 24px;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 500;
+		margin-top: 16px;
 	}
 
 	.loader {
@@ -836,129 +1091,126 @@
 		width: 36px;
 		height: 36px;
 		animation: spin 1s linear infinite;
+		margin: 0 auto 16px;
 	}
 
 	@keyframes spin {
-		0% {
-			transform: rotate(0deg);
-		}
-		100% {
-			transform: rotate(360deg);
-		}
+		0% { transform: rotate(0deg); }
+		100% { transform: rotate(360deg); }
 	}
 
-	.metadata-section {
-		@apply flex flex-col gap-4;
-	}
-
-	.metadata-heading {
-		@apply text-base font-semibold text-white;
-	}
-
-	.divider {
-		@apply w-full h-px bg-gray-700 my-6;
-	}
-
-	.shortcuts-content {
-		@apply flex justify-start;
-	}
-
-	.keyboard-help-trigger {
-		@apply flex items-center gap-2 text-gray-400 hover:text-gray-200 transition-colors;
-		@apply bg-transparent border-none cursor-pointer p-3 rounded-md;
-		@apply border border-gray-700 hover:border-gray-600;
-	}
-
-	.keyboard-help-text {
-		@apply text-sm font-medium;
-	}
-
-	.artist-back-button {
-		@apply flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors;
-		@apply bg-transparent border-none cursor-pointer p-0 m-0 min-w-0;
-		text-decoration: none;
-		
-		&:hover {
-			.back-icon {
-				transform: translateX(-2px);
-			}
-		}
-	}
-
-	.back-icon {
-		@apply w-4 h-4 transition-transform duration-200 flex-shrink-0;
-	}
-
-	.artist-name {
-		@apply text-sm font-medium uppercase tracking-wider;
-	}
-
+	/* Keyboard help overlay */
 	.keyboard-help-overlay {
-		@apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.8);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 50;
 	}
 
 	.keyboard-help-content {
-		@apply bg-white dark:bg-gray-950 p-8 rounded-lg shadow-xl max-w-2xl max-h-[80vh] overflow-y-auto;
+		background: #1f2937;
+		padding: 32px;
+		border-radius: 8px;
+		box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+		max-width: 600px;
+		max-height: 80vh;
+		overflow-y: auto;
+		color: white;
 	}
 
 	.keyboard-help-header {
-		@apply flex justify-between items-center mb-6;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 24px;
 	}
 
 	.keyboard-help-header h3 {
-		@apply text-lg font-bold text-gray-900 dark:text-white;
+		font-size: 20px;
+		font-weight: 600;
+		margin: 0;
 	}
 
 	.help-close-button {
-		@apply relative -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-200 dark:bg-gray-950 text-gray-500 dark:text-white rounded-full hover:bg-gray-300 dark:hover:bg-gray-800 transition-colors;
+		width: 32px;
+		height: 32px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(255, 255, 255, 0.1);
+		color: white;
+		border: none;
+		border-radius: 50%;
+		cursor: pointer;
+		transition: background-color 0.2s;
+	}
+
+	.help-close-button:hover {
+		background: rgba(255, 255, 255, 0.2);
 	}
 
 	.keyboard-help-grid {
-		@apply grid grid-cols-1 md:grid-cols-3 gap-6;
-	}
-
-	.help-section {
-		@apply flex flex-col gap-3;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 24px;
 	}
 
 	.help-section h4 {
-		@apply text-base font-semibold text-gray-800 dark:text-gray-200 mb-2;
+		font-size: 16px;
+		font-weight: 600;
+		margin-bottom: 12px;
+		color: #fbbf24;
 	}
 
 	.help-item {
-		@apply flex items-center gap-3;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin-bottom: 8px;
 	}
 
 	.help-item kbd {
-		@apply inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-mono rounded-md border border-gray-300 dark:border-gray-600 min-w-[2rem] justify-center;
+		display: inline-flex;
+		align-items: center;
+		padding: 4px 8px;
+		background: rgba(255, 255, 255, 0.1);
+		color: white;
+		font-size: 12px;
+		font-family: monospace;
+		border-radius: 4px;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		min-width: 32px;
+		justify-content: center;
 	}
 
 	.help-item span {
-		@apply text-sm text-gray-700 dark:text-gray-300;
+		font-size: 14px;
+		color: #d1d5db;
 	}
 
+	/* Fullscreen hint */
 	.fullscreen-hint {
-		@apply fixed top-4 left-1/2 transform -translate-x-1/2 z-50;
+		position: fixed;
+		top: 16px;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 50;
 	}
 
 	.fullscreen-hint-content {
-		@apply bg-black bg-opacity-80 text-white px-4 py-2 rounded-lg shadow-lg;
+		background: rgba(0, 0, 0, 0.8);
+		color: white;
+		padding: 12px 20px;
+		border-radius: 6px;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 	}
 
 	.fullscreen-hint-content p {
-		@apply text-sm font-medium m-0;
-	}
-
-	.artwork-container.fullscreen {
-		@apply bg-black p-0;
-		width: 100vw;
-		height: 82svh;
-		max-width: 100vw;
-		max-height: 82svh;
-		border-radius: 0;
-		margin-left: calc(-50vw + 50%);
-		margin-right: calc(-50vw + 50%);
-		overflow: hidden;
-		aspect-ratio: auto;
+		font-size: 14px;
+		font-weight: 500;
+		margin: 0;
 	}
 </style> 

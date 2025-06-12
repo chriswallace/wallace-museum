@@ -159,7 +159,7 @@
 					alt={getArtworkTitle(artwork)}
 					width={80}
 					height={artwork.dimensions ? Math.round((80 * artwork.dimensions.height) / artwork.dimensions.width) : 80}
-					format="webp"
+					format="auto"
 					quality={80}
 					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
 					showSkeleton={true}
@@ -189,17 +189,16 @@
 			{:else}
 				<!-- Image display -->
 				<OptimizedImage
-					src={getDisplayMediaUrl()}
-					alt={getArtworkTitle(artwork)}
-					width={300}
-					height={artwork.dimensions ? Math.round((300 * artwork.dimensions.height) / artwork.dimensions.width) : 300}
-					format="webp"
-					quality={80}
+					src={artwork.image_url}
+					alt={artwork.title}
+					width={artwork.dimensions?.width || 300}
+					height={artwork.dimensions?.height || 300}
 					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
-					className="w-full h-auto object-contain rounded-t-sm"
+					fit="contain"
+					format="auto"
+					quality={85}
+					className="w-full h-auto max-w-full"
 					fallbackSrc="/images/medici-image.png"
-					loading="lazy"
-					on:error={handleImageError}
 				/>
 			{/if}
 
@@ -362,7 +361,7 @@
 							width={48}
 							height={48}
 							fit="cover"
-							format="webp"
+							format="auto"
 							quality={80}
 							aspectRatio="1/1"
 							showSkeleton={true}
@@ -391,18 +390,16 @@
 					{:else}
 						<!-- Image thumbnail -->
 						<OptimizedImage
-							src={getDisplayMediaUrl()}
-							alt={getArtworkTitle(artwork)}
-							width={48}
-							height={48}
-							fit="cover"
-							format="webp"
-							quality={80}
-							aspectRatio="1/1"
-							className="w-full h-full object-cover"
+							src={artwork.image_url}
+							alt={artwork.title}
+							width={artwork.dimensions?.width || 300}
+							height={artwork.dimensions?.height || 300}
+							aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
+							fit="contain"
+							format="auto"
+							quality={85}
+							className="w-full h-auto max-w-full"
 							fallbackSrc="/images/medici-image.png"
-							loading="lazy"
-							on:error={handleImageError}
 						/>
 					{/if}
 				</div>

@@ -65,7 +65,7 @@
 				height: 400,
 				fit: 'crop',
 				gravity: 'auto',
-				format: 'webp',
+				format: 'auto',
 				quality: 90
 			});
 			
@@ -214,15 +214,14 @@
 					<OptimizedImage
 						src={artist.avatarUrl}
 						alt={artist.name}
+						width={120}
+						height={120}
 						fit="crop"
 						gravity="auto"
-						format="webp"
-						height={2000}
-						width={2000}
-						quality={85}
-						showSkeleton={true}
-						skeletonBorderRadius="6px"
-						className="avatar-image w-full h-full object-cover border-2 border-gray-300 dark:border-gray-600 rounded-full"
+						format="auto"
+						quality={90}
+						aspectRatio="1/1"
+						className="w-full h-full object-cover"
 						fallbackSrc="/images/medici-image.png"
 					/>
 				{:else}
@@ -360,7 +359,7 @@
 							width={300}
 							height={300}
 							fit="cover"
-							format="webp"
+							format="auto"
 							quality={85}
 							className="w-full h-full object-cover rounded-lg"
 						/>

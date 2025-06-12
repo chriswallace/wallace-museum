@@ -20,6 +20,7 @@ export interface ImageOptimizationOptions {
 	animation?: boolean; // Preserve animations
 	sharpen?: number; // 0-10
 	metadata?: 'keep' | 'copyright' | 'none';
+	mimeType?: string | null; // Optional MIME type for better format detection
 }
 
 /**
@@ -166,7 +167,7 @@ function isSvgUrl(url: string): boolean {
 function isGifUrl(url: string): boolean {
 	if (!url) return false;
 	
-	// Check for .gif extension (case insensitive)
+	// Check for .gif extension (case insensitive) as fallback
 	if (url.toLowerCase().includes('.gif')) {
 		return true;
 	}
@@ -177,6 +178,21 @@ function isGifUrl(url: string): boolean {
 	}
 	
 	return false;
+}
+
+/**
+ * Detect if this is a GIF file based on URL or MIME type (more comprehensive)
+ */
+function isGifFile(url: string, mimeType?: string | null): boolean {
+	if (!url) return false;
+	
+	// Check MIME type first (most reliable)
+	if (mimeType === 'image/gif') {
+		return true;
+	}
+	
+	// Fall back to URL-based detection
+	return isGifUrl(url);
 }
 
 /**
@@ -211,9 +227,11 @@ export function buildOptimizedImageUrl(
 	}
 
 	// For GIF files, bypass optimization and serve directly to preserve animation
-	if (isGifUrl(imageUrl)) {
+	if (isGifFile(imageUrl, options.mimeType)) {
+		console.log(`[buildOptimizedImageUrl] GIF detected, serving directly: ${imageUrl}`);
 		// If it's an IPFS GIF, use direct IPFS URL, otherwise use the original URL
-		return isIpfsUrl(imageUrl) ? buildDirectImageUrl(imageUrl) : imageUrl;
+		const directUrl = isIpfsUrl(imageUrl) ? buildDirectImageUrl(imageUrl) : imageUrl;
+		return directUrl;
 	}
 
 	// For non-IPFS URLs (like Arweave, HTTP, etc.), serve them directly
@@ -306,7 +324,7 @@ export function createResponsiveSrcSet(
 
 	// For GIFs, don't create responsive variants to preserve animation
 	// The browser will use the main src attribute
-	if (isGifUrl(imageUrl)) {
+	if (isGifFile(imageUrl, options.mimeType)) {
 		return '';
 	}
 
@@ -338,7 +356,7 @@ export function createRetinaUrls(
 
 	// For GIFs, don't create retina variants to preserve animation
 	// Return the original URL for both
-	if (isGifUrl(imageUrl)) {
+	if (isGifFile(imageUrl, options.mimeType)) {
 		const directUrl = buildDirectImageUrl(imageUrl);
 		return { src1x: directUrl, src2x: directUrl };
 	}
@@ -509,7 +527,80 @@ export class ImageOptimizer {
  * Default image optimizer instance
  */
 export const defaultImageOptimizer = new ImageOptimizer(IPFS_DIRECT_ENDPOINT, {
-	format: 'webp',
+	format: 'auto',
 	quality: 85,
 	metadata: 'copyright'
-}); 
+});
+
+/**
+ * Build an image URL with a complete fallback strategy for IPFS content
+ * This is a higher-level function that provides:
+ * 1. Optimized/transformed URL (if IPFS and transformable)
+ * 2. Direct IPFS URL fallback (if optimization fails)
+ * 3. Basic IPFS gateway URL fallback (if direct fails)
+ * 4. Generic fallback image (if all else fails)
+ */
+export function buildImageUrlWithFallback(
+	imageUrl: string | null | undefined,
+	options: ImageOptimizationOptions & {
+		enableOptimizations?: boolean;
+		fallbackImage?: string;
+	} = {}
+): {
+	primaryUrl: string;
+	fallbackUrls: string[];
+	isIpfs: boolean;
+	canOptimize: boolean;
+} {
+	const { enableOptimizations = true, fallbackImage = '/images/medici-image.png', ...optimizationOptions } = options;
+	
+	if (!imageUrl) {
+		return {
+			primaryUrl: fallbackImage,
+			fallbackUrls: [],
+			isIpfs: false,
+			canOptimize: false
+		};
+	}
+
+	const isIpfsContent = isIpfsUrl(imageUrl);
+	const canOptimizeContent = isIpfsContent && !isSvgUrl(imageUrl) && !isGifFile(imageUrl, optimizationOptions.mimeType);
+	const fallbacks: string[] = [];
+
+	let primaryUrl = imageUrl;
+
+	if (isIpfsContent) {
+		// For IPFS content, build a chain of fallbacks
+		if (enableOptimizations && canOptimizeContent) {
+			// Try optimized version first
+			primaryUrl = buildOptimizedImageUrl(imageUrl, optimizationOptions);
+			
+			// Add direct IPFS as first fallback
+			const directUrl = buildDirectImageUrl(imageUrl);
+			if (directUrl && directUrl !== primaryUrl) {
+				fallbacks.push(directUrl);
+			}
+		} else {
+			// If can't optimize, use direct IPFS URL
+			primaryUrl = buildDirectImageUrl(imageUrl) || imageUrl;
+		}
+		
+		// Add basic IPFS gateway as fallback
+		const basicIpfsUrl = ipfsToHttpUrl(imageUrl);
+		if (basicIpfsUrl && !fallbacks.includes(basicIpfsUrl) && basicIpfsUrl !== primaryUrl) {
+			fallbacks.push(basicIpfsUrl);
+		}
+	}
+
+	// Add generic fallback image as final option
+	if (fallbackImage && !fallbacks.includes(fallbackImage)) {
+		fallbacks.push(fallbackImage);
+	}
+
+	return {
+		primaryUrl,
+		fallbackUrls: fallbacks,
+		isIpfs: isIpfsContent,
+		canOptimize: canOptimizeContent
+	};
+} 

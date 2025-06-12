@@ -70,7 +70,7 @@
 						height={artwork.dimensions?.height || 300}
 						aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
 						fit="contain"
-						format="webp"
+						format="auto"
 						quality={85}
 						className="w-full aspect-square object-contain rounded-md mb-3"
 						fallbackSrc="/images/medici-image.png"
@@ -108,7 +108,7 @@
 					height={artwork.dimensions?.height || 300}
 					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
 					fit="contain"
-					format="webp"
+					format="auto"
 					quality={85}
 					className="w-full aspect-square object-contain rounded-md mb-3"
 					fallbackSrc="/images/medici-image.png"

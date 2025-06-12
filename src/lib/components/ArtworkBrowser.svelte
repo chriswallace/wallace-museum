@@ -156,19 +156,16 @@
 				&lt;
 			</button>
 			<div class="artwork-image-container">
-				<OptimizedImage 
-					src={displayImageUrl} 
-					alt={currentArtwork.title} 
-					className="current-artwork-image"
-					width={currentArtwork.dimensions?.width || 800}
-					height={currentArtwork.dimensions?.height}
-					aspectRatio={currentArtwork.dimensions ? `${currentArtwork.dimensions.width}/${currentArtwork.dimensions.height}` : undefined}
-					responsive={true}
-					responsiveSizes={[400, 800, 1200]}
-					sizes="(max-width: 768px) 100vw, 80vw"
+				<OptimizedImage
+					src={displayImageUrl}
+					alt={currentArtwork.title}
+					width={currentArtwork.dimensions?.width || 400}
+					height={currentArtwork.dimensions?.height || 400}
 					fit="contain"
-					format="webp"
-					quality={90}
+					format="auto"
+					quality={85}
+					className="w-full h-auto"
+					fallbackSrc="/images/medici-image.png"
 				/>
 			</div>
 			<button

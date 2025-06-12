@@ -3,11 +3,6 @@
 	import { ipfsToHttpUrl, IPFS_GATEWAYS } from '$lib/mediaUtils';
 	import { getBestMediaUrl, getMediaDisplayType } from '$lib/utils/mediaHelpers';
 	import { buildOptimizedImageUrl, buildDirectImageUrl } from '$lib/imageOptimization';
-	import VideoPlayer from './VideoPlayer.svelte';
-	import MobileVideoPlayer from './MobileVideoPlayer.svelte';
-	import IframeSkeleton from './IframeSkeleton.svelte';
-	import OptimizedImage from './OptimizedImage.svelte';
-	import { browser } from '$app/environment';
 
 	interface Artwork {
 		generatorUrl?: string | null;
@@ -23,47 +18,19 @@
 	}
 
 	export let artwork: Artwork;
-	export let dimensions: { width: number; height: number } | null = null;
-	export let style: string = 'width: 100%; height: 100%;';
-	export let fullscreen: boolean = false;
-	export let showSkeleton: boolean = true;
 
-	// State for fullscreen functionality
-	let isInFullscreen = false;
-	let fullscreenElement: HTMLElement | null = null;
+	let mediaContainer: HTMLElement;
+	let constrainWidth = true; // true = constrain width, false = constrain height
+	let isMediaLoaded = false;
+	let hasImageError = false;
+	let currentImageUrl = '';
+	let loadTimeout: ReturnType<typeof setTimeout> | null = null;
+	let previousUrl = ''; // Track URL changes
 
-	// State for iframe loading
-	let isIframeLoading = true;
-
-	// Detect if this is a mobile/touch device
-	let isMobileDevice = false;
-
-	// Use provided dimensions or fall back to artwork dimensions
-	$: actualDimensions = dimensions || artwork.dimensions;
-
-	// Calculate aspect ratio for CSS
-	$: aspectRatio = actualDimensions 
-		? `${actualDimensions.width} / ${actualDimensions.height}`
+	// Calculate aspect ratio from artwork dimensions
+	$: aspectRatio = artwork.dimensions 
+		? `${artwork.dimensions.width} / ${artwork.dimensions.height}`
 		: '1 / 1'; // Square fallback
-
-	// Calculate artwork orientation and sizing
-	$: artworkOrientation = actualDimensions 
-		? actualDimensions.width > actualDimensions.height 
-			? 'landscape' 
-			: actualDimensions.width < actualDimensions.height 
-				? 'portrait' 
-				: 'square'
-		: 'square';
-
-	// Debug logging
-	$: if (actualDimensions) {
-		console.log('ArtworkDisplay dimensions:', {
-			actualDimensions,
-			aspectRatio,
-			artworkOrientation,
-			mediaType
-		});
-	}
 
 	// Get the best media URL and display type
 	$: mediaUrls = {
@@ -77,267 +44,226 @@
 	$: displayUrl = bestMedia?.url || '';
 	$: mediaType = getMediaDisplayType(bestMedia, artwork.mime);
 
-	// Transform URLs for optimization
-	$: transformedUrl = displayUrl ? ipfsToHttpUrl(displayUrl) : '';
-
-	// Get optimized image URL for normal display
+	// Transform URLs
+	$: transformedUrl = displayUrl ? ipfsToHttpUrl(displayUrl, IPFS_GATEWAYS[0], true, artwork.mime || undefined) : '';
+	
 	$: optimizedImageUrl = mediaType === 'image' && displayUrl 
-		? buildOptimizedImageUrl(displayUrl, {
-			width: actualDimensions?.width || 800,
-			height: actualDimensions?.height || 800,
-			fit: 'contain',
-			format: 'webp',
-			quality: 85
-		})
+		? buildOptimizedImageUrl(displayUrl, { width: 1200, fit: 'contain', format: 'auto', quality: 85, mimeType: artwork.mime })
+		: transformedUrl;
+	
+	// Create fallback URL for IPFS images - this will be the direct IPFS URL without transformations
+	$: fallbackImageUrl = mediaType === 'image' && displayUrl 
+		? buildDirectImageUrl(displayUrl) || transformedUrl
 		: transformedUrl;
 
-	// Get full-size image URL for fullscreen (no optimizations)
-	$: fullSizeImageUrl = mediaType === 'image' && displayUrl 
-		? buildDirectImageUrl(displayUrl)
-		: transformedUrl;
-
-	// Handle iframe load
-	function handleIframeLoad() {
-		isIframeLoading = false;
-	}
-
-	// Reset iframe loading state when URL changes
-	$: if (transformedUrl && mediaType === 'iframe') {
-		isIframeLoading = true;
-	}
-
-	// Handle fullscreen functionality
-	function toggleFullscreen() {
-		if (!browser || !fullscreenElement) return;
-
-		if (!document.fullscreenElement) {
-			fullscreenElement.requestFullscreen().then(() => {
-				isInFullscreen = true;
-			}).catch(err => {
-				console.error('Error attempting to enable fullscreen:', err);
-			});
+	// Determine which URL to use based on error state
+	$: {
+		if (mediaType === 'image') {
+			if (hasImageError && optimizedImageUrl !== fallbackImageUrl) {
+				// Use fallback URL if optimized version failed
+				currentImageUrl = fallbackImageUrl;
+			} else {
+				// Use optimized URL by default
+				currentImageUrl = optimizedImageUrl;
+			}
 		} else {
-			document.exitFullscreen().then(() => {
-				isInFullscreen = false;
-			}).catch(err => {
-				console.error('Error attempting to exit fullscreen:', err);
-			});
+			// For non-image media, always use transformed URL
+			currentImageUrl = transformedUrl;
 		}
 	}
 
-	// Listen for fullscreen changes
-	function handleFullscreenChange() {
-		if (!browser) return;
-		isInFullscreen = !!document.fullscreenElement;
+	// Simple loading state management - reset when URL actually changes
+	$: {
+		const urlToCheck = mediaType === 'image' ? currentImageUrl : transformedUrl;
+		if (urlToCheck && urlToCheck !== previousUrl) {
+			// Clear any existing timeout
+			if (loadTimeout) {
+				clearTimeout(loadTimeout);
+			}
+			
+			// Reset state
+			isMediaLoaded = false;
+			previousUrl = urlToCheck;
+			
+			// Set fallback timeout
+			loadTimeout = setTimeout(() => {
+				isMediaLoaded = true;
+				loadTimeout = null;
+			}, 3000);
+		}
 	}
 
-	// Check if fullscreen is supported and if this is an image (only in browser)
-	$: canFullscreen = browser && (mediaType === 'image' || mediaType === 'iframe') && typeof document !== 'undefined' && 'requestFullscreen' in document.documentElement;
+	// Reset error state when base display URL changes
+	$: if (displayUrl) {
+		hasImageError = false;
+	}
 
-	// Disable skeleton loaders in fullscreen mode
-	$: shouldShowSkeleton = showSkeleton && !isInFullscreen;
+	function calculateConstraint() {
+		if (!mediaContainer || !artwork.dimensions) return;
 
-	// Detect mobile device on mount
+		const containerRect = mediaContainer.getBoundingClientRect();
+		const containerWidth = containerRect.width;
+		const containerHeight = containerRect.height;
+		
+		if (containerWidth === 0 || containerHeight === 0) return;
+
+		const artworkWidth = artwork.dimensions.width;
+		const artworkHeight = artwork.dimensions.height;
+		
+		// Calculate container and artwork aspect ratios
+		const containerAspectRatio = containerWidth / containerHeight;
+		const artworkAspectRatio = artworkWidth / artworkHeight;
+		
+		// If artwork is wider than container proportionally, constrain width
+		// If artwork is taller than container proportionally, constrain height
+		constrainWidth = artworkAspectRatio > containerAspectRatio;
+	}
+
+	function handleResize() {
+		calculateConstraint();
+	}
+
+	function handleMediaLoad() {
+		isMediaLoaded = true;
+		if (loadTimeout) {
+			clearTimeout(loadTimeout);
+			loadTimeout = null;
+		}
+	}
+
+	function handleImageError() {
+		console.log(`[ArtworkDisplay] Image failed to load: ${currentImageUrl}`);
+		
+		// If we're currently showing the optimized URL and it failed, try the fallback
+		if (!hasImageError && mediaType === 'image' && optimizedImageUrl !== fallbackImageUrl) {
+			console.log(`[ArtworkDisplay] Trying fallback URL: ${fallbackImageUrl}`);
+			hasImageError = true;
+			isMediaLoaded = false;
+		} else {
+			// If fallback also failed, just show as loaded to prevent infinite retry
+			console.log(`[ArtworkDisplay] Fallback URL also failed, giving up`);
+			isMediaLoaded = true;
+		}
+	}
+
 	onMount(() => {
-		isMobileDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+		calculateConstraint();
+		window.addEventListener('resize', handleResize);
+		
+		return () => {
+			window.removeEventListener('resize', handleResize);
+			// Clear timeout on component cleanup
+			if (loadTimeout) {
+				clearTimeout(loadTimeout);
+				loadTimeout = null;
+			}
+		};
 	});
+
+	// Recalculate when artwork changes
+	$: if (artwork.dimensions && mediaContainer) {
+		calculateConstraint();
+	}
+
+	// Dynamic style based on constraint
+	$: mediaStyle = constrainWidth 
+		? 'width: 100%; height: auto;' 
+		: 'width: auto; height: 100%;';
+
+	// Special handling for iframe aspect ratio - ensure proper sizing within container
+	$: iframeStyle = mediaType === 'iframe' && artwork.dimensions
+		? (constrainWidth 
+			? `width: 100%; height: auto; aspect-ratio: ${artwork.dimensions.width} / ${artwork.dimensions.height};`
+			: `width: auto; height: 100%; aspect-ratio: ${artwork.dimensions.width} / ${artwork.dimensions.height};`)
+		: mediaType === 'iframe' 
+		? (constrainWidth 
+			? 'width: 100%; height: auto; aspect-ratio: 1 / 1;'
+			: 'width: auto; height: 100%; aspect-ratio: 1 / 1;')
+		: mediaStyle;
 </script>
 
-<svelte:window on:fullscreenchange={handleFullscreenChange} />
-
-<div class="artwork-display" class:fullscreen bind:this={fullscreenElement}>
+<div class="media-container" class:isMediaLoaded style="transform: scale(1) translateY(0%);" bind:this={mediaContainer}>
 	{#if !displayUrl}
 		<div class="no-media">
-			<div class="no-media-content">
-				<p>No media available</p>
-			</div>
+			<p>No media available</p>
 		</div>
 	{:else if mediaType === 'video'}
-		{#if isMobileDevice}
-			<MobileVideoPlayer
-				src={transformedUrl}
-				autoplay={true}
-				loop={true}
-				muted={true}
-				className="video-player-artwork"
-				aspectRatio={aspectRatio}
-				showSkeleton={shouldShowSkeleton}
-				width={actualDimensions?.width}
-				height={actualDimensions?.height}
-			/>
-		{:else}
-			<VideoPlayer
-				src={transformedUrl}
-				autoplay={true}
-				loop={true}
-				muted={true}
-				className="video-player-artwork"
-				aspectRatio={aspectRatio}
-				showSkeleton={shouldShowSkeleton}
-				width={actualDimensions?.width}
-				height={actualDimensions?.height}
-				simplifiedControls={false}
-			/>
-		{/if}
+		<video
+			src={transformedUrl}
+			autoplay
+			loop
+			muted
+			playsinline
+			style="object-fit: contain; {mediaStyle}"
+			on:loadeddata={handleMediaLoad}
+		>
+			<track kind="captions" />
+			Your browser does not support the video tag.
+		</video>
 	{:else if mediaType === 'iframe'}
-		<div class="iframe-container">
-			<iframe
-				src={transformedUrl}
-				class="interactive-content"
-				title="Interactive Artwork"
-				height={fullscreen ? '100%' : actualDimensions?.height}
-				style={fullscreen ? 'height: 100%; width: 100%;' : `aspect-ratio: ${aspectRatio};`}
-				allowfullscreen
-				on:load={handleIframeLoad}
-			></iframe>
-			
-			{#if canFullscreen && !isInFullscreen}
-				<button 
-					class="fullscreen-button"
-					on:click={toggleFullscreen}
-					aria-label="View fullscreen"
-					title="View fullscreen"
-				>
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-					</svg>
-				</button>
-			{/if}
-		</div>
+		<iframe
+			src={transformedUrl}
+			title="Interactive Artwork"
+			style="border: none; {iframeStyle}"
+			allowfullscreen
+			on:load={handleMediaLoad}
+		></iframe>
 	{:else if mediaType === 'image'}
-		<div class="image-container">
-			<OptimizedImage
-				src={isInFullscreen ? fullSizeImageUrl : optimizedImageUrl}
-				alt={artwork.title}
-				aspectRatio={aspectRatio}
-				showSkeleton={shouldShowSkeleton}
-				className="artwork-image {isInFullscreen ? 'fullscreen-image' : 'normal-image'}"
-				style="aspect-ratio: {aspectRatio};"
-			/>
-			
-			{#if canFullscreen && !isInFullscreen}
-				<button 
-					class="fullscreen-button"
-					on:click={toggleFullscreen}
-					aria-label="View fullscreen"
-					title="View fullscreen"
-				>
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-					</svg>
-				</button>
-			{/if}
-		</div>
+		<img
+			src={currentImageUrl}
+			alt={artwork.title}
+			style="object-fit: contain; {mediaStyle}"
+			on:load={handleMediaLoad}
+			on:error={handleImageError}
+		/>
 	{/if}
 </div>
-
-<style lang="scss">
-	.artwork-display {
-		@apply relative overflow-hidden h-full max-h-[82svh] md:pt-12 w-full flex items-center justify-center;
-		/* Use flexbox to center content properly */
+<style>
+	.media-container {
+		position: relative;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		box-sizing: border-box;
+		contain: layout style size;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
-	.no-media {
-		@apply flex items-center justify-center bg-gray-100 rounded-sm;
-	}
-
-	.no-media-content {
-		@apply text-center text-gray-600 text-sm;
-	}
-
-	.iframe-container {
-		@apply relative w-full h-full flex items-center justify-center;
-	}
-
-	.interactive-content {
-		@apply relative border-none bg-transparent transition-opacity duration-200 ease-in-out max-h-full max-w-full;
-		/* Positioned above the loader */
-		aspect-ratio: var(--artwork-aspect-ratio);
-	}
-
-	.interactive-content.hidden {
-		@apply opacity-0 pointer-events-none;
-	}
-
-	.image-container {
-		@apply relative w-full h-full flex items-center justify-center;
-	}
-
-	.fullscreen-button {
-		@apply absolute bottom-3 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-70 text-white border-none rounded-md p-2 cursor-pointer transition-opacity duration-200 ease-linear z-10 flex items-center justify-center;
-		opacity: 0; /* Hidden by default, show on hover */
-	}
-
-	.fullscreen-button:hover {
-		@apply bg-black bg-opacity-90;
-		opacity: 1;
-	}
-
-	.image-container:hover .fullscreen-button,
-	.iframe-container:hover .fullscreen-button {
-		opacity: 1;
-	}
-
-	/* Show button on mobile/touch devices */
-	@media (hover: none) {
-		.fullscreen-button {
-			opacity: 0.8;
-		}
-	}
-
-	/* Ensure video and iframe elements are properly centered */
-	:global(.video-player-artwork),
-	.interactive-content,
-	:global(.artwork-image) {
-		display: block;
-		margin: 0 auto;
+	.media-container img,
+	.media-container video,
+	.media-container iframe {
 		max-width: 100%;
 		max-height: 100%;
 		object-fit: contain;
+		box-sizing: border-box;
+		transition: opacity 1000ms cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+		opacity: 1;
+		transform: scale(1);
 	}
 
-	/* Video player specific styling */
-	:global(.video-player-artwork) {
+	/* Special handling for iframes since they don't support object-fit */
+	.media-container iframe {
+		object-fit: unset; /* Remove object-fit for iframes as it doesn't apply */
+		/* Aspect ratio and sizing will be handled via inline styles */
+	}
+
+	/* Only apply loading state when media is not loaded */
+	.media-container:not(.isMediaLoaded) img,
+	.media-container:not(.isMediaLoaded) video,
+	.media-container:not(.isMediaLoaded) iframe {
+		opacity: 0;
+		transform: scale(0.8);
+	}
+
+	.no-media {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #666;
+		font-size: 14px;
 		width: 100%;
-		height: auto;
-		max-width: 100%;
-	}
-
-	/* Ensure video elements maintain aspect ratio */
-	:global(.video-player-artwork .video-element) {
-		width: 100% !important;
-		height: auto !important;
-		max-width: 100% !important;
-		object-fit: contain !important;
-	}
-
-	/* Mobile video player styling */
-	:global(.mobile-video-player) {
-		width: 100%;
-		height: auto;
-		max-width: 100%;
-	}
-
-	:global(.mobile-video-player .video-element) {
-		width: 100% !important;
-		height: auto !important;
-		max-width: 100% !important;
-		object-fit: contain !important;
-	}
-
-	/* Image styling for normal display */
-	:global(.artwork-image.normal-image) {
-		max-height: 100% !important;
-		max-width: 100% !important;
-		width: auto !important;
-		height: auto !important;
-	}
-
-	/* Image styling for fullscreen display */
-	:global(.artwork-image.fullscreen-image) {
-		max-width: 100% !important;
-		max-height: 100% !important;
-		width: auto !important;
-		height: auto !important;
+		height: 100%;
 	}
 </style>

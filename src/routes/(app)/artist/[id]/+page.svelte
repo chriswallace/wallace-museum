@@ -195,7 +195,7 @@
 									height={120}
 									fit="crop"
 									gravity="auto"
-									format="webp"
+									format="auto"
 									quality={90}
 									className="artist-avatar"
 									fallbackSrc="/images/medici-image.png"
@@ -310,10 +310,11 @@
 												width={800}
 												height={800}
 												fit="contain"
-												format="webp"
+												format="auto"
 												quality={70}
 												className="thumbnail-image"
 												fallbackSrc="/images/medici-image.png"
+												mimeType={artwork.mime}
 											/>
 										{:else}
 											<div class="thumbnail-placeholder">
@@ -366,7 +367,7 @@
 								height={120}
 								fit="crop"
 								gravity="auto"
-								format="webp"
+								format="auto"
 								quality={90}
 								className="modal-artist-avatar"
 								fallbackSrc="/images/medici-image.png"
@@ -521,7 +522,7 @@
 	}
 
 	.artwork-container {
-		@apply cursor-pointer bg-transparent border-none p-0 h-full;
+		@apply cursor-pointer bg-transparent border-none p-0;
 	}
 
 	.artwork-thumbnail {

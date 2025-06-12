@@ -131,9 +131,8 @@
 
 <style lang="scss">
 	.top-nav {
-		@apply fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-sm border-b border-gray-700;
-		@apply transition-transform duration-300 ease-in-out;
-		transform: translateY(0);
+		@apply bg-black/80 backdrop-blur-sm border-b border-gray-700;
+		height: var(--navbar-height);
 	}
 
 	.top-nav.nav-hidden {
@@ -145,15 +144,18 @@
 
 	.page-title {
 		@apply invisible md:visible m-0 p-0 text-yellow-500 text-sm font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer hover:text-yellow-400 transition-colors duration-200 focus:text-yellow-400 focus:outline-none;
-		@apply absolute left-4 top-0 h-12 flex items-center z-10;
+		@apply absolute left-4 top-0 flex items-center z-10;
+		height: var(--navbar-height);
 	}
 
 	.nav-container {
-		@apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center h-12;
+		@apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center;
+		height: var(--navbar-height);
 	}
 
 	.nav-center {
-		@apply flex items-center justify-center h-12;
+		@apply flex items-center justify-center;
+		height: var(--navbar-height);
 	}
 
 	.nav-tabs {
@@ -163,7 +165,8 @@
 	.nav-tab {
 		@apply px-6 py-2 font-semibold text-gray-500 hover:text-white transition-colors duration-200 text-sm;
 		@apply bg-none border-none cursor-pointer outline-none;
-		@apply relative h-12 flex items-center;
+		@apply relative flex items-center;
+		height: var(--navbar-height);
 	}
 
 	.nav-tab.active {

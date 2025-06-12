@@ -1,6 +1,22 @@
 <script>
+	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import TopNav from '$lib/components/TopNav.svelte';
 	import '../../app.css';
+
+	onMount(() => {
+		// Prevent automatic scroll restoration
+		if (typeof window !== 'undefined' && 'scrollRestoration' in history) {
+			history.scrollRestoration = 'manual';
+		}
+	});
+
+	// Ensure we start at the top on navigation
+	$: if ($page) {
+		if (typeof window !== 'undefined') {
+			window.scrollTo(0, 0);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -8,8 +24,9 @@
 	<link rel="stylesheet" href="https://use.typekit.net/dpg0jya.css" />
 </svelte:head>
 
+<TopNav />
+
 <div class="page-container">
-	<TopNav />
 	<div class="content">
 		<slot />
 	</div>
@@ -46,6 +63,10 @@
 </div>
 
 <style lang="scss" global>
+	:root {
+		--navbar-height: 64px;
+	}
+
 	body {
 		@apply p-0 m-0;
 		font-family: Helvetica, Arial, sans-serif;
@@ -69,7 +90,7 @@
 	}
 
 	.site-footer {
-		@apply py-4 md:px-8 mt-16 border-t border-gray-800 relative z-10;
+		@apply py-4 md:px-8 border-t border-gray-800 relative z-10;
 		background: rgba(0, 0, 0, 0.95);
 	}
 

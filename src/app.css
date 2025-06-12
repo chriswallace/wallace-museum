@@ -164,14 +164,9 @@
 		@apply px-3 py-1;
 	}
 
-	.artwork-display.fullscreen,
-	.artwork-display.fullscreen .artwork-image,
-	.artwork-display.fullscreen .interactive-content {
-		@apply !w-full;
-	}
-
-	.artwork-image{
-		@apply h-full flex items-center justify-center;
+	.thumbnail-image img,
+	.thumbnail-image video{
+		@apply max-h-[80%] max-w-[80%];
 	}
 
 	dl {

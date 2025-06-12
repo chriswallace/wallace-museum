@@ -39,7 +39,7 @@
 			height={sizeConfig.height}
 			fit="crop"
 			gravity="auto"
-			format="webp"
+			format="auto"
 			quality={85}
 			aspectRatio="1/1"
 			showSkeleton={showSkeleton}

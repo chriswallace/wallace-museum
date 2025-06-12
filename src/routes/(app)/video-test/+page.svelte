@@ -16,10 +16,24 @@
 		},
 		{
 			src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-			title: 'Another Landscape Video',
+			title: 'Another Landscape Video (16:9)',
 			aspectRatio: '16/9',
 			width: 1280,
 			height: 720
+		},
+		{
+			src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
+			title: 'Portrait Style Video (9:16)',
+			aspectRatio: '9/16',
+			width: 720,
+			height: 1280
+		},
+		{
+			src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+			title: 'Square-ish Video (4:3)',
+			aspectRatio: '4/3',
+			width: 640,
+			height: 480
 		}
 	];
 

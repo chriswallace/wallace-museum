@@ -17,6 +17,7 @@
 		artists?: Artist[];
 		collection?: { id: number | string; title: string };
 		// Add other fields as needed
+		displayImageUrl?: string;
 	}
 
 	interface Collection {
@@ -68,10 +69,15 @@
 		const response = await fetch(url);
 		if (response.ok) {
 			const data = await response.json();
-				// Normalize image URLs to handle both imageUrl and image_url
-				artworks = data.artworks.map((artwork: Artwork) => ({
+				// Normalize image URLs to handle both imageUrl and image_url, and prioritize thumbnail
+				artworks = data.artworks.map((artwork: any) => ({
 					...artwork,
-					imageUrl: artwork.imageUrl || artwork.image_url
+					displayImageUrl:
+						artwork.thumbnailUrl ||
+						artwork.thumbnail_url ||
+						artwork.imageUrl ||
+						artwork.image_url ||
+						'',
 				}));
 			totalPages = data.totalPages;
 			page = data.page;
@@ -473,12 +479,12 @@
 					<td>
 						<button class="image" on:click={() => editArtwork(artwork.id)}>
 							<OptimizedImage
-								src={artwork.imageUrl}
+								src={artwork.displayImageUrl}
 								alt={artwork.title}
 								width={80}
 								height={80}
 								fit="cover"
-								format="webp"
+								format="auto"
 								quality={80}
 								aspectRatio="1/1"
 								showSkeleton={true}

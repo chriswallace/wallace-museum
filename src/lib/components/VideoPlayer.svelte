@@ -34,6 +34,12 @@
 	// Calculate aspect ratio
 	$: calculatedAspectRatio = aspectRatio || (width && height ? `${width}/${height}` : undefined);
 
+	// Calculate sizing strategy based on aspect ratios
+	$: containerAspectRatio = calculatedAspectRatio ? parseFloat(calculatedAspectRatio.replace('/', ' / ').split(' / ')[0]) / parseFloat(calculatedAspectRatio.replace('/', ' / ').split(' / ')[1]) : null;
+	
+	// Determine sizing strategy - if no aspect ratio provided, fill container
+	$: sizingStrategy = calculatedAspectRatio ? 'aspect-ratio' : 'fill-container';
+
 	// Show skeleton when loading and showSkeleton is enabled
 	$: shouldShowSkeleton = showSkeleton && isLoading && !hasError;
 
@@ -188,6 +194,10 @@
 	class="video-player {className}"
 	{style}
 	style:aspect-ratio={calculatedAspectRatio}
+	style:width={sizingStrategy === 'fill-container' ? '100%' : 'auto'}
+	style:height={sizingStrategy === 'fill-container' ? '100%' : 'auto'}
+	style:max-width={sizingStrategy === 'aspect-ratio' ? '100%' : 'none'}
+	style:max-height={sizingStrategy === 'aspect-ratio' ? '100%' : 'none'}
 	on:mousemove={showControlsTemporarily}
 	on:mouseleave={hideControls}
 	on:touchstart={showControlsTemporarily}
@@ -324,9 +334,6 @@
 		border-radius: 4px;
 		overflow: hidden;
 		outline: none;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 	}
 
 	.video-player::after {
@@ -348,13 +355,14 @@
 	}
 
 	.video-element {
+		position: absolute;
+		top: 0;
+		left: 0;
 		width: 100%;
-		height: auto;
-		max-width: 100%;
+		height: 100%;
 		object-fit: contain;
 		cursor: pointer;
 		display: block;
-		position: relative;
 		z-index: 2;
 	}
 

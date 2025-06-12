@@ -26,7 +26,7 @@
 				height: 300,
 				fit: 'crop',
 				gravity: 'auto',
-				format: 'webp',
+				format: 'auto',
 				quality: 85
 			});
 			
@@ -120,16 +120,13 @@
 						<OptimizedImage
 							src={artist.avatarUrl}
 							alt={artist.name}
-							width={300}
-							height={300}
-							fit="crop"
-							gravity="auto"
-							format="webp"
+							width={48}
+							height={48}
+							fit="cover"
+							format="auto"
 							quality={85}
 							aspectRatio="1/1"
-							showSkeleton={true}
-							skeletonBorderRadius="6px"
-							className="avatar-image"
+							className="w-full h-full object-cover"
 							fallbackSrc="/images/medici-image.png"
 						/>
 					{:else}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { buildOptimizedImageUrl, createResponsiveSrcSet, createRetinaUrls } from '$lib/imageOptimization';
+	import { buildOptimizedImageUrl, createResponsiveSrcSet, createRetinaUrls, buildDirectImageUrl } from '$lib/imageOptimization';
 	import type { ImageOptimizationOptions } from '$lib/imageOptimization';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import SkeletonLoader from './SkeletonLoader.svelte';
@@ -13,10 +13,11 @@
 	export let loading: 'lazy' | 'eager' = 'lazy';
 	export let className: string = '';
 	export let style: string = '';
+	export let mimeType: string | null | undefined = undefined;
 	
 	// Image optimization options
 	export let quality: number = 85;
-	export let format: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png' = 'webp';
+	export let format: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png' = 'auto';
 	export let fit: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad' = 'contain';
 	export let gravity: 'auto' | 'side' | string = 'auto';
 	export let dpr: 1 | 2 | 3 = 1;
@@ -43,6 +44,7 @@
 	let hasError = false;
 	let isLoaded = false;
 	let isLoading = false;
+	let hasTriedDirectIpfs = false;
 
 	/**
 	 * Detect if a URL points to an SVG file
@@ -57,6 +59,30 @@
 		
 		// Check for SVG MIME type in data URLs
 		if (url.startsWith('data:image/svg+xml')) {
+			return true;
+		}
+		
+		return false;
+	}
+
+	/**
+	 * Detect if this is a GIF file based on URL or MIME type
+	 */
+	function isGifFile(url: string, mime?: string | null): boolean {
+		if (!url) return false;
+		
+		// Check MIME type first (most reliable)
+		if (mime === 'image/gif') {
+			return true;
+		}
+		
+		// Check for .gif extension (case insensitive) as fallback
+		if (url.toLowerCase().includes('.gif')) {
+			return true;
+		}
+		
+		// Check for GIF MIME type in data URLs
+		if (url.startsWith('data:image/gif')) {
 			return true;
 		}
 		
@@ -81,15 +107,21 @@
 
 	// Check if the source is an SVG or non-IPFS URL
 	$: isSvg = src ? isSvgUrl(src) : false;
+	$: isGif = src ? isGifFile(src, mimeType) : false;
 	$: isIpfs = src ? isIpfsUrl(src) : false;
-	$: canOptimize = isIpfs && !isSvg; // Only optimize IPFS URLs that aren't SVGs
+	$: canOptimize = isIpfs && !isSvg && !isGif; // Only optimize IPFS URLs that aren't SVGs or GIFs
 
-	// Build optimization options - don't apply format conversion to SVGs
+	// Debug logging
+	$: if (src && mimeType && isGif) {
+		console.log(`[OptimizedImage] GIF detected - src: ${src}, mimeType: ${mimeType}, optimizedSrc: ${optimizedSrc}`);
+	}
+
+	// Build optimization options - don't apply format conversion to SVGs or GIFs
 	$: optimizationOptions = {
 		width,
 		height,
 		quality,
-		format: isSvg ? 'auto' : format, // Use 'auto' for SVGs to preserve original format
+		format: (isSvg || isGif) ? 'auto' : format, // Use 'auto' for SVGs and GIFs to preserve original format
 		fit,
 		gravity,
 		dpr: retina ? 2 : dpr,
@@ -98,19 +130,62 @@
 		metadata: 'copyright'
 	} as ImageOptimizationOptions;
 
-	// Generate optimized URLs - only for IPFS URLs
-	$: optimizedSrc = src && canOptimize ? buildOptimizedImageUrl(src, optimizationOptions) : src;
-	$: fallbackUrl = src && isIpfs ? ipfsToHttpUrl(src) : (src || fallbackSrc);
+	// Generate optimized URLs - only for IPFS URLs that can be optimized
+	$: optimizedSrc = (() => {
+		if (!src) return src;
+		
+		if (canOptimize) {
+			// Can optimize - use the optimization service
+			return buildOptimizedImageUrl(src, optimizationOptions);
+		} else if (isGif && isIpfs) {
+			// GIF on IPFS - use direct URL to preserve animation
+			return buildDirectImageUrl(src);
+		} else if (isIpfs) {
+			// Other IPFS content that can't be optimized - use direct URL
+			return buildDirectImageUrl(src);
+		} else {
+			// Non-IPFS URL - use as-is
+			return src;
+		}
+	})();
+	
+	// Create different fallback levels for IPFS content
+	$: directIpfsSrc = src && isIpfs ? buildDirectImageUrl(src) : '';
+	$: basicIpfsSrc = src && isIpfs ? ipfsToHttpUrl(src) : '';
+	$: finalFallbackSrc = fallbackSrc;
+	
+	// Determine which source to use based on error state and attempts
+	$: currentSrc = (() => {
+		if (!src || src.trim() === '') return '';
+		
+		if (!hasError) {
+			// No error yet, use optimized version (which handles GIFs correctly)
+			return optimizedSrc || src;
+		}
+		
+		if (isIpfs && !hasTriedDirectIpfs) {
+			// First error with IPFS content - try direct IPFS URL
+			return directIpfsSrc || basicIpfsSrc || src;
+		}
+		
+		if (showFallbackOnError) {
+			// Final fallback - use generic fallback image
+			return finalFallbackSrc;
+		}
+		
+		// No fallback allowed, stick with last attempted URL
+		return src;
+	})();
 	
 	// Determine if we should show the image
 	$: shouldShowImage = src && src.trim() !== '';
-	$: imageSrc = shouldShowImage ? (optimizedSrc || fallbackUrl) : '';
+	$: imageSrc = shouldShowImage ? currentSrc : '';
 
 	// Show skeleton when loading or when src is empty but showSkeleton is true
 	$: shouldShowSkeleton = showSkeleton && (isLoading || !shouldShowImage);
 
 	// Generate responsive srcset if enabled - only for IPFS URLs that can be optimized
-	$: srcset = responsive && src && canOptimize ? createResponsiveSrcSet(src, responsiveSizes, {
+	$: srcset = responsive && src && canOptimize && !hasError ? createResponsiveSrcSet(src, responsiveSizes, {
 		height: optimizationOptions.height,
 		quality: optimizationOptions.quality,
 		format: optimizationOptions.format,
@@ -123,7 +198,7 @@
 	}) : '';
 
 	// Generate retina URLs if enabled - only for IPFS URLs that can be optimized
-	$: retinaUrls = retina && width && src && canOptimize ? createRetinaUrls(src, width, {
+	$: retinaUrls = retina && width && src && canOptimize && !hasError ? createRetinaUrls(src, width, {
 		height: optimizationOptions.height,
 		quality: optimizationOptions.quality,
 		format: optimizationOptions.format,
@@ -141,26 +216,35 @@
 	function handleLoadStart() {
 		isLoading = true;
 		isLoaded = false;
-		hasError = false;
 	}
 
 	// Handle image load
 	function handleLoad() {
 		isLoaded = true;
 		isLoading = false;
-		hasError = false;
+		// Don't reset hasError here - let it persist to track fallback state
 	}
 
 	// Handle image error
 	function handleError() {
+		console.log(`[OptimizedImage] Image failed to load: ${currentSrc}`);
 		isLoading = false;
-		if (showFallbackOnError && !hasError) {
+		
+		if (isIpfs && !hasTriedDirectIpfs) {
+			// First error with IPFS - try direct IPFS URL
+			console.log(`[OptimizedImage] Trying direct IPFS URL for: ${src}`);
+			hasTriedDirectIpfs = true;
 			hasError = true;
-			isLoaded = false; // Reset loaded state when switching to fallback
-			// Try fallback URL
-			if (imageElement && fallbackUrl !== optimizedSrc) {
-				imageElement.src = fallbackUrl;
-			}
+			isLoaded = false;
+		} else if (showFallbackOnError && currentSrc !== finalFallbackSrc) {
+			// Try final fallback
+			console.log(`[OptimizedImage] Trying final fallback for: ${src}`);
+			hasError = true;
+			isLoaded = false;
+		} else {
+			// All fallbacks exhausted
+			console.log(`[OptimizedImage] All fallbacks exhausted for: ${src}`);
+			isLoaded = true; // Stop trying
 		}
 	}
 
@@ -168,9 +252,9 @@
 	function retryWithFallback() {
 		if (imageElement && src) {
 			hasError = false;
-			isLoaded = false; // Reset loaded state when retrying
+			hasTriedDirectIpfs = false;
+			isLoaded = false;
 			isLoading = true;
-			imageElement.src = fallbackUrl;
 		}
 	}
 
@@ -179,6 +263,7 @@
 		isLoading = true;
 		isLoaded = false;
 		hasError = false;
+		hasTriedDirectIpfs = false;
 	}
 </script>
 
@@ -186,7 +271,7 @@
 	class="{className} image-container" 
 	{style}
 	style:aspect-ratio={calculatedAspectRatio}
-	style:width="100%"
+	style:width={calculatedAspectRatio ? 'auto' : (width ? `${width}px` : '100%')}
 	style:height={calculatedAspectRatio ? 'auto' : (height ? `${height}px` : '100%')}
 >
 	<!-- Skeleton loader positioned to exactly match the image -->
@@ -225,6 +310,9 @@
 	.image-container {
 		position: relative;
 		box-sizing: border-box;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.skeleton-overlay {

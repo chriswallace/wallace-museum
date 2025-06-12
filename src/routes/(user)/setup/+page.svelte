@@ -27,8 +27,8 @@
 		<input id="password" name="password" type="password" required />
 	</div>
 
-	{#if form?.user}
-		<p class="error">Username is taken.</p>
+	{#if form?.error}
+		<p class="error">{form.error}</p>
 	{/if}
 
 	<button type="submit">Register</button>

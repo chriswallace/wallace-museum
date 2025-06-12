@@ -115,8 +115,9 @@
 					img.src = buildOptimizedImageUrl(artwork.image_url, {
 						width: 340, // Use max size for preloading
 						fit: 'contain',
-						format: 'webp',
-						quality: 80
+						format: 'auto', // Let the optimizer decide format (preserves GIFs)
+						quality: 80,
+						mimeType: artwork.mime // Pass MIME type for proper GIF detection
 					});
 					preloadedImages[artwork.image_url] = img;
 				}
@@ -277,8 +278,9 @@
 					width={previewDimensions?.width || 320}
 					height={previewDimensions?.height || 240}
 					fit="contain"
-					format="webp"
+					format="auto"
 					quality={80}
+					mimeType={hoveredArtist.artworks[0].mime}
 					className={loadingStates[previewMedia.url] ? 'hidden preview-image' : 'preview-image'}
 					on:load={() => {
 						if (previewMedia?.url) {
@@ -401,7 +403,7 @@
 	/* Hide artwork previews on touch devices */
 	@media (hover: none) and (pointer: coarse) {
 		.floating-artwork-preview {
-			display: none !important;
+			display: none;
 		}
 	}
 

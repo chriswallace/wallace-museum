@@ -117,7 +117,7 @@
 									width={250}
 									height={250}
 									fit="crop"
-									format="webp"
+									format="auto"
 									quality={80}
 									aspectRatio="1/1"
 									showSkeleton={true}

@@ -8,7 +8,7 @@
 
 	import { showToast } from '$lib/toastHelper';
 	import { goto } from '$app/navigation';
-	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import { ipfsToHttpUrl, ipfsToHttpUrlForHtml } from '$lib/mediaUtils';
 
 	let artworkId: string;
 
@@ -30,8 +30,11 @@
 		title: string;
 		description: string;
 		imageUrl?: string | null;
+		image_url?: string | null;
 		animationUrl?: string | null;
+		animation_url?: string | null;
 		thumbnailUrl?: string | null;
+		thumbnail_url?: string | null;
 		generatorUrl?: string | null;
 		artists?: Artist[];
 		collectionId: number | null;
@@ -45,34 +48,11 @@
 		tokenID?: string;
 		mintDate?: string;
 		fullscreen?: boolean;
-
-		// OpenSea-specific display-optimized URLs
-		// display_image_url?: string;
-		// display_animation_url?: string;
-
-		// Tezos-specific URLs
-		// thumbnailUri?: string;
-		// artifactUri?: string;
-		// displayUri?: string;
-
-		// External and metadata URLs
 		metadataUrl?: string | null;
 		externalUrl?: string | null;
-
-		// Content moderation flags
-		// isDisabled?: boolean;
-		// isNsfw?: boolean;
-		// isSuspicious?: boolean;
-
-		// Media metadata
 		fileSize?: number;
 		duration?: number;
 		supply?: number;
-
-		// Creator tracking
-		// resolvedArtist?: boolean;
-
-		// Ownership data
 		dimensions?: { width: number; height: number } | null;
 	}
 
@@ -315,10 +295,10 @@
 			<div>
 				<div class="artwork-preview-container">
 					<div class="artwork-preview">
-						{#if artwork.animationUrl || artwork.generatorUrl}
+						{#if artwork.animationUrl || (artwork as any).generatorUrl}
 							{#if artwork.mime?.startsWith('video/')}
 								<video 
-									src={artwork.animationUrl || artwork.generatorUrl} 
+									src={artwork.animationUrl || (artwork as any).generatorUrl} 
 									controls 
 									muted 
 									autoplay 
@@ -330,9 +310,9 @@
 								>
 									<track kind="captions" />
 								</video>
-							{:else if artwork.mime === 'text/html' || artwork.mime === 'application/javascript' || artwork.generatorUrl}
+							{:else if artwork.mime === 'text/html' || artwork.mime === 'application/javascript' || (artwork as any).generatorUrl}
 								<iframe 
-									src={artwork.animationUrl || artwork.generatorUrl} 
+									src={ipfsToHttpUrlForHtml((artwork.animationUrl || (artwork as any).generatorUrl) as string, artwork.mime)} 
 									title="Interactive Artwork"
 									class="media-content"
 									width={artwork.dimensions?.width || 800}
@@ -342,37 +322,25 @@
 								></iframe>
 							{:else}
 								<OptimizedImage
-									src={artwork.animationUrl}
+									src={(artwork.imageUrl ?? (artwork as any).image_url ?? '') || ''}
 									alt={artwork.title}
 									width={artwork.dimensions?.width || 800}
 									height={artwork.dimensions?.height || 800}
 									fit="contain"
-									format="webp"
+									format="auto"
 									quality={85}
 									className="media-content"
 									style={mediaStyle}
 								/>
 							{/if}
-						{:else if artwork.imageUrl}
+						{:else if artwork.thumbnailUrl || (artwork as any).thumbnail_url}
 							<OptimizedImage
-								src={artwork.imageUrl}
+								src={(artwork.thumbnailUrl ?? (artwork as any).thumbnail_url ?? '') || ''}
 								alt={artwork.title}
 								width={artwork.dimensions?.width || 800}
 								height={artwork.dimensions?.height || 800}
 								fit="contain"
-								format="webp"
-								quality={85}
-								className="media-content"
-								style={mediaStyle}
-							/>
-						{:else if artwork.thumbnailUrl}
-							<OptimizedImage
-								src={artwork.thumbnailUrl}
-								alt={artwork.title}
-								width={artwork.dimensions?.width || 800}
-								height={artwork.dimensions?.height || 800}
-								fit="contain"
-								format="webp"
+								format="auto"
 								quality={85}
 								className="media-content"
 								style={mediaStyle}
