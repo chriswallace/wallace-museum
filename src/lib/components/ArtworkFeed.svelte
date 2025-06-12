@@ -3,9 +3,6 @@
 	import { goto } from '$app/navigation';
 	import OptimizedImage from './OptimizedImage.svelte';
 	import LoaderWrapper from './LoaderWrapper.svelte';
-	import { ipfsToHttpUrl, IPFS_GATEWAYS } from '$lib/mediaUtils';
-	import { getBestMediaUrl, getMediaDisplayType, VideoPresets } from '$lib/utils/mediaHelpers';
-	import type { MediaUrls } from '$lib/utils/mediaHelpers';
 	import type { FeedArtwork } from '../../routes/api/artworks/random/+server';
 
 	let artworks: FeedArtwork[] = [];
@@ -14,7 +11,6 @@
 	let feedContainer: HTMLElement;
 	let intersectionTarget: HTMLElement;
 	let currentObserver: IntersectionObserver | null = null;
-	let videoLoadingStates: Record<string, boolean> = {};
 
 	// Format mint date for display
 	function formatMintDate(mintDate: Date | null): string | null {
@@ -65,35 +61,30 @@
 		}
 	}
 
-	// Set up intersection observer for infinite scroll
-	function setupIntersectionObserver() {
-		if (currentObserver) {
-			currentObserver.disconnect();
+	function handleArtworkClick(artwork: FeedArtwork) {
+		if (artwork.artists && artwork.artists.length > 0) {
+			goto(`/artist/${artwork.artists[0].id}/${artwork.id}`);
 		}
+	}
 
+	function setupIntersectionObserver() {
 		if (!intersectionTarget) return;
 
-		currentObserver = new IntersectionObserver(
-			(entries) => {
-				const [entry] = entries;
+		const options = {
+			root: null,
+			rootMargin: '100px',
+			threshold: 0.1
+		};
+
+		currentObserver = new IntersectionObserver((entries) => {
+			entries.forEach((entry) => {
 				if (entry.isIntersecting && hasMore && !loading) {
 					loadArtworks();
 				}
-			},
-			{ 
-				threshold: 0.1,
-				rootMargin: '100px'
-			}
-		);
+			});
+		}, options);
 
 		currentObserver.observe(intersectionTarget);
-	}
-
-	function handleArtworkClick(artwork: FeedArtwork) {
-		// Navigate to the first artist's page with the artwork
-		if (artwork.artists.length > 0) {
-			goto(`/artist/${artwork.artists[0].id}/${artwork.id}`);
-		}
 	}
 
 	onMount(() => {
@@ -118,133 +109,80 @@
 	
 	<div class="artworks-stack">
 		{#each artworks as artwork (artwork.id)}
-			{@const mediaUrls = {
-				generatorUrl: null,
-				animationUrl: artwork.animationUrl,
-				imageUrl: artwork.imageUrl,
-				thumbnailUrl: null
-			}}
-			{@const bestMedia = getBestMediaUrl(mediaUrls, 'thumbnail', artwork.mime)}
-			{@const mediaType = getMediaDisplayType(bestMedia, artwork.mime)}
-			
-			{#if bestMedia}
-				<div class="artwork-card">
-					<button 
-						class="artwork-container" 
-						on:click={() => handleArtworkClick(artwork)}
-						aria-label="View {artwork.title} by {artwork.artists.map(a => a.name).join(', ')}"
-					>
-						<div class="artwork-thumbnail">
-							{#if mediaType === 'image'}
+			<div class="artwork-card">
+				<button 
+					class="artwork-container" 
+					on:click={() => handleArtworkClick(artwork)}
+					aria-label="View {artwork.title} by {artwork.artists.map(a => a.name).join(', ')}"
+				>
+					<div class="artwork-thumbnail">
+						<div class="stage">
+							{#if artwork.imageUrl}
 								<OptimizedImage
-									src={bestMedia.url}
+									src={artwork.imageUrl}
 									alt={artwork.title}
-									width={artwork.dimensions?.width || 800}
-									height={artwork.dimensions?.height || 800}
-									aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
-									quality={85}
-									format="auto"
+									width={800}
+									height={800}
 									fit="contain"
-									responsive={true}
-									responsiveSizes={[800 * 0.5, 800, 800 * 1.5]}
-									sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-									skeletonBorderRadius="0px"
-									className="artwork-image"
+									format="auto"
+									quality={70}
+									className="thumbnail-image"
 									fallbackSrc="/images/medici-image.png"
+									mimeType={artwork.mime}
 								/>
-							{:else if mediaType === 'video'}
-								{@const transformedVideoUrl = ipfsToHttpUrl(bestMedia.url, IPFS_GATEWAYS[0], true, artwork.mime || undefined)}
-								{@const videoAttrs = VideoPresets.feed(transformedVideoUrl)}
-								<div class="video-container">
-									{#if videoLoadingStates[artwork.id]}
-										<div class="video-loading">
-											<LoaderWrapper width="100%" height="200px" />
-										</div>
-									{/if}
-									<video
-										src={videoAttrs.src}
-										autoplay={videoAttrs.autoplay}
-										loop={videoAttrs.loop}
-										muted={videoAttrs.muted}
-										playsinline={videoAttrs.playsinline}
-										preload={videoAttrs.preload}
-										class="thumbnail-video"
-										class:loading={videoLoadingStates[artwork.id]}
-										width={videoAttrs.width}
-										height={videoAttrs.height}
-										style={videoAttrs.style}
-										on:loadstart={() => {
-											videoLoadingStates[artwork.id] = true;
-											videoLoadingStates = videoLoadingStates;
-										}}
-										on:loadeddata={() => {
-											videoLoadingStates[artwork.id] = false;
-											videoLoadingStates = videoLoadingStates;
-										}}
-										on:error={(e) => {
-											console.warn('Video failed to load:', transformedVideoUrl);
-											videoLoadingStates[artwork.id] = false;
-											videoLoadingStates = videoLoadingStates;
-										}}
-									>
-										<track kind="captions" />
-										Your browser does not support the video tag.
-									</video>
-								</div>
 							{:else}
-								<!-- For feed, we only show images and videos, not iframes -->
 								<div class="thumbnail-placeholder">
 									<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-										<path d="M21 19V5c0-1.1-.9-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+										<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
 									</svg>
 								</div>
 							{/if}
 						</div>
-						
-						<div class="artwork-info-container">
-							<div class="artwork-info">
-								{#if formatMintDate(artwork.mintDate)}
-									<div class="artwork-mint-date">
-										{formatMintDate(artwork.mintDate)}
-									</div>
-								{/if}
-								<h3 class="artwork-title">{artwork.title}</h3>
-								<div class="artwork-artists">
-									{#each artwork.artists as artist, index}
-										<div class="artist-info">
-											{#if artist.avatarUrl}
-												<div class="artist-avatar">
-													<OptimizedImage
-														src={artist.avatarUrl}
-														alt="{artist.name} avatar"
-														width={32}
-														height={32}
-														fit="cover"
-														format="auto"
-														quality={85}
-														className="avatar-image"
-														fallbackSrc="/images/medici-image.png"
-													/>
-												</div>
-											{:else}
-												<div class="artist-avatar-placeholder">
-													<svg viewBox="0 0 24 24" fill="currentColor" class="avatar-icon">
-														<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-													</svg>
-												</div>
-											{/if}
-											<span class="artist-name">{artist.name}</span>
-										</div>
-										{#if index < artwork.artists.length - 1}
-											<span class="artist-separator"> </span>
-										{/if}
-									{/each}
+					</div>
+					
+					<div class="artwork-info-container">
+						<div class="artwork-info">
+							{#if formatMintDate(artwork.mintDate)}
+								<div class="artwork-mint-date">
+									{formatMintDate(artwork.mintDate)}
 								</div>
+							{/if}
+							<h3 class="artwork-title">{artwork.title}</h3>
+							<div class="artwork-artists">
+								{#each artwork.artists as artist, index}
+									<div class="artist-info">
+										{#if artist.avatarUrl}
+											<div class="artist-avatar">
+												<OptimizedImage
+													src={artist.avatarUrl}
+													alt="{artist.name} avatar"
+													width={32}
+													height={32}
+													fit="cover"
+													format="auto"
+													quality={85}
+													className="avatar-image"
+													fallbackSrc="/images/medici-image.png"
+												/>
+											</div>
+										{:else}
+											<div class="artist-avatar-placeholder">
+												<svg viewBox="0 0 24 24" fill="currentColor" class="avatar-icon">
+													<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+												</svg>
+											</div>
+										{/if}
+										<span class="artist-name">{artist.name}</span>
+									</div>
+									{#if index < artwork.artists.length - 1}
+										<span class="artist-separator"> </span>
+									{/if}
+								{/each}
 							</div>
 						</div>
-					</button>
-				</div>
-			{/if}
+					</div>
+				</button>
+			</div>
 		{/each}
 	</div>
 
@@ -274,51 +212,36 @@
 		@apply w-full max-w-[560px] mx-auto px-4 py-8;
 	}
 
-	.feed-title {
-		@apply text-xl font-bold mb-8 tracking-tight;
-	}
-
 	.artworks-stack {
 		@apply space-y-12;
 	}
 
 	.artwork-card {
-		@apply relative;
+		@apply relative w-full;
 	}
 
 	.artwork-container {
-		@apply bg-transparent border-none p-0 cursor-pointer;
+		@apply bg-transparent border-none p-0 cursor-pointer w-full;
 		@apply transition-transform duration-200 focus:outline-none;
 		@apply block text-left;
 	}
 
 	.artwork-thumbnail {
-		@apply aspect-square bg-gray-950/70 rounded-t-sm overflow-hidden;
+		@apply bg-gray-950/70 rounded-t-sm overflow-hidden w-full;
 		@apply flex items-center justify-center;
 		margin: 0 auto;
 	}
 
-	.thumbnail-video {
+	.stage {
+		@apply w-full bg-gray-950/70 overflow-hidden;
+		@apply flex items-center justify-center;
+		aspect-ratio: 1 / 1;
+	}
+
+	:global(.thumbnail-image) {
 		@apply w-full h-full object-contain;
-		border-radius: inherit;
-		transition: opacity 0.3s ease;
-	}
-
-	.thumbnail-video:hover {
-		opacity: 0.9;
-	}
-
-	.thumbnail-video.loading {
-		opacity: 0;
-	}
-
-	.video-container {
-		@apply relative w-full h-full;
-	}
-
-	.video-loading {
-		@apply absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg;
-		z-index: 10;
+		width: 100% !important;
+		height: 100% !important;
 	}
 
 	.thumbnail-placeholder {
@@ -370,61 +293,34 @@
 	}
 
 	.artist-name {
-		@apply text-yellow-400 text-sm font-medium;
+		@apply text-sm font-medium text-white;
 	}
 
 	.artist-separator {
-		@apply text-gray-500 text-sm;
+		@apply text-gray-400;
 	}
 
 	.intersection-target {
 		@apply mt-8;
-		min-height: 100px;
 	}
 
 	.loading-indicator {
-		@apply flex flex-col items-center justify-center py-8;
+		@apply flex flex-col items-center gap-4 py-8;
 	}
 
 	.loading-text {
-		@apply text-gray-400 text-sm mt-4;
+		@apply text-gray-400 text-sm;
 	}
 
 	.load-more-placeholder {
-		@apply h-20 w-full;
+		@apply h-4;
 	}
 
 	.end-message {
-		@apply mt-8 text-center py-8;
+		@apply text-center py-8;
 	}
 
 	.end-message p {
-		@apply text-gray-500 text-sm;
-	}
-
-	@media (max-width: 640px) {
-		.artwork-feed {
-			@apply px-4 py-6;
-		}
-
-		.feed-title {
-			@apply text-xl mb-6;
-		}
-
-		.artworks-stack {
-			@apply space-y-8;
-		}
-
-		.artwork-title {
-			@apply text-lg;
-		}
-
-		.artwork-info {
-			@apply px-4 py-3;
-		}
-
-		.artwork-container {
-			aspect-ratio: 1 / 1;
-		}
+		@apply text-gray-400 text-sm;
 	}
 </style> 
