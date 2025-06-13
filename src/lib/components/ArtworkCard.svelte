@@ -169,9 +169,17 @@
 
 	.artwork-title {
 		@apply text-base text-center font-normal mb-3;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 
 		.selectable & {
-			@apply py-3 truncate text-base font-normal mb-0;
+			@apply py-3 text-base font-normal mb-0;
+			word-break: break-word;
+			white-space: normal;
+			overflow-wrap: break-word;
+			hyphens: auto;
 		}
 	}
 

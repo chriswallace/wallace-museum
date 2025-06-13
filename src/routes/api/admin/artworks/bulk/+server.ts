@@ -144,6 +144,11 @@ async function handleBulkEdit(artworkIds: number[], data: any): Promise<Response
 			}
 		}
 
+		// Handle MIME type assignment
+		if (data.mimeType !== undefined) {
+			updateData.mime = data.mimeType;
+		}
+
 		if (Object.keys(updateData).length === 0) {
 			return new Response(
 				JSON.stringify({ error: 'No valid update data provided' }),

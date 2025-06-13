@@ -174,12 +174,6 @@
 	</div>
 {:else}
 	<div class="page-container" transition:fade>
-		<!-- Header Navigation -->
-		<header class="header-nav">
-			<button class="museum-link" on:click={() => goto('/')} aria-label="Return to homepage">
-				The Wallace Museum
-			</button>
-		</header>
 
 		<div class="content-container">
 			<div class="layout-grid">

@@ -313,7 +313,7 @@
 
 <style lang="scss">
 	.artists-container {
-		@apply w-full min-h-screen bg-black text-white pt-12;
+		@apply w-full min-h-screen bg-black text-white;
 	}
 
 	.content {

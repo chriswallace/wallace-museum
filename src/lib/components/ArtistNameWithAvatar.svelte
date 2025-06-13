@@ -29,10 +29,10 @@
 	// Text size mappings based on avatar size
 	const textSizeMap = {
 		xs: 'text-xs',
-		sm: 'text-xs',
-		md: 'text-sm',
-		lg: 'text-base',
-		xl: 'text-lg'
+		sm: 'text-sm',
+		md: 'text-base',
+		lg: 'text-lg',
+		xl: 'text-xl'
 	};
 
 	$: textSize = textSizeMap[size];

@@ -83,6 +83,7 @@
 
 	.page-container {
 		@apply min-h-screen flex flex-col relative;
+		padding-top: var(--navbar-height);
 	}
 
 	.content {
@@ -90,24 +91,29 @@
 	}
 
 	.site-footer {
-		@apply py-4 md:px-8 border-t border-gray-800 relative z-10;
+		@apply py-12 md:px-12 border-t border-gray-800 relative z-10;
 		background: rgba(0, 0, 0, 0.95);
+		padding-bottom: 80px;
 	}
 
 	.footer-content {
-		@apply max-w-full mx-auto px-4 text-sm md:flex	justify-between;
+		@apply max-w-full mx-auto px-8 text-sm md:flex	justify-between;
 	}
 
 	.copyright {
-		@apply text-base text-gray-600 tracking-tight;
+		@apply text-sm text-gray-600 tracking-tight;
 	}
 
 	.copyright p {
-		@apply m-0 mb-1 text-base;
+		@apply m-0 mb-1 text-sm;
+	}
+
+	.copyright p.text-white {
+		@apply text-base font-bold;
 	}
 
 	.artists-copyright {
-		@apply text-xs;
+		@apply text-sm;
 	}
 
 	.social-links {
@@ -115,6 +121,6 @@
 	}
 
 	.social-link {
-		@apply font-bold text-gray-600 no-underline hover:underline transition-colors first:mr-4;
+		@apply font-bold text-gray-600 no-underline hover:underline transition-colors first:mr-4 text-sm;
 	}
 </style>

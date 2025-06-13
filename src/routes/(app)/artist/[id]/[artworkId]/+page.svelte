@@ -29,6 +29,7 @@
 	let fullscreenHintVisible = false;
 	let fullscreenHintTimeout: ReturnType<typeof setTimeout>;
 	let mainContainer: HTMLElement;
+	let isDescriptionExpanded = false;
 
 	// Track fullscreen state
 	function handleFullscreenChange() {
@@ -482,6 +483,20 @@
 			setupMediaLoadDetection();
 		});
 	}
+
+	// Description helpers
+	function shouldTruncateDescription(description: string): boolean {
+		return !!(description && typeof description === 'string' && description.length > 255);
+	}
+
+	function getTruncatedDescription(description: string): string {
+		if (!description || typeof description !== 'string') return '';
+		return description.length > 255 ? description.substring(0, 255) + '...' : description;
+	}
+
+	function toggleDescription() {
+		isDescriptionExpanded = !isDescriptionExpanded;
+	}
 </script>
 
 <svelte:head>
@@ -571,7 +586,29 @@
 							<!-- Description -->
 							{#if currentArtwork.description}
 								<div class="artwork-description">
-									<p>{currentArtwork.description}</p>
+									{#if shouldTruncateDescription(currentArtwork.description)}
+										{#if isDescriptionExpanded}
+											<p>{currentArtwork.description}</p>
+											<button 
+												class="read-more-button" 
+												on:click={toggleDescription}
+												aria-label="Show less description"
+											>
+												Read less
+											</button>
+										{:else}
+											<p>{getTruncatedDescription(currentArtwork.description)}</p>
+											<button 
+												class="read-more-button" 
+												on:click={toggleDescription}
+												aria-label="Show full description"
+											>
+												Read more
+											</button>
+										{/if}
+									{:else}
+										<p>{currentArtwork.description}</p>
+									{/if}
 								</div>
 							{/if}
 
@@ -762,336 +799,172 @@
 	</main>
 {/if}
 
-<style>
+<style lang="postcss">
 	/* Base styles from template */
 	.artwork-page {
-		margin: 0;
-		padding: 0;
+		@apply m-0 p-0 bg-black text-white min-h-screen outline-none;
 		font-family: Suisse, "Suisse Fallback", -apple-system, "system-ui", "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-		background: black;
-		color: white;
-		min-height: 100vh;
-		outline: none;
 	}
 
 	.artwork-content-container {
-		max-width: 2000px;
-		margin-left: auto;
-		margin-right: auto;
-		flex: 1 1 0%;
-		padding-left: 16px;
-		padding-right: 16px;
-	}
-
-	@media (min-width: 640px) {
-		.artwork-content-container {
-			padding-left: 24px;
-			padding-right: 24px;
-		}
-	}
-
-	@media (min-width: 1024px) {
-		.artwork-content-container {
-			padding-left: 48px;
-			padding-right: 48px;
-		}
+		@apply max-w-[2000px] mx-auto flex-1 px-4 sm:px-6 lg:px-12;
 	}
 
 	.artwork-flex-container {
-		position: relative;
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-	}
-
-	@media (min-width: 1024px) {
-		.artwork-flex-container {
-			flex-direction: row;
-		}
+		@apply relative flex flex-col gap-0 lg:flex-row;
 	}
 
 	.artwork-container {
-		display: flex;
-		align-items: flex-start;
-		justify-content: center;
-		flex-grow: 1;
+		@apply flex items-start justify-center flex-grow min-w-0;
 		box-sizing: inherit;
-		min-width: 0;
 	}
 
 	.artwork-canvas {
-		align-items: center;
+		@apply flex items-center justify-center flex-grow h-[50vh] p-[5%] sticky top-0 self-start;
+		@apply lg:h-[calc(100vh-var(--navbar-height))] lg:pl-0 lg:pr-12 lg:top-[var(--navbar-height)];
 		box-sizing: border-box;
 		color: rgb(255, 255, 255);
-		display: flex;
-		flex-grow: 1;
-		height: 50vh;
-		justify-content: center;
-		padding: 5%;
-		position: sticky;
-		top: 0;
 		unicode-bidi: isolate;
 		transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
 		-webkit-font-smoothing: antialiased;
-		box-sizing: border-box;
-		align-self: flex-start;
-	}
-
-	@media (min-width: 1024px) {
-		.artwork-canvas {
-			height: calc(100vh - var(--navbar-height));
-			padding-left: 0px;
-			padding-right: 48px;
-			top: 0;
-		}
 	}
 
 	.nft-media {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), aspect-ratio 0.4s ease-out;
-		position: relative;
+		@apply flex items-center justify-center relative max-w-full max-h-full w-full h-full;
 		box-sizing: inherit;
-		max-width: 100%;
-		max-height: 100%;
-		width: 100%;
-		height: 100%;
+		transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), aspect-ratio 0.4s ease-out;
 	}
 
 	.info-container {
-		flex-grow: 0;
-		flex-shrink: 0;
-		gap: 24px;
-		display: flex;
-		flex-direction: column;
-		color: white;
-	}
-
-	@media (min-width: 1024px) {
-		.info-container {
-			padding-top: 48px;
-			padding-left: 48px;
-			padding-right: 0;
-			padding-bottom: 48px;
-			min-width: 464px;
-			max-width: 464px;
-			gap: 24px;
-			border-left: 1px solid rgba(255, 255, 255, 0.1);
-		}
+		@apply flex-grow-0 flex-shrink-0 gap-6 flex flex-col text-white pb-8;
+		@apply lg:pt-12 lg:pl-12 lg:pr-0 lg:pb-12 lg:min-w-[464px] lg:max-w-[464px] lg:border-l lg:border-white/10;
 	}
 
 	.media-container {
+		@apply relative max-h-full max-w-full overflow-hidden cursor-zoom-in;
+		box-sizing: inherit;
 		transition: opacity 1000ms cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
 		will-change: opacity, transform;
-		cursor: zoom-in;
-		position: relative;
-		max-height: 100%;
-		max-width: 100%;
-		box-sizing: inherit;
-		overflow: hidden;
 	}
 
 	.isMediaLoaded-false .media-container {
-		opacity: 0;
-		transform: scale(0.8);
+		@apply opacity-0 scale-75;
 	}
 
 	.isMediaLoaded-true .media-container {
-		opacity: 1;
-		transform: scale(1);
+		@apply opacity-100 scale-100;
 	}
 
 	/* Artwork header styles */
 	.artwork-header {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-		position: relative;
+		@apply flex flex-col gap-4 relative;
 	}
 
 	.artist-info {
-		margin-bottom: 8px;
+		@apply mb-2;
 	}
 
 	.artist-name {
-		font-size: 16px;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: #fbbf24;
+		@apply text-lg font-medium uppercase tracking-wider text-yellow-400;
+	}
+
+	/* Override the text-xs class from ArtistList component */
+	.artist-info .artist-name,
+	.artist-info .artist-name * {
+		font-size: 18px !important;
 	}
 
 	.artwork-title {
-		font-size: 32px;
-		font-weight: 600;
-		line-height: 1.2;
-		margin: 0;
-		color: white;
+		@apply text-3xl font-semibold leading-tight m-0 text-white break-words;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.artwork-navigation {
-		position: absolute;
-		top: -8px;
-		right: 0;
-		display: flex;
-		gap: 8px;
+		@apply absolute -top-4 right-0 flex gap-2;
 	}
 
 	.nav-button {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 40px;
-		height: 40px;
-		background: rgba(0, 0, 0, 0.6);
-		color: white;
-		border: none;
-		border-radius: 50%;
-		cursor: pointer;
-		transition: background-color 0.2s;
-		font-size: 18px;
-	}
-
-	.nav-button:hover {
-		background: rgba(0, 0, 0, 0.8);
+		@apply flex items-center justify-center w-10 h-10 bg-black/60 text-white border-none rounded-full cursor-pointer text-lg;
+		@apply hover:bg-black/80 transition-colors duration-200;
 	}
 
 	/* Content styles */
 	.artwork-description {
-		color: #d1d5db;
-		line-height: 1.6;
+		@apply text-gray-300 leading-relaxed text-sm;
 	}
 
 	.artwork-description p {
-		margin: 0;
+		@apply m-0 mb-2;
+	}
+
+	.read-more-button {
+		@apply bg-transparent border-none text-yellow-400 cursor-pointer text-sm p-0 underline;
+		@apply hover:text-yellow-500 transition-colors duration-200;
 	}
 
 	.metadata-section {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
+		@apply flex flex-col gap-4;
 	}
 
 	.metadata-heading {
-		font-size: 18px;
-		font-weight: 600;
-		color: white;
-		margin: 0;
+		@apply text-base font-semibold text-white m-0;
 	}
 
 	.metadata-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 16px;
-	}
-
-	@media (min-width: 768px) {
-		.metadata-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
+		@apply grid grid-cols-2 gap-4;
 	}
 
 	.metadata-item {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		min-width: 0;
+		@apply flex flex-col gap-1 min-w-0;
 	}
 
 	.metadata-item strong {
-		font-size: 12px;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: #9ca3af;
-		font-weight: 500;
+		@apply text-xs uppercase tracking-wider text-gray-400 font-medium;
 	}
 
 	.metadata-item span,
 	.metadata-item a {
-		font-size: 14px;
-		color: #f3f4f6;
-		word-break: break-word;
+		@apply text-sm text-gray-100 break-words;
 	}
 
 	.contract-link {
-		color: #fbbf24;
-		text-decoration: none;
-		transition: color 0.2s;
-	}
-
-	.contract-link:hover {
-		color: #f59e0b;
-		text-decoration: underline;
+		@apply text-yellow-400 no-underline hover:text-yellow-500 hover:underline transition-colors duration-200;
 	}
 
 	/* Keyboard shortcuts */
 	.keyboard-shortcuts-section {
-		margin-top: 32px;
-		padding-top: 24px;
-		border-top: 1px solid rgba(255, 255, 255, 0.1);
+		@apply mt-8;
 	}
 
 	.keyboard-help-trigger {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		background: transparent;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		color: #9ca3af;
-		padding: 12px 16px;
-		border-radius: 6px;
-		cursor: pointer;
-		transition: all 0.2s;
-		font-size: 14px;
-	}
-
-	.keyboard-help-trigger:hover {
-		color: #d1d5db;
-		border-color: rgba(255, 255, 255, 0.3);
+		@apply flex items-center gap-2 bg-transparent border border-white/20 text-gray-400 px-4 py-3 rounded-md cursor-pointer text-sm;
+		@apply hover:text-gray-300 hover:border-white/30 transition-all duration-200;
 	}
 
 	/* Error and loading states */
 	.error-page,
 	.loading-page {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		min-height: 100vh;
-		background: black;
-		color: white;
+		@apply flex items-center justify-center min-h-screen bg-black text-white;
 	}
 
 	.error-content,
 	.loading-content {
-		text-align: center;
-		padding: 32px;
+		@apply text-center p-8;
 	}
 
 	.error-content h2 {
-		font-size: 24px;
-		margin-bottom: 16px;
+		@apply text-2xl mb-4;
 	}
 
 	.error-content button {
-		background: #fbbf24;
-		color: black;
-		border: none;
-		padding: 12px 24px;
-		border-radius: 6px;
-		cursor: pointer;
-		font-weight: 500;
-		margin-top: 16px;
+		@apply bg-yellow-400 text-black border-none px-6 py-3 rounded-md cursor-pointer font-medium mt-4;
 	}
 
 	.loader {
-		border: 4px solid #444;
-		border-top: 4px solid #fff;
-		border-radius: 50%;
-		width: 36px;
-		height: 36px;
+		@apply border-4 border-gray-600 border-t-white rounded-full w-9 h-9 mx-auto mb-4;
 		animation: spin 1s linear infinite;
-		margin: 0 auto 16px;
 	}
 
 	@keyframes spin {
@@ -1101,116 +974,56 @@
 
 	/* Keyboard help overlay */
 	.keyboard-help-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.8);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 50;
+		@apply fixed inset-0 bg-black/80 flex items-center justify-center z-50;
 	}
 
 	.keyboard-help-content {
-		background: #1f2937;
-		padding: 32px;
-		border-radius: 8px;
-		box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-		max-width: 600px;
-		max-height: 80vh;
-		overflow-y: auto;
-		color: white;
+		@apply bg-gray-800 p-8 rounded-lg shadow-2xl max-w-2xl max-h-[80vh] overflow-y-auto text-white;
 	}
 
 	.keyboard-help-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 24px;
+		@apply flex justify-between items-center mb-6;
 	}
 
 	.keyboard-help-header h3 {
-		font-size: 20px;
-		font-weight: 600;
-		margin: 0;
+		@apply text-xl font-semibold m-0;
 	}
 
 	.help-close-button {
-		width: 32px;
-		height: 32px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: rgba(255, 255, 255, 0.1);
-		color: white;
-		border: none;
-		border-radius: 50%;
-		cursor: pointer;
-		transition: background-color 0.2s;
-	}
-
-	.help-close-button:hover {
-		background: rgba(255, 255, 255, 0.2);
+		@apply w-8 h-8 flex items-center justify-center bg-white/10 text-white border-none rounded-full cursor-pointer;
+		@apply hover:bg-white/20 transition-colors duration-200;
 	}
 
 	.keyboard-help-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 24px;
+		@apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
 	}
 
 	.help-section h4 {
-		font-size: 16px;
-		font-weight: 600;
-		margin-bottom: 12px;
-		color: #fbbf24;
+		@apply text-base font-semibold mb-3 text-yellow-400;
 	}
 
 	.help-item {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		margin-bottom: 8px;
+		@apply flex items-center gap-3 mb-2;
 	}
 
 	.help-item kbd {
-		display: inline-flex;
-		align-items: center;
-		padding: 4px 8px;
-		background: rgba(255, 255, 255, 0.1);
-		color: white;
-		font-size: 12px;
-		font-family: monospace;
-		border-radius: 4px;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		min-width: 32px;
-		justify-content: center;
+		@apply inline-flex items-center justify-center px-2 py-1 bg-white/10 text-white text-xs font-mono border border-white/20 min-w-8;
 	}
 
 	.help-item span {
-		font-size: 14px;
-		color: #d1d5db;
+		@apply text-sm text-gray-300;
 	}
 
 	/* Fullscreen hint */
 	.fullscreen-hint {
-		position: fixed;
-		top: 16px;
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 50;
+		@apply fixed top-4 left-1/2 -translate-x-1/2 z-50;
 	}
 
 	.fullscreen-hint-content {
-		background: rgba(0, 0, 0, 0.8);
-		color: white;
-		padding: 12px 20px;
-		border-radius: 6px;
-		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+		@apply bg-black/80 text-white px-5 py-3 rounded-md shadow-lg;
 	}
 
 	.fullscreen-hint-content p {
-		font-size: 14px;
-		font-weight: 500;
-		margin: 0;
+		@apply text-sm font-medium m-0;
 	}
-</style> 
+</style>

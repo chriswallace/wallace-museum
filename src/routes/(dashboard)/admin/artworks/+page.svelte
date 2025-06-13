@@ -41,6 +41,29 @@
 	let allCollections: Collection[] = [];
 	let bulkEditArtistIds: number[] = [];
 	let bulkEditCollectionId: number | null = null;
+	let bulkEditMimeType: string = '';
+
+	// Common MIME types for artworks
+	const commonMimeTypes = [
+		{ value: '', label: '-- No Change --' },
+		{ value: 'image/jpeg', label: 'JPEG Image (image/jpeg)' },
+		{ value: 'image/png', label: 'PNG Image (image/png)' },
+		{ value: 'image/gif', label: 'GIF Image (image/gif)' },
+		{ value: 'image/webp', label: 'WebP Image (image/webp)' },
+		{ value: 'image/svg+xml', label: 'SVG Image (image/svg+xml)' },
+		{ value: 'video/mp4', label: 'MP4 Video (video/mp4)' },
+		{ value: 'video/webm', label: 'WebM Video (video/webm)' },
+		{ value: 'video/quicktime', label: 'QuickTime Video (video/quicktime)' },
+		{ value: 'video/ogg', label: 'OGG Video (video/ogg)' },
+		{ value: 'text/html', label: 'HTML Document (text/html)' },
+		{ value: 'application/javascript', label: 'JavaScript (application/javascript)' },
+		{ value: 'model/gltf+json', label: 'glTF Model (model/gltf+json)' },
+		{ value: 'model/gltf-binary', label: 'glTF Binary (model/gltf-binary)' },
+		{ value: 'application/pdf', label: 'PDF Document (application/pdf)' },
+		{ value: 'audio/mpeg', label: 'MP3 Audio (audio/mpeg)' },
+		{ value: 'audio/wav', label: 'WAV Audio (audio/wav)' },
+		{ value: 'audio/ogg', label: 'OGG Audio (audio/ogg)' }
+	];
 
 	// Bulk refetch state
 	let isRefetching = false;
@@ -143,6 +166,7 @@
 		showBulkActions = false;
 		bulkEditArtistIds = [];
 		bulkEditCollectionId = null;
+		bulkEditMimeType = '';
 	}
 
 	async function handleBulkDelete() {
@@ -192,8 +216,8 @@
 			return;
 		}
 
-		if (bulkEditArtistIds.length === 0 && bulkEditCollectionId === null) {
-			toast.push('Please select at least one artist or collection to assign');
+		if (bulkEditArtistIds.length === 0 && bulkEditCollectionId === null && !bulkEditMimeType) {
+			toast.push('Please select at least one field to update (artists, collection, or MIME type)');
 			return;
 		}
 
@@ -206,6 +230,10 @@
 			
 			if (bulkEditCollectionId !== null) {
 				editData.collectionId = bulkEditCollectionId;
+			}
+
+			if (bulkEditMimeType) {
+				editData.mimeType = bulkEditMimeType;
 			}
 
 			const response = await fetch('/api/admin/artworks/bulk', {
@@ -493,7 +521,7 @@
 							/>
 						</button>
 					</td>
-					<td><div>{artwork.title}</div></td>
+					<td><div style="word-break: break-word; white-space: normal; overflow-wrap: break-word; hyphens: auto;">{artwork.title}</div></td>
 					<td>
 						<ArtistTableCell 
 							artists={artwork.artists}
@@ -564,6 +592,16 @@
 						{/each}
 					</select>
 					<small class="help-text">This will replace existing collection assignments.</small>
+				</div>
+
+				<div class="form-group">
+					<label for="bulk-mime-type">MIME Type</label>
+					<select id="bulk-mime-type" bind:value={bulkEditMimeType}>
+						{#each commonMimeTypes as mimeType}
+							<option value={mimeType.value}>{mimeType.label}</option>
+						{/each}
+					</select>
+					<small class="help-text">This will update the MIME type for all selected artworks.</small>
 				</div>
 			</div>
 			<div class="modal-actions">

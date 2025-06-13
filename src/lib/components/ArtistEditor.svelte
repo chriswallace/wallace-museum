@@ -364,7 +364,7 @@
 							className="w-full h-full object-cover rounded-lg"
 						/>
 					</div>
-					<h3 class="mt-2 text-sm font-medium truncate">{artwork.title}</h3>
+					<h3 class="mt-2 text-sm font-medium" style="word-break: break-word; white-space: normal; overflow-wrap: break-word; hyphens: auto;">{artwork.title}</h3>
 				</a>
 			{/each}
 		</div>

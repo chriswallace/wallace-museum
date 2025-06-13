@@ -3,6 +3,7 @@
 	import { ipfsToHttpUrl, IPFS_GATEWAYS } from '$lib/mediaUtils';
 	import { getBestMediaUrl, getMediaDisplayType } from '$lib/utils/mediaHelpers';
 	import { buildOptimizedImageUrl, buildDirectImageUrl } from '$lib/imageOptimization';
+	import EnhancedVideoPlayer from './EnhancedVideoPlayer.svelte';
 
 	interface Artwork {
 		generatorUrl?: string | null;
@@ -188,18 +189,18 @@
 			<p>No media available</p>
 		</div>
 	{:else if mediaType === 'video'}
-		<video
+		<EnhancedVideoPlayer
 			src={transformedUrl}
-			autoplay
-			loop
-			muted
-			playsinline
+			title={artwork.title}
+			{aspectRatio}
+			autoplay={true}
+			loop={true}
+			muted={true}
+			width="100%"
+			height="100%"
 			style="object-fit: contain; {mediaStyle}"
 			on:loadeddata={handleMediaLoad}
-		>
-			<track kind="captions" />
-			Your browser does not support the video tag.
-		</video>
+		/>
 	{:else if mediaType === 'iframe'}
 		<iframe
 			src={transformedUrl}

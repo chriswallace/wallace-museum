@@ -258,6 +258,10 @@
 
 	.artwork-title {
 		@apply text-lg font-semibold text-white mb-3;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.artwork-mint-date {

@@ -245,6 +245,10 @@
 
 	.artwork-title {
 		@apply text-2xl mb-4 font-bold leading-normal;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.artwork-description {

@@ -268,7 +268,7 @@
 		</div>
 		
 		<div class="p-3">
-			<h3 class="font-medium text-base truncate dark:text-gray-100" title={getArtworkTitle(artwork)}>
+			<h3 class="font-medium text-base dark:text-gray-100" title={getArtworkTitle(artwork)} style="word-break: break-word; white-space: normal; overflow-wrap: break-word; hyphens: auto;">
 				{getArtworkTitle(artwork)}
 			</h3>
 
@@ -406,7 +406,7 @@
 			</div>
 		</td>
 		<td class="p-3">
-			<div class="font-medium dark:text-gray-100">{getArtworkTitle(artwork)}</div>
+			<div class="font-medium dark:text-gray-100" style="word-break: break-word; white-space: normal; overflow-wrap: break-word; hyphens: auto;">{getArtworkTitle(artwork)}</div>
 			<div class="text-xs text-gray-500 dark:text-gray-400">
 				ID: {getTokenId(artwork)}
 			</div>

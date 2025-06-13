@@ -1,105 +1,54 @@
 <script lang="ts">
-	import VideoPlayer from '$lib/components/VideoPlayer.svelte';
-	import MobileVideoPlayer from '$lib/components/MobileVideoPlayer.svelte';
-	import { onMount } from 'svelte';
+	import EnhancedVideoPlayer from '$lib/components/EnhancedVideoPlayer.svelte';
 
-	let isMobileDevice = false;
-
-	// Test video URLs with different aspect ratios
-	const testVideos = [
-		{
-			src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-			title: 'Landscape Video (16:9)',
-			aspectRatio: '16/9',
-			width: 1920,
-			height: 1080
-		},
-		{
-			src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-			title: 'Another Landscape Video (16:9)',
-			aspectRatio: '16/9',
-			width: 1280,
-			height: 720
-		},
-		{
-			src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
-			title: 'Portrait Style Video (9:16)',
-			aspectRatio: '9/16',
-			width: 720,
-			height: 1280
-		},
-		{
-			src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-			title: 'Square-ish Video (4:3)',
-			aspectRatio: '4/3',
-			width: 640,
-			height: 480
-		}
-	];
-
-	onMount(() => {
-		isMobileDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-	});
+	// Test video URL
+	const testVideo = {
+		src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+		title: 'Big Buck Bunny',
+		description: 'A sample video to test the enhanced video player',
+		aspectRatio: '16/9'
+	};
 </script>
 
 <svelte:head>
 	<title>Video Player Test - Wallace Collection</title>
 </svelte:head>
 
-<div class="container">
-	<h1>Video Player Test</h1>
-	<p>Testing improved video player with dimension constraints and mobile support.</p>
-	<p><strong>Device Type:</strong> {isMobileDevice ? 'Mobile/Touch' : 'Desktop'}</p>
+<main class="container">
+	<h1>Enhanced Video Player Test</h1>
+	<p>Testing the web component-based video player with advanced features.</p>
 
-	<div class="video-grid">
-		{#each testVideos as video, index}
-			<div class="video-section">
-				<h2>{video.title}</h2>
-				<p>Aspect Ratio: {video.aspectRatio} | Dimensions: {video.width}x{video.height}</p>
-				
-				<div class="video-container">
-					{#if isMobileDevice}
-						<MobileVideoPlayer
-							src={video.src}
-							autoplay={false}
-							loop={true}
-							muted={true}
-							aspectRatio={video.aspectRatio}
-							width={video.width}
-							height={video.height}
-							className="test-video-player"
-						/>
-					{:else}
-						<VideoPlayer
-							src={video.src}
-							autoplay={false}
-							loop={true}
-							muted={true}
-							aspectRatio={video.aspectRatio}
-							width={video.width}
-							height={video.height}
-							className="test-video-player"
-							showControls={true}
-							simplifiedControls={false}
-						/>
-					{/if}
-				</div>
-			</div>
-		{/each}
+	<div class="video-section">
+		<h2>{testVideo.title}</h2>
+		<div class="video-container">
+			<EnhancedVideoPlayer
+				src={testVideo.src}
+				title={testVideo.title}
+				description={testVideo.description}
+				aspectRatio={testVideo.aspectRatio}
+				autoplay={false}
+				loop={true}
+				muted={true}
+				themeColor="#3b82f6"
+				className="test-video-player"
+			/>
+		</div>
 	</div>
 
-	<div class="test-info">
-		<h2>Test Features</h2>
+	<div class="features">
+		<h3>Features</h3>
 		<ul>
-			<li>✅ Video dimensions are properly constrained</li>
-			<li>✅ Aspect ratios are maintained</li>
-			<li>✅ Mobile devices get simplified controls</li>
-			<li>✅ Desktop devices get full controls</li>
-			<li>✅ Touch-friendly controls on mobile</li>
-			<li>✅ Proper video sizing within containers</li>
+			<li>✅ Custom video controls with smooth animations</li>
+			<li>✅ Touch device detection and adaptive UI</li>
+			<li>✅ Keyboard shortcuts (Space/K for play/pause, M for mute, F for fullscreen)</li>
+			<li>✅ Volume control with visual bars</li>
+			<li>✅ Progress bar with seeking</li>
+			<li>✅ Fullscreen support</li>
+			<li>✅ Auto-pause when out of view</li>
+			<li>✅ Accessibility features</li>
 		</ul>
 	</div>
-</div>
+</main>
 
 <style>
 	.container {
@@ -109,65 +58,60 @@
 	}
 
 	h1 {
-		font-size: 2rem;
+		font-size: 2.5rem;
+		font-weight: 700;
 		margin-bottom: 1rem;
-		color: #333;
+		color: #1f2937;
 	}
 
 	h2 {
 		font-size: 1.5rem;
-		margin-bottom: 0.5rem;
-		color: #555;
-	}
-
-	p {
+		font-weight: 600;
 		margin-bottom: 1rem;
-		color: #666;
+		color: #374151;
 	}
 
-	.video-grid {
-		display: grid;
-		gap: 3rem;
-		margin: 2rem 0;
+	h3 {
+		font-size: 1.25rem;
+		font-weight: 600;
+		margin-bottom: 0.5rem;
+		color: #374151;
 	}
 
 	.video-section {
-		border: 1px solid #ddd;
-		border-radius: 8px;
-		padding: 1.5rem;
-		background: #f9f9f9;
+		margin-bottom: 3rem;
 	}
 
 	.video-container {
 		width: 100%;
 		max-width: 800px;
-		margin: 1rem 0;
-		border: 2px solid #e0e0e0;
-		border-radius: 8px;
+		aspect-ratio: 16/9;
+		border-radius: 12px;
 		overflow: hidden;
+		box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 	}
 
 	:global(.test-video-player) {
-		width: 100%;
-		height: auto;
+		border-radius: 12px;
 	}
 
-	.test-info {
-		margin-top: 3rem;
-		padding: 1.5rem;
-		background: #e8f5e8;
-		border-radius: 8px;
-		border-left: 4px solid #4caf50;
+	.features {
+		background: #f9fafb;
+		padding: 2rem;
+		border-radius: 12px;
+		border: 1px solid #e5e7eb;
 	}
 
-	.test-info ul {
+	.features ul {
 		list-style: none;
 		padding: 0;
+		margin: 0;
 	}
 
-	.test-info li {
-		margin: 0.5rem 0;
-		padding-left: 1rem;
+	.features li {
+		padding: 0.5rem 0;
+		font-size: 1rem;
+		color: #374151;
 	}
 
 	@media (max-width: 768px) {
@@ -175,16 +119,12 @@
 			padding: 1rem;
 		}
 
-		.video-section {
-			padding: 1rem;
-		}
-
 		h1 {
-			font-size: 1.5rem;
+			font-size: 2rem;
 		}
 
-		h2 {
-			font-size: 1.25rem;
+		.video-container {
+			max-width: 100%;
 		}
 	}
 </style> 

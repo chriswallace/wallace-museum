@@ -314,6 +314,10 @@
 		font-family: 'europa', sans-serif;
 		margin-bottom: 0.75rem;
 		color: #fff;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.artwork-edition {

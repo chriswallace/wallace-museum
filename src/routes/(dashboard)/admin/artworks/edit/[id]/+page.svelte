@@ -311,8 +311,9 @@
 									<track kind="captions" />
 								</video>
 							{:else if artwork.mime === 'text/html' || artwork.mime === 'application/javascript' || artwork.generatorUrl}
+								{@const url = artwork.animationUrl || artwork.generatorUrl || undefined}
 								<iframe 
-									src={ipfsToHttpUrlForHtml((artwork.animationUrl ?? artwork.generatorUrl) ?? '', artwork.mime)} 
+									src={ipfsToHttpUrlForHtml(url, artwork.mime)} 
 									title="Interactive Artwork"
 									class="media-content"
 									width={artwork.dimensions?.width || 800}
