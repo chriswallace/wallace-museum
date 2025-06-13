@@ -121,8 +121,6 @@
 								<OptimizedImage
 									src={artwork.imageUrl}
 									alt={artwork.title}
-									width={800}
-									height={800}
 									fit="contain"
 									format="auto"
 									quality={70}
@@ -240,8 +238,6 @@
 
 	:global(.thumbnail-image) {
 		@apply w-full h-full object-contain;
-		width: 100% !important;
-		height: 100% !important;
 	}
 
 	.thumbnail-placeholder {
