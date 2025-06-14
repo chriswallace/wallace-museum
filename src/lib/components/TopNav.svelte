@@ -243,38 +243,30 @@
 		top: calc(-1 * env(safe-area-inset-top));
 		/* Adjust height to include the status bar area */
 		height: calc(var(--navbar-height) + env(safe-area-inset-top));
-		/* Extend padding to cover the entire area including status bar */
+		/* Add padding to push content down to original position */
 		padding-top: env(safe-area-inset-top);
 	}
 
-	/* Adjust mobile nav for PWA iOS */
+	/* Mobile nav positioning remains the same */
 	.top-nav.pwa-ios .mobile-nav {
-		/* Remove extra padding since parent now handles it */
-		padding-top: 0;
 		height: var(--navbar-height);
+		/* Content positioned normally within the padded area */
 	}
 
-	/* Adjust desktop nav for PWA iOS */
+	/* Desktop nav positioning remains the same */
 	.top-nav.pwa-ios .desktop-nav {
-		/* Remove extra padding since parent now handles it */
-		padding-top: 0;
 		height: var(--navbar-height);
+		/* Content positioned normally within the padded area */
 	}
 
 	.top-nav.pwa-ios .page-logo {
-		/* Adjust logo position for status bar */
+		/* Logo positioned normally within the padded area */
 		height: var(--navbar-height);
-		padding-top: 0;
-		/* Position relative to the navbar content area */
-		top: env(safe-area-inset-top);
 	}
 
 	.top-nav.pwa-ios .nav-container {
-		/* Adjust nav container for status bar */
+		/* Nav container positioned normally within the padded area */
 		height: var(--navbar-height);
-		padding-top: 0;
-		/* Position relative to the navbar content area */
-		margin-top: env(safe-area-inset-top);
 	}
 
 	.top-nav.pwa-ios .nav-center {
