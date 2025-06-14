@@ -96,10 +96,6 @@
 	// Add tab state for filtering
 	let activeTab: 'owned' | 'created' = 'owned'; // Changed from 'all' to default to 'owned'
 
-	// Debug mode for skeleton loading
-	let debugSkeletonMode = false;
-	let showDebugControls = true;
-
 	// Debounced search functionality
 	let searchTimeout: NodeJS.Timeout;
 	const SEARCH_DEBOUNCE_MS = 300; // 300ms debounce delay
@@ -194,11 +190,7 @@
 
 	// Search indexed artworks
 	async function searchArtworks(reset = false) {
-		// Don't clear results immediately on reset to prevent interface flashing
-		if (reset) {
-			currentOffset = 0;
-			// Only clear results after new ones are loaded
-		}
+		if (isSearching) return;
 
 		isSearching = true;
 
@@ -213,48 +205,21 @@
 			const response = await fetch(`/api/admin/search?${params}`);
 			const data = await response.json();
 
-			if (data.error) {
-				console.error('Search error:', data.error);
-				return;
+			if (!response.ok) {
+				throw new Error(data.error || 'Search failed');
 			}
 
-			const newResults = data.results || [];
-			
-			// Detect MIME types for the new results to properly display videos vs images
-			if (newResults.length > 0) {
-				try {
-					const mimeResponse = await fetch('/api/admin/detect-mime', {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json'
-						},
-						body: JSON.stringify({
-							artworks: newResults.map((artwork: ExtendedArtwork) => ({
-								id: artwork.id,
-								image_url: artwork.image_url,
-								animation_url: artwork.animation_url,
-								thumbnailUrl: artwork.thumbnailUrl
-							}))
-						})
-					});
+			let newResults = data.results || [];
 
-					if (mimeResponse.ok) {
-						const mimeData = await mimeResponse.json();
-						const mimeMap = new Map(mimeData.results.map((result: any) => [result.id, result.mime]));
-						
-						// Update the results with detected MIME types by creating new objects
-						for (let i = 0; i < newResults.length; i++) {
-							const artwork = newResults[i];
-							const detectedMime = mimeMap.get(artwork.id);
-							if (detectedMime) {
-								newResults[i] = { ...artwork, mime: detectedMime };
-							}
-						}
-					}
-				} catch (mimeError) {
-					console.warn('Failed to detect MIME types:', mimeError);
-					// Continue without MIME types - the UI will fall back to URL-based detection
-				}
+			// Log MIME type information from API results
+			const mimeTypeStats = newResults.reduce((acc: Record<string, number>, artwork: any) => {
+				const mimeType = artwork.mime || 'unknown';
+				acc[mimeType] = (acc[mimeType] || 0) + 1;
+				return acc;
+			}, {});
+			
+			if (Object.keys(mimeTypeStats).length > 0) {
+				console.log('[ImportPage] MIME types from search API:', mimeTypeStats);
 			}
 
 			if (reset) {
@@ -812,7 +777,7 @@
 					</button>
 					<!-- New Index All Artworks Button -->
 					<button
-						class="save button py-2 px-4"
+						class="secondary button py-2 px-4"
 						on:click={() => runIndexer(false)}
 						disabled={isIndexing}
 					>
@@ -876,36 +841,11 @@
 					</span>
 				</button>
 			</div>
-
-			{#if showDebugControls}
-				<div>
-					<h3 class="font-medium text-lg mb-2">Debug Controls</h3>
-					<div class="flex gap-3 flex-wrap">
-						<button
-							class="secondary button py-2 px-4 {debugSkeletonMode ? 'bg-yellow-100 border-yellow-300 text-yellow-800 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-200' : ''}"
-							on:click={() => (debugSkeletonMode = !debugSkeletonMode)}
-						>
-							{debugSkeletonMode ? '🔍 Disable' : '🔍 Enable'} Skeleton Debug Mode
-						</button>
-						{#if debugSkeletonMode}
-							<span class="text-sm text-yellow-600 dark:text-yellow-400 flex items-center">
-								⚠️ Debug active - all images show skeleton loaders
-							</span>
-						{/if}
-					</div>
-					<div class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-						<strong>Skeleton Debug Mode:</strong> Forces all images to show skeleton loaders by setting empty src URLs. 
-						This lets you see exactly how the skeleton loading will look during real loading states.
-					</div>
-				</div>
-			{/if}
 		</div>
 	{/if}
 
 	<!-- Search & Controls -->
-	<div
-		class="bg-white dark:bg-gray-800 p-4 rounded-md shadow-sm mb-6 flex flex-col md:flex-row md:items-end gap-4 border border-gray-200 dark:border-gray-700"
-	>
+	<div class="mb-2 flex items-end gap-4">
 		<div class="flex-1 flex flex-col">
 			<label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
 				>Search</label
@@ -934,7 +874,7 @@
 				/>
 			</div>
 		</div>
-		<div class="flex gap-2 md:gap-4 items-end">
+		<div class="flex-shrink-0">
 			<button
 				class="primary button py-2 px-6 h-11"
 				on:click={() => searchArtworks(true)}
@@ -944,10 +884,10 @@
 	</div>
 
 	<!-- Filter Tabs -->
-	<div class="bg-white dark:bg-gray-800 p-4 rounded-md shadow-sm mb-6 border border-gray-200 dark:border-gray-700">
+	<div class="mb-8">
 		<div class="flex border-b border-gray-200 dark:border-gray-700">
 			<button
-				class="flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'owned'
+				class="px-4 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'owned'
 					? 'border-yellow-400 text-gray-900 dark:text-yellow-400'
 					: 'border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-yellow-300'}"
 				on:click={() => handleTabChange('owned')}
@@ -955,20 +895,13 @@
 				Owned by Me
 			</button>
 			<button
-				class="flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'created'
+				class="px-4 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'created'
 					? 'border-yellow-400 text-gray-900 dark:text-yellow-400'
 					: 'border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-yellow-300'}"
 				on:click={() => handleTabChange('created')}
 			>
 				Created by Me
 			</button>
-		</div>
-		<div class="mt-3 text-sm text-gray-600 dark:text-gray-400">
-			{#if activeTab === 'owned'}
-				Showing NFTs owned by your wallet addresses (excluding those you created)
-			{:else if activeTab === 'created'}
-				Showing NFTs where the creator address matches one of your wallet addresses
-			{/if}
 		</div>
 	</div>
 
@@ -989,7 +922,7 @@
 			<div class="mb-4 flex justify-between items-center">
 				<div class="text-gray-600 dark:text-gray-400">
 					Found {totalResults} result{totalResults !== 1 ? 's' : ''} 
-					<button class="secondary button py-2 px-4 h-11" on:click={toggleSelectAll}>
+					<button class="secondary button ml-4" on:click={toggleSelectAll}>
 						{selectAllText}
 					</button>
 				</div>
@@ -1059,7 +992,6 @@
 				selectedIds={$selectedIdsStore}
 				onToggleSelection={toggleSelection}
 				{canSelect}
-				{debugSkeletonMode}
 				{viewMode}
 				{selectAllChecked}
 				onToggleSelectAll={toggleSelectAll}

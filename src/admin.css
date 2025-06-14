@@ -215,7 +215,7 @@
 	}
 
 	.secondary {
-		@apply bg-transparent border border-gray-400 dark:border-gray-500 text-gray-600 dark:text-gray-300;
+		@apply bg-transparent border border-gray-400 dark:border-transparent text-gray-600 dark:text-gray-300 rounded-sm;
 	}
 
 	.secondary:hover {

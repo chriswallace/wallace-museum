@@ -290,7 +290,15 @@
 	}
 
 	.edit-form {
-		@apply pb-24 sm:grid sm:grid-cols-2 sm:gap-8;
+		padding-bottom: 6rem;
+	}
+
+	@media (min-width: 640px) {
+		.edit-form {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 2rem;
+		}
 	}
 
 	.artwork {

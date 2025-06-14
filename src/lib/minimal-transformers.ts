@@ -180,6 +180,8 @@ export class MinimalNFTTransformer {
           console.log(`[MinimalNFTTransformer] Detected MIME type: ${mime} for ${contractAddress}:${tokenId}`);
         }
       }
+    } else {
+      console.log(`[MinimalNFTTransformer] Using provided MIME type: ${mime} for OpenSea NFT ${contractAddress}:${tokenId}`);
     }
     
     const symbol = nft.symbol;
@@ -390,8 +392,10 @@ export class MinimalNFTTransformer {
       };
     }
     
-    const tokenStandard = 'FA2'; // Tezos standard
-    let mime = enhancedFields.mime || actualToken.mime;
+    // Enhanced MIME type handling for Tezos
+    // IMPORTANT: Prioritize token.mime from the API over enhanced field processing
+    // The Tezos API provides accurate MIME types that should not be overridden
+    let mime = actualToken.mime || enhancedFields.mime;
     
     // If no MIME type is available, detect it from the best media URL
     if (!mime) {
@@ -403,6 +407,8 @@ export class MinimalNFTTransformer {
           console.log(`[MinimalNFTTransformer] Detected MIME type: ${mime} for ${contractAddress}:${tokenId}`);
         }
       }
+    } else {
+      console.log(`[MinimalNFTTransformer] Using provided MIME type: ${mime} for Tezos token ${contractAddress}:${tokenId}`);
     }
     
     const symbol = actualToken.symbol || actualToken.fa?.symbol;
@@ -420,7 +426,7 @@ export class MinimalNFTTransformer {
       animationUrl,
       generatorUrl,
       metadataUrl,
-      tokenStandard,
+      tokenStandard: 'FA2', // Tezos standard
       mime,
       symbol,
       supply,

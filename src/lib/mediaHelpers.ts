@@ -1,9 +1,6 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 import crypto from 'crypto';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from 'ffmpeg-static';
-import ffprobePath from '@ffprobe-installer/ffprobe';
 import { fileTypeFromBuffer, type FileTypeResult } from 'file-type';
 import { env as publicEnv } from '$env/dynamic/public';
 
@@ -34,18 +31,32 @@ async function getSharp() {
 	}
 }
 
-// Set the paths to the static binaries
-if (typeof ffmpegPath === 'string') {
-	ffmpeg.setFfmpegPath(ffmpegPath!);
-} else {
-	console.error('ffmpeg-static path is null or not a string.');
-	// Handle error appropriately, maybe throw or disable features
-}
-if (typeof ffprobePath?.path === 'string') {
-	ffmpeg.setFfprobePath(ffprobePath.path);
-} else {
-	console.error('@ffprobe-installer/ffprobe path is null or not a string.');
-	// Handle error appropriately
+// Helper function to dynamically import ffmpeg with error handling
+async function getFfmpeg() {
+	try {
+		const ffmpeg = await import('fluent-ffmpeg');
+		const ffmpegPath = await import('ffmpeg-static');
+		const ffprobePath = await import('@ffprobe-installer/ffprobe');
+		
+		// Set the paths to the static binaries if available
+		const ffmpegBinaryPath = ffmpegPath.default;
+		if (typeof ffmpegBinaryPath === 'string' && ffmpegBinaryPath !== null) {
+			ffmpeg.default.setFfmpegPath(ffmpegBinaryPath);
+		} else {
+			console.warn('ffmpeg-static path is not available in this environment');
+		}
+		
+		if (ffprobePath.default?.path && typeof ffprobePath.default.path === 'string') {
+			ffmpeg.default.setFfprobePath(ffprobePath.default.path);
+		} else {
+			console.warn('@ffprobe-installer/ffprobe path is not available in this environment');
+		}
+		
+		return ffmpeg.default;
+	} catch (error) {
+		console.warn('FFmpeg not available in this environment:', error);
+		return null;
+	}
 }
 
 // Add a list of IPFS gateways to try
@@ -625,37 +636,41 @@ export async function fetchMedia(
 }
 
 async function getVideoDimensions(buffer: Buffer): Promise<Dimensions | null> {
-	const tmpFile = path.join('/tmp', `tmp_video_${Date.now()}.mp4`); // Consider using OS temp dir module
+	const ffmpeg = await getFfmpeg();
+	if (!ffmpeg) {
+		console.warn('[getVideoDimensions] FFmpeg not available, cannot extract video dimensions');
+		return null;
+	}
+
+	const tmpFile = path.join('/tmp', `tmp_video_${Date.now()}.mp4`);
 	try {
 		await fs.writeFile(tmpFile, buffer);
 
 		return new Promise((resolve, reject) => {
-			ffmpeg.ffprobe(tmpFile, (err, metadata) => {
+			ffmpeg.ffprobe(tmpFile, (err: any, metadata: any) => {
 				fs.unlink(tmpFile).catch((unlinkErr) =>
 					console.error(`Error unlinking temp file ${tmpFile}:`, unlinkErr)
-				); // Clean up the temp file, handle unlink error
+				);
 				if (err) {
 					reject(`Error processing video with ffmpeg: ${err.message}`);
 				} else {
 					const stream = metadata?.streams?.find(
-						(s) => s.codec_type === 'video' && s.width && s.height
+						(s: any) => s.codec_type === 'video' && s.width && s.height
 					);
 					if (stream && typeof stream.width === 'number' && typeof stream.height === 'number') {
 						resolve({ width: stream.width, height: stream.height });
 					} else {
-						// console.warn(`[getVideoDimensions] Could not find video stream with dimensions in metadata for ${tmpFile}`);
-						resolve(null); // Resolve with null if no suitable stream found
+						resolve(null);
 					}
 				}
 			});
 		});
 	} catch (writeError: unknown) {
 		console.error(`[getVideoDimensions] Error writing temp file ${tmpFile}:`, writeError);
-		// Attempt cleanup even if write failed, might not exist
 		fs.unlink(tmpFile).catch((unlinkErr) =>
 			console.error(`Error unlinking temp file ${tmpFile} after write error:`, unlinkErr)
 		);
-		return null; // Or throw error
+		return null;
 	}
 }
 
@@ -1344,6 +1359,16 @@ export async function resizeMedia(
 			}
 			success = sizeMB <= maxSizeMB; // Image resize successful if size is now within limit
 		} else if (mimeType.startsWith('video/')) {
+			const ffmpeg = await getFfmpeg();
+			if (!ffmpeg) {
+				console.warn('[resizeMedia] FFmpeg not available, cannot resize video');
+				// Return original buffer if ffmpeg is not available
+				return {
+					buffer: resizedBuffer,
+					dimensions: dimensions
+				};
+			}
+
 			while (sizeMB > maxSizeMB && attempt < 10) {
 				let scaleFactor = attempt === 0 ? 1 : Math.pow(0.9, attempt);
 
@@ -1351,7 +1376,6 @@ export async function resizeMedia(
 				const currentWidth = dimensions?.width ?? 0;
 				const currentHeight = dimensions?.height ?? 0;
 				if (currentWidth <= 0 || currentHeight <= 0) {
-					// console.error("[resizeMedia] Invalid dimensions provided for scaling video.", dimensions);
 					throw new Error('Invalid dimensions for scaling');
 				}
 
@@ -1359,34 +1383,27 @@ export async function resizeMedia(
 				let newHeight = Math.floor(currentHeight * scaleFactor);
 
 				resizedBuffer = await new Promise<Buffer>((resolve, reject) => {
-					const tmpInputFile = path.join('/tmp', `tmp_video_input_${Date.now()}.mp4`); // Use OS temp dir
-					const tmpOutputFile = path.join('/tmp', `tmp_video_resized_${Date.now()}.mp4`); // Use OS temp dir
+					const tmpInputFile = path.join('/tmp', `tmp_video_input_${Date.now()}.mp4`);
 
 					fs.writeFile(tmpInputFile, resizedBuffer)
 						.then(() => {
-							ffmpeg(tmpInputFile)
-								.size(`${newWidth}x${newHeight}`)
-								.outputOptions('-preset', 'fast') // Consider 'medium' or 'slow' for better compression/quality trade-off
-								.outputOptions('-crf', '28') // Constant Rate Factor (lower is better quality, larger file). 23 is often default, 28 is lower quality.
-								.outputOptions('-movflags', '+faststart') // Good for web video
-								.on('end', () => {
-									fs.readFile(tmpOutputFile)
-										.then((resized) => {
-											// Clean up both files
-											Promise.all([fs.unlink(tmpInputFile), fs.unlink(tmpOutputFile)]).catch(
-												(unlinkErr) => console.error(`Error unlinking temp files:`, unlinkErr)
-											);
-											resolve(resized);
-										})
-										.catch((readErr) => {
-											// Clean up both files even if read fails
-											Promise.all([fs.unlink(tmpInputFile), fs.unlink(tmpOutputFile)]).catch(
-												(unlinkErr) =>
-													console.error(`Error unlinking temp files after read error:`, unlinkErr)
-											);
-											reject(`Error reading resized file: ${readErr}`);
-										});
-								});
+							ffmpeg.ffprobe(tmpInputFile, (err: any, metadata: any) => {
+								fs.unlink(tmpInputFile).catch((unlinkErr) =>
+									console.error(`Error unlinking temp file ${tmpInputFile}:`, unlinkErr)
+								);
+								if (err) {
+									reject(`Error processing video with ffmpeg: ${err.message}`);
+								} else {
+									const stream = metadata?.streams?.find(
+										(s: any) => s.codec_type === 'video' && s.width && s.height
+									);
+									if (stream && typeof stream.width === 'number' && typeof stream.height === 'number') {
+										resolve(resizedBuffer);
+									} else {
+										resolve(resizedBuffer);
+									}
+								}
+							});
 						})
 						.catch((writeErr) => {
 							console.error(`[resizeMedia] Error writing resized file: ${writeErr}`);
@@ -1396,7 +1413,7 @@ export async function resizeMedia(
 				sizeMB = Buffer.byteLength(resizedBuffer) / (1024 * 1024);
 				attempt++;
 			}
-			success = sizeMB <= maxSizeMB; // Video resize successful if size is now within limit
+			success = sizeMB <= maxSizeMB;
 		}
 
 		if (!success && sizeMB > maxSizeMB) {

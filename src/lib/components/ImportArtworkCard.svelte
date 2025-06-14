@@ -2,8 +2,6 @@
 	import OptimizedImage from './OptimizedImage.svelte';
 	import ArtistNameWithAvatar from './ArtistNameWithAvatar.svelte';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
-	import { getBestMediaUrl, getMediaDisplayType } from '$lib/utils/mediaHelpers';
-	import type { MediaUrls } from '$lib/utils/mediaHelpers';
 
 	// Extended artwork type for import functionality
 	export let artwork: {
@@ -51,34 +49,35 @@
 	export let debugSkeletonMode = false;
 	export let viewMode: 'grid' | 'list' = 'grid';
 
-	// Use centralized media handling utilities
-	$: mediaUrls = {
-		generatorUrl: null, // Import cards typically don't have generator URLs
-		animationUrl: getArtworkAnimationUrl(artwork),
-		imageUrl: getArtworkImageUrl(artwork),
-		thumbnailUrl: artwork.thumbnailUrl || artwork.thumbnail_uri
-	} as MediaUrls;
-
-	$: bestMediaForThumbnail = getBestMediaUrl(mediaUrls, 'thumbnail', artwork.mime);
-	$: bestMediaForFullsize = getBestMediaUrl(mediaUrls, 'fullscreen', artwork.mime);
-	$: thumbnailDisplayType = getMediaDisplayType(bestMediaForThumbnail, artwork.mime);
-	$: fullsizeDisplayType = getMediaDisplayType(bestMediaForFullsize, artwork.mime);
+	// Simplified media URL resolution - prioritize thumbnails for grid display
+	$: displayImageUrl = getDisplayImageUrl();
+	$: displayAnimationUrl = getDisplayAnimationUrl();
+	$: shouldShowVideo = shouldDisplayAsVideo();
 
 	// Helper functions
-	function getArtworkImageUrl(artwork: any): string {
-		return artwork.image_url || 
-			   artwork.imageUrl || 
-			   artwork.display_uri || 
-			   artwork.displayUrl || 
-			   '';
+	function getDisplayImageUrl(): string {
+		// For grid display, prioritize thumbnail URLs for better performance
+		const candidates = [
+			artwork.thumbnailUrl,
+			artwork.thumbnail_uri,
+			artwork.image_url,
+			artwork.imageUrl,
+			artwork.display_uri,
+			artwork.displayUrl
+		].filter(Boolean);
+		
+		return candidates.length > 0 ? ipfsToHttpUrl(candidates[0]!) : '';
 	}
 
-	function getArtworkAnimationUrl(artwork: any): string {
-		return artwork.animation_url || 
-			   artwork.animationUrl || 
-			   artwork.artifact_uri || 
-			   artwork.artifactUrl || 
-			   '';
+	function getDisplayAnimationUrl(): string {
+		const candidates = [
+			artwork.animation_url,
+			artwork.animationUrl,
+			artwork.artifact_uri,
+			artwork.artifactUrl
+		].filter(Boolean);
+		
+		return candidates.length > 0 ? ipfsToHttpUrl(candidates[0]!) : '';
 	}
 
 	function getArtworkTitle(artwork: any): string {
@@ -98,8 +97,8 @@
 	}
 
 	function hasIpfsContent(artwork: any): boolean {
-		const imageUrl = getArtworkImageUrl(artwork);
-		const animationUrl = getArtworkAnimationUrl(artwork);
+		const imageUrl = getDisplayImageUrl();
+		const animationUrl = getDisplayAnimationUrl();
 		return imageUrl.includes('ipfs://') || imageUrl.includes('/ipfs/') ||
 			   animationUrl.includes('ipfs://') || animationUrl.includes('/ipfs/');
 	}
@@ -114,8 +113,10 @@
 	}
 
 	function handleImageError(event: Event) {
-		const img = event.currentTarget as HTMLImageElement;
-		img.src = '/images/medici-image.png';
+		const target = event.currentTarget as HTMLImageElement | HTMLVideoElement;
+		if (target instanceof HTMLImageElement) {
+			target.src = '/images/medici-image.png';
+		}
 	}
 
 	function handleClick() {
@@ -124,16 +125,29 @@
 		}
 	}
 
-	// Get the appropriate media URL for display
-	function getDisplayMediaUrl(context: 'thumbnail' | 'fullsize' = 'thumbnail'): string {
-		const mediaResult = context === 'thumbnail' ? bestMediaForThumbnail : bestMediaForFullsize;
-		return mediaResult?.url ? ipfsToHttpUrl(mediaResult.url) : '';
+	// Simplified video detection based on MIME type and URL patterns
+	function shouldDisplayAsVideo(): boolean {
+		// First check MIME type if available (most reliable)
+		if (artwork.mime) {
+			console.log(`[ImportArtworkCard] Using MIME type for media detection: ${artwork.mime} (${getArtworkTitle(artwork)})`);
+			return artwork.mime.startsWith('video/');
+		}
+		
+		// Fallback to URL-based detection for animation_url
+		if (displayAnimationUrl) {
+			const isVideoUrl = /\.(mp4|webm|mov|avi|ogv|m4v|3gp|flv|wmv|mkv)(\?.*)?$/i.test(displayAnimationUrl);
+			if (isVideoUrl) {
+				console.log(`[ImportArtworkCard] Detected video from animation URL pattern: ${displayAnimationUrl}`);
+				return true;
+			}
+		}
+		
+		return false;
 	}
 
-	// Determine if we should display as video
-	function shouldDisplayAsVideo(context: 'thumbnail' | 'fullsize' = 'thumbnail'): boolean {
-		const displayType = context === 'thumbnail' ? thumbnailDisplayType : fullsizeDisplayType;
-		return displayType === 'video';
+	// Get the best URL for display based on context
+	function getMediaUrl(): string {
+		return shouldShowVideo ? displayAnimationUrl : displayImageUrl;
 	}
 </script>
 
@@ -141,76 +155,86 @@
 	<!-- Grid View Card -->
 	<!-- svelte-ignore a11y-click-events-have-key-events -->
 	<div
-		class="grid-item group bg-white dark:bg-gray-800 rounded-sm shadow-sm overflow-hidden transition-all duration-200"
+		class="grid-item group bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden transition-all duration-200 border border-gray-200 dark:border-gray-700"
 		class:opacity-50={artwork.isImported}
 		class:cursor-not-allowed={artwork.isImported}
 		class:cursor-pointer={!artwork.isImported}
-		class:hover:shadow-lg={!artwork.isImported}
+		class:hover:shadow-md={!artwork.isImported}
+		class:hover:scale-[1.02]={!artwork.isImported}
 		class:selected={isSelected && !artwork.isImported}
 		on:click={handleClick}
 		role="button"
 		tabindex={canSelect ? 0 : -1}
 	>
-		<div class="relative">
+		<div class="relative aspect-square bg-gray-50 dark:bg-gray-900">
 			{#if debugSkeletonMode}
-				<!-- Debug skeleton mode - show empty OptimizedImage -->
+				<!-- Debug skeleton mode -->
 				<OptimizedImage
 					src=""
 					alt={getArtworkTitle(artwork)}
-					width={80}
-					height={artwork.dimensions ? Math.round((80 * artwork.dimensions.height) / artwork.dimensions.width) : 80}
+					width={300}
+					height={300}
 					format="auto"
 					quality={80}
-					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
+					aspectRatio="1/1"
 					showSkeleton={true}
 					skeletonBorderRadius="0px"
-					className="w-full h-auto object-contain rounded-t-sm"
+					className="w-full h-full object-cover"
 					fallbackSrc="/images/medici-image.png"
 					loading="lazy"
 					on:error={handleImageError}
 				/>
-			{:else if shouldDisplayAsVideo()}
-				<!-- Video display without controls -->
+			{:else if shouldShowVideo && displayAnimationUrl}
+				<!-- Video display optimized for grid -->
 				<video
-					src={getDisplayMediaUrl()}
-					class="w-full h-auto object-contain rounded-t-sm"
-					style="aspect-ratio: {artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'};"
-					width={artwork.dimensions?.width || 300}
-					height={artwork.dimensions?.height || 300}
+					src={displayAnimationUrl}
+					class="w-full h-full object-cover"
+					width="300"
+					height="300"
 					autoplay
 					loop
 					muted
 					playsinline
+					preload="metadata"
 					on:error={handleImageError}
 				>
 					<track kind="captions" />
 					Your browser does not support the video tag.
 				</video>
-			{:else}
-				<!-- Image display -->
+			{:else if displayImageUrl}
+				<!-- Image display optimized for grid -->
 				<OptimizedImage
-					src={artwork.image_url}
-					alt={artwork.title}
-					width={artwork.dimensions?.width || 300}
-					height={artwork.dimensions?.height || 300}
-					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
-					fit="contain"
+					src={displayImageUrl}
+					alt={getArtworkTitle(artwork)}
+					width={300}
+					height={300}
+					aspectRatio="1/1"
+					fit="cover"
 					format="auto"
 					quality={85}
-					className="w-full h-auto max-w-full"
+					className="w-full h-full object-cover"
 					fallbackSrc="/images/medici-image.png"
+					loading="lazy"
+					on:error={handleImageError}
 				/>
+			{:else}
+				<!-- Fallback placeholder -->
+				<div class="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+					<svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+					</svg>
+				</div>
 			{/if}
 
 			<!-- Selection indicator -->
 			{#if isSelected}
 				<div
-					class="absolute top-3 right-3 bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-xl border-4 border-white dark:border-gray-800 z-20"
+					class="absolute top-2 right-2 bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800 z-20"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						width="20"
-						height="20"
+						width="14"
+						height="14"
 						viewBox="0 0 24 24"
 						fill="none"
 						stroke="currentColor"
@@ -224,7 +248,7 @@
 			{:else if !artwork.isImported}
 				<!-- Unselected state indicator (shows on hover) -->
 				<div
-					class="absolute top-3 right-3 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-full w-8 h-8 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-70 transition-all duration-200 z-20"
+					class="absolute top-2 right-2 bg-white dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-500 rounded-full w-6 h-6 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-70 transition-all duration-200 z-20"
 				>
 					<!-- Empty circle for unselected state -->
 				</div>
@@ -233,13 +257,13 @@
 			<!-- Imported indicator -->
 			{#if artwork.isImported}
 				<div
-					class="absolute top-3 left-3 bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-xl border-2 border-white dark:border-gray-800 z-20"
+					class="absolute top-2 left-2 bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800 z-20"
 					title="Already imported"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						width="18"
-						height="18"
+						width="14"
+						height="14"
 						viewBox="0 0 24 24"
 						fill="none"
 						stroke="currentColor"
@@ -255,20 +279,30 @@
 			<!-- IPFS indicator -->
 			{#if hasIpfsContent(artwork)}
 				<div
-					class="absolute bottom-3 right-3 bg-purple-600 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800 z-10"
+					class="absolute bottom-2 right-2 bg-purple-600 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-lg border border-white dark:border-gray-800 z-10"
 					title="Contains IPFS content"
 				>
-					<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+					<svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
 						<path
 							d="M12 2L4 6V12C4 15.31 7.58 18.5 12 20C16.42 18.5 20 15.31 20 12V6L12 2Z"
 						/>
 					</svg>
 				</div>
 			{/if}
+
+			<!-- Video indicator -->
+			{#if shouldShowVideo}
+				<div
+					class="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white rounded px-1.5 py-0.5 text-xs font-medium"
+					title="Video content"
+				>
+					VIDEO
+				</div>
+			{/if}
 		</div>
 		
 		<div class="p-3">
-			<h3 class="font-medium text-base dark:text-gray-100" title={getArtworkTitle(artwork)} style="word-break: break-word; white-space: normal; overflow-wrap: break-word; hyphens: auto;">
+			<h3 class="font-medium text-sm dark:text-gray-100 line-clamp-2 mb-1" title={getArtworkTitle(artwork)}>
 				{getArtworkTitle(artwork)}
 			</h3>
 
@@ -280,11 +314,11 @@
 				<div class="space-y-1">
 					<!-- Collection name -->
 					{#if collectionInfo}
-						<div class="font-medium text-sm">
+						<div class="text-xs text-gray-600 dark:text-gray-400 truncate">
 							{collectionInfo.title || 'Unknown Collection'}
 						</div>
 					{:else}
-						<div class="font-medium text-sm">
+						<div class="text-xs text-gray-600 dark:text-gray-400 truncate">
 							{getContractName(artwork)}
 						</div>
 					{/if}
@@ -312,9 +346,9 @@
 			{/if}
 
 			{#if getBlockchain(artwork)}
-				<div class="mt-1">
+				<div class="mt-2">
 					<span
-						class="blockchain-badge px-2 py-1 text-xs font-semibold rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+						class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
 					>
 						{getBlockchain(artwork)}
 					</span>
@@ -351,144 +385,126 @@
 			{/if}
 		</td>
 		<td class="p-3 w-16">
-			<div class="w-12 h-12 overflow-hidden rounded-sm">
-				<div class="relative">
-					{#if debugSkeletonMode}
-						<!-- Debug skeleton mode -->
-						<OptimizedImage
-							src=""
-							alt={getArtworkTitle(artwork)}
-							width={48}
-							height={48}
-							fit="cover"
-							format="auto"
-							quality={80}
-							aspectRatio="1/1"
-							showSkeleton={true}
-							skeletonBorderRadius="6px"
-							className="w-full h-full object-cover"
-							fallbackSrc="/images/medici-image.png"
-							loading="lazy"
-							on:error={handleImageError}
-						/>
-					{:else if shouldDisplayAsVideo()}
-						<!-- Video thumbnail without controls -->
-						<video
-							src={getDisplayMediaUrl()}
-							class="w-full h-full object-cover"
-							width="48"
-							height="48"
-							autoplay
-							loop
-							muted
-							playsinline
-							on:error={handleImageError}
-						>
-							<track kind="captions" />
-							Your browser does not support the video tag.
-						</video>
-					{:else}
-						<!-- Image thumbnail -->
-						<OptimizedImage
-							src={artwork.image_url}
-							alt={artwork.title}
-							width={artwork.dimensions?.width || 300}
-							height={artwork.dimensions?.height || 300}
-							aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
-							fit="contain"
-							format="auto"
-							quality={85}
-							className="w-full h-auto max-w-full"
-							fallbackSrc="/images/medici-image.png"
-						/>
-					{/if}
-				</div>
+			<div class="w-12 h-12 overflow-hidden rounded-md bg-gray-50 dark:bg-gray-900">
+				{#if debugSkeletonMode}
+					<!-- Debug skeleton mode -->
+					<OptimizedImage
+						src=""
+						alt={getArtworkTitle(artwork)}
+						width={48}
+						height={48}
+						fit="cover"
+						format="auto"
+						quality={80}
+						aspectRatio="1/1"
+						showSkeleton={true}
+						skeletonBorderRadius="6px"
+						className="w-full h-full object-cover"
+						fallbackSrc="/images/medici-image.png"
+						loading="lazy"
+						on:error={handleImageError}
+					/>
+				{:else if shouldShowVideo && displayAnimationUrl}
+					<!-- Video thumbnail -->
+					<video
+						src={displayAnimationUrl}
+						class="w-full h-full object-cover"
+						width="48"
+						height="48"
+						autoplay
+						loop
+						muted
+						playsinline
+						preload="metadata"
+						on:error={handleImageError}
+					>
+						<track kind="captions" />
+						Your browser does not support the video tag.
+					</video>
+				{:else if displayImageUrl}
+					<!-- Image thumbnail -->
+					<OptimizedImage
+						src={displayImageUrl}
+						alt={getArtworkTitle(artwork)}
+						width={48}
+						height={48}
+						aspectRatio="1/1"
+						fit="cover"
+						format="auto"
+						quality={85}
+						className="w-full h-full object-cover"
+						fallbackSrc="/images/medici-image.png"
+						loading="lazy"
+						on:error={handleImageError}
+					/>
+				{:else}
+					<!-- Fallback placeholder -->
+					<div class="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+						<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+						</svg>
+					</div>
+				{/if}
 			</div>
 		</td>
 		<td class="p-3">
-			<div class="font-medium dark:text-gray-100" style="word-break: break-word; white-space: normal; overflow-wrap: break-word; hyphens: auto;">{getArtworkTitle(artwork)}</div>
+			<div class="font-medium dark:text-gray-100 line-clamp-1" style="word-break: break-word; white-space: normal; overflow-wrap: break-word; hyphens: auto;">{getArtworkTitle(artwork)}</div>
 			<div class="text-xs text-gray-500 dark:text-gray-400">
 				ID: {getTokenId(artwork)}
+				{#if artwork.mime}
+					<span class="ml-2 text-purple-600 dark:text-purple-400">({artwork.mime})</span>
+				{/if}
 			</div>
 		</td>
-		<td class="p-3 dark:text-gray-300">
-			<!-- Enhanced collection/artist info -->
-			{#if artwork.supportsArtistLookup}
-				{@const collectionInfo = getCollectionInfo(artwork)}
-				{@const artistInfo = getArtistInfo(artwork)}
-
-				<div class="space-y-1">
-					<!-- Collection name -->
-					{#if collectionInfo}
-						<div class="font-medium text-sm">
-							{collectionInfo.title || 'Unknown Collection'}
-						</div>
-					{:else}
-						<div class="font-medium text-sm">
-							{getContractName(artwork)}
-						</div>
-					{/if}
-
-					<!-- Artist info -->
-					{#if artistInfo}
-						<ArtistNameWithAvatar 
-							artist={{
-								name: artistInfo.name,
-								avatarUrl: artistInfo.avatarUrl
-							}}
-							size="xs"
-							showAvatar={true}
-							debugSkeletonMode={debugSkeletonMode}
-							nameClassName="text-gray-500 dark:text-gray-400"
-							prefix="by"
-						/>
-					{/if}
-				</div>
-			{:else}
-				<div class="text-xs text-gray-500 dark:text-gray-400 truncate">
-					{getContractName(artwork)}
-				</div>
-			{/if}
+		<td class="p-3">
+			<div class="text-sm dark:text-gray-300 truncate">{getContractName(artwork)}</div>
 		</td>
-		<td class="p-3 dark:text-gray-300">
+		<td class="p-3">
 			{#if getBlockchain(artwork)}
 				<span
-					class="blockchain-badge px-2 py-1 text-xs font-semibold rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+					class="inline-block px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
 				>
 					{getBlockchain(artwork)}
 				</span>
 			{/if}
 		</td>
-		<td class="p-3 dark:text-gray-300">
+		<td class="p-3">
 			{#if hasIpfsContent(artwork)}
-				<div class="flex items-center space-x-1">
-					<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="text-purple-600">
-						<path
-							d="M12 2L4 6V12C4 15.31 7.58 18.5 12 20C16.42 18.5 20 15.31 20 12V6L12 2Z"
-						/>
-					</svg>
-					<span class="text-xs">IPFS</span>
-				</div>
+				<span
+					class="inline-block px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+					title="Contains IPFS content"
+				>
+					IPFS
+				</span>
 			{:else}
-				<span class="text-xs text-gray-400">HTTP</span>
+				<span class="text-xs text-gray-500 dark:text-gray-400">HTTP</span>
 			{/if}
 		</td>
 	</tr>
 {/if}
 
-<style lang="scss">
-	.grid-item {
-		/* Remove masonry-specific styles and add grid-appropriate ones */
-		display: flex;
-		flex-direction: column;
-		height: fit-content;
+<style>
+	.grid-item.selected {
+		box-shadow: 0 0 0 2px rgb(59 130 246), 0 0 0 4px rgb(255 255 255);
 	}
-
-	.selected {
-		@apply ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900;
+	
+	@media (prefers-color-scheme: dark) {
+		.grid-item.selected {
+			box-shadow: 0 0 0 2px rgb(59 130 246), 0 0 0 4px rgb(17 24 39);
+		}
 	}
-
-	.blockchain-badge {
-		@apply inline-block;
+	
+	.line-clamp-1 {
+		display: -webkit-box;
+		-webkit-line-clamp: 1;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+	
+	.line-clamp-2 {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
 	}
 </style> 
