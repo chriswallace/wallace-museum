@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { showToast } from '$lib/toastHelper';
 	import { goto } from '$app/navigation';
+	import { cleanTwitterHandle, cleanInstagramHandle } from '$lib/utils/socialMediaUtils';
 
 	let artistId;
 	let name = '';
@@ -27,12 +28,16 @@
 			formData.append('image', fileInput.files[0]);
 		}
 
+		// Clean social media handles before submitting
+		const cleanedTwitterHandle = cleanTwitterHandle(twitterHandle);
+		const cleanedInstagramHandle = cleanInstagramHandle(instagramHandle);
+
 		// Append the rest of the form fields
 		formData.append('name', name);
 		formData.append('bio', bio);
 		formData.append('websiteUrl', websiteUrl);
-		formData.append('twitterHandle', twitterHandle);
-		formData.append('instagramHandle', instagramHandle);
+		formData.append('twitterHandle', cleanedTwitterHandle);
+		formData.append('instagramHandle', cleanedInstagramHandle);
 
 		try {
 			const response = await fetch('/api/admin/artists/create', {
@@ -87,16 +92,17 @@
 						<input type="url" id="website" name="website" bind:value={websiteUrl} />
 					</div>
 					<div class="mb-4">
-						<label for="twitterHandle">Twitter Handle</label>
-						<input type="text" id="twitterHandle" name="twitterHandle" bind:value={twitterHandle} />
+						<label for="twitterHandle">Twitter Handle (without @)</label>
+						<input type="text" id="twitterHandle" name="twitterHandle" bind:value={twitterHandle} placeholder="username" />
 					</div>
 					<div class="mb-4">
-						<label for="instagramHandle">Instagram Handle</label>
+						<label for="instagramHandle">Instagram Handle (without @)</label>
 						<input
 							type="text"
 							id="instagramHandle"
 							name="instagramHandle"
 							bind:value={instagramHandle}
+							placeholder="username"
 						/>
 					</div>
 					<div class="flex justify-between">

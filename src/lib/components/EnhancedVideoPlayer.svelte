@@ -14,7 +14,6 @@
 	export let aspectRatio: string = '16/9';
 	export let className: string = '';
 	export let style: string = '';
-	export let themeColor: string = '#3b82f6';
 
 	const dispatch = createEventDispatcher();
 
@@ -52,7 +51,7 @@
 		{muted}
 		playsinline
 		class={className}
-		style="width: {width}; height: {height}; aspect-ratio: {aspectRatio}; --video-theme-color: {themeColor}; {style}"
+		style="width: {width}; height: {height}; aspect-ratio: {aspectRatio}; {style}"
 	></video-player>
 {:else}
 	<div
@@ -72,6 +71,8 @@
 		width: 100%;
 		height: 100%;
 		border-radius: inherit;
+		/* Use white as accent color for both light and dark modes */
+		--video-theme-color: #ffffff; /* White for both modes */
 	}
 
 	.video-loading-placeholder {

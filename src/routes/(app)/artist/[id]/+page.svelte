@@ -4,6 +4,7 @@
 	import { fade, fly, scale } from 'svelte/transition';
 	import { quintOut } from 'svelte/easing';
 	import { getContractUrl, getContractName, truncateAddress } from '$lib/utils';
+	import { getTwitterUrl, getInstagramUrl, formatSocialHandle } from '$lib/utils/socialMediaUtils';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 
 	export let data: { artist?: any; error?: string };
@@ -22,11 +23,6 @@
 			month: 'long',
 			day: 'numeric'
 		}).format(date);
-	}
-
-	function formatSocialHandle(handle: string | null): string {
-		if (!handle) return '';
-		return handle.startsWith('@') ? handle : `@${handle}`;
 	}
 
 	function parseWalletAddresses(addresses: any): Array<{blockchain: string, address: string}> {
@@ -237,10 +233,10 @@
 									<li><a href={data.artist.websiteUrl} target="_blank" rel="noopener noreferrer">Website</a></li>
 								{/if}
 								{#if data.artist.twitterHandle}
-									<li><a href={data.artist.twitterHandle} target="_blank" rel="noopener noreferrer">Twitter</a></li>
+									<li><a href={getTwitterUrl(data.artist.twitterHandle)} target="_blank" rel="noopener noreferrer">Twitter {formatSocialHandle(data.artist.twitterHandle)}</a></li>
 								{/if}
 								{#if data.artist.instagramHandle}
-									<li><a href={`https://instagram.com/${data.artist.instagramHandle.replace('@', '')}`} target="_blank" rel="noopener noreferrer">Instagram {formatSocialHandle(data.artist.instagramHandle)}</a></li>
+									<li><a href={getInstagramUrl(data.artist.instagramHandle)} target="_blank" rel="noopener noreferrer">Instagram {formatSocialHandle(data.artist.instagramHandle)}</a></li>
 								{/if}
 								{#if data.artist.profileUrl}
 									<li><a href={data.artist.profileUrl} target="_blank" rel="noopener noreferrer">Profile</a></li>

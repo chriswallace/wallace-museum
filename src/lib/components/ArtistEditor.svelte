@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
+	import { cleanTwitterHandle, cleanInstagramHandle } from '$lib/utils/socialMediaUtils';
 	import OptimizedImage from './OptimizedImage.svelte';
 
 	interface Artwork {
@@ -205,7 +206,12 @@
 </script>
 
 <form
-	on:submit|preventDefault={() => updateArtist(artist)}
+	on:submit|preventDefault={() => {
+		// Clean social media handles before updating
+		artist.twitterHandle = cleanTwitterHandle(artist.twitterHandle);
+		artist.instagramHandle = cleanInstagramHandle(artist.instagramHandle);
+		updateArtist(artist);
+	}}
 	class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start"
 >
 	<div class="md:col-span-1">
@@ -290,12 +296,12 @@
 			<input type="url" id="websiteUrl" bind:value={artist.websiteUrl} />
 		</div>
 		<div class="mb-4">
-			<label for="twitterHandle">Twitter Handle</label>
-			<input type="text" id="twitterHandle" bind:value={artist.twitterHandle} />
+			<label for="twitterHandle">Twitter Handle (without @)</label>
+			<input type="text" id="twitterHandle" bind:value={artist.twitterHandle} placeholder="username" />
 		</div>
 		<div class="mb-4">
-			<label for="instagramHandle">Instagram Handle</label>
-			<input type="text" id="instagramHandle" bind:value={artist.instagramHandle} />
+			<label for="instagramHandle">Instagram Handle (without @)</label>
+			<input type="text" id="instagramHandle" bind:value={artist.instagramHandle} placeholder="username" />
 		</div>
 	</div>
 	<div class="md:col-span-3 mt-8">

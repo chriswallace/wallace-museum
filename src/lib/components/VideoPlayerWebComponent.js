@@ -135,7 +135,7 @@ class VideoPlayer extends HTMLElement {
                 }
                 .video-info {
                     position: static;
-                    padding: 0 24px;
+                    padding: 0 12px;
                     color: white;
                     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
                     margin-bottom: 12px;
@@ -143,7 +143,7 @@ class VideoPlayer extends HTMLElement {
                 
                 .video-info h2 {
                     margin: 0 0 4px;
-                    font-size: 22px;
+                    font-size: 18px;
                     font-weight: 700;
                 }
                 
@@ -207,7 +207,7 @@ class VideoPlayer extends HTMLElement {
                         opacity: 1;
                         transition: opacity 0.3s ease;
                         background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
-                        padding-bottom: 8px;
+                        padding-bottom: 4px;
                     }
                     .play-info-container {
                         display: flex;
@@ -227,7 +227,8 @@ class VideoPlayer extends HTMLElement {
                     .left-controls {
                         display: flex;
                         align-items: center;
-                        gap: 8px;
+                        gap: 4px;
+                        height: 100%;
                     }
                     .play-button {
                         position: static;
@@ -236,7 +237,7 @@ class VideoPlayer extends HTMLElement {
                     }
                     .play-button-inner {
                         display: flex;
-                        padding: 0 14px 0 24px;
+                        padding: 0 8px 0 12px;
                         height: 100%;
                         align-items: center;
                         justify-content: center;
@@ -295,10 +296,10 @@ class VideoPlayer extends HTMLElement {
                         background-color: transparent;
                         border: none;
                         color: white;
-                        padding-top: 16px;
-                        padding-bottom: 12px;
-                        padding-left: 16px;
-                        padding-right: 16px;
+                        padding-top: 8px;
+                        padding-bottom: 8px;
+                        padding-left: 8px;
+                        padding-right: 8px;
                         cursor: pointer;
                         border-radius: 4px;
                         transition: background-color 0.3s, transform 0.3s;
@@ -330,6 +331,7 @@ class VideoPlayer extends HTMLElement {
                         display: flex;
                         align-items: center;
                         gap: 0;
+                        height: 100%;
                     }   
 
                     /* Hide controls by default */
@@ -372,6 +374,8 @@ class VideoPlayer extends HTMLElement {
                     .buttons-container{
                         display: flex;
                         justify-content: space-between;
+                        align-items: center;
+                        height: 40px;
                     }
 
                     .volume-bars {
@@ -383,6 +387,7 @@ class VideoPlayer extends HTMLElement {
                         padding: 0;
                         width: calc(4px * 5);
                         cursor: pointer;
+                        margin: 0 4px;
                     }
 
                     .volume-bar {
@@ -482,16 +487,18 @@ class VideoPlayer extends HTMLElement {
                     .time-display {
                         color: white;
                         font-size: 14px;
-                        padding: 2px 12px 0;
+                        padding: 0 8px;
                         opacity: 0.9;
                         font-variant-numeric: tabular-nums;
                         display: flex;
                         align-items: center;
+                        height: 100%;
                     }
 
                     .right-controls {
                         display: flex;
                         align-items: center;
+                        height: 100%;
                     }
 
                     /* Add focus styles */
