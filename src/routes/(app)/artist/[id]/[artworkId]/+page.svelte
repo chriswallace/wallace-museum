@@ -170,9 +170,9 @@
 			case 'F':
 				// Toggle fullscreen for images and iframes
 				if (currentArtworkForDisplay && !isInBrowserFullscreen) {
-					const artworkContainer = document.querySelector('.artwork-container');
-					if (artworkContainer && artworkContainer.requestFullscreen) {
-						artworkContainer.requestFullscreen();
+					const artworkCanvas = document.querySelector('.artwork-canvas');
+					if (artworkCanvas && artworkCanvas.requestFullscreen) {
+						artworkCanvas.requestFullscreen();
 					}
 				} else if (isInBrowserFullscreen) {
 					document.exitFullscreen?.();
@@ -528,18 +528,36 @@
 	<main class="artwork-page" role="application" tabindex="0" on:keydown={handleKeyDown} on:click={() => mainContainer?.focus({ preventScroll: true })} transition:fade bind:this={mainContainer}>
 		{#if data.artist.artworks.length > 0 && currentArtwork}
 			{#key currentIndex}
-				<div class="artwork-content-container">
-					<div class="artwork-flex-container">
+				<div class="artwork-content-container" class:fullscreen={isInBrowserFullscreen}>
+					<div class="artwork-flex-container" class:fullscreen={isInBrowserFullscreen}>
 						<div class="artwork-container">
-							<div class="artwork-canvas">
-								<div class="nft-media">
+							<div class="artwork-canvas" class:fullscreen={isInBrowserFullscreen}>
+								<!-- Fullscreen close button -->
+								{#if isInBrowserFullscreen}
+									<button 
+										class="fullscreen-close-button"
+										on:click={() => document.exitFullscreen?.()}
+										aria-label="Exit fullscreen (Esc)"
+										title="Exit fullscreen (Esc)"
+									>
+										<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<line x1="18" y1="6" x2="6" y2="18"></line>
+											<line x1="6" y1="6" x2="18" y2="18"></line>
+										</svg>
+									</button>
+								{/if}
+								
+								<div class="nft-media" class:fullscreen={isInBrowserFullscreen}>
 										{#if currentArtworkForDisplay}
-											<ArtworkDisplay artwork={currentArtworkForDisplay} />
+											<ArtworkDisplay 
+												artwork={currentArtworkForDisplay} 
+												isInFullscreenMode={isInBrowserFullscreen && isFullscreen}
+											/>
 										{/if}
 								</div>
 							</div>
 						</div>
-						<div class="info-container">
+						<div class="info-container" class:fullscreen={isInBrowserFullscreen}>
 							<!-- Artist and Title Header -->
 							<div class="artwork-header">
 								<div class="artist-info">
@@ -802,16 +820,28 @@
 <style lang="postcss">
 	/* Base styles from template */
 	.artwork-page {
-		@apply m-0 p-0 bg-black text-white min-h-screen outline-none;
-		font-family: Suisse, "Suisse Fallback", -apple-system, "system-ui", "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+		@apply m-0 p-0 min-h-screen outline-none;
 	}
 
 	.artwork-content-container {
 		@apply max-w-[2000px] mx-auto flex-1 px-4 sm:px-6 lg:px-12;
 	}
 
+	/* Fullscreen content container - remove constraints and padding */
+	.artwork-content-container.fullscreen {
+		@apply max-w-none px-0;
+		margin: 0;
+		height: 100vh;
+	}
+
 	.artwork-flex-container {
-		@apply relative flex flex-col gap-0 lg:flex-row;
+		@apply relative flex flex-col gap-12 lg:gap-0 lg:flex-row;
+	}
+
+	/* Fullscreen flex container adjustments */
+	.artwork-flex-container.fullscreen {
+		@apply gap-0;
+		height: 100vh;
 	}
 
 	.artwork-container {
@@ -829,15 +859,52 @@
 		-webkit-font-smoothing: antialiased;
 	}
 
+	/* Fullscreen artwork canvas - remove padding and extend edge-to-edge */
+	.artwork-canvas.fullscreen {
+		@apply p-0 lg:pr-0;
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		width: 100vw;
+		height: 100vh;
+		z-index: 1000;
+		background: black;
+		/* Center the content with equal margins and padding */
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 2rem;
+	}
+
 	.nft-media {
 		@apply flex items-center justify-center relative max-w-full max-h-full w-full h-full;
 		box-sizing: inherit;
 		transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), aspect-ratio 0.4s ease-out;
 	}
 
+	/* Fullscreen nft-media - maintain normal behavior within the centered canvas */
+	.nft-media.fullscreen {
+		/* Remove aggressive positioning - let the parent artwork-canvas handle it */
+		position: relative;
+		width: 100%;
+		height: 100%;
+		max-width: 100%;
+		max-height: 100%;
+	}
+
 	.info-container {
-		@apply flex-grow-0 flex-shrink-0 gap-6 flex flex-col text-white pb-8;
-		@apply lg:pt-12 lg:pl-12 lg:pr-0 lg:pb-12 lg:min-w-[464px] lg:max-w-[464px] lg:border-l lg:border-white/10;
+		@apply flex-grow-0 flex-shrink-0 gap-6 flex flex-col pb-8 lg:pt-12 lg:pl-12 lg:pr-0 lg:pb-12 lg:min-w-[464px] lg:max-w-[464px] lg:border-l lg:border-white/10;
+	}
+
+	/* Fullscreen info container - position as overlay */
+	.info-container.fullscreen {
+		@apply fixed top-0 right-0 z-10 bg-black/80 backdrop-blur-sm;
+		@apply max-w-[400px] min-w-[350px] h-screen overflow-y-auto;
+		@apply p-6 lg:p-8;
+		border-left: none;
+		z-index: 1001; /* Above the fullscreen artwork-canvas */
 	}
 
 	.media-container {
@@ -865,7 +932,7 @@
 	}
 
 	.artist-name {
-		@apply text-lg font-medium uppercase tracking-wider text-yellow-400;
+		@apply text-lg font-medium uppercase tracking-wider text-primary-dark;
 	}
 
 	/* Override the text-xs class from ArtistList component */
@@ -875,7 +942,7 @@
 	}
 
 	.artwork-title {
-		@apply text-3xl font-semibold leading-tight m-0 text-white break-words;
+		@apply text-3xl font-semibold leading-tight m-0 break-words;
 		white-space: normal;
 		overflow-wrap: break-word;
 		hyphens: auto;
@@ -886,13 +953,14 @@
 	}
 
 	.nav-button {
-		@apply flex items-center justify-center w-10 h-10 bg-black/60 text-white border-none rounded-full cursor-pointer text-lg;
-		@apply hover:bg-black/80 transition-colors duration-200;
+		@apply flex items-center justify-center w-10 h-10 border-none rounded-full cursor-pointer text-lg;
+		@apply text-gray-600 hover:bg-primary hover:text-black transition-colors duration-200;
+		@apply dark:text-gray-400 dark:hover:bg-primary-dark dark:hover:text-black;
 	}
 
 	/* Content styles */
 	.artwork-description {
-		@apply text-gray-300 leading-relaxed text-sm;
+		@apply leading-relaxed text-sm;
 	}
 
 	.artwork-description p {
@@ -900,8 +968,9 @@
 	}
 
 	.read-more-button {
-		@apply bg-transparent border-none text-yellow-400 cursor-pointer text-sm p-0 underline;
-		@apply hover:text-yellow-500 transition-colors duration-200;
+		@apply bg-transparent border-none text-primary cursor-pointer text-sm p-0 underline;
+		@apply hover:text-primary/80 transition-colors duration-200;
+		@apply dark:text-primary-dark dark:hover:text-primary-dark/80;
 	}
 
 	.metadata-section {
@@ -909,7 +978,7 @@
 	}
 
 	.metadata-heading {
-		@apply text-base font-semibold text-white m-0;
+		@apply text-base font-semibold text-white dark:text-gray-100 m-0;
 	}
 
 	.metadata-grid {
@@ -921,16 +990,16 @@
 	}
 
 	.metadata-item strong {
-		@apply text-xs uppercase tracking-wider text-gray-400 font-medium;
+		@apply text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium;
 	}
 
 	.metadata-item span,
 	.metadata-item a {
-		@apply text-sm text-gray-100 break-words;
+		@apply text-sm font-medium text-gray-700 dark:text-gray-100 break-words;
 	}
 
 	.contract-link {
-		@apply text-yellow-400 no-underline hover:text-yellow-500 hover:underline transition-colors duration-200;
+		@apply no-underline hover:text-primary-dark/80 hover:underline transition-colors duration-200;
 	}
 
 	/* Keyboard shortcuts */
@@ -939,8 +1008,7 @@
 	}
 
 	.keyboard-help-trigger {
-		@apply flex items-center gap-2 bg-transparent border border-white/20 text-gray-400 px-4 py-3 rounded-md cursor-pointer text-sm;
-		@apply hover:text-gray-300 hover:border-white/30 transition-all duration-200;
+		@apply flex items-center gap-2 bg-transparent border border-gray-200 dark:border-white/20 text-gray-400 dark:text-gray-400 px-4 py-3 rounded-sm cursor-pointer text-sm hover:text-gray-700 hover:bg-gray-100 dark:hover:border-white/30 transition-all duration-200;
 	}
 
 	/* Error and loading states */
@@ -959,7 +1027,7 @@
 	}
 
 	.error-content button {
-		@apply bg-yellow-400 text-black border-none px-6 py-3 rounded-md cursor-pointer font-medium mt-4;
+		@apply bg-primary-dark text-black border-none px-6 py-3 rounded-md cursor-pointer font-medium mt-4;
 	}
 
 	.loader {
@@ -978,7 +1046,7 @@
 	}
 
 	.keyboard-help-content {
-		@apply bg-gray-800 p-8 rounded-lg shadow-2xl max-w-2xl max-h-[80vh] overflow-y-auto text-white;
+		@apply bg-gray-950 p-8 rounded-lg shadow-2xl max-w-2xl max-h-[80vh] overflow-y-auto text-white;
 	}
 
 	.keyboard-help-header {
@@ -999,7 +1067,7 @@
 	}
 
 	.help-section h4 {
-		@apply text-base font-semibold mb-3 text-yellow-400;
+		@apply text-base font-semibold mb-3 text-primary-dark;
 	}
 
 	.help-item {
@@ -1025,5 +1093,16 @@
 
 	.fullscreen-hint-content p {
 		@apply text-sm font-medium m-0;
+	}
+
+	/* Fullscreen close button */
+	.fullscreen-close-button {
+		@apply fixed top-4 right-4 z-50 w-12 h-12 bg-black/60 backdrop-blur-sm text-white border-none rounded-full cursor-pointer;
+		@apply flex items-center justify-center transition-all duration-200;
+		@apply hover:bg-black/80 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50;
+	}
+
+	.fullscreen-close-button svg {
+		@apply w-6 h-6;
 	}
 </style>

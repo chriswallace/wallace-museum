@@ -124,7 +124,7 @@
 					<div class="col-span-2 text-right">
 						<button
 							type="submit"
-							class="primary button mt-0"
+							class="save button mt-0"
 							disabled={isSubmitting || !newAddress}
 						>
 							{isSubmitting ? 'Adding...' : 'Add Address'}
@@ -174,7 +174,7 @@
 										>
 										<td class="p-2 border dark:border-gray-600">
 											<button
-												class="small-button remove text-sm py-1 px-2 bg-red-50 text-red-700 rounded-md hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+												class="small-button remove text-sm py-1 px-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 												on:click={() => onRemove(addr.address, addr.blockchain)}
 											>
 												Delete

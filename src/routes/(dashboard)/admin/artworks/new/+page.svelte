@@ -271,7 +271,7 @@
 						{/if}
 					</fieldset>
 
-					<button class="primary w-full" type="submit">Add artwork</button>
+					<button class="save w-full" type="submit">Add artwork</button>
 				</form>
 			</div>
 		</div>

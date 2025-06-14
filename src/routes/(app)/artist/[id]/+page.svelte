@@ -430,7 +430,7 @@
 	}
 
 	.ens-name {
-		@apply text-gray-600 text-xs;
+		@apply text-gray-400;
 	}
 
 	.bio-section,
@@ -439,12 +439,12 @@
 	}
 
 	.bio-section p {
-		@apply mt-0 text-sm leading-relaxed;
+		@apply text-sm text-gray-900 leading-snug mb-3;
 	}
 
 	.read-more-button {
-		@apply text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 bg-transparent border-none cursor-pointer mt-2 transition-colors duration-200;
-		text-decoration: underline;
+		@apply bg-transparent border-none text-red-500 cursor-pointer text-sm p-0 underline;
+		@apply hover:text-red-500/80 transition-colors duration-200;
 	}
 
 	.description-section p {
@@ -598,7 +598,7 @@
 	}
 
 	.modal-description p {
-		@apply text-base leading-relaxed m-0;
+		@apply text-base leading-relaxed m-0 text-left;
 	}
 
 	@keyframes spin {
@@ -632,8 +632,21 @@
 			@apply text-gray-400;
 		}
 
+		.bio-section p {
+			@apply text-gray-100;
+		}
+
 		.description-section p {
 			@apply text-gray-300;
+		}
+
+		.read-more-button {
+			@apply text-yellow-400 hover:text-yellow-400/80;
+			color: #FCED1C; /* Use exact yellow from logo */
+		}
+
+		.read-more-button:hover {
+			color: #FFF075; /* Lighter yellow on hover */
 		}
 
 		.detail-section h3 {

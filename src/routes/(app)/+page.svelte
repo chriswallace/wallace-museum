@@ -19,6 +19,6 @@
 
 <style lang="scss">
 	.homepage-container {
-		@apply w-full min-h-screen bg-black;
+		@apply w-full min-h-screen;
 	}
 </style>

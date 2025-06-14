@@ -25,9 +25,12 @@
 </script>
 
 <div class="ui-frame bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200">
-	<div class="ui-header bg-white dark:bg-primary">
+	<div class="ui-header bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
 		<nav>
-			<a class="medici" href="/">Medici.</a>
+			<a class="logo-link" href="/">
+				<img src="/images/wallace-museum-red.svg" alt="Wallace Museum" class="logo-svg logo-light" />
+				<img src="/images/wallace-museum-yellow.svg" alt="Wallace Museum" class="logo-svg logo-dark" />
+			</a>
 
 			<div class="primary-nav">
 				<a href="/admin/collections" class={currentPage === '/admin/collections' ? 'selected' : ''}
@@ -43,7 +46,7 @@
 			</div>
 
 			<form action="/logout" method="POST">
-				<button type="submit">Log out</button>
+				<button type="submit" class="logout-btn">Log out</button>
 			</form>
 		</nav>
 	</div>
@@ -76,12 +79,51 @@
 
 		a,
 		button {
-			@apply text-gray-800 dark:text-white font-normal px-2 py-3 transition duration-300 ease-in-out decoration-2 underline-offset-8 underline decoration-transparent;
+			@apply text-gray-600 dark:text-gray-300 font-normal px-2 py-3 transition duration-300 ease-in-out decoration-2 underline-offset-8 underline decoration-transparent;
 			font-variation-settings: initial;
 		}
 
+		.logout-btn {
+			@apply text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm px-3 py-2 bg-transparent dark:bg-transparent rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600;
+		}
+
+		.logo-link {
+			@apply px-2 py-3 hover:opacity-80 transition-opacity duration-200 focus:opacity-80 focus:outline-none;
+			text-decoration: none;
+		}
+
+		.logo-svg {
+			@apply h-8 w-auto;
+		}
+
+		/* Show red logo in light mode, hide yellow logo */
+		.logo-light {
+			display: block;
+		}
+
+		.logo-dark {
+			display: none;
+		}
+
+		/* Show yellow logo in dark mode, hide red logo */
+		@media (prefers-color-scheme: dark) {
+			.logo-light {
+				display: none;
+			}
+
+			.logo-dark {
+				display: block;
+			}
+		}
+
 		.selected {
-			@apply decoration-white;
+			@apply text-gray-800 dark:text-gray-100 font-medium;
+			text-decoration: underline;
+			text-decoration-color: var(--color-primary);
+		}
+
+		a:hover:not(.logo-link) {
+			@apply text-gray-800 dark:text-gray-100;
 		}
 	}
 
@@ -105,11 +147,11 @@
 	}
 
 	:global(h1 button) {
-		@apply align-middle text-sm border border-gray-400 dark:border-gray-500 text-gray-600 dark:text-gray-300 ml-4 px-2 py-1 rounded-sm hover:bg-primary hover:border-primary hover:text-white dark:hover:text-black;
+		@apply align-middle text-sm border border-gray-400 dark:border-gray-500 text-gray-600 dark:text-gray-300 ml-4 px-2 py-1 rounded-sm hover:bg-gray-100 hover:border-gray-500 hover:text-gray-800 dark:hover:bg-gray-700 dark:hover:text-gray-100;
 	}
 
 	:global(.back-btn) {
-		@apply inline-block px-2 py-1 mb-6 uppercase text-sm border border-transparent rounded-sm text-gray-500 dark:text-gray-300 hover:text-primary hover:border-primary dark:hover:text-primary dark:hover:border-primary font-semibold no-underline transition duration-300 ease-in-out;
+		@apply inline-block px-2 py-1 mb-6 uppercase text-sm border border-transparent rounded-sm text-gray-500 dark:text-gray-300 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-100 dark:hover:border-gray-500 font-semibold no-underline transition duration-300 ease-in-out;
 	}
 
 	:global(.pagination) {

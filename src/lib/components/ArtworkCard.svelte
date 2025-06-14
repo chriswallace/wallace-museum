@@ -151,7 +151,7 @@
 		@apply p-0 rounded-[8px] w-full;
 
 		&.active {
-			@apply border-2 border-primary relative;
+			@apply border-2 border-primary dark:border-primary-dark relative;
 
 			.artwork-title {
 				@apply p-3;
@@ -184,11 +184,11 @@
 	}
 
 	.selected-indicator {
-		@apply absolute top-2 right-2 bg-primary text-white px-2 py-1 rounded-md text-sm;
+		@apply absolute top-2 right-2 bg-primary dark:bg-primary-dark text-white dark:text-black px-2 py-1 rounded-md text-sm;
 	}
 
 	.remove-button {
-		@apply absolute top-[-8px] right-[-8px] bg-red-500 rounded-full p-1 z-20;
+		@apply absolute top-[-8px] right-[-8px] bg-red-600 hover:bg-red-700 rounded-full p-1 z-20 transition-colors;
 
 		svg {
 			@apply w-[20px] h-[20px];

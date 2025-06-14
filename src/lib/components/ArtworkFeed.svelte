@@ -225,15 +225,12 @@
 	}
 
 	.artwork-thumbnail {
-		@apply bg-gray-950/70 rounded-t-sm overflow-hidden w-full;
-		@apply flex items-center justify-center;
-		margin: 0 auto;
+		@apply overflow-hidden w-full;
+		@apply flex items-center justify-center mx-auto my-0;
 	}
 
 	.stage {
-		@apply w-full bg-gray-950/70 overflow-hidden;
-		@apply flex items-center justify-center;
-		aspect-ratio: 1 / 1;
+		@apply bg-gray-100 dark:bg-gray-950/70 rounded-sm w-full overflow-hidden aspect-square flex items-center justify-center;
 	}
 
 	:global(.thumbnail-image) {
@@ -253,11 +250,11 @@
 	}
 
 	.artwork-info {
-		@apply bg-gray-950/50 rounded-b-sm px-6 py-4;
+		@apply rounded-b-sm py-4;
 	}
 
 	.artwork-title {
-		@apply text-lg font-semibold text-white mb-3;
+		@apply text-lg font-semibold mb-3;
 		word-break: break-word;
 		white-space: normal;
 		overflow-wrap: break-word;
@@ -265,7 +262,7 @@
 	}
 
 	.artwork-mint-date {
-		@apply text-gray-400 text-sm mt-3;
+		@apply text-gray-400 text-sm;
 	}
 
 	.artwork-artists {
@@ -281,7 +278,7 @@
 	}
 
 	.artist-avatar-placeholder {
-		@apply w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0;
+		@apply w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0;
 	}
 
 	:global(.avatar-image) {
@@ -293,11 +290,11 @@
 	}
 
 	.artist-name {
-		@apply text-sm font-medium text-white;
+		@apply text-sm font-medium text-gray-700 dark:text-gray-300;
 	}
 
 	.artist-separator {
-		@apply text-gray-400;
+		@apply text-gray-200 dark:text-gray-500;
 	}
 
 	.intersection-target {

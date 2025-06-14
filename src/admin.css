@@ -19,21 +19,29 @@
 	--border-radius-md: 12px;
 	--border-radius-lg: 18px;
 
-	--color-primary: rgb(184 92 40);
+	/* Light mode: Minimal theme with green/red actions */
+	--color-primary: #6b7280; /* Neutral gray for primary elements */
 	--color-secondary: #242424;
-	--color-background-error: #f20000;
+	--color-background-error: #dc2626; /* Red for errors */
 	--color-text-error: #fff;
-	--color-background-success: #00a572;
+	--color-background-success: #16a34a; /* Green for success */
 	--color-text-success: #fff;
+
+	/* Action button colors */
+	--color-save: #16a34a; /* Green for save/update actions */
+	--color-save-hover: #15803d;
+	--color-destructive: #dc2626; /* Red for destructive actions */
+	--color-destructive-hover: #b91c1c;
 
 	--grid-spacing: 8px;
 
-	--button-color-background-primary: rgb(184 92 40);
-	--button-color-background-primary-dark: rgb(166 83 36);
+	/* Button colors for light mode */
+	--button-color-background-primary: var(--color-primary);
+	--button-color-background-primary-dark: #4b5563;
 	--button-color-text-primary: #ffffff;
 	--button-color-text-primary-dark: #ffffff;
-	--button-color-background-primary-hover: rgb(211 161 114);
-	--button-color-background-primary-dark-hover: rgb(138 69 30);
+	--button-color-background-primary-hover: #4b5563;
+	--button-color-background-primary-dark-hover: #374151;
 	--button-color-text-primary-hover: #ffffff;
 	--button-color-text-primary-dark-hover: #ffffff;
 
@@ -59,13 +67,20 @@
 		--background-without-opacity: #1c1c1c;
 		--logo-color: #f5f5f5;
 
-		--color-primary: rgb(184 92 40);
+		/* Dark mode: Yellow theme for consistency with main app */
+		--color-primary: #FCED1C; /* Use yellow from logo as primary */
 		--color-secondary: #f5f5f5;
 
-		--button-color-background-primary: rgb(184 92 40);
-		--button-color-text-primary: #ffffff;
-		--button-color-background-primary-hover: rgb(211 161 114);
-		--button-color-text-primary-hover: #ffffff;
+		/* Action button colors for dark mode */
+		--color-save: #22c55e; /* Slightly brighter green for dark mode */
+		--color-save-hover: #16a34a;
+		--color-destructive: #ef4444; /* Slightly brighter red for dark mode */
+		--color-destructive-hover: #dc2626;
+
+		--button-color-background-primary: #FCED1C; /* Yellow primary buttons */
+		--button-color-text-primary: #000000; /* Black text on yellow */
+		--button-color-background-primary-hover: #FFF075; /* Lighter yellow on hover */
+		--button-color-text-primary-hover: #000000; /* Black text on hover */
 
 		--input-color-background: #303030;
 		--input-color-text: #f5f5f5;
@@ -131,13 +146,7 @@
 
 	.medici {
 		@apply font-semibold tracking-tight text-2xl mr-6 justify-self-start;
-		color: rgb(138 69 30);
-	}
-
-	@media (prefers-color-scheme: dark) {
-		.medici {
-			color: rgb(184 92 40);
-		}
+		color: var(--color-primary);
 	}
 
 	.content {
@@ -152,17 +161,40 @@
 		@apply px-4 py-3;
 	}
 
+	/* Primary buttons - now neutral gray */
 	.primary {
 		@apply rounded-sm whitespace-nowrap text-white font-semibold;
-		background-color: rgb(184 92 40);
+		background-color: var(--color-primary);
 	}
 
 	.primary:hover {
-		background-color: rgb(166 83 36);
+		background-color: var(--button-color-background-primary-hover);
 	}
 
-	.destructive {
-		@apply rounded-sm bg-red-500 dark:bg-red-700 border-red-500 dark:border-red-700 whitespace-nowrap text-white font-semibold;
+	/* Save/Update action buttons - green */
+	.save,
+	.update {
+		@apply rounded-sm whitespace-nowrap text-white font-semibold;
+		background-color: var(--color-save);
+	}
+
+	.save:hover,
+	.update:hover {
+		background-color: var(--color-save-hover);
+	}
+
+	/* Destructive action buttons - red */
+	.destructive,
+	.delete {
+		@apply rounded-sm whitespace-nowrap text-white font-semibold;
+		background-color: var(--color-destructive);
+		border-color: var(--color-destructive);
+	}
+
+	.destructive:hover,
+	.delete:hover {
+		background-color: var(--color-destructive-hover);
+		border-color: var(--color-destructive-hover);
 	}
 
 	.link {
@@ -178,18 +210,23 @@
 	}
 
 	.ghost:hover {
-		@apply dark:bg-green-500;
+		@apply bg-gray-100 dark:bg-gray-700;
+	}
+
+	.secondary {
+		@apply bg-transparent border border-gray-400 dark:border-gray-500 text-gray-600 dark:text-gray-300;
+	}
+
+	.secondary:hover {
+		@apply bg-gray-100 dark:bg-gray-700;
 	}
 
 	.edit {
-		@apply bg-transparent border;
-		color: rgb(184 92 40);
-		border-color: rgb(184 92 40);
+		@apply bg-transparent border border-gray-400 dark:border-gray-500 text-gray-600 dark:text-gray-300;
 	}
 
 	.edit:hover {
-		background-color: rgb(184 92 40);
-		@apply text-white;
+		@apply bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100;
 	}
 
 	button[disabled] {

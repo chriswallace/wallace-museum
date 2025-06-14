@@ -286,7 +286,7 @@
 			/>
 			<div class="well">
 				{#if selectedArtworks.size > 0}
-					<button class="primary" on:click={addSelectedArtworksToCollection}>
+					<button class="save" on:click={addSelectedArtworksToCollection}>
 						Add Selected Artworks
 					</button>
 				{/if}
@@ -363,7 +363,7 @@
 					</div>
 					<div class="flex justify-between mt-8">
 						<button class="destructive" type="button" on:click={deleteCollection}>Delete</button>
-						<button class="primary" type="submit">Save</button>
+						<button class="save" type="submit">Save</button>
 					</div>
 				</form>
 			</div>
@@ -385,7 +385,7 @@
 	}
 
 	.delete {
-		@apply bg-red-500 text-white;
+		@apply bg-red-600 text-white hover:bg-red-700 transition-colors;
 	}
 
 	.tabs {
@@ -397,7 +397,7 @@
 	}
 
 	.tabs button.active {
-		@apply border-primary;
+		@apply border-primary dark:border-primary-dark;
 	}
 
 	.details-tab form {

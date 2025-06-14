@@ -220,38 +220,45 @@ export function buildOptimizedImageUrl(
 ): string {
 	if (!imageUrl) return '';
 
+	// Clean and sanitize input - remove any @ symbol that might have gotten prepended
+	let cleanImageUrl = imageUrl.trim();
+	if (cleanImageUrl.startsWith('@')) {
+		cleanImageUrl = cleanImageUrl.substring(1);
+		console.log(`[buildOptimizedImageUrl] Removed @ symbol from URL: ${imageUrl} -> ${cleanImageUrl}`);
+	}
+
 	// For SVG files, bypass optimization and serve directly to preserve vector format
-	if (isSvgUrl(imageUrl)) {
+	if (isSvgUrl(cleanImageUrl)) {
 		// If it's an IPFS SVG, use direct IPFS URL, otherwise use the original URL
-		return isIpfsUrl(imageUrl) ? buildDirectImageUrl(imageUrl) : imageUrl;
+		return isIpfsUrl(cleanImageUrl) ? buildDirectImageUrl(cleanImageUrl) : cleanImageUrl;
 	}
 
 	// For GIF files, bypass optimization and serve directly to preserve animation
-	if (isGifFile(imageUrl, options.mimeType)) {
-		console.log(`[buildOptimizedImageUrl] GIF detected, serving directly: ${imageUrl}`);
+	if (isGifFile(cleanImageUrl, options.mimeType)) {
+		console.log(`[buildOptimizedImageUrl] GIF detected, serving directly: ${cleanImageUrl}`);
 		// If it's an IPFS GIF, use direct IPFS URL, otherwise use the original URL
-		const directUrl = isIpfsUrl(imageUrl) ? buildDirectImageUrl(imageUrl) : imageUrl;
+		const directUrl = isIpfsUrl(cleanImageUrl) ? buildDirectImageUrl(cleanImageUrl) : cleanImageUrl;
 		return directUrl;
 	}
 
 	// For non-IPFS URLs (like Arweave, HTTP, etc.), serve them directly
-	if (!isIpfsUrl(imageUrl)) {
-		return imageUrl;
+	if (!isIpfsUrl(cleanImageUrl)) {
+		return cleanImageUrl;
 	}
 
 	// Check if the IPFS URL has a path component (e.g., ipfs://QmXXX/image.jpg)
 	// If it does, we can't perform transformations and should serve directly
-	if (hasIpfsPath(imageUrl)) {
-		console.log(`[buildOptimizedImageUrl] IPFS URL has path, serving directly: ${imageUrl}`);
-		return buildDirectImageUrl(imageUrl);
+	if (hasIpfsPath(cleanImageUrl)) {
+		console.log(`[buildOptimizedImageUrl] IPFS URL has path, serving directly: ${cleanImageUrl}`);
+		return buildDirectImageUrl(cleanImageUrl);
 	}
 
 	// Extract CID from the IPFS image URL
-	const cid = extractCidFromUrl(imageUrl);
+	const cid = extractCidFromUrl(cleanImageUrl);
 	
 	if (!cid) {
 		// If we can't extract a CID from what should be an IPFS URL, fall back to conversion
-		return ipfsToHttpUrl(imageUrl);
+		return ipfsToHttpUrl(cleanImageUrl);
 	}
 
 	// Build optimized URL using Pinata's image optimization via gateway
@@ -281,13 +288,20 @@ export function buildOptimizedImageUrl(
 export function buildDirectImageUrl(imageUrl: string | null | undefined): string {
 	if (!imageUrl) return '';
 
+	// Clean and sanitize input - remove any @ symbol that might have gotten prepended
+	let cleanImageUrl = imageUrl.trim();
+	if (cleanImageUrl.startsWith('@')) {
+		cleanImageUrl = cleanImageUrl.substring(1);
+		console.log(`[buildDirectImageUrl] Removed @ symbol from URL: ${imageUrl} -> ${cleanImageUrl}`);
+	}
+
 	// For non-IPFS URLs, return them directly
-	if (!isIpfsUrl(imageUrl)) {
-		return imageUrl;
+	if (!isIpfsUrl(cleanImageUrl)) {
+		return cleanImageUrl;
 	}
 
 	// Try to extract CID and path to preserve the full path
-	const cidAndPath = extractCidAndPath(imageUrl);
+	const cidAndPath = extractCidAndPath(cleanImageUrl);
 	if (cidAndPath) {
 		const { cid, path } = cidAndPath;
 		const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}${path ? `/${path}` : ''}`);
@@ -296,9 +310,9 @@ export function buildDirectImageUrl(imageUrl: string | null | undefined): string
 	}
 
 	// Fallback: extract just the CID (for backwards compatibility)
-	const cid = extractCidFromUrl(imageUrl);
+	const cid = extractCidFromUrl(cleanImageUrl);
 	if (!cid) {
-		return ipfsToHttpUrl(imageUrl);
+		return ipfsToHttpUrl(cleanImageUrl);
 	}
 
 	const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}`);
@@ -316,20 +330,26 @@ export function createResponsiveSrcSet(
 ): string {
 	if (!imageUrl) return '';
 
+	// Clean and sanitize input - remove any @ symbol that might have gotten prepended
+	let cleanImageUrl = imageUrl.trim();
+	if (cleanImageUrl.startsWith('@')) {
+		cleanImageUrl = cleanImageUrl.substring(1);
+	}
+
 	// For non-IPFS URLs, we can't create responsive variants, so return empty srcset
 	// The browser will use the main src attribute
-	if (!isIpfsUrl(imageUrl)) {
+	if (!isIpfsUrl(cleanImageUrl)) {
 		return '';
 	}
 
 	// For GIFs, don't create responsive variants to preserve animation
 	// The browser will use the main src attribute
-	if (isGifFile(imageUrl, options.mimeType)) {
+	if (isGifFile(cleanImageUrl, options.mimeType)) {
 		return '';
 	}
 
 	const srcsetEntries = sizes.map(size => {
-		const optimizedUrl = buildOptimizedImageUrl(imageUrl, {
+		const optimizedUrl = buildOptimizedImageUrl(cleanImageUrl, {
 			...options,
 			width: size
 		});
@@ -349,25 +369,31 @@ export function createRetinaUrls(
 ): { src1x: string; src2x: string } {
 	if (!imageUrl) return { src1x: '', src2x: '' };
 
+	// Clean and sanitize input - remove any @ symbol that might have gotten prepended
+	let cleanImageUrl = imageUrl.trim();
+	if (cleanImageUrl.startsWith('@')) {
+		cleanImageUrl = cleanImageUrl.substring(1);
+	}
+
 	// For non-IPFS URLs, we can't create retina variants, so return the original URL for both
-	if (!isIpfsUrl(imageUrl)) {
-		return { src1x: imageUrl, src2x: imageUrl };
+	if (!isIpfsUrl(cleanImageUrl)) {
+		return { src1x: cleanImageUrl, src2x: cleanImageUrl };
 	}
 
 	// For GIFs, don't create retina variants to preserve animation
 	// Return the original URL for both
-	if (isGifFile(imageUrl, options.mimeType)) {
-		const directUrl = buildDirectImageUrl(imageUrl);
+	if (isGifFile(cleanImageUrl, options.mimeType)) {
+		const directUrl = buildDirectImageUrl(cleanImageUrl);
 		return { src1x: directUrl, src2x: directUrl };
 	}
 
-	const src1x = buildOptimizedImageUrl(imageUrl, {
+	const src1x = buildOptimizedImageUrl(cleanImageUrl, {
 		...options,
 		width,
 		dpr: 1
 	});
 
-	const src2x = buildOptimizedImageUrl(imageUrl, {
+	const src2x = buildOptimizedImageUrl(cleanImageUrl, {
 		...options,
 		width,
 		dpr: 2

@@ -237,7 +237,7 @@
 					<div class="text-right">
 						<button
 							type="submit"
-							class="primary button mt-0"
+							class="save button mt-0"
 							disabled={isSubmitting || !newWalletAddresses.trim()}
 						>
 							{isSubmitting ? 'Adding...' : 'Add Wallet Set'}
@@ -298,7 +298,7 @@
 										<div class="flex space-x-2">
 											<button
 												type="submit"
-												class="primary button"
+												class="save button"
 												disabled={isSubmitting || !editAddresses.trim()}
 											>
 												{isSubmitting ? 'Saving...' : 'Save Changes'}
@@ -338,7 +338,7 @@
 												Edit
 											</button>
 											<button
-												class="delete-button px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+												class="delete-button px-3 py-1 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
 												on:click={() => handleDelete(wallet.id)}
 											>
 												Delete
@@ -424,12 +424,12 @@
 	}
 
 	.primary {
-		background-color: rgb(184 92 40);
-		color: white;
+		background-color: var(--color-primary);
+		color: var(--button-color-text-primary);
 	}
 
 	.primary:hover:not(:disabled) {
-		background-color: rgb(166 83 36);
+		background-color: var(--color-primary-hover);
 	}
 
 	.primary:disabled {

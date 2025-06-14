@@ -128,13 +128,14 @@
 <nav class="top-nav" class:nav-hidden={!isNavVisible}>
 	<!-- Mobile Layout (small screens) -->
 	<div class="mobile-nav md:hidden">
-		<!-- Museum Title -->
+		<!-- Museum Logo -->
 		<button 
-			class="mobile-title"
+			class="mobile-logo"
 			on:click={handleTitleClick}
 			aria-label="Return to homepage"
 		>
-			The Wallace Museum
+			<img src="/images/wallace-museum-red.svg" alt="Wallace Museum" class="logo-svg logo-light" />
+			<img src="/images/wallace-museum-yellow.svg" alt="Wallace Museum" class="logo-svg logo-dark" />
 		</button>
 
 		<!-- Hamburger Menu Button -->
@@ -154,13 +155,14 @@
 
 	<!-- Desktop Layout (medium screens and up) -->
 	<div class="desktop-nav hidden md:flex">
-		<!-- Museum Title - positioned at left edge -->
+		<!-- Museum Logo - positioned at left edge -->
 		<button 
-			class="page-title"
+			class="page-logo"
 			on:click={handleTitleClick}
 			aria-label="Return to homepage"
 		>
-			The Wallace Museum
+			<img src="/images/wallace-museum-red.svg" alt="Wallace Museum" class="logo-svg logo-light" />
+			<img src="/images/wallace-museum-yellow.svg" alt="Wallace Museum" class="logo-svg logo-dark" />
 		</button>
 
 		<div class="nav-container">
@@ -199,7 +201,6 @@
 	<!-- Slide-out menu panel -->
 	<div class="mobile-menu-panel md:hidden">
 		<div class="mobile-menu-header">
-			<h2 class="mobile-menu-title">Navigation</h2>
 			<button 
 				class="mobile-menu-close"
 				on:click={closeMobileMenu}
@@ -229,7 +230,7 @@
 
 <style lang="scss">
 	.top-nav {
-		@apply bg-black/40 backdrop-blur-sm border-b border-gray-900 fixed top-0 left-0 right-0 z-40;
+		@apply bg-white/90 backdrop-blur-sm border-b border-gray-200 fixed top-0 left-0 right-0 z-40;
 		height: var(--navbar-height);
 		transition: transform 0.3s ease-in-out;
 	}
@@ -252,19 +253,43 @@
 		}
 	}
 
-	.mobile-title {
-		@apply text-yellow-500 text-sm font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer hover:text-yellow-400 transition-colors duration-200 focus:text-yellow-400 focus:outline-none;
+	.mobile-logo {
+		@apply bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity duration-200 focus:opacity-80 focus:outline-none;
+	}
+
+	.logo-svg {
+		@apply h-8 w-auto;
+	}
+
+	/* Show red logo in light mode, hide yellow logo */
+	.logo-light {
+		display: block;
+	}
+
+	.logo-dark {
+		display: none;
+	}
+
+	/* Show yellow logo in dark mode, hide red logo */
+	@media (prefers-color-scheme: dark) {
+		.logo-light {
+			display: none;
+		}
+
+		.logo-dark {
+			display: block;
+		}
 	}
 
 	.hamburger-button {
-		@apply bg-transparent border-none cursor-pointer p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 rounded-md;
+		@apply bg-transparent border-none cursor-pointer p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 rounded-sm;
 	}
 
 	.hamburger-lines {
 		@apply flex flex-col justify-center items-center w-6 h-6 relative;
 		
 		span {
-			@apply block w-6 h-0.5 bg-white transition-all duration-300 ease-in-out;
+			@apply block w-6 h-0.5 bg-gray-600 transition-all duration-300 ease-in-out;
 			
 			&:nth-child(1) {
 				transform: translateY(-6px);
@@ -307,8 +332,8 @@
 		}
 	}
 
-	.page-title {
-		@apply m-0 p-0 text-yellow-500 text-sm font-bold uppercase tracking-wider bg-transparent border-none cursor-pointer hover:text-yellow-400 transition-colors duration-200 focus:text-yellow-400 focus:outline-none;
+	.page-logo {
+		@apply m-0 p-0 bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity duration-200 focus:opacity-80 focus:outline-none;
 		@apply absolute left-4 top-0 flex items-center z-10;
 		height: var(--navbar-height);
 	}
@@ -328,47 +353,47 @@
 	}
 
 	.nav-tab {
-		@apply px-6 py-2 font-semibold text-gray-300 hover:text-white transition-colors duration-200 text-sm;
+		@apply px-6 py-2 font-semibold text-gray-600 hover:text-gray-900 transition-colors duration-200 text-sm;
 		@apply bg-none border-none cursor-pointer outline-none;
 		@apply relative flex items-center;
 		height: var(--navbar-height);
 	}
 
 	.nav-tab.active {
-		@apply text-yellow-500;
+		@apply text-primary;
 	}
 
 	.nav-tab.active::after {
-		@apply absolute left-0 right-0 h-0.5 bg-yellow-500;
+		@apply absolute left-0 right-0 h-0.5 bg-primary;
 		content: '';
 		bottom: -1px;
 	}
 
 	.nav-tab:hover:not(.active) {
-		@apply text-gray-100;
+		@apply text-gray-800;
 	}
 
 	/* Mobile Menu Overlay and Panel */
 	.mobile-menu-overlay {
 		@apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
-		animation: fadeIn 0.3s ease-out;
+		animation: fadeIn 0.25s ease-in-out;
 	}
 
 	.mobile-menu-panel {
-		@apply fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-black/95 backdrop-blur-md border-l border-gray-700 z-50;
-		animation: slideIn 0.3s ease-out;
+		@apply fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white/95 backdrop-blur-md border-l border-gray-200 z-50;
+		animation: slideIn 0.25s ease-in-out;
 	}
 
 	.mobile-menu-header {
-		@apply flex items-center justify-between p-6 border-b border-gray-700;
+		@apply flex items-center justify-between p-6;
 	}
 
 	.mobile-menu-title {
-		@apply text-lg font-semibold text-white m-0;
+		@apply text-lg font-semibold text-gray-900 m-0;
 	}
 
 	.mobile-menu-close {
-		@apply bg-transparent border-none text-gray-400 hover:text-white cursor-pointer p-2 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50;
+		@apply bg-transparent border-none text-gray-600 hover:text-gray-900 cursor-pointer p-2 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50;
 	}
 
 	.mobile-menu-nav {
@@ -376,11 +401,62 @@
 	}
 
 	.mobile-nav-item {
-		@apply w-full text-left px-4 py-3 text-lg font-medium text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all duration-200 bg-transparent border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50;
+		@apply w-full text-left px-4 py-3 text-lg font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200 bg-transparent border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50;
 	}
 
 	.mobile-nav-item.active {
-		@apply text-yellow-500 bg-yellow-500/10;
+		@apply text-primary bg-primary/10;
+	}
+
+	/* Dark mode styles */
+	@media (prefers-color-scheme: dark) {
+		.top-nav {
+			@apply bg-black/40 border-gray-900;
+		}
+
+		.hamburger-button {
+			@apply focus:ring-primary-dark;
+		}
+
+		.hamburger-lines span {
+			@apply bg-white/40;
+		}
+
+		.nav-tab {
+			@apply text-gray-300 hover:text-white;
+		}
+
+		.nav-tab.active {
+			@apply text-primary-dark;
+		}
+
+		.nav-tab.active::after {
+			@apply bg-primary-dark;
+		}
+
+		.nav-tab:hover:not(.active) {
+			@apply text-gray-100;
+		}
+
+		.mobile-menu-panel {
+			@apply bg-black/95 border-gray-700;
+		}
+
+		.mobile-menu-title {
+			@apply text-white;
+		}
+
+		.mobile-menu-close {
+			@apply text-gray-400 hover:text-white focus:ring-primary-dark;
+		}
+
+		.mobile-nav-item {
+			@apply text-gray-300 hover:text-white hover:bg-gray-800/50 focus:ring-primary-dark;
+		}
+
+		.mobile-nav-item.active {
+			@apply text-primary-dark bg-primary-dark/10;
+		}
 	}
 
 	/* Animations */

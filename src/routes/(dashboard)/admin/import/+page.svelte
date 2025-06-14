@@ -812,7 +812,7 @@
 					</button>
 					<!-- New Index All Artworks Button -->
 					<button
-						class="primary button py-2 px-4"
+						class="save button py-2 px-4"
 						on:click={() => runIndexer(false)}
 						disabled={isIndexing}
 					>
@@ -1126,7 +1126,7 @@
 
 				<!-- Import button -->
 				<button
-					class="primary button py-2 px-6 text-lg"
+					class="save button py-2 px-6 text-lg"
 					on:click={handleImportSelected}
 					disabled={selectedIds.length === 0}
 				>

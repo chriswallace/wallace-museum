@@ -457,7 +457,7 @@
 				<button class="secondary" on:click={openBulkActions}>
 					Bulk Edit
 				</button>
-				<button class="delete" on:click={handleBulkDelete}>
+				<button class="destructive" on:click={handleBulkDelete}>
 					Delete Selected
 				</button>
 			</div>
@@ -606,7 +606,7 @@
 			</div>
 			<div class="modal-actions">
 				<button class="secondary" on:click={closeBulkActions}>Cancel</button>
-				<button class="primary" on:click={handleBulkEdit}>Update Artworks</button>
+				<button class="save" on:click={handleBulkEdit}>Update Artworks</button>
 			</div>
 		</div>
 	</div>
@@ -639,11 +639,11 @@
 
 	.bulk-actions-bar {
 		@apply flex items-center justify-between border rounded-md p-4 mb-4;
-		background-color: rgba(184, 92, 40, 0.1);
-		border-color: rgba(184, 92, 40, 0.3);
+		background-color: rgba(255, 255, 255, 0.1);
+		border-color: rgba(255, 255, 255, 0.3);
 		
 		.selected-count {
-			color: rgb(138 69 30);
+			color: rgb(149, 149, 149);
 			@apply font-medium;
 			
 			.refetch-progress {

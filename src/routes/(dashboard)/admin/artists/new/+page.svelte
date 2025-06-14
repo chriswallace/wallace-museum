@@ -100,7 +100,7 @@
 						/>
 					</div>
 					<div class="flex justify-between">
-						<button class="primary" type="submit">Add Artist</button>
+						<button class="save" type="submit">Add Artist</button>
 					</div>
 				</form>
 			</div>

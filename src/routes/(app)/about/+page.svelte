@@ -45,7 +45,7 @@
 
 <style lang="scss">
 	.about-container {
-		@apply w-full min-h-screen bg-black text-white;
+		@apply w-full min-h-screen bg-white text-gray-900;
 	}
 
 	.content {
@@ -57,7 +57,7 @@
 	}
 
 	.title {
-		@apply text-4xl md:text-5xl 2xl:text-6xl font-bold text-yellow-500 tracking-tight mb-6;
+		@apply text-4xl md:text-5xl 2xl:text-6xl font-bold text-primary tracking-tight mb-6;
 	}
 
 	.about-content {
@@ -69,25 +69,58 @@
 	}
 
 	p {
-		@apply text-xl md:text-2xl 2xl:text-3xl text-gray-400 font-medium leading-relaxed tracking-tight mb-10;
+		@apply text-xl md:text-2xl 2xl:text-3xl text-gray-600 font-medium leading-relaxed tracking-tight mb-10;
 	}
 
 	.description {
-		@apply text-white font-bold;
+		@apply text-gray-900 font-bold;
 	}
 
 	.section-title {
-		@apply text-2xl md:text-3xl font-bold text-yellow-500 tracking-tight mb-4;
+		@apply text-2xl md:text-3xl font-bold text-primary tracking-tight mb-4;
 	}
 
 	.section-text {
-		@apply text-lg md:text-xl text-gray-200 leading-relaxed;
+		@apply text-lg md:text-xl text-gray-700 leading-relaxed;
 	}
 
 	.mission-section,
 	.vision-section,
 	.collection-section {
-		@apply border-l-4 border-yellow-500/30 pl-6;
+		@apply border-l-4 border-primary/30 pl-6;
+	}
+
+	/* Dark mode styles */
+	@media (prefers-color-scheme: dark) {
+		.about-container {
+			@apply bg-black text-white;
+		}
+
+		.title {
+			@apply text-primary-dark;
+		}
+
+		p {
+			@apply text-gray-400;
+		}
+
+		.description {
+			@apply text-white;
+		}
+
+		.section-title {
+			@apply text-primary-dark;
+		}
+
+		.section-text {
+			@apply text-gray-200;
+		}
+
+		.mission-section,
+		.vision-section,
+		.collection-section {
+			@apply border-primary-dark/30;
+		}
 	}
 
 	@media (max-width: 768px) {

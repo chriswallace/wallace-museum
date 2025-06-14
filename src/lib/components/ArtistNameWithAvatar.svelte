@@ -106,46 +106,29 @@
 	/>
 {/if}
 
-<style>
+<style lang="postcss">
+	a{
+		@apply text-gray-800 no-underline dark:text-gray-200 hover:underline;
+	}
+
 	.artist-name-button {
-		background: none;
-		border: none;
-		padding: 0;
-		margin: 0;
-		font: inherit;
-		color: inherit;
-		cursor: pointer;
-		text-decoration: none;
-		transition: all 0.2s ease;
-		border-radius: 4px;
+		@apply bg-transparent border-none p-0 m-0 text-inherit cursor-pointer no-underline transition-all duration-200 ease-in-out rounded-sm inline-block;
 		padding: 2px 4px;
 		margin: -2px -4px;
-		display: inline-block;
 	}
 
 	.artist-name-button span {
-		transition: all 0.2s ease;
+		@apply transition-all duration-200 ease-in-out;
 	}
 
 	.artist-name-button:hover span {
-		background: rgba(184, 92, 40, 0.1);
-		color: rgb(184 92 40);
-		text-decoration: underline;
-		border-radius: 4px;
+		@apply underline rounded-sm text-primary dark:text-primary-dark;
+		background: rgba(255, 17, 17, 0.1); /* Light red background for light mode */
 		padding: 2px 4px;
 		margin: -2px -4px;
 	}
 
 	.artist-name-button:focus {
-		outline: 2px solid rgb(184 92 40);
-		outline-offset: 2px;
-	}
-
-	/* Dark mode support */
-	@media (prefers-color-scheme: dark) {
-		.artist-name-button:hover span {
-			background: rgba(184, 92, 40, 0.2);
-			color: rgb(211 161 114);
-		}
+		@apply outline-2 outline-offset-2 outline-primary dark:outline-primary-dark;
 	}
 </style> 

@@ -16,9 +16,11 @@
 			width: number;
 			height: number;
 		} | null;
+		fullscreen?: boolean;
 	}
 
 	export let artwork: Artwork;
+	export let isInFullscreenMode: boolean = false;
 
 	let mediaContainer: HTMLElement;
 	let constrainWidth = true; // true = constrain width, false = constrain height
@@ -166,13 +168,17 @@
 		calculateConstraint();
 	}
 
-	// Dynamic style based on constraint
-	$: mediaStyle = constrainWidth 
+	// Dynamic style based on constraint - fullscreen behavior only applies in browser fullscreen
+	$: mediaStyle = (isInFullscreenMode && artwork.fullscreen)
+		? 'width: 100%; height: 100%; object-fit: cover;'
+		: constrainWidth 
 		? 'width: 100%; height: auto;' 
 		: 'width: auto; height: 100%;';
 
 	// Special handling for iframe aspect ratio - ensure proper sizing within container
-	$: iframeStyle = mediaType === 'iframe' && artwork.dimensions
+	$: iframeStyle = (isInFullscreenMode && artwork.fullscreen)
+		? 'width: 100%; height: 100%; border: none;'
+		: mediaType === 'iframe' && artwork.dimensions
 		? (constrainWidth 
 			? `width: 100%; height: auto; aspect-ratio: ${artwork.dimensions.width} / ${artwork.dimensions.height};`
 			: `width: auto; height: 100%; aspect-ratio: ${artwork.dimensions.width} / ${artwork.dimensions.height};`)

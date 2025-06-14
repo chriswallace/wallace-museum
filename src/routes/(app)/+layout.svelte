@@ -74,10 +74,21 @@
 	}
 
 	a {
-		@apply text-yellow-500;
+		@apply text-primary;
 
 		&:hover {
-			@apply text-yellow-400;
+			@apply text-primary/80;
+		}
+	}
+
+	/* Dark mode link colors */
+	@media (prefers-color-scheme: dark) {
+		a {
+			@apply text-primary-dark;
+
+			&:hover {
+				@apply text-primary-dark/80;
+			}
 		}
 	}
 

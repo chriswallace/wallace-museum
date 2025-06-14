@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/prisma';
-import { uploadToPinata } from '$lib/pinataHelpers';
+import { uploadToPinata, convertToIpfsUrl } from '$lib/pinataHelpers';
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -35,16 +35,19 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: 'Image upload failed' }, { status: 500 });
 		}
 		
-		// Update the artist's avatar with the uploaded image URL
+		// Convert the gateway URL to IPFS format for storage
+		const ipfsUrl = `ipfs://${uploadResponse.IpfsHash}`;
+		
+		// Update the artist's avatar with the IPFS URL
 		const updatedArtist = await db.write.artist.update({
 			where: { id: parseInt(artistId) },
-			data: { avatarUrl: uploadResponse.url }
+			data: { avatarUrl: ipfsUrl }
 		});
 		
 		return json({ 
 			success: true, 
 			artist: updatedArtist,
-			avatarUrl: uploadResponse.url,
+			avatarUrl: ipfsUrl,
 			message: 'Avatar updated successfully'
 		});
 	} catch (error) {

@@ -20,7 +20,10 @@
 	--border-radius-md: 12px;
 	--border-radius-lg: 18px;
 
-	--color-primary: rgb(184 92 40);
+	/* Light mode: Red theme */
+	--color-primary: #FF1111;
+	--color-primary-hover: #E60E0E;
+	--color-primary-light: #FF8787;
 	--color-secondary: #242424;
 	--color-background-error: #f20000;
 	--color-text-error: #fff;
@@ -29,12 +32,13 @@
 
 	--grid-spacing: 8px;
 
-	--button-color-background-primary: rgb(184 92 40);
-	--button-color-background-primary-dark: rgb(166 83 36);
+	/* Button colors for light mode (red theme) */
+	--button-color-background-primary: #FF1111;
+	--button-color-background-primary-dark: #E60E0E;
 	--button-color-text-primary: #ffffff;
 	--button-color-text-primary-dark: #ffffff;
-	--button-color-background-primary-hover: rgb(211 161 114);
-	--button-color-background-primary-dark-hover: rgb(138 69 30);
+	--button-color-background-primary-hover: #FF8787;
+	--button-color-background-primary-dark-hover: #CC0C0C;
 	--button-color-text-primary-hover: #ffffff;
 	--button-color-text-primary-dark-hover: #ffffff;
 
@@ -51,24 +55,27 @@
 	:root {
 		--heading-color: #ffffff;
 		--text-color: #f0f0f0;
-		--background-without-opacity: #f5f5f5;
+		--background-without-opacity: #000;
 		--logo-color: #eaeaea;
 
-		--color-primary: rgb(184 92 40);
+		/* Dark mode: Yellow theme */
+		--color-primary: #FCED1C;
+		--color-primary-hover: #FFF075;
+		--color-primary-light: #FFFCE0;
 		--color-secondary: #888888;
 		--color-background-error: #b00020;
 		--color-text-error: #fff;
 		--color-background-success: #007a42;
 		--color-text-success: #fff;
 
-		--button-color-background-primary: rgb(184 92 40);
-		--button-color-background-primary-dark: rgb(166 83 36);
-		--button-color-text-primary: #ffffff;
-		--button-color-text-primary-dark: #ffffff;
-		--button-color-background-primary-hover: rgb(211 161 114);
-		--button-color-background-primary-dark-hover: rgb(138 69 30);
-		--button-color-text-primary-hover: #ffffff;
-		--button-color-text-primary-dark-hover: #ffffff;
+		--button-color-background-primary: #FCED1C;
+		--button-color-background-primary-dark: #E6D419;
+		--button-color-text-primary: #000000;
+		--button-color-text-primary-dark: #000000;
+		--button-color-background-primary-hover: #FFF075;
+		--button-color-background-primary-dark-hover: #CCBB16;
+		--button-color-text-primary-hover: #000000;
+		--button-color-text-primary-dark-hover: #000000;
 
 		--button-color-background-secondary: var(--color-secondary);
 		--button-color-text-secondary: #ffffff;
@@ -77,6 +84,36 @@
 
 		--input-color-background: #3a3a3a;
 		--input-color-text: #fff;
+	}
+
+	html,
+	body {
+		@apply bg-black text-white;
+	}
+
+	body {
+		background-color: #000;
+		color: #f0f0f0;
+	}
+
+	h1 a {
+		@apply text-white;
+	}
+
+	h4 {
+		@apply text-gray-300;
+	}
+
+	a {
+		color: #FCED1C;
+	}
+
+	.content .prose {
+		@apply text-white;
+	}
+
+	.maximize {
+		background-image: url('/images/expand-dark-mode.svg');
 	}
 }
 
@@ -89,7 +126,7 @@
 	body {
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
-		@apply text-base bg-black;
+		@apply text-base bg-white text-gray-900;
 	}
 
 	h1 {
@@ -123,21 +160,19 @@
 	}
 
 	a {
-		@apply text-secondary text-yellow-500 underline hover:no-underline;
+		@apply text-secondary underline hover:no-underline;
+		color: #FF1111;
 	}
 
 	body {
+		@apply text-gray-900 dark:text-white;
 		background-color: var(--background-without-opacity);
 		color: #1e1e1e;
 		font-family: var(--font-family);
 	}
 
 	.error {
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		height: 100vh;
-		text-align: center;
+		@apply flex items-center justify-center h-screen text-center;
 	}
 
 	.content {
@@ -145,7 +180,7 @@
 	}
 
 	section {
-		margin-right: auto;
+		@apply mr-auto;
 	}
 
 	.subtitle {
@@ -188,8 +223,7 @@
 }
 
 .fade-in {
-	opacity: 0;
-	position: relative;
+	@apply opacity-0 relative;
 	transform: translateY(10px);
 	transition:
 		opacity 0.4s,
@@ -198,7 +232,7 @@
 }
 
 .visible {
-	opacity: 1;
+	@apply opacity-100;
 	transform: translateY(0);
 }
 
@@ -327,20 +361,5 @@
 			-10px -10px 0 5px,
 			-10px -10px 0 5px,
 			-10px -10px 0 5px;
-	}
-}
-
-@media (prefers-color-scheme: dark) {
-	body {
-		background-color: #000;
-		color: #f0f0f0;
-	}
-
-	.content .prose {
-		@apply text-white;
-	}
-
-	.maximize {
-		background-image: url('/images/expand-dark-mode.svg');
 	}
 }

@@ -12,18 +12,39 @@ module.exports = {
 		extend: {
 			colors: {
 				primary: {
-					DEFAULT: 'rgb(184 92 40)',
-					50: 'rgb(251 247 244)',
-					100: 'rgb(247 237 230)',
-					200: 'rgb(238 218 201)',
-					300: 'rgb(229 199 172)',
-					400: 'rgb(211 161 114)',
-					500: 'rgb(184 92 40)',
-					600: 'rgb(166 83 36)',
-					700: 'rgb(138 69 30)',
-					800: 'rgb(110 55 24)',
-					900: 'rgb(92 46 20)',
-					950: 'rgb(55 27 12)'
+					// Light mode: Red theme
+					DEFAULT: '#FF1111',
+					50: '#FFF5F5',
+					100: '#FFE3E3',
+					200: '#FFC9C9',
+					300: '#FFA8A8',
+					400: '#FF8787',
+					500: '#FF1111',
+					600: '#E60E0E',
+					700: '#CC0C0C',
+					800: '#B30A0A',
+					900: '#990808',
+					950: '#660505'
+				},
+				'primary-dark': {
+					// Dark mode: Yellow theme
+					DEFAULT: '#FCED1C',
+					50: '#FFFEF0',
+					100: '#FFFCE0',
+					200: '#FFF9C2',
+					300: '#FFF59E',
+					400: '#FFF075',
+					500: '#FCED1C',
+					600: '#E6D419',
+					700: '#CCBB16',
+					800: '#B3A213',
+					900: '#998910',
+					950: '#66590A'
+				},
+				// Add utility classes for theme-aware colors
+				'theme-primary': {
+					DEFAULT: '#FF1111', // Red for light mode
+					dark: '#FCED1C' // Yellow for dark mode
 				},
 				secondary: 'var(--color-secondary)',
 				success: 'var(--color-background-success)',

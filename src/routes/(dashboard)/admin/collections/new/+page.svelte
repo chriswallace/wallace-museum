@@ -91,7 +91,7 @@
 			<label for="enabled" class="inline">Enabled</label>
 		</div>
 		<div class="button-split">
-			<button class="primary" type="submit">Save and Add Artworks</button>
+			<button class="save" type="submit">Save and Add Artworks</button>
 		</div>
 	</form>
 </div>

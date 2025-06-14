@@ -52,6 +52,7 @@
 
 	let isUploadingAvatar = false;
 	let fileInputRef: HTMLInputElement;
+	let avatarKey = 0;
 	let newAddress = {
 		address: '',
 		blockchain: 'ethereum'
@@ -119,6 +120,7 @@
 			if (response.ok) {
 				const data = await response.json();
 				artist.avatarUrl = data.avatarUrl;
+				avatarKey++;
 				showToast('Avatar updated successfully.', 'success');
 			} else {
 				// Try to get detailed error message from server
@@ -211,19 +213,21 @@
 			<label class="block text-sm font-medium mb-2">Avatar</label>
 			<div class="relative group w-full aspect-square">
 				{#if artist.avatarUrl}
-					<OptimizedImage
-						src={artist.avatarUrl}
-						alt={artist.name}
-						width={120}
-						height={120}
-						fit="crop"
-						gravity="auto"
-						format="auto"
-						quality={90}
-						aspectRatio="1/1"
-						className="w-full h-full object-cover"
-						fallbackSrc="/images/medici-image.png"
-					/>
+					{#key avatarKey}
+						<OptimizedImage
+							src={artist.avatarUrl}
+							alt={artist.name}
+							width={120}
+							height={120}
+							fit="crop"
+							gravity="auto"
+							format="auto"
+							quality={90}
+							aspectRatio="1/1"
+							className="w-full h-full object-cover"
+							fallbackSrc="/images/medici-image.png"
+						/>
+					{/key}
 				{:else}
 					<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-md">
 						<span class="text-gray-500 dark:text-gray-400 text-lg">No Avatar</span>
@@ -309,7 +313,7 @@
 							</div>
 							<button
 								type="button"
-								class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+								class="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
 								on:click={() => removeAddress(address.id)}
 							>
 								Remove
@@ -342,7 +346,7 @@
 	</div>
 	<div class="md:col-span-3 flex justify-between mt-4">
 		<button class="destructive" on:click={confirmAndDelete} type="button">Delete Artist</button>
-		<button class="primary" type="submit">Save details</button>
+		<button class="save" type="submit">Save details</button>
 	</div>
 </form>
 

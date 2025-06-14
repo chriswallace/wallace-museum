@@ -313,7 +313,7 @@
 
 <style lang="scss">
 	.artists-container {
-		@apply w-full min-h-screen bg-black text-white;
+		@apply w-full min-h-screen bg-white text-gray-900;
 	}
 
 	.content {
@@ -325,11 +325,11 @@
 	}
 
 	.title {
-		@apply text-4xl md:text-5xl 2xl:text-6xl font-bold text-yellow-500 tracking-tight mb-6;
+		@apply text-4xl md:text-5xl 2xl:text-6xl font-bold text-primary tracking-tight mb-6;
 	}
 
 	.description {
-		@apply text-lg md:text-xl 2xl:text-2xl text-gray-100 font-medium leading-relaxed tracking-tight max-w-4xl;
+		@apply text-lg md:text-xl 2xl:text-2xl text-gray-700 font-medium leading-relaxed tracking-tight max-w-4xl;
 	}
 
 	.alphabetical-grid {
@@ -340,7 +340,7 @@
 		@apply grid grid-cols-[80px_1fr] md:grid-cols-[120px_1fr] gap-8 py-8;
 		
 		&.has-border {
-			@apply border-t border-gray-800;
+			@apply border-t border-gray-200;
 		}
 	}
 
@@ -349,7 +349,7 @@
 	}
 
 	.letter-display {
-		@apply text-4xl md:text-5xl font-bold text-yellow-500 tracking-tight;
+		@apply text-4xl md:text-5xl font-bold text-primary tracking-tight;
 	}
 
 	.artists-column {
@@ -357,15 +357,15 @@
 	}
 
 	.artist-item {
-		@apply w-full text-left cursor-pointer transition-all duration-200 p-4 md:p-6 rounded-lg border border-transparent hover:bg-gray-900/50 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:bg-gray-900/50;
+		@apply w-full text-left cursor-pointer transition-all duration-200 p-4 md:p-6 rounded-lg border border-transparent hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-gray-50;
 	}
 
 	.artist-name {
-		@apply text-lg md:text-xl font-semibold text-yellow-500 mb-1;
+		@apply text-lg md:text-xl font-semibold text-primary mb-1;
 	}
 
 	.artwork-count {
-		@apply text-sm text-gray-400;
+		@apply text-sm text-gray-500;
 	}
 
 	.no-artists {
@@ -373,14 +373,13 @@
 	}
 
 	.no-artists p {
-		@apply text-gray-400 text-lg;
+		@apply text-gray-500 text-lg;
 	}
 
 	.floating-artwork-preview {
-		@apply fixed pointer-events-none z-[9999] p-0 flex gap-0 items-center justify-center overflow-hidden bg-black border-none shadow-xl rounded-sm;
+		@apply fixed pointer-events-none z-[9999] p-0 flex gap-0 items-center justify-center overflow-hidden bg-white border-none shadow-xl rounded-sm;
 		transition: opacity 0.2s ease-in-out;
-		border: 1px solid rgba(255, 255, 255, 0.15);
-		mix-blend-mode: screen;
+		border: 1px solid rgba(0, 0, 0, 0.15);
 		opacity: 0.75;
 	}
 
@@ -389,7 +388,7 @@
 	}
 
 	.preview-image {
-		@apply w-full h-full rounded-lg bg-black object-contain shadow-lg m-0;
+		@apply w-full h-full rounded-lg bg-white object-contain shadow-lg m-0;
 		max-width: 100%;
 		max-height: 100%;
 	}
@@ -453,5 +452,62 @@
 
 	.hidden {
 		@apply opacity-0;
+	}
+
+	.featured-title {
+		@apply text-4xl md:text-5xl font-bold text-primary-dark tracking-tight;
+	}
+
+	.search-input {
+		@apply w-full px-6 py-4 text-lg bg-black/60 backdrop-blur-sm border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-dark/50 focus:bg-gray-900/50;
+	}
+
+	/* Dark mode styles */
+	@media (prefers-color-scheme: dark) {
+		.artists-container {
+			@apply bg-black text-white;
+		}
+
+		.title {
+			@apply text-primary-dark;
+		}
+
+		.description {
+			@apply text-gray-100;
+		}
+
+		.letter-section.has-border {
+			@apply border-gray-800;
+		}
+
+		.letter-display {
+			@apply text-primary-dark;
+		}
+
+		.artist-item {
+			@apply hover:bg-gray-900/50 focus:ring-primary-dark/50 focus:bg-gray-900/50;
+		}
+
+		.artist-name {
+			@apply text-primary-dark;
+		}
+
+		.artwork-count {
+			@apply text-gray-400;
+		}
+
+		.no-artists p {
+			@apply text-gray-400;
+		}
+
+		.floating-artwork-preview {
+			@apply bg-black;
+			border: 1px solid rgba(255, 255, 255, 0.15);
+			mix-blend-mode: screen;
+		}
+
+		.preview-image {
+			@apply bg-black;
+		}
 	}
 </style> 

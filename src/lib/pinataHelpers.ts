@@ -114,6 +114,9 @@ export function getPinataGateway(includePath: boolean = true): string {
 		if (gateway.startsWith('http')) {
 			// Full URL provided (e.g., 'https://my-gateway.mypinata.cloud/ipfs/')
 			baseUrl = gateway.endsWith('/') ? gateway : `${gateway}/`;
+		} else if (gateway.includes('.mypinata.cloud')) {
+			// Full domain provided (e.g., 'gray-main-sloth-467.mypinata.cloud')
+			baseUrl = `https://${gateway}/ipfs/`;
 		} else {
 			// Subdomain format (e.g., 'my-gateway')
 			baseUrl = `https://${gateway}.mypinata.cloud/ipfs/`;

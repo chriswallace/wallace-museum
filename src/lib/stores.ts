@@ -33,6 +33,7 @@ export interface Artwork {
 	features?: Record<string, any>;
 	collectionId?: number;
 	creatorAddresses?: string[];
+	fullscreen?: boolean;
 	// --- Fields from ArtworkResult for import page compatibility ---
 	image_url?: string | null;
 	animation_url?: string | null;

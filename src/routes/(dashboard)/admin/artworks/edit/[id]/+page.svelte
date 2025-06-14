@@ -108,6 +108,9 @@
 			: `height: 100%; width: auto; aspect-ratio: ${artwork.dimensions.width}/${artwork.dimensions.height};`)
 		: 'width: 100%; height: auto;';
 
+	// Reactive variable for interactive content URL
+	$: interactiveUrl = artwork.animationUrl || artwork.generatorUrl || '';
+
 	// Common MIME types for artworks
 	const commonMimeTypes = [
 		{ value: '', label: '-- Select MIME Type --' },
@@ -310,20 +313,9 @@
 								>
 									<track kind="captions" />
 								</video>
-							{:else if artwork.mime === 'text/html' || artwork.mime === 'application/javascript' || artwork.generatorUrl}
-								{@const url = artwork.animationUrl || artwork.generatorUrl || undefined}
-								<iframe 
-									src={ipfsToHttpUrlForHtml(url, artwork.mime)} 
-									title="Interactive Artwork"
-									class="media-content"
-									width={artwork.dimensions?.width || 800}
-									height={artwork.dimensions?.height || 800}
-									style={mediaStyle}
-									allowfullscreen
-								></iframe>
-							{:else}
+							{:else if artwork.mime === 'image/gif'}
 								<OptimizedImage
-									src={artwork.imageUrl || ''}
+									src={artwork.animationUrl || artwork.generatorUrl || ''}
 									alt={artwork.title}
 									width={artwork.dimensions?.width || 800}
 									height={artwork.dimensions?.height || 800}
@@ -332,8 +324,47 @@
 									quality={85}
 									className="media-content"
 									style={mediaStyle}
+									mimeType={artwork.mime}
+								/>
+							{:else if artwork.mime === 'text/html' || artwork.mime === 'application/javascript' || artwork.generatorUrl}
+								{#if interactiveUrl}
+									<iframe 
+										src={ipfsToHttpUrlForHtml(interactiveUrl, artwork.mime)} 
+										title="Interactive Artwork"
+										class="media-content"
+										width={artwork.dimensions?.width || 800}
+										height={artwork.dimensions?.height || 800}
+										style={mediaStyle}
+										allowfullscreen
+									></iframe>
+								{/if}
+							{:else}
+								<OptimizedImage
+									src={artwork.imageUrl ?? ''}
+									alt={artwork.title}
+									width={artwork.dimensions?.width || 800}
+									height={artwork.dimensions?.height || 800}
+									fit="contain"
+									format="auto"
+									quality={85}
+									className="media-content"
+									style={mediaStyle}
+									mimeType={artwork.mime}
 								/>
 							{/if}
+						{:else if artwork.imageUrl}
+							<OptimizedImage
+								src={artwork.imageUrl ?? ''}
+								alt={artwork.title}
+								width={artwork.dimensions?.width || 800}
+								height={artwork.dimensions?.height || 800}
+								fit="contain"
+								format="auto"
+								quality={85}
+								className="media-content"
+								style={mediaStyle}
+								mimeType={artwork.mime}
+							/>
 						{:else if artwork.thumbnailUrl}
 							<OptimizedImage
 								src={artwork.thumbnailUrl || ''}
@@ -345,6 +376,7 @@
 								quality={85}
 								className="media-content"
 								style={mediaStyle}
+								mimeType={artwork.mime}
 							/>
 						{:else}
 							<div class="no-media-placeholder">
@@ -547,7 +579,7 @@
 									Refetch Data
 								{/if}
 							</button>
-							<button class="primary" type="submit">Save details</button>
+							<button class="save" type="submit">Save details</button>
 						</div>
 					</div>
 				</form>
@@ -567,14 +599,6 @@
 	}
 
 	.artwork-preview {
-		background: var(--color-surface-secondary, #343434);
-		border-radius: 8px;
-		aspect-ratio: 1/1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		overflow: hidden;
-		height: 100%;
 		width: 100%;
 	}
 
