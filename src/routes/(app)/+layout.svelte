@@ -34,29 +34,30 @@
 	<footer class="site-footer">
 		<div class="footer-content">
 			<div class="copyright">
-				<p class="text-white font-bold">The Wallace Museum</p>
-				<p>
-					{new Date().getFullYear()} &copy; Chris Wallace. All rights reserved. All artworks remain the
-					property of their respective creators.
-				</p>
-			</div>
-			<div class="social-links">
-				<a
-					href="https://twitter.com/chriswallace"
-					target="_blank"
-					rel="noopener noreferrer"
-					class="social-link"
-				>
-					@chriswallace
-				</a>
-				<a
-					href="https://chriswallace.net"
-					target="_blank"
-					rel="noopener noreferrer"
-					class="social-link"
-				>
-					chriswallace.net
-				</a>
+				<div class="font-bold">The Wallace Museum</div>
+				<div>
+					<div class="mb-12">
+						{new Date().getFullYear()} &copy; Chris Wallace.
+					</div>
+					<div class="social-links inline">
+						<a
+							href="https://twitter.com/chriswallace"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="social-link"
+						>
+							@chriswallace
+						</a>
+						<a
+							href="https://chriswallace.net"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="social-link"
+						>
+							chriswallace.net
+						</a>
+					</div>
+				</div>
 			</div>
 		</div>
 	</footer>
@@ -102,13 +103,11 @@
 	}
 
 	.site-footer {
-		@apply py-12 md:px-12 border-t border-gray-800 relative z-10;
-		background: rgba(0, 0, 0, 0.95);
-		padding-bottom: 80px;
+		@apply py-16 md:px-4 border-t border-gray-200 dark:border-gray-800 relative z-10;
 	}
 
 	.footer-content {
-		@apply max-w-full mx-auto px-8 text-sm md:flex	justify-between;
+		@apply max-w-full mx-auto px-8 text-sm md:flex;
 	}
 
 	.copyright {
@@ -116,7 +115,7 @@
 	}
 
 	.copyright p {
-		@apply m-0 mb-1 text-sm;
+		@apply m-0 mb-0 text-sm;
 	}
 
 	.copyright p.text-white {
@@ -125,10 +124,6 @@
 
 	.artists-copyright {
 		@apply text-sm;
-	}
-
-	.social-links {
-		@apply mt-6;
 	}
 
 	.social-link {

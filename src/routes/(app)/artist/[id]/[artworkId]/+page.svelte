@@ -895,7 +895,7 @@
 	}
 
 	.info-container {
-		@apply flex-grow-0 flex-shrink-0 gap-6 flex flex-col pb-8 lg:pt-12 lg:pl-12 lg:pr-0 lg:pb-12 lg:min-w-[464px] lg:max-w-[464px] lg:border-l lg:border-white/10;
+		@apply flex-grow-0 flex-shrink-0 gap-6 flex flex-col pb-8 lg:pt-12 lg:pl-12 lg:pr-0 lg:pb-12 lg:min-w-[464px] lg:max-w-[464px] lg:border-l lg:border-black/10 dark:lg:border-white/10;
 	}
 
 	/* Fullscreen info container - position as overlay */
