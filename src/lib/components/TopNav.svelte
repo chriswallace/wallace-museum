@@ -29,6 +29,11 @@
 	let isPWA = false;
 	let isIOS = false;
 
+	// Touch handling for swipe-to-close
+	let touchStartX = 0;
+	let touchStartY = 0;
+	let isDragging = false;
+
 	function handleNavClick(path: string) {
 		goto(path);
 		// Close mobile menu after navigation
@@ -68,6 +73,38 @@
 		// Detect iOS
 		isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
 				(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	}
+
+	// Touch event handlers for swipe-to-close
+	function handleTouchStart(event: TouchEvent) {
+		touchStartX = event.touches[0].clientX;
+		touchStartY = event.touches[0].clientY;
+		isDragging = false;
+	}
+
+	function handleTouchMove(event: TouchEvent) {
+		if (!touchStartX || !touchStartY) return;
+
+		const touchCurrentX = event.touches[0].clientX;
+		const touchCurrentY = event.touches[0].clientY;
+		
+		const deltaX = touchCurrentX - touchStartX;
+		const deltaY = touchCurrentY - touchStartY;
+		
+		// Only consider horizontal swipes (more horizontal than vertical)
+		if (Math.abs(deltaX) > Math.abs(deltaY)) {
+			isDragging = true;
+			// Swipe right to close (positive deltaX)
+			if (deltaX > 50) {
+				closeMobileMenu();
+			}
+		}
+	}
+
+	function handleTouchEnd() {
+		touchStartX = 0;
+		touchStartY = 0;
+		isDragging = false;
 	}
 
 	onMount(() => {
@@ -172,20 +209,12 @@
 	></div>
 
 	<!-- Slide-out menu panel -->
-	<div class="mobile-menu-panel md:hidden">
-		<div class="mobile-menu-header">
-			<button 
-				class="mobile-menu-close"
-				on:click={closeMobileMenu}
-				aria-label="Close navigation menu"
-			>
-				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-					<line x1="18" y1="6" x2="6" y2="18"></line>
-					<line x1="6" y1="6" x2="18" y2="18"></line>
-				</svg>
-			</button>
-		</div>
-		
+	<div 
+		class="mobile-menu-panel md:hidden"
+		on:touchstart={handleTouchStart}
+		on:touchmove={handleTouchMove}
+		on:touchend={handleTouchEnd}
+	>
 		<nav class="mobile-menu-nav">
 			{#each navItems as item, index}
 				<button
@@ -210,42 +239,46 @@
 
 	/* PWA iOS specific styles - extend behind status bar */
 	.top-nav.pwa-ios {
-		/* Add padding-top to account for iOS status bar */
-		padding-top: env(safe-area-inset-top);
 		/* Extend the background behind the status bar */
 		top: calc(-1 * env(safe-area-inset-top));
 		/* Adjust height to include the status bar area */
 		height: calc(var(--navbar-height) + env(safe-area-inset-top));
+		/* Extend padding to cover the entire area including status bar */
+		padding-top: env(safe-area-inset-top);
 	}
 
 	/* Adjust mobile nav for PWA iOS */
 	.top-nav.pwa-ios .mobile-nav {
-		/* Add top padding to push content below status bar */
-		padding-top: env(safe-area-inset-top);
-		height: calc(var(--navbar-height) + env(safe-area-inset-top));
+		/* Remove extra padding since parent now handles it */
+		padding-top: 0;
+		height: var(--navbar-height);
 	}
 
 	/* Adjust desktop nav for PWA iOS */
 	.top-nav.pwa-ios .desktop-nav {
-		/* Add top padding to push content below status bar */
-		padding-top: env(safe-area-inset-top);
-		height: calc(var(--navbar-height) + env(safe-area-inset-top));
+		/* Remove extra padding since parent now handles it */
+		padding-top: 0;
+		height: var(--navbar-height);
 	}
 
 	.top-nav.pwa-ios .page-logo {
 		/* Adjust logo position for status bar */
-		height: calc(var(--navbar-height) + env(safe-area-inset-top));
-		padding-top: env(safe-area-inset-top);
+		height: var(--navbar-height);
+		padding-top: 0;
+		/* Position relative to the navbar content area */
+		top: env(safe-area-inset-top);
 	}
 
 	.top-nav.pwa-ios .nav-container {
 		/* Adjust nav container for status bar */
-		height: calc(var(--navbar-height) + env(safe-area-inset-top));
-		padding-top: env(safe-area-inset-top);
+		height: var(--navbar-height);
+		padding-top: 0;
+		/* Position relative to the navbar content area */
+		margin-top: env(safe-area-inset-top);
 	}
 
 	.top-nav.pwa-ios .nav-center {
-		/* Adjust nav center for status bar */
+		/* Keep nav center height normal */
 		height: var(--navbar-height);
 	}
 
@@ -396,20 +429,8 @@
 		animation: slideIn 0.25s ease-in-out;
 	}
 
-	.mobile-menu-header {
-		@apply flex items-center justify-between p-6;
-	}
-
-	.mobile-menu-title {
-		@apply text-lg font-semibold text-gray-900 m-0;
-	}
-
-	.mobile-menu-close {
-		@apply bg-transparent border-none text-gray-600 hover:text-gray-900 cursor-pointer p-2 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50;
-	}
-
 	.mobile-menu-nav {
-		@apply flex flex-col p-6 space-y-2;
+		@apply flex flex-col p-6 pt-20 space-y-2;
 	}
 
 	.mobile-nav-item {
@@ -452,14 +473,6 @@
 
 		.mobile-menu-panel {
 			@apply bg-black/95 border-gray-700;
-		}
-
-		.mobile-menu-title {
-			@apply text-white;
-		}
-
-		.mobile-menu-close {
-			@apply text-gray-400 hover:text-white focus:ring-primary-dark;
 		}
 
 		.mobile-nav-item {

@@ -818,7 +818,7 @@
 							</div>
 
 							<!-- Keyboard Shortcuts -->
-							<div class="keyboard-shortcuts-section">
+							<div class="keyboard-shortcuts-section hidden md:block">
 								<button 
 									class="keyboard-help-trigger"
 									on:click={() => keyboardHelpVisible = true}
