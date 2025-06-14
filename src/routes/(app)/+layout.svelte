@@ -1,14 +1,44 @@
-<script>
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import TopNav from '$lib/components/TopNav.svelte';
 	import '../../app.css';
+
+	// PWA and iOS detection for layout adjustments
+	let isPWA = false;
+	let isIOS = false;
+
+	// Detect PWA and iOS
+	function detectPWAAndPlatform() {
+		if (typeof window === 'undefined') return;
+
+		// Detect if running as PWA
+		isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+				 (window.navigator as any).standalone === true ||
+				 document.referrer.includes('android-app://');
+
+		// Detect iOS
+		isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+				(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	}
 
 	onMount(() => {
 		// Prevent automatic scroll restoration
 		if (typeof window !== 'undefined' && 'scrollRestoration' in history) {
 			history.scrollRestoration = 'manual';
 		}
+
+		// Detect PWA and platform
+		detectPWAAndPlatform();
+
+		// Listen for display mode changes (PWA installation/uninstallation)
+		const mediaQuery = window.matchMedia('(display-mode: standalone)');
+		const handleDisplayModeChange = () => detectPWAAndPlatform();
+		mediaQuery.addEventListener('change', handleDisplayModeChange);
+
+		return () => {
+			mediaQuery.removeEventListener('change', handleDisplayModeChange);
+		};
 	});
 
 	// Ensure we start at the top on navigation
@@ -20,7 +50,7 @@
 </script>
 
 <svelte:head>
-	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 	<link rel="stylesheet" href="https://use.typekit.net/dpg0jya.css" />
 	
 	<!-- Favicon and App Icons -->
@@ -38,7 +68,7 @@
 
 <TopNav />
 
-<div class="page-container">
+<div class="page-container" class:pwa-ios={isPWA && isIOS}>
 	<div class="content">
 		<slot />
 	</div>
@@ -108,6 +138,12 @@
 	.page-container {
 		@apply min-h-screen flex flex-col relative;
 		padding-top: var(--navbar-height);
+	}
+
+	/* PWA iOS specific layout adjustments */
+	.page-container.pwa-ios {
+		/* Account for both navbar height and iOS status bar */
+		padding-top: calc(var(--navbar-height) + env(safe-area-inset-top));
 	}
 
 	.content {

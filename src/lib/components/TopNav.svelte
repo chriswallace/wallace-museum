@@ -22,13 +22,12 @@
 		return currentPath.startsWith(item.path);
 	});
 
-	// Scroll hiding state - only for small screens
-	let isNavVisible = true;
-	let lastScrollY = 0;
-	let ticking = false;
-
 	// Mobile menu state
 	let isMobileMenuOpen = false;
+
+	// PWA detection state
+	let isPWA = false;
+	let isIOS = false;
 
 	function handleNavClick(path: string) {
 		goto(path);
@@ -50,49 +49,6 @@
 		isMobileMenuOpen = false;
 	}
 
-	function handleScroll() {
-		if (!ticking) {
-			requestAnimationFrame(updateNavVisibility);
-			ticking = true;
-		}
-	}
-
-	function updateNavVisibility() {
-		if (!browser) return;
-		
-		const currentScrollY = window.scrollY;
-		const scrollDifference = currentScrollY - lastScrollY;
-		
-		// Only apply scroll hiding on small screens (below md breakpoint - 768px)
-		if (window.innerWidth < 768) {
-			// Show navbar when scrolling up or at top of page
-			if (scrollDifference < 0 || currentScrollY < 10) {
-				isNavVisible = true;
-			}
-			// Hide navbar when scrolling down and past initial threshold
-			else if (scrollDifference > 0 && currentScrollY > 100) {
-				isNavVisible = false;
-			}
-		} else {
-			// Always show navbar on medium screens and larger
-			isNavVisible = true;
-		}
-		
-		lastScrollY = currentScrollY;
-		ticking = false;
-	}
-
-	function handleResize() {
-		if (!browser) return;
-		
-		// Ensure navbar is always visible on medium screens and larger
-		if (window.innerWidth >= 768) {
-			isNavVisible = true;
-			// Close mobile menu on resize to larger screen
-			isMobileMenuOpen = false;
-		}
-	}
-
 	// Handle escape key to close mobile menu
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Escape' && isMobileMenuOpen) {
@@ -100,32 +56,49 @@
 		}
 	}
 
+	// Detect PWA and iOS
+	function detectPWAAndPlatform() {
+		if (!browser) return;
+
+		// Detect if running as PWA
+		isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+				 (window.navigator as any).standalone === true ||
+				 document.referrer.includes('android-app://');
+
+		// Detect iOS
+		isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+				(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	}
+
 	onMount(() => {
 		if (!browser) return;
 		
-		// Set initial scroll position
-		lastScrollY = window.scrollY;
+		// Detect PWA and platform
+		detectPWAAndPlatform();
 		
 		// Add event listeners
-		window.addEventListener('scroll', handleScroll, { passive: true });
-		window.addEventListener('resize', handleResize);
 		window.addEventListener('keydown', handleKeydown);
 		
-		// Handle initial screen size
-		handleResize();
+		// Listen for display mode changes (PWA installation/uninstallation)
+		const mediaQuery = window.matchMedia('(display-mode: standalone)');
+		const handleDisplayModeChange = () => detectPWAAndPlatform();
+		mediaQuery.addEventListener('change', handleDisplayModeChange);
+		
+		return () => {
+			window.removeEventListener('keydown', handleKeydown);
+			mediaQuery.removeEventListener('change', handleDisplayModeChange);
+		};
 	});
 
 	onDestroy(() => {
 		if (!browser) return;
 		
 		// Clean up event listeners
-		window.removeEventListener('scroll', handleScroll);
-		window.removeEventListener('resize', handleResize);
 		window.removeEventListener('keydown', handleKeydown);
 	});
 </script>
 
-<nav class="top-nav" class:nav-hidden={!isNavVisible}>
+<nav class="top-nav" class:pwa-ios={isPWA && isIOS}>
 	<!-- Mobile Layout (small screens) -->
 	<div class="mobile-nav md:hidden">
 		<!-- Museum Logo -->
@@ -232,14 +205,53 @@
 	.top-nav {
 		@apply bg-white/90 backdrop-blur-sm border-b border-gray-200 fixed top-0 left-0 right-0 z-40;
 		height: var(--navbar-height);
-		transition: transform 0.3s ease-in-out;
+		/* Removed transition since we're no longer hiding the navbar */
 	}
 
-	.top-nav.nav-hidden {
-		// Only hide on small screens
-		@media (max-width: 767px) {
-			transform: translateY(-100%);
-		}
+	/* PWA iOS specific styles - extend behind status bar */
+	.top-nav.pwa-ios {
+		/* Add padding-top to account for iOS status bar */
+		padding-top: env(safe-area-inset-top);
+		/* Extend the background behind the status bar */
+		top: calc(-1 * env(safe-area-inset-top));
+		/* Adjust height to include the status bar area */
+		height: calc(var(--navbar-height) + env(safe-area-inset-top));
+	}
+
+	/* Adjust mobile nav for PWA iOS */
+	.top-nav.pwa-ios .mobile-nav {
+		/* Add top padding to push content below status bar */
+		padding-top: env(safe-area-inset-top);
+		height: calc(var(--navbar-height) + env(safe-area-inset-top));
+	}
+
+	/* Adjust desktop nav for PWA iOS */
+	.top-nav.pwa-ios .desktop-nav {
+		/* Add top padding to push content below status bar */
+		padding-top: env(safe-area-inset-top);
+		height: calc(var(--navbar-height) + env(safe-area-inset-top));
+	}
+
+	.top-nav.pwa-ios .page-logo {
+		/* Adjust logo position for status bar */
+		height: calc(var(--navbar-height) + env(safe-area-inset-top));
+		padding-top: env(safe-area-inset-top);
+	}
+
+	.top-nav.pwa-ios .nav-container {
+		/* Adjust nav container for status bar */
+		height: calc(var(--navbar-height) + env(safe-area-inset-top));
+		padding-top: env(safe-area-inset-top);
+	}
+
+	.top-nav.pwa-ios .nav-center {
+		/* Adjust nav center for status bar */
+		height: var(--navbar-height);
+	}
+
+	.top-nav.pwa-ios .nav-tab {
+		/* Keep nav tab height normal */
+		height: var(--navbar-height);
 	}
 
 	/* Mobile Navigation Styles */
