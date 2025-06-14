@@ -239,34 +239,40 @@
 
 	/* PWA iOS specific styles - extend behind status bar */
 	.top-nav.pwa-ios {
+		/* Use solid white background for better iOS integration */
+		@apply bg-white;
 		/* Extend the background behind the status bar */
 		top: calc(-1 * env(safe-area-inset-top));
 		/* Adjust height to include the status bar area */
 		height: calc(var(--navbar-height) + env(safe-area-inset-top));
-		/* Add padding to push content down to original position */
+	}
+
+	/* Mobile nav positioning - add top padding to push content below status bar */
+	.top-nav.pwa-ios .mobile-nav {
+		height: var(--navbar-height);
+		/* Add padding to push content below status bar */
 		padding-top: env(safe-area-inset-top);
 	}
 
-	/* Mobile nav positioning remains the same */
-	.top-nav.pwa-ios .mobile-nav {
-		height: var(--navbar-height);
-		/* Content positioned normally within the padded area */
-	}
-
-	/* Desktop nav positioning remains the same */
+	/* Desktop nav positioning - add top padding to push content below status bar */
 	.top-nav.pwa-ios .desktop-nav {
 		height: var(--navbar-height);
-		/* Content positioned normally within the padded area */
+		/* Add padding to push content below status bar */
+		padding-top: env(safe-area-inset-top);
 	}
 
 	.top-nav.pwa-ios .page-logo {
-		/* Logo positioned normally within the padded area */
+		/* Logo positioned normally within the content area */
 		height: var(--navbar-height);
+		/* Position logo below the status bar */
+		top: env(safe-area-inset-top);
 	}
 
 	.top-nav.pwa-ios .nav-container {
-		/* Nav container positioned normally within the padded area */
+		/* Nav container positioned normally within the content area */
 		height: var(--navbar-height);
+		/* Add top margin to account for status bar */
+		margin-top: env(safe-area-inset-top);
 	}
 
 	.top-nav.pwa-ios .nav-center {
@@ -419,14 +425,23 @@
 	.mobile-menu-panel {
 		@apply fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white/95 backdrop-blur-md border-l border-gray-200 z-50;
 		animation: slideIn 0.25s ease-in-out;
+		padding: 0;
 	}
 
 	.mobile-menu-nav {
-		@apply flex flex-col p-6 pt-20 space-y-2;
+		@apply flex flex-col p-4 pt-16 space-y-0;
+		display: flex !important;
+		flex-direction: column !important;
 	}
 
 	.mobile-nav-item {
-		@apply w-full text-left px-4 py-3 text-lg font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200 bg-transparent border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50;
+		@apply w-full text-left px-6 py-4 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 bg-transparent border-none cursor-pointer focus:outline-none focus:ring-0 block;
+		display: block !important;
+		width: 100% !important;
+		flex: none !important;
+		margin: 0 !important;
+		border-radius: 0 !important;
+		border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 	}
 
 	.mobile-nav-item.active {
@@ -437,6 +452,11 @@
 	@media (prefers-color-scheme: dark) {
 		.top-nav {
 			@apply bg-black/40 border-gray-900;
+		}
+
+		/* PWA iOS dark mode - use solid black background */
+		.top-nav.pwa-ios {
+			@apply bg-black;
 		}
 
 		.hamburger-button {
@@ -468,7 +488,8 @@
 		}
 
 		.mobile-nav-item {
-			@apply text-gray-300 hover:text-white hover:bg-gray-800/50 focus:ring-primary-dark;
+			@apply text-gray-300 hover:text-white hover:bg-gray-800/50 focus:ring-0;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 		}
 
 		.mobile-nav-item.active {

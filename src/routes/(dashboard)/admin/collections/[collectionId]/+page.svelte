@@ -315,7 +315,7 @@
 		</div>
 
 		{#if activeTab === 'artworks'}
-			<div class="artworks-tab">
+			<div class="artworks-tab mt-8">
 				<CollectionArtworkGrid
 					artworks={collection.artworks}
 					variant="collection"
@@ -327,7 +327,7 @@
 				/>
 			</div>
 		{:else if activeTab === 'details'}
-			<div class="details-tab">
+			<div class="details-tab mt-8">
 				<form on:submit|preventDefault={updateCollection}>
 					<div class="mb-4">
 						<label for="title">Title</label>
@@ -389,11 +389,11 @@
 	}
 
 	.tabs {
-		@apply relative flex mb-8 after:content-[''] after:block after:z-0 after:h-[2px] after:absolute after:bottom-0 after:left-0 after:bg-gray-700 after:w-full;
+		@apply relative flex items-stretch -mx-6 -mb-6 border-b border-gray-200 dark:border-gray-700;
 	}
 
 	.tabs button {
-		@apply z-10 border-b-2 border-b-transparent py-2 px-4;
+		@apply z-10 border-b-2 border-b-transparent px-6 flex items-center font-medium;
 	}
 
 	.tabs button.active {

@@ -1054,8 +1054,31 @@
 
 	.nav-button {
 		@apply flex items-center justify-center w-10 h-10 border-none rounded-full cursor-pointer text-lg;
-		@apply text-gray-600 hover:bg-primary hover:text-black transition-colors duration-200;
-		@apply dark:text-gray-400 dark:hover:bg-primary-dark dark:hover:text-black;
+		@apply text-gray-600 transition-colors duration-200;
+		@apply dark:text-gray-400;
+	}
+
+	/* Desktop hover styles - only apply on medium screens and larger */
+	@media (min-width: 768px) {
+		.nav-button:hover {
+			@apply bg-primary text-black;
+		}
+	}
+
+	/* Desktop dark mode hover styles */
+	@media (min-width: 768px) and (prefers-color-scheme: dark) {
+		.nav-button:hover {
+			@apply bg-primary-dark text-black;
+		}
+	}
+
+	/* Mobile touch styles - prevent background color changes */
+	@media (max-width: 767px) {
+		.nav-button:hover,
+		.nav-button:active,
+		.nav-button:focus {
+			background-color: transparent !important;
+		}
 	}
 
 	/* Content styles */

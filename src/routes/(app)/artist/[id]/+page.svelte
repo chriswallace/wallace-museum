@@ -50,7 +50,7 @@
 	// New utility functions for wallet display
 	function formatWalletAddress(address: string): string {
 		if (!address || address.length <= 10) return address;
-		return `${address.substring(0, 4)}...${address.substring(address.length - 4)}`;
+		return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 	}
 
 	function getProfileUrl(address: string, blockchain: string): string {
@@ -137,7 +137,7 @@
 	$: walletAddresses = data.artist ? parseWalletAddresses(data.artist.walletAddresses) : [];
 	$: socialLinks = data.artist ? parseSocialLinks(data.artist.socialLinks) : {};
 
-	// Get the primary description (bio or description)
+	// Get the primary description (bio or description as fallback)
 	$: primaryDescription = data.artist?.bio || data.artist?.description || '';
 	$: shouldShowReadMore = shouldTruncateDescription(primaryDescription);
 	$: truncatedDescription = getTruncatedDescription(primaryDescription);
@@ -275,92 +275,106 @@
 
 						<div class="artist-title">
 							<h1>
-								{data.artist.displayName || data.artist.name}
-								{#if data.artist.isVerified}
-									<span class="verification-badge" title="Verified Artist">✓</span>
-								{/if}
+								{data.artist.name}{#if data.artist.displayName && data.artist.displayName !== data.artist.name}&nbsp;<span class="display-name">{data.artist.displayName}</span>{/if}
 							</h1>
-							{#if data.artist.ensName}
-								<p class="ens-name">{data.artist.ensName}</p>
-							{/if}
 						</div>
 						{#if primaryDescription}
 							<div class="bio-section">
-								<p>{shouldShowReadMore ? truncatedDescription : primaryDescription}</p>
-								{#if shouldShowReadMore}
-									<button 
-										class="read-more-button"
-										on:click={openDescriptionModal}
-									>
-										Read more
-									</button>
-								{/if}
+								<p>
+									{shouldShowReadMore ? truncatedDescription : primaryDescription}
+									{#if shouldShowReadMore}
+										<button 
+											class="read-more-button"
+											on:click={openDescriptionModal}
+										>
+											Read more
+										</button>
+									{/if}
+								</p>
 							</div>
 						{/if}
-						{#if data.artist.description && data.artist.description !== data.artist.bio && !primaryDescription.includes(data.artist.description)}
-							<div class="description-section">
-								<p>{data.artist.description}</p>
+						<!-- Social Icons -->
+						{#if data.artist.websiteUrl || data.artist.twitterHandle || data.artist.instagramHandle}
+							<div class="social-icons">
+								{#if data.artist.websiteUrl}
+									<a href={data.artist.websiteUrl} target="_blank" rel="noopener noreferrer" class="social-icon-button" title="Website">
+										<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.875" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+									</a>
+								{/if}
+								{#if data.artist.twitterHandle}
+									<a href={getTwitterUrl(data.artist.twitterHandle)} target="_blank" rel="noopener noreferrer" class="social-icon-button" title="Twitter/X">
+										<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+											<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+										</svg>
+									</a>
+								{/if}
+								{#if data.artist.instagramHandle}
+									<a href={getInstagramUrl(data.artist.instagramHandle)} target="_blank" rel="noopener noreferrer" class="social-icon-button" title="Instagram">
+										<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+											<path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+										</svg>
+									</a>
+								{/if}
 							</div>
 						{/if}
 					</div>
 
-					<!-- Social Links -->
-					{#if data.artist.websiteUrl || data.artist.twitterHandle || data.artist.instagramHandle || data.artist.profileUrl}
-						<div class="detail-section">
-							<h3>Links</h3>
-							<ul class="links-list">
-								{#if data.artist.websiteUrl}
-									<li><a href={data.artist.websiteUrl} target="_blank" rel="noopener noreferrer">Website</a></li>
-								{/if}
-								{#if data.artist.twitterHandle}
-									<li><a href={getTwitterUrl(data.artist.twitterHandle)} target="_blank" rel="noopener noreferrer">Twitter {formatSocialHandle(data.artist.twitterHandle)}</a></li>
-								{/if}
-								{#if data.artist.instagramHandle}
-									<li><a href={getInstagramUrl(data.artist.instagramHandle)} target="_blank" rel="noopener noreferrer">Instagram {formatSocialHandle(data.artist.instagramHandle)}</a></li>
-								{/if}
-								{#if data.artist.profileUrl}
-									<li><a href={data.artist.profileUrl} target="_blank" rel="noopener noreferrer">Profile</a></li>
-								{/if}
-							</ul>
-						</div>
-					{/if}
-
-					<!-- Wallet Addresses -->
-					{#if walletAddresses.length > 0}
-						<div class="detail-section">
-							<h3>Wallets</h3>
-							<ul class="wallets-list">
-								{#each walletAddresses as wallet}
-									<li class="wallet-item">
-										<div class="wallet-info">
-											<div class="chain-icon">
-												{#if getChainIcon(wallet.blockchain) === 'ethereum'}
-													<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-														<path d="M11.944 17.97L4.58 13.62 11.943 24l7.37-10.38-7.372 4.35h.003zM12.056 0L4.69 12.223l7.365 4.354 7.365-4.35L12.056 0z"/>
-													</svg>
-												{:else if getChainIcon(wallet.blockchain) === 'tezos'}
-													<svg height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1169.87 1593" fill="currentColor"><g id="Layer_2" data-name="Layer 2"><path d="M755.68,1593q-170.51,0-248.91-82.14a253.6,253.6,0,0,1-78.15-177,117.39,117.39,0,0,1,13.69-58.5A101.21,101.21,0,0,1,479.64,1238a130.22,130.22,0,0,1,116.24,0A99.55,99.55,0,0,1,633,1275.36a115,115,0,0,1,14.18,58.5,111.73,111.73,0,0,1-19.91,68.45a92.78,92.78,0,0,1-47.31,34.62,129.18,129.18,0,0,0,74.67,46.55,370,370,0,0,0,101.8,14.68,226.91,226.91,0,0,0,128.19-38.33,224,224,0,0,0,83.63-113.25,492,492,0,0,0,27.38-169.5,465.07,465.07,0,0,0-29.87-176.23,217.54,217.54,0,0,0-86.37-109.52,229.68,229.68,0,0,0-124.43-35.59,236.75,236.75,0,0,0-107.78,36.59L567.26,932.4V892.33L926.43,410.5H428.62v500A178.9,178.9,0,0,0,456,1012.8a94.34,94.34,0,0,0,83.63,40.07a139.85,139.85,0,0,0,82.63-29.12,298.38,298.38,0,0,0,69.2-71.19a24.86,24.86,0,0,1,9-11.94,18.4,18.4,0,0,1,12-4.48,41.55,41.55,0,0,1,23.4,9.95,49.82,49.82,0,0,1,12.69,33.85,197.86,197.86,0,0,1-4.48,24.89,241,241,0,0,1-85.38,106,211.78,211.78,0,0,1-119.76,36.38q-161.67,0-224-63.72A238.67,238.67,0,0,1,253.2,909.25V410.5H0V317.6H254.38V105.78L196.14,47.5V0h169l63.48,32.86V317.6l657.6-2,65.47,65.71L748.46,786.5a271,271,0,0,1,76.16-18.42A330.1,330.1,0,0,1,972,810.15a302.7,302.7,0,0,1,126.95,113.29,399.78,399.78,0,0,1,57.25,136.65,575.65,575.65,0,0,1,13.69,117,489.39,489.39,0,0,1-49.78,216.79,317.92,317.92,0,0,1-149.35,149.35A483.27,483.27,0,0,1,755.68,1593Z"/></g></svg>
-												{:else}
-													<div class="unknown-chain"></div>
-												{/if}
+					<div class="detail-sections-grid">
+						<!-- Wallets -->
+						{#if data.artist.profileUrl || walletAddresses.length > 0}
+							<div class="detail-section">
+								<h3>Known Wallets</h3>
+								<div class="links-combined">									
+									<!-- Wallet Addresses -->
+									{#each walletAddresses as wallet}
+										{#if getProfileUrl(wallet.address, wallet.blockchain)}
+											<a
+												href={getProfileUrl(wallet.address, wallet.blockchain)}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="wallet-link"
+												title={getProfileLinkText(wallet.blockchain)}
+											>
+												<div class="wallet-item">
+													<div class="wallet-info">
+														<div class="chain-icon">
+															{#if getChainIcon(wallet.blockchain) === 'ethereum'}
+																<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+																	<path d="M11.944 17.97L4.58 13.62 11.943 24l7.37-10.38-7.372 4.35h.003zM12.056 0L4.69 12.223l7.365 4.354 7.365-4.35L12.056 0z"/>
+																</svg>
+															{:else if getChainIcon(wallet.blockchain) === 'tezos'}
+																<svg height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1169.87 1593" fill="currentColor"><g id="Layer_2" data-name="Layer 2"><path d="M755.68,1593q-170.51,0-248.91-82.14a253.6,253.6,0,0,1-78.15-177,117.39,117.39,0,0,1,13.69-58.5A101.21,101.21,0,0,1,479.64,1238a130.22,130.22,0,0,1,116.24,0A99.55,99.55,0,0,1,633,1275.36a115,115,0,0,1,14.18,58.5,111.73,111.73,0,0,1-19.91,68.45a92.78,92.78,0,0,1-47.31,34.62,129.18,129.18,0,0,0,74.67,46.55,370,370,0,0,0,101.8,14.68,226.91,226.91,0,0,0,128.19-38.33,224,224,0,0,0,83.63-113.25,492,492,0,0,0,27.38-169.5,465.07,465.07,0,0,0-29.87-176.23,217.54,217.54,0,0,0-86.37-109.52,229.68,229.68,0,0,0-124.43-35.59,236.75,236.75,0,0,0-107.78,36.59L567.26,932.4V892.33L926.43,410.5H428.62v500A178.9,178.9,0,0,0,456,1012.8a94.34,94.34,0,0,0,83.63,40.07a139.85,139.85,0,0,0,82.63-29.12,298.38,298.38,0,0,0,69.2-71.19a24.86,24.86,0,0,1,9-11.94,18.4,18.4,0,0,1,12-4.48a41.55,41.55,0,0,1,23.4,9.95,49.82,49.82,0,0,1,12.69,33.85a197.86,197.86,0,0,1-4.48,24.89a241,241,0,0,1-85.38,106,211.78,211.78,0,0,1-119.76,36.38q-161.67,0-224-63.72A238.67,238.67,0,0,1,253.2,909.25V410.5H0V317.6H254.38V105.78L196.14,47.5V0h169l63.48,32.86V317.6l657.6-2,65.47,65.71L748.46,786.5a271,271,0,0,1,76.16-18.42A330.1,330.1,0,0,1,972,810.15a302.7,302.7,0,0,1,126.95,113.29a399.78,399.78,0,0,1,57.25,136.65a575.65,575.65,0,0,1,13.69,117,489.39,489.39,0,0,1-49.78,216.79a317.92,317.92,0,0,1-149.35,149.35A483.27,483.27,0,0,1,755.68,1593Z"/></g></svg>
+															{:else}
+																<div class="unknown-chain"></div>
+															{/if}
+														</div>
+														<code class="wallet-address">{formatWalletAddress(wallet.address)}</code>
+													</div>
+												</div>
+											</a>
+										{:else}
+											<div class="wallet-item">
+												<div class="wallet-info">
+													<div class="chain-icon">
+														{#if getChainIcon(wallet.blockchain) === 'ethereum'}
+															<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+																<path d="M11.944 17.97L4.58 13.62 11.943 24l7.37-10.38-7.372 4.35h.003zM12.056 0L4.69 12.223l7.365 4.354 7.365-4.35L12.056 0z"/>
+															</svg>
+														{:else if getChainIcon(wallet.blockchain) === 'tezos'}
+															<svg height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1169.87 1593" fill="currentColor"><g id="Layer_2" data-name="Layer 2"><path d="M755.68,1593q-170.51,0-248.91-82.14a253.6,253.6,0,0,1-78.15-177,117.39,117.39,0,0,1,13.69-58.5A101.21,101.21,0,0,1,479.64,1238a130.22,130.22,0,0,1,116.24,0A99.55,99.55,0,0,1,633,1275.36a115,115,0,0,1,14.18,58.5,111.73,111.73,0,0,1-19.91,68.45a92.78,92.78,0,0,1-47.31,34.62,129.18,129.18,0,0,0,74.67,46.55,370,370,0,0,0,101.8,14.68,226.91,226.91,0,0,0,128.19-38.33a224,224,0,0,0,83.63-113.25a492,492,0,0,0,27.38-169.5,465.07,465.07,0,0,0-29.87-176.23,217.54,217.54,0,0,0-86.37-109.52,229.68,229.68,0,0,0-124.43-35.59a236.75,236.75,0,0,0-107.78,36.59L567.26,932.4V892.33L926.43,410.5H428.62v500A178.9,178.9,0,0,0,456,1012.8a94.34,94.34,0,0,0,83.63,40.07a139.85,139.85,0,0,0,82.63-29.12a298.38,298.38,0,0,0,69.2-71.19a24.86,24.86,0,0,1,9-11.94,18.4,18.4,0,0,1,12-4.48a41.55,41.55,0,0,1,23.4,9.95,49.82,49.82,0,0,1,12.69,33.85a197.86,197.86,0,0,1-4.48,24.89a241,241,0,0,1-85.38,106,211.78,211.78,0,0,1-119.76,36.38q-161.67,0-224-63.72A238.67,238.67,0,0,1,253.2,909.25V410.5H0V317.6H254.38V105.78L196.14,47.5V0h169l63.48,32.86V317.6l657.6-2,65.47,65.71L748.46,786.5a271,271,0,0,1,76.16-18.42A330.1,330.1,0,0,1,972,810.15a302.7,302.7,0,0,1,126.95,113.29a399.78,399.78,0,0,1,57.25,136.65a575.65,575.65,0,0,1,13.69,117,489.39,489.39,0,0,1-49.78,216.79a317.92,317.92,0,0,1-149.35,149.35A483.27,483.27,0,0,1,755.68,1593Z"/></g></svg>
+															{:else}
+																<div class="unknown-chain"></div>
+															{/if}
+													</div>
+													<code class="wallet-address">{formatWalletAddress(wallet.address)}</code>
+												</div>
 											</div>
-											<code class="wallet-address">{formatWalletAddress(wallet.address)}</code>
-											{#if getProfileUrl(wallet.address, wallet.blockchain)}
-												<a
-													href={getProfileUrl(wallet.address, wallet.blockchain)}
-													target="_blank"
-													rel="noopener noreferrer"
-													class="profile-link"
-												>
-													{getProfileLinkText(wallet.blockchain)}
-												</a>
-											{/if}
-										</div>
-									</li>
-								{/each}
-							</ul>
-						</div>
-					{/if}
+										{/if}
+									{/each}
+								</div>
+							</div>
+						{/if}
+					</div>
 				</aside>
 
 				<!-- Right Column - Artworks -->
@@ -478,19 +492,30 @@
 	}
 
 	.layout-grid {
-		@apply flex flex-col lg:flex-row;
+		@apply flex flex-col md:flex-row md:mb-12;
 	}
 
 	.artist-sidebar {
-		@apply w-full lg:w-80 lg:flex-shrink-0 space-y-6 py-8;
+		@apply w-full md:w-60 lg:w-80 md:flex-shrink-0 space-y-6 py-8;
 	}
 
 	.artist-header {
-		@apply flex flex-col items-start text-left gap-4 mb-0;
+		@apply flex flex-col items-center text-center gap-2 md:gap-4 mb-0;
+		@apply sm:items-start sm:text-left;
+	}
+
+	.artist-title {
+		@apply flex flex-col items-center gap-2;
+		@apply sm:items-start;
+	}
+
+	.social-icons {
+		@apply flex items-center justify-center gap-3 mt-3;
+		@apply sm:justify-start;
 	}
 
 	.avatar-container {
-		@apply w-16 h-16 rounded-sm overflow-hidden flex-shrink-0;
+		@apply w-16 h-16 rounded-sm overflow-hidden flex-shrink-0 mb-2 lg:mb-0;
 	}
 
 	.artist-avatar {
@@ -498,7 +523,11 @@
 	}
 
 	.artist-title h1 {
-		@apply text-base font-semibold mb-0;
+		@apply text-lg font-semibold mb-0 lg:inline;
+	}
+
+	.display-name {
+		@apply text-gray-500;
 	}
 
 	.verification-badge {
@@ -509,7 +538,6 @@
 		@apply text-gray-400;
 	}
 
-	.bio-section,
 	.description-section {
 		@apply mb-4;
 	}
@@ -521,36 +549,41 @@
 	.read-more-button {
 		@apply bg-transparent border-none text-red-500 cursor-pointer text-sm p-0 underline;
 		@apply hover:text-red-500/80 transition-colors duration-200;
+		@apply inline ml-1;
 	}
 
 	.description-section p {
-		@apply mt-0 text-xs text-gray-700 leading-relaxed;
+		@apply mt-0 text-xs text-gray-300 leading-relaxed;
 	}
 
 	.detail-section {
-		@apply mb-4;
+		@apply mb-4 text-center sm:text-left;
 	}
 
 	.detail-section h3 {
 		@apply text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2;
 	}
 
-	.links-list,
-	.wallets-list {
-		@apply list-none p-0 space-y-1;
+	.links-combined {
+		@apply flex flex-wrap justify-center gap-2 sm:justify-start;
 	}
 
-	.links-list a {
-		@apply text-black/60 hover:text-black text-xs transition-colors duration-200;
+	.link-item {
+		@apply flex items-center gap-2 text-black/60 hover:text-black text-xs transition-colors duration-200;
 		text-decoration: none;
 	}
 
-	.wallets-list {
-		@apply list-none p-0 space-y-1;
+	.link-icon {
+		@apply w-4 h-4 text-gray-600;
 	}
 
 	.wallet-item {
 		@apply flex items-center text-xs;
+	}
+
+	.wallet-link {
+		@apply text-black/60 hover:text-black text-xs transition-colors duration-200;
+		text-decoration: none;
 	}
 
 	.wallet-info {
@@ -562,12 +595,7 @@
 	}
 
 	.wallet-address {
-		@apply text-xs font-mono bg-gray-100 px-2 py-1 rounded-sm;
-	}
-
-	.profile-link {
-		@apply text-black/60 hover:text-black text-xs transition-colors duration-200;
-		text-decoration: none;
+		@apply text-xs font-mono bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-sm transition-colors duration-200;
 	}
 
 	.unknown-chain {
@@ -576,19 +604,19 @@
 
 	.artworks-main {
 		@apply flex-1 min-h-0;
-		@apply px-0 lg:px-8 py-0 lg:py-8;
+		@apply px-0 md:px-8 py-0 lg:py-8;
 	}
 
 	.artworks-header {
-		@apply px-6 lg:px-0 mb-6 pt-8 lg:pt-0;
+		@apply lg:px-0 mb-6 md:pt-8 lg:pt-0;
 	}
 
 	.artworks-header h2 {
-		@apply text-2xl font-bold;
+		@apply text-lg font-bold;
 	}
 
 	.artworks-grid {
-		@apply grid gap-4 lg:gap-6 grid-cols-1 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4;
+		@apply grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4;
 	}
 
 	.artwork-container {
@@ -712,6 +740,10 @@
 			@apply text-gray-100;
 		}
 
+		.display-name {
+			@apply text-gray-400;
+		}
+
 		.description-section p {
 			@apply text-gray-300;
 		}
@@ -729,8 +761,12 @@
 			@apply text-gray-400;
 		}
 
-		.links-list a {
+		.links-combined a {
 			@apply text-white/60 hover:text-white;
+		}
+
+		.link-icon {
+			@apply text-gray-400;
 		}
 
 		.chain-icon {
@@ -738,11 +774,7 @@
 		}
 
 		.wallet-address {
-			@apply bg-gray-800 text-gray-300;
-		}
-
-		.profile-link {
-			@apply text-white/60 hover:text-white;
+			@apply bg-gray-800 hover:bg-gray-700 text-gray-300;
 		}
 
 		.unknown-chain {
@@ -764,6 +796,14 @@
 		.loader {
 			@apply border-gray-700 border-t-white;
 		}
+
+		.social-icon-button {
+			@apply text-gray-400 hover:text-white hover:bg-gray-800;
+		}
+
+		.wallet-link {
+			@apply text-white/60 hover:text-white;
+		}
 	}
 
 	/* Responsive adjustments */
@@ -776,5 +816,26 @@
 		.modal-scroll {
 			@apply p-4;
 		}
+
+		.artist-header {
+			@apply gap-1;
+		}
+
+		.bio-section p {
+			@apply mb-2;
+		}
+	}
+
+	.detail-sections-grid {
+		@apply space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0 lg:block lg:space-y-6;
+	}
+
+	.social-icons {
+		@apply flex items-center gap-2 mt-2;
+	}
+
+	.social-icon-button {
+		@apply w-10 h-10 flex items-center justify-center text-gray-600 hover:text-black transition-colors duration-200 rounded-md hover:bg-gray-100;
+		text-decoration: none;
 	}
 </style>

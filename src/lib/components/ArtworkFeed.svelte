@@ -207,7 +207,7 @@
 
 <style lang="scss">
 	.artwork-feed {
-		@apply w-full max-w-[560px] mx-auto px-4 py-8;
+		@apply w-full max-w-[560px] mx-auto py-8;
 	}
 
 	.artworks-stack {
@@ -230,11 +230,17 @@
 	}
 
 	.stage {
-		@apply bg-gray-100 dark:bg-gray-950/70 rounded-sm w-full overflow-hidden aspect-square flex items-center justify-center;
+		@apply bg-gray-100 dark:bg-gray-950/70 w-full overflow-hidden aspect-square flex items-center justify-center;
 	}
 
 	:global(.thumbnail-image) {
-		@apply w-full h-full object-contain;
+		@apply w-full h-full object-cover;
+	}
+
+	/* Override global thumbnail-image constraints for feed artworks */
+	.artwork-feed :global(.thumbnail-image img),
+	.artwork-feed :global(.thumbnail-image video) {
+		@apply max-w-full max-h-full;
 	}
 
 	.thumbnail-placeholder {
@@ -246,11 +252,11 @@
 	}
 
 	.artwork-info-container {
-		@apply relative mx-auto;
+		@apply relative mx-auto px-4;
 	}
 
 	.artwork-info {
-		@apply rounded-b-sm py-4;
+		@apply py-4;
 	}
 
 	.artwork-title {
@@ -298,7 +304,7 @@
 	}
 
 	.intersection-target {
-		@apply mt-8;
+		@apply mt-8 px-4;
 	}
 
 	.loading-indicator {

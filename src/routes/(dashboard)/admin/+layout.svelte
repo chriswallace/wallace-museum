@@ -4,9 +4,23 @@
 	import { onMount } from 'svelte';
 
 	let currentPage: string = '';
+	let mobileMenuOpen = false;
 
 	onMount(() => {
 		// We no longer need to manually set dark mode - Tailwind will handle it
+		
+		// Close mobile menu when switching to desktop view
+		const mediaQuery = window.matchMedia('(min-width: 768px)');
+		const handleMediaChange = () => {
+			if (mediaQuery.matches) {
+				closeMobileMenu();
+			}
+		};
+		mediaQuery.addEventListener('change', handleMediaChange);
+		
+		return () => {
+			mediaQuery.removeEventListener('change', handleMediaChange);
+		};
 	});
 
 	page.subscribe(($page) => {
@@ -22,17 +36,36 @@
 		'--toastBarBackground': 'var(--color-primary)',
 		'--toastBorderRadius': 'var(--border-radius-sm)'
 	};
+
+	function toggleMobileMenu() {
+		mobileMenuOpen = !mobileMenuOpen;
+		console.log('Mobile menu toggled:', mobileMenuOpen);
+	}
+
+	function closeMobileMenu() {
+		mobileMenuOpen = false;
+	}
 </script>
 
 <div class="ui-frame bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200">
-	<div class="ui-header bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+	<div class="ui-header bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
 		<nav>
-			<a class="logo-link" href="/">
-				<img src="/images/wallace-museum-red.svg" alt="Wallace Museum" class="logo-svg logo-light" />
-				<img src="/images/wallace-museum-yellow.svg" alt="Wallace Museum" class="logo-svg logo-dark" />
-			</a>
+			<div class="flex items-center">
+				<a class="logo-link" href="/">
+					<img src="/images/wallace-museum-red.svg" alt="Wallace Museum" class="logo-svg logo-light" />
+					<img src="/images/wallace-museum-yellow.svg" alt="Wallace Museum" class="logo-svg logo-dark" />
+				</a>
 
-			<div class="primary-nav">
+				<!-- Mobile hamburger menu next to logo -->
+				<button class="mobile-menu-btn md:hidden ml-2" on:click={toggleMobileMenu}>
+					<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+					</svg>
+				</button>
+			</div>
+
+			<!-- Desktop Navigation -->
+			<div class="primary-nav hidden md:flex">
 				<a href="/admin/collections" class={currentPage === '/admin/collections' ? 'selected' : ''}
 					>Collections</a
 				>
@@ -45,10 +78,51 @@
 				<a href="/admin/import" class={currentPage === '/admin/import' ? 'selected' : ''}>Import</a>
 			</div>
 
-			<form action="/logout" method="POST">
-				<button type="submit" class="logout-btn">Log out</button>
-			</form>
+			<!-- Username display (replaces logout button) -->
+			<div class="user-info flex items-center">
+				<span class="text-sm text-gray-600 dark:text-gray-300">Admin User</span>
+			</div>
 		</nav>
+
+		<!-- Mobile Navigation Menu -->
+		{#if mobileMenuOpen}
+			<!-- Backdrop overlay -->
+			<div class="mobile-nav-backdrop fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" on:click={closeMobileMenu}></div>
+			
+			<!-- Slide-in menu -->
+			<div class="mobile-nav fixed top-0 left-0 h-full w-80 bg-white dark:bg-gray-900 shadow-xl z-50 md:hidden transform transition-transform duration-300 ease-in-out">
+				<div class="p-0">
+					<div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+						<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Menu</h2>
+						<button class="close-btn p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" on:click={closeMobileMenu}>
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+							</svg>
+						</button>
+					</div>
+					
+					<nav class="space-y-0" style="display: flex; flex-direction: column;">
+						<a href="/admin/collections" class={currentPage === '/admin/collections' ? 'selected' : ''} on:click={closeMobileMenu}
+							style="display: block !important; width: 100% !important; margin: 0; padding: 16px 24px; border-bottom: 1px solid rgba(0, 0, 0, 0.05); border-radius: 0;">Collections</a
+						>
+						<a href="/admin/artworks" class={currentPage === '/admin/artworks' ? 'selected' : ''} on:click={closeMobileMenu}
+							style="display: block !important; width: 100% !important; margin: 0; padding: 16px 24px; border-bottom: 1px solid rgba(0, 0, 0, 0.05); border-radius: 0;">Artworks</a
+						>
+						<a href="/admin/artists" class={currentPage === '/admin/artists' ? 'selected' : ''} on:click={closeMobileMenu}
+							style="display: block !important; width: 100% !important; margin: 0; padding: 16px 24px; border-bottom: 1px solid rgba(0, 0, 0, 0.05); border-radius: 0;">Artists</a
+						>
+						<a href="/admin/import" class={currentPage === '/admin/import' ? 'selected' : ''} on:click={closeMobileMenu}
+							style="display: block !important; width: 100% !important; margin: 0; padding: 16px 24px; border-bottom: 1px solid rgba(0, 0, 0, 0.05); border-radius: 0;">Import</a>
+					</nav>
+					
+					<div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+						<form action="/logout" method="POST">
+							<button type="submit" class="logout-btn w-full text-left px-0 py-2">Log out</button>
+						</form>
+					</div>
+				</div>
+			</div>
+		{/if}
 	</div>
 	<div class="ui-content bg-white dark:bg-gray-900">
 		<slot />
@@ -63,37 +137,70 @@
 	}
 
 	.ui-header {
-		@apply col-span-1 md:col-span-3 p-6;
+		@apply col-span-1 md:col-span-3 relative;
+		height: 64px;
 
 		nav {
-			@apply justify-center items-center flex w-full;
+			@apply justify-between items-stretch flex w-full h-full;
 		}
 
 		.primary-nav {
-			@apply flex-grow text-center;
+			@apply flex-grow text-center flex items-stretch justify-center;
 		}
 
-		form {
-			@apply inline-block justify-self-end;
+		/* Mobile layout: only logo and hamburger */
+		@media (max-width: 767px) {
+			nav {
+				@apply justify-between;
+			}
+			
+			.primary-nav {
+				@apply hidden;
+			}
 		}
 
-		a,
-		button {
-			@apply text-gray-600 dark:text-gray-300 font-normal px-2 py-3 transition duration-300 ease-in-out decoration-2 underline-offset-8 underline decoration-transparent;
-			font-variation-settings: initial;
+		.mobile-menu-btn {
+			@apply text-gray-600 dark:text-gray-300 p-2 hover:text-gray-800 dark:hover:text-gray-100 flex items-center cursor-pointer;
+			min-width: 44px;
+			min-height: 44px;
 		}
 
-		.logout-btn {
-			@apply text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm px-3 py-2 bg-transparent dark:bg-transparent rounded-sm hover:bg-gray-100 dark:hover:bg-gray-600;
+		.mobile-nav {
+			@apply transition-transform duration-300 ease-in-out;
+		}
+
+		.mobile-nav nav a {
+			@apply block px-4 py-4 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors duration-200 w-full;
+			display: block !important;
+			width: 100% !important;
+		}
+
+		.mobile-nav nav a.selected {
+			@apply text-gray-900 dark:text-gray-100 font-medium bg-gray-100 dark:bg-gray-800;
+		}
+
+		.mobile-nav .logout-btn {
+			@apply text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-4 py-3 rounded-md transition-colors duration-200;
+		}
+
+		.mobile-nav .close-btn {
+			@apply rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200;
+		}
+
+		.mobile-nav-backdrop {
+			@apply transition-opacity duration-300 ease-in-out;
 		}
 
 		.logo-link {
-			@apply px-2 py-3 hover:opacity-80 transition-opacity duration-200 focus:opacity-80 focus:outline-none;
+			@apply hover:opacity-80 transition-opacity duration-200 focus:opacity-80 focus:outline-none flex items-center;
 			text-decoration: none;
+			height: 64px;
+			padding: 0;
 		}
 
 		.logo-svg {
-			@apply h-8 w-auto;
+			@apply w-auto;
+			height: 64px;
 		}
 
 		/* Show red logo in light mode, hide yellow logo */
@@ -116,14 +223,28 @@
 			}
 		}
 
-		.selected {
-			@apply text-gray-800 dark:text-gray-100 font-medium;
-			text-decoration: underline;
-			text-decoration-color: var(--color-primary);
+		.primary-nav .selected {
+			@apply text-gray-800 dark:text-gray-100 font-medium border-b-2;
+			text-decoration: none;
+			border-bottom-color: var(--color-primary);
 		}
 
-		a:hover:not(.logo-link) {
+		.primary-nav a:hover:not(.logo-link) {
 			@apply text-gray-800 dark:text-gray-100;
+		}
+
+		.primary-nav a,
+		.primary-nav button {
+			@apply text-gray-600 dark:text-gray-300 font-normal px-4 transition duration-300 ease-in-out decoration-2 underline-offset-8 underline decoration-transparent flex items-center border-b-2 border-b-transparent;
+			font-variation-settings: initial;
+		}
+
+		.user-info {
+			@apply px-4;
+		}
+
+		.user-info span {
+			@apply font-medium;
 		}
 	}
 
