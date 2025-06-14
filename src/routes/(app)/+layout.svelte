@@ -22,6 +22,18 @@
 <svelte:head>
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<link rel="stylesheet" href="https://use.typekit.net/dpg0jya.css" />
+	
+	<!-- Favicon and App Icons -->
+	<link rel="icon" type="image/png" href="/images/app-icon.png" />
+	<link rel="apple-touch-icon" href="/images/app-icon.png" />
+	<link rel="shortcut icon" href="/images/app-icon.png" />
+	
+	<!-- Web App Manifest -->
+	<link rel="manifest" href="/manifest.json" />
+	
+	<!-- DNS Prefetch for Performance -->
+	<link rel="dns-prefetch" href="//use.typekit.net" />
+	<link rel="preconnect" href="https://use.typekit.net" crossorigin="anonymous" />
 </svelte:head>
 
 <TopNav />

@@ -141,16 +141,96 @@
 	$: primaryDescription = data.artist?.bio || data.artist?.description || '';
 	$: shouldShowReadMore = shouldTruncateDescription(primaryDescription);
 	$: truncatedDescription = getTruncatedDescription(primaryDescription);
+
+	// SEO constants
+	$: siteUrl = 'https://wallace-collection.vercel.app'; // Update this to your actual domain
+	$: artistImageUrl = data.artist?.avatarUrl || `${siteUrl}/images/wallace-museum.png`;
+	$: artistDescription = data.artist 
+		? `${data.artist.name} - ${primaryDescription || 'Digital artist at the Wallace Museum showcasing innovative computational and algorithmic art.'}`
+		: 'Artist profile at the Wallace Museum';
+	$: artworkCount = data.artist?.artworks?.length || 0;
 </script>
 
 <svelte:head>
+	<!-- Primary Meta Tags -->
 	<title>{pageTitle}</title>
-	<meta
-		name="description"
-		content={data.artist
-			? `${data.artist.name} - ${data.artist.bio || 'Digital artist at the Wallace Museum'}`
-			: 'Artist profile at the Wallace Museum'}
-	/>
+	<meta name="title" content={pageTitle} />
+	<meta name="description" content={artistDescription} />
+	<meta name="keywords" content="digital artist, {data.artist?.name || 'artist'}, computational art, generative art, algorithmic art, NFT artist, Wallace Museum" />
+	<meta name="author" content="Chris Wallace" />
+	<meta name="robots" content="index, follow" />
+	{#if data.artist}
+		<link rel="canonical" href="{siteUrl}/artist/{data.artist.id}" />
+	{/if}
+
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="profile" />
+	{#if data.artist}
+		<meta property="og:url" content="{siteUrl}/artist/{data.artist.id}" />
+	{/if}
+	<meta property="og:title" content={pageTitle} />
+	<meta property="og:description" content={artistDescription} />
+	<meta property="og:image" content={artistImageUrl} />
+	<meta property="og:image:width" content="400" />
+	<meta property="og:image:height" content="400" />
+	<meta property="og:image:alt" content="{data.artist?.name || 'Artist'} - Wallace Museum" />
+	<meta property="og:site_name" content="Wallace Museum" />
+	<meta property="og:locale" content="en_US" />
+
+	<!-- Twitter -->
+	<meta property="twitter:card" content="summary" />
+	{#if data.artist}
+		<meta property="twitter:url" content="{siteUrl}/artist/{data.artist.id}" />
+	{/if}
+	<meta property="twitter:title" content={pageTitle} />
+	<meta property="twitter:description" content={artistDescription} />
+	<meta property="twitter:image" content={artistImageUrl} />
+	<meta property="twitter:image:alt" content="{data.artist?.name || 'Artist'} - Wallace Museum" />
+	<meta property="twitter:site" content="@chriswallace" />
+	<meta property="twitter:creator" content="@chriswallace" />
+
+	<!-- Structured Data (JSON-LD) -->
+	{#if data.artist}
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "Person",
+				"name": "{data.artist.name}",
+				"description": "{primaryDescription || 'Digital artist showcasing innovative computational and algorithmic art'}",
+				"url": "{siteUrl}/artist/{data.artist.id}",
+				{#if data.artist.avatarUrl}
+				"image": "{data.artist.avatarUrl}",
+				{/if}
+				{#if data.artist.websiteUrl}
+				"mainEntityOfPage": "{data.artist.websiteUrl}",
+				{/if}
+				"jobTitle": "Digital Artist",
+				"worksFor": {
+					"@type": "Organization",
+					"name": "Wallace Museum",
+					"url": "{siteUrl}"
+				},
+				{#if data.artist.twitterHandle || data.artist.instagramHandle || data.artist.websiteUrl}
+				"sameAs": [
+					{#if data.artist.twitterHandle}
+					"https://twitter.com/{data.artist.twitterHandle.replace('@', '')}",
+					{/if}
+					{#if data.artist.instagramHandle}
+					"https://instagram.com/{data.artist.instagramHandle.replace('@', '')}",
+					{/if}
+					{#if data.artist.websiteUrl}
+					"{data.artist.websiteUrl}"
+					{/if}
+				],
+				{/if}
+				"hasOfferCatalog": {
+					"@type": "OfferCatalog",
+					"name": "Artworks by {data.artist.name}",
+					"numberOfItems": {artworkCount}
+				}
+			}
+		</script>
+	{/if}
 </svelte:head>
 
 {#if !data.artist && data.error}

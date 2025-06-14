@@ -366,6 +366,14 @@
 	$: hasValidDimensions = dimensionsObj && dimensionsObj.width > 0 && dimensionsObj.height > 0;
 	$: useExactDimensions = hasValidDimensions && !isFullscreen;
 
+	// SEO constants
+	$: siteUrl = 'https://wallace-collection.vercel.app'; // Update this to your actual domain
+	$: artworkImageUrl = currentArtwork?.image_url || currentArtwork?.thumbnail_url || `${siteUrl}/images/wallace-museum.png`;
+	$: artworkDescription = data.currentArtworkArtists && currentArtwork
+		? `${currentArtwork.title} by ${data.currentArtworkArtists.map(a => a.name).join(', ')} - ${currentArtwork.description || 'Digital artwork at the Wallace Museum showcasing innovative computational and algorithmic art.'}`
+		: 'Artwork gallery at the Wallace Museum';
+	$: artistNames = data.currentArtworkArtists?.map(a => a.name).join(', ') || 'Unknown Artist';
+
 	// Template layout functions
 	function calculateAspectRatio() {
 		const artworkCanvas = document.querySelector('.artwork-canvas');
@@ -500,13 +508,105 @@
 </script>
 
 <svelte:head>
+	<!-- Primary Meta Tags -->
 	<title>{pageTitle}</title>
-	<meta
-		name="description"
-		content={data.currentArtworkArtists && currentArtwork
-			? `${currentArtwork.title} by ${data.currentArtworkArtists.map(a => a.name).join(', ')} at the Wallace Museum`
-			: 'Artwork gallery at the Wallace Museum'}
-	/>
+	<meta name="title" content={pageTitle} />
+	<meta name="description" content={artworkDescription} />
+	<meta name="keywords" content="digital artwork, {currentArtwork?.title || 'artwork'}, {artistNames}, computational art, generative art, algorithmic art, NFT, Wallace Museum" />
+	<meta name="author" content="Chris Wallace" />
+	<meta name="robots" content="index, follow" />
+	{#if data.artist && currentArtwork}
+		<link rel="canonical" href="{siteUrl}/artist/{data.artist.id}/{currentArtwork.id}" />
+	{/if}
+
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="article" />
+	{#if data.artist && currentArtwork}
+		<meta property="og:url" content="{siteUrl}/artist/{data.artist.id}/{currentArtwork.id}" />
+	{/if}
+	<meta property="og:title" content={pageTitle} />
+	<meta property="og:description" content={artworkDescription} />
+	<meta property="og:image" content={artworkImageUrl} />
+	{#if dimensionsObj}
+		<meta property="og:image:width" content={dimensionsObj.width?.toString() || "800"} />
+		<meta property="og:image:height" content={dimensionsObj.height?.toString() || "800"} />
+	{:else}
+		<meta property="og:image:width" content="800" />
+		<meta property="og:image:height" content="800" />
+	{/if}
+	<meta property="og:image:alt" content="{currentArtwork?.title || 'Artwork'} by {artistNames} - Wallace Museum" />
+	<meta property="og:site_name" content="Wallace Museum" />
+	<meta property="og:locale" content="en_US" />
+	{#if data.currentArtworkArtists && data.currentArtworkArtists.length > 0}
+		<meta property="article:author" content={data.currentArtworkArtists.map(a => a.name).join(', ')} />
+	{/if}
+	<meta property="article:section" content="Digital Art" />
+	<meta property="article:tag" content="Digital Art" />
+	<meta property="article:tag" content="Generative Art" />
+	<meta property="article:tag" content="Computational Art" />
+
+	<!-- Twitter -->
+	<meta property="twitter:card" content="summary_large_image" />
+	{#if data.artist && currentArtwork}
+		<meta property="twitter:url" content="{siteUrl}/artist/{data.artist.id}/{currentArtwork.id}" />
+	{/if}
+	<meta property="twitter:title" content={pageTitle} />
+	<meta property="twitter:description" content={artworkDescription} />
+	<meta property="twitter:image" content={artworkImageUrl} />
+	<meta property="twitter:image:alt" content="{currentArtwork?.title || 'Artwork'} by {artistNames} - Wallace Museum" />
+	<meta property="twitter:site" content="@chriswallace" />
+	<meta property="twitter:creator" content="@chriswallace" />
+
+	<!-- Structured Data (JSON-LD) -->
+	{#if currentArtwork && data.currentArtworkArtists}
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "VisualArtwork",
+				"name": "{currentArtwork.title}",
+				"description": "{currentArtwork.description || 'Digital artwork showcasing innovative computational and algorithmic art'}",
+				"url": "{siteUrl}/artist/{data.artist.id}/{currentArtwork.id}",
+				"image": "{artworkImageUrl}",
+				"creator": [
+					{#each data.currentArtworkArtists as artist, i}
+					{
+						"@type": "Person",
+						"name": "{artist.name}",
+						"url": "{siteUrl}/artist/{artist.id}"
+					}{#if i < data.currentArtworkArtists.length - 1},{/if}
+					{/each}
+				],
+				"artMedium": "Digital Art",
+				"artworkSurface": "Digital",
+				"artform": "Computational Art",
+				{#if dimensionsObj}
+				"width": {
+					"@type": "Distance",
+					"name": "{dimensionsObj.width} pixels"
+				},
+				"height": {
+					"@type": "Distance", 
+					"name": "{dimensionsObj.height} pixels"
+				},
+				{/if}
+				{#if currentArtwork.mintDate}
+				"dateCreated": "{currentArtwork.mintDate}",
+				{/if}
+				{#if currentArtwork.tokenID}
+				"identifier": "{currentArtwork.tokenID}",
+				{/if}
+				"isPartOf": {
+					"@type": "Collection",
+					"name": "Wallace Museum Digital Art Collection",
+					"url": "{siteUrl}"
+				},
+				"mainEntityOfPage": {
+					"@type": "WebPage",
+					"@id": "{siteUrl}/artist/{data.artist.id}/{currentArtwork.id}"
+				}
+			}
+		</script>
+	{/if}
 </svelte:head>
 
 {#if !data.artist && data.error}

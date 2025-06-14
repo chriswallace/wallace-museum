@@ -214,11 +214,75 @@
 </script>
 
 <svelte:head>
+	<!-- Primary Meta Tags -->
 	<title>Artists | Wallace Museum</title>
-	<meta
-		name="description"
-		content="Explore the pioneering artists in the Wallace Museum collection, pushing the boundaries of computational aesthetics and algorithmic expression."
-	/>
+	<meta name="title" content="Artists | Wallace Museum" />
+	<meta name="description" content="Explore the pioneering artists in the Wallace Museum collection, pushing the boundaries of computational aesthetics and algorithmic expression. Discover innovative digital artists creating generative art, algorithmic art, and blockchain-connected artworks." />
+	<meta name="keywords" content="digital artists, generative artists, computational artists, algorithmic artists, NFT artists, blockchain artists, contemporary artists, Wallace Museum, art collection" />
+	<meta name="author" content="Chris Wallace" />
+	<meta name="robots" content="index, follow" />
+	<link rel="canonical" href="https://wallace-collection.vercel.app/artists" />
+
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://wallace-collection.vercel.app/artists" />
+	<meta property="og:title" content="Artists | Wallace Museum" />
+	<meta property="og:description" content="Explore the pioneering artists in the Wallace Museum collection, pushing the boundaries of computational aesthetics and algorithmic expression." />
+	<meta property="og:image" content="https://wallace-collection.vercel.app/images/wallace-museum.png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content="Wallace Museum Artists Collection" />
+	<meta property="og:site_name" content="Wallace Museum" />
+	<meta property="og:locale" content="en_US" />
+
+	<!-- Twitter -->
+	<meta property="twitter:card" content="summary_large_image" />
+	<meta property="twitter:url" content="https://wallace-collection.vercel.app/artists" />
+	<meta property="twitter:title" content="Artists | Wallace Museum" />
+	<meta property="twitter:description" content="Explore the pioneering artists in the Wallace Museum collection, pushing the boundaries of computational aesthetics and algorithmic expression." />
+	<meta property="twitter:image" content="https://wallace-collection.vercel.app/images/wallace-museum.png" />
+	<meta property="twitter:image:alt" content="Wallace Museum Artists Collection" />
+	<meta property="twitter:site" content="@chriswallace" />
+	<meta property="twitter:creator" content="@chriswallace" />
+
+	<!-- Structured Data (JSON-LD) -->
+	<script type="application/ld+json">
+		{
+			"@context": "https://schema.org",
+			"@type": "CollectionPage",
+			"name": "Artists - Wallace Museum",
+			"description": "Explore the pioneering artists in the Wallace Museum collection, pushing the boundaries of computational aesthetics and algorithmic expression.",
+			"url": "https://wallace-collection.vercel.app/artists",
+			"mainEntity": {
+				"@type": "ItemList",
+				"name": "Digital Artists Collection",
+				"description": "A curated collection of pioneering digital artists",
+				"numberOfItems": {data.artists?.length || 0}
+			},
+			"isPartOf": {
+				"@type": "Museum",
+				"name": "Wallace Museum",
+				"url": "https://wallace-collection.vercel.app"
+			},
+			"breadcrumb": {
+				"@type": "BreadcrumbList",
+				"itemListElement": [
+					{
+						"@type": "ListItem",
+						"position": 1,
+						"name": "Home",
+						"item": "https://wallace-collection.vercel.app"
+					},
+					{
+						"@type": "ListItem",
+						"position": 2,
+						"name": "Artists",
+						"item": "https://wallace-collection.vercel.app/artists"
+					}
+				]
+			}
+		}
+	</script>
 </svelte:head>
 
 <div class="artists-container" on:mousemove={handleMouseMove}>

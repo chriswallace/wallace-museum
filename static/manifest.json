@@ -1,0 +1,22 @@
+{
+  "name": "Wallace Museum",
+  "short_name": "Wallace Museum",
+  "description": "Digital Art Collection showcasing pioneering works from bleeding-edge artists",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/app-icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["art", "culture", "museums"],
+  "lang": "en-US",
+  "scope": "/",
+  "id": "wallace-museum"
+} 
