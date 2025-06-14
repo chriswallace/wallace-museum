@@ -329,7 +329,7 @@
 							{:else if artwork.mime === 'text/html' || artwork.mime === 'application/javascript' || artwork.generatorUrl}
 								{#if interactiveUrl}
 									<iframe 
-										src={ipfsToHttpUrlForHtml(interactiveUrl, artwork.mime)} 
+										src={ipfsToHttpUrlForHtml(interactiveUrl, artwork.mime || undefined)} 
 										title="Interactive Artwork"
 										class="media-content"
 										width={artwork.dimensions?.width || 800}
@@ -349,7 +349,7 @@
 									quality={85}
 									className="media-content"
 									style={mediaStyle}
-									mimeType={artwork.mime}
+									mimeType={artwork.mime || undefined}
 								/>
 							{/if}
 						{:else if artwork.imageUrl}
@@ -363,7 +363,7 @@
 								quality={85}
 								className="media-content"
 								style={mediaStyle}
-								mimeType={artwork.mime}
+								mimeType={artwork.mime || undefined}
 							/>
 						{:else if artwork.thumbnailUrl}
 							<OptimizedImage
@@ -376,7 +376,7 @@
 								quality={85}
 								className="media-content"
 								style={mediaStyle}
-								mimeType={artwork.mime}
+								mimeType={artwork.mime || undefined}
 							/>
 						{:else}
 							<div class="no-media-placeholder">
@@ -548,9 +548,9 @@
 							Fullscreen artworks will be displayed with full bleed to the browser edges at 82svh height.
 						</small>
 					</div>
-					<div class="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-						<h3 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Refetch Data</h3>
-						<p class="text-sm text-blue-700 dark:text-blue-300">
+					<div class="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+						<h3 class="text-sm font-medium text-blue-800 dark:text-yellow-400 mb-2">Refetch Data</h3>
+						<p class="text-sm text-blue-700 dark:text-yellow-300">
 							Use "Refetch Data" to fetch the latest information from external APIs (OpenSea for Ethereum, Objkt for Tezos). 
 							This will update the artwork's metadata, images, and other properties with the most current data available.
 						</p>
@@ -625,18 +625,10 @@
 
 	/* Fieldset styling for dimensions */
 	fieldset {
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		padding: 1rem;
-		margin: 0;
-	}
-
-	:global(.dark) fieldset {
-		border-color: #374151;
+		@apply border border-gray-300 dark:border-gray-600 rounded-md p-4 m-0;
 	}
 
 	legend {
-		@apply text-gray-700 dark:text-white font-medium;
-		padding: 0 0.5rem;
+		@apply text-gray-700 dark:text-white font-medium px-2;
 	}
 </style>

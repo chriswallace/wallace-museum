@@ -614,70 +614,74 @@
 
 <style lang="scss">
 	.select {
-		@apply w-12;
+		@apply w-8 md:w-12;
 	}
 
 	.artwork {
-		@apply w-32;
+		@apply w-16 md:w-32;
 	}
 
 	.title {
-		@apply w-[400px];
+		@apply min-w-[200px] md:w-[400px];
 	}
 
 	.artist {
-		@apply w-[400px];
+		@apply min-w-[150px] md:w-[400px];
 	}
 
 	.collection {
-		@apply w-[400px];
+		@apply min-w-[150px] md:w-[400px];
 	}
 
 	.actions {
-		@apply w-12;
+		@apply w-16 md:w-12;
 	}
 
 	.bulk-actions-bar {
-		@apply flex items-center justify-between border rounded-md p-4 mb-4;
+		@apply flex flex-col sm:flex-row sm:items-center sm:justify-between border rounded-md p-3 md:p-4 mb-4 gap-3 sm:gap-0;
 		background-color: rgba(255, 255, 255, 0.1);
 		border-color: rgba(255, 255, 255, 0.3);
 		
 		.selected-count {
 			color: rgb(149, 149, 149);
-			@apply font-medium;
+			@apply font-medium text-sm md:text-base;
 			
 			.refetch-progress {
-				@apply text-sm font-normal text-gray-600 dark:text-gray-400;
+				@apply text-xs md:text-sm font-normal text-gray-600 dark:text-gray-400;
 			}
 		}
 		
 		.bulk-actions-buttons {
-			@apply flex gap-2;
+			@apply flex flex-wrap gap-2;
+			
+			button {
+				@apply text-xs md:text-sm px-2 md:px-3 py-1 md:py-2;
+			}
 		}
 	}
 
 	.modal-overlay {
-		@apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+		@apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4;
 	}
 
 	.modal {
-		@apply bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4;
+		@apply bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto;
 	}
 
 	.modal-header {
-		@apply flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700;
+		@apply flex items-center justify-between p-4 md:p-6 border-b border-gray-200 dark:border-gray-700;
 		
 		h2 {
 			@apply text-lg font-semibold text-gray-900 dark:text-white;
 		}
 		
 		.close-button {
-			@apply text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl font-bold bg-transparent border-none cursor-pointer;
+			@apply text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl font-bold bg-transparent border-none cursor-pointer min-h-[44px] min-w-[44px] dark:text-gray-500 dark:hover:text-yellow-400;
 		}
 	}
 
 	.modal-content {
-		@apply p-6 space-y-4;
+		@apply p-4 md:p-6 space-y-4;
 	}
 
 	.form-group {
@@ -697,7 +701,11 @@
 	}
 
 	.modal-actions {
-		@apply flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700;
+		@apply flex flex-col sm:flex-row sm:justify-end gap-3 p-4 md:p-6 border-t border-gray-200 dark:border-gray-700;
+		
+		button {
+			@apply w-full sm:w-auto;
+		}
 	}
 
 	.loading {
@@ -712,19 +720,23 @@
 		@apply flex flex-col items-center justify-center py-12 space-y-4;
 		
 		p {
-			@apply text-red-600 dark:text-red-400 text-lg;
+			@apply text-red-600 dark:text-red-400 text-lg text-center;
+		}
+		
+		button {
+			@apply mt-4;
 		}
 	}
 
 	.empty {
-		@apply flex flex-col items-center justify-center py-12 space-y-2;
+		@apply text-center py-12;
 		
 		p {
-			@apply text-gray-600 dark:text-gray-400 text-lg;
+			@apply text-gray-600 dark:text-gray-400 mb-4;
 		}
 		
-		button.link {
-			@apply text-blue-600 dark:text-blue-400 underline hover:no-underline bg-transparent border-none cursor-pointer;
+		.link {
+			@apply text-primary hover:text-primary/80 underline cursor-pointer;
 		}
 	}
 </style>

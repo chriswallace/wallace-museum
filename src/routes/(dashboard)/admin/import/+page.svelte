@@ -882,13 +882,13 @@
 					<h3 class="font-medium text-lg mb-2">Debug Controls</h3>
 					<div class="flex gap-3 flex-wrap">
 						<button
-							class="secondary button py-2 px-4 {debugSkeletonMode ? 'bg-orange-100 border-orange-300 text-orange-800 dark:bg-orange-900 dark:border-orange-700 dark:text-orange-200' : ''}"
+							class="secondary button py-2 px-4 {debugSkeletonMode ? 'bg-yellow-100 border-yellow-300 text-yellow-800 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-200' : ''}"
 							on:click={() => (debugSkeletonMode = !debugSkeletonMode)}
 						>
 							{debugSkeletonMode ? '🔍 Disable' : '🔍 Enable'} Skeleton Debug Mode
 						</button>
 						{#if debugSkeletonMode}
-							<span class="text-sm text-orange-600 dark:text-orange-400 flex items-center">
+							<span class="text-sm text-yellow-600 dark:text-yellow-400 flex items-center">
 								⚠️ Debug active - all images show skeleton loaders
 							</span>
 						{/if}
@@ -927,7 +927,7 @@
 				<input
 					id="search"
 					type="text"
-					class="w-full h-11 !pl-11 pr-3 mb-0 border dark:border-gray-700 rounded-md dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+					class="w-full h-11 !pl-11 pr-3 mb-0 border dark:border-gray-700 rounded-md dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-400 dark:focus:ring-yellow-400"
 					placeholder="Search by title, description, or contract name. Use quotes for exact phrases."
 					bind:value={searchTerm}
 					on:keydown={(e) => e.key === 'Enter' && searchArtworks(true)}
@@ -945,25 +945,25 @@
 
 	<!-- Filter Tabs -->
 	<div class="bg-white dark:bg-gray-800 p-4 rounded-md shadow-sm mb-6 border border-gray-200 dark:border-gray-700">
-		<div class="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+		<div class="flex border-b border-gray-200 dark:border-gray-700">
 			<button
-				class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors {activeTab === 'owned'
-					? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-					: 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}"
+				class="flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'owned'
+					? 'border-yellow-400 text-gray-900 dark:text-yellow-400'
+					: 'border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-yellow-300'}"
 				on:click={() => handleTabChange('owned')}
 			>
 				Owned by Me
 			</button>
 			<button
-				class="flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors {activeTab === 'created'
-					? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-					: 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}"
+				class="flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'created'
+					? 'border-yellow-400 text-gray-900 dark:text-yellow-400'
+					: 'border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-yellow-300'}"
 				on:click={() => handleTabChange('created')}
 			>
 				Created by Me
 			</button>
 		</div>
-		<div class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+		<div class="mt-3 text-sm text-gray-600 dark:text-gray-400">
 			{#if activeTab === 'owned'}
 				Showing NFTs owned by your wallet addresses (excluding those you created)
 			{:else if activeTab === 'created'}
@@ -1088,7 +1088,7 @@
 	>
 		<div class="container mx-auto px-4 py-3 flex items-center justify-between">
 			<div class="flex items-center">
-				<div class="text-blue-600 dark:text-blue-400 font-semibold">
+				<div class="text-blue-600 dark:text-yellow-400 font-semibold">
 					{selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
 				</div>
 			</div>
@@ -1156,20 +1156,17 @@
 	}
 
 	.checkbox {
-		width: 1.25rem;
-		height: 1.25rem;
-		border: 2px solid rgb(209 213 219);
-		border-radius: 0.375rem;
-	}
-
-	@media (prefers-color-scheme: dark) {
-		.checkbox {
-			border-color: rgb(75 85 99);
-		}
+		@apply w-5 h-5 border-2 border-gray-300 rounded-md;
 	}
 
 	.checkbox:checked {
-		background-color: rgb(59 130 246);
-		border-color: rgb(59 130 246);
+		@apply bg-yellow-400 border-yellow-400;
+	}
+
+	/* Dark mode styles for checkbox */
+	@media (prefers-color-scheme: dark) {
+		.checkbox {
+			border-color: rgb(75 85 99); /* gray-600 */
+		}
 	}
 </style>

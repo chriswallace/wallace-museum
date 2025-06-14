@@ -171,7 +171,7 @@
 			<button class="back-btn" on:click={goBack}>&lt; Back</button>
 		</div>
 		<h1 class="mb-12">Add new artwork</h1>
-		<div class="pb-24 sm:grid sm:grid-cols-2 sm:gap-8">
+		<div class="edit-form">
 			<div>
 				<div class="file-uploader">
 					<input type="file" name="image" />
@@ -290,15 +290,7 @@
 	}
 
 	.edit-form {
-		padding-bottom: 6rem;
-	}
-
-	@media (min-width: 640px) {
-		.edit-form {
-			display: grid;
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-			gap: 2rem;
-		}
+		@apply pb-24 sm:grid sm:grid-cols-2 sm:gap-8;
 	}
 
 	.artwork {

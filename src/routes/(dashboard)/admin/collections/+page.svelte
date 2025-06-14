@@ -158,48 +158,114 @@
 
 <style>
 	.collection-grid {
-		width: 100%;
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		width: 100%;
 		gap: 1rem;
+		grid-template-columns: 1fr;
 	}
+	
+	@media (min-width: 640px) {
+		.collection-grid {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+	
+	@media (min-width: 1024px) {
+		.collection-grid {
+			grid-template-columns: 1fr 1fr 1fr;
+		}
+	}
+	
 	.card {
 		cursor: pointer;
 		border-radius: 0.375rem;
-		box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+		box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 		overflow: hidden;
 		padding: 0;
+		background: white;
+		border: 1px solid rgb(229 231 235);
+		transition: all 0.2s ease-in-out;
 	}
+	
+	.card:hover {
+		box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+		transform: translateY(-0.25rem);
+	}
+	
+	@media (prefers-color-scheme: dark) {
+		.card {
+			background: rgb(31 41 55);
+			border-color: rgb(75 85 99);
+		}
+	}
+	
 	.cover-image-wrap {
 		overflow: hidden;
 	}
+	
 	.cover-image-grid {
-		width: 100%;
-		aspect-ratio: 1 / 1;
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		transition-property: transform;
-		transition-duration: 200ms;
-		transition-timing-function: ease-in-out;
+		width: 100%;
+		aspect-ratio: 1;
+		grid-template-columns: 1fr 1fr;
+		transition: transform 0.2s ease-in-out;
 	}
+	
 	.cover-image-grid:hover {
 		transform: scale(1.05);
 	}
+	
 	.title {
-		font-size: 1.125rem;
-		line-height: 1.75rem;
 		font-weight: 600;
-		padding: 1rem;
+		padding: 0.75rem 1rem;
+		font-size: 0.875rem;
 	}
+	
+	@media (min-width: 640px) {
+		.title {
+			font-size: 1rem;
+		}
+	}
+	
+	@media (min-width: 768px) {
+		.title {
+			font-size: 1.125rem;
+			padding: 1rem;
+		}
+	}
+	
 	.pagination {
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		column-gap: 0.5rem;
+		gap: 0.5rem;
 		margin-top: 1rem;
 		margin-bottom: 1rem;
+		flex-wrap: wrap;
 	}
+	
 	.artists-container {
 		padding-bottom: 0.5rem;
+		padding-right: 0.75rem;
+	}
+	
+	@media (min-width: 768px) {
+		.artists-container {
+			padding-right: 1rem;
+		}
+	}
+	
+	.artists-count {
+		font-size: 0.75rem;
+		color: rgb(107 114 128);
+		margin-top: 0.25rem;
+	}
+	
+	@media (prefers-color-scheme: dark) {
+		.artists-count {
+			color: rgb(156 163 175);
+		}
 	}
 </style>
+
+

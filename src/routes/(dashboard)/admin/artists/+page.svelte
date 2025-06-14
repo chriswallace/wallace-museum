@@ -112,7 +112,7 @@
 		<p>No artists found.</p>
 	</div>
 {:else}
-	<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 w-full">
+	<div class="artists-grid">
 		{#each artists as artist}
 			<button class="card" on:click={() => editArtist(artist.id)}>
 				<div class="avatar-container">
@@ -142,14 +142,27 @@
 {/if}
 
 <style lang="scss">
+	.artists-grid {
+		@apply w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6;
+	}
+
 	.card {
-		@apply p-4 shadow-md rounded-lg flex justify-between text-center items-center flex-col text-sm hover:scale-105 transition-transform;
+		@apply shadow-md rounded-lg flex flex-col items-center text-center text-sm transition-all duration-200 bg-white border border-gray-200 min-h-[120px] md:min-h-[140px] p-3 md:p-4 dark:bg-gray-800 dark:border-gray-700;
+		
+		&:hover {
+			@apply scale-105 shadow-lg;
+		}
+		
+		&:active {
+			@apply scale-95;
+		}
 	}
 
 	.avatar-container {
-		@apply aspect-square w-full relative overflow-hidden rounded-full;
-		width: 100%;
-		height: auto;
+		@apply aspect-square w-full relative overflow-hidden rounded-full mb-2 md:mb-3;
+		max-width: 60px;
+		
+		@apply md:max-w-[80px];
 	}
 
 	.avatar-image {
@@ -157,22 +170,24 @@
 	}
 
 	.avatar-placeholder {
-		@apply w-full h-full flex items-center justify-center text-2xl font-bold text-white bg-gray-500/20 border border-gray-500 rounded-full;
+		@apply w-full h-full flex items-center justify-center font-bold text-white bg-gray-500/20 border border-gray-500 rounded-full text-xl md:text-2xl;
 	}
 
 	.empty {
-		text-align: center;
-		margin: 20px 0;
+		@apply text-center my-5;
+		
+		p {
+			@apply text-gray-600 dark:text-gray-400;
+		}
 	}
 
 	span {
-		@apply block w-full truncate mt-2;
+		@apply block w-full truncate text-xs md:text-sm;
 	}
 
 	.search {
-		margin-bottom: 20px;
-		width: 100%;
-		padding: 10px;
+		@apply mb-5 w-full p-2.5 text-base md:text-lg;
+		/* Prevent zoom on iOS */
 		font-size: 16px;
 	}
 </style>

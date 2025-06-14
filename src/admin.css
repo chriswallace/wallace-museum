@@ -100,7 +100,7 @@
 	}
 
 	h1 {
-		@apply max-w-5xl text-5xl mb-8;
+		@apply text-2xl md:text-5xl mb-6 md:mb-8 max-w-5xl;
 	}
 
 	h1 a {
@@ -130,7 +130,7 @@
 	}
 
 	a {
-		@apply text-secondary text-primary underline hover:no-underline;
+		@apply text-secondary text-primary underline hover:no-underline dark:text-yellow-400 dark:hover:text-yellow-300;
 	}
 
 	body {
@@ -163,12 +163,13 @@
 
 	/* Primary buttons - now neutral gray */
 	.primary {
-		@apply rounded-sm whitespace-nowrap text-white font-semibold;
+		@apply rounded-sm whitespace-nowrap text-white font-semibold dark:text-black;
 		background-color: var(--color-primary);
 	}
 
 	.primary:hover {
 		background-color: var(--button-color-background-primary-hover);
+		@apply dark:text-black;
 	}
 
 	/* Save/Update action buttons - green */
@@ -198,7 +199,7 @@
 	}
 
 	.link {
-		@apply text-secondary align-middle;
+		@apply text-secondary align-middle dark:text-yellow-400 dark:hover:text-yellow-300;
 	}
 
 	.cta {
@@ -210,7 +211,7 @@
 	}
 
 	.ghost:hover {
-		@apply bg-gray-100 dark:bg-gray-700;
+		@apply bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-100;
 	}
 
 	.secondary {
@@ -218,7 +219,7 @@
 	}
 
 	.secondary:hover {
-		@apply bg-gray-100 dark:bg-gray-700;
+		@apply bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100;
 	}
 
 	.edit {
@@ -437,7 +438,7 @@ input,
 select,
 textarea,
 .form-field {
-	@apply bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:border-primary dark:focus:border-primary focus:outline-none;
+	@apply bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:border-yellow-400 dark:focus:border-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 dark:focus:ring-yellow-400;
 }
 
 /* Exception for checkboxes */
@@ -462,11 +463,14 @@ input[type='url'],
 input[type='date'],
 textarea,
 select:not([multiple]) {
-	@apply px-3 py-2 rounded-sm;
+	@apply px-3 py-2 rounded-sm text-base md:text-sm;
+	/* Prevent zoom on iOS */
+	font-size: 16px;
 }
 
 select[multiple] {
-	@apply px-3 py-2 rounded-sm min-h-[150px];
+	@apply px-3 py-2 rounded-sm min-h-[150px] text-base md:text-sm;
+	font-size: 16px;
 }
 
 input::placeholder,
@@ -478,12 +482,13 @@ select::placeholder {
 input[type='checkbox'],
 input[type='radio'] {
 	@apply border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-900;
+	min-width: 16px;
+	min-height: 16px;
 }
 
 input[type='checkbox']:checked,
 input[type='radio']:checked {
-	background-color: rgb(184 92 40);
-	border-color: rgb(184 92 40);
+	@apply bg-yellow-400 border-yellow-400;
 }
 
 /* Small descriptive text under inputs */
@@ -514,8 +519,7 @@ small {
 }
 
 .selected-indicator {
-	background-color: rgb(184 92 40);
-	@apply text-white;
+	@apply bg-yellow-400 text-black;
 }
 
 /* Non-editable content style */
@@ -637,4 +641,132 @@ button.card:hover {
 	--toastBackground: var(--background-without-opacity);
 	--toastColor: var(--text-color);
 	--toastBarBackground: var(--color-primary);
+}
+
+/* Mobile-friendly button improvements */
+button {
+	@apply px-3 md:px-4 py-2 md:py-3 text-sm md:text-base min-h-[44px];
+	touch-action: manipulation;
+}
+
+/* Responsive form layouts */
+.edit-form {
+	@apply block space-y-4 md:grid md:grid-cols-2 md:gap-6 md:space-y-0;
+}
+
+.edit-form > * {
+	@apply w-full;
+}
+
+fieldset {
+	@apply p-3 md:p-4;
+}
+
+legend {
+	@apply text-sm md:text-base;
+}
+
+/* Admin-specific global styles */
+
+/* Back button styling */
+.back-btn {
+	@apply inline-block px-2 py-1 mb-6 uppercase text-sm border border-transparent rounded-sm text-gray-500 dark:text-gray-300 hover:text-gray-700 hover:border-gray-300 dark:hover:text-yellow-400 dark:hover:border-yellow-400 font-semibold no-underline transition duration-300 ease-in-out;
+}
+
+/* Search input styling */
+.search {
+	@apply w-full text-base md:text-lg px-3 md:px-4 py-2 md:py-3 mb-6 md:mb-8 rounded-sm;
+}
+
+/* Pagination styling */
+.pagination {
+	@apply flex flex-wrap justify-center py-8 md:py-16;
+}
+
+.pagination button {
+	@apply inline-block px-3 md:px-4 py-2 md:py-3 mx-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 text-sm md:text-base min-h-[44px] hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100;
+	border-radius: 4px;
+	text-decoration: none;
+}
+
+/* Table styling */
+table {
+	@apply relative w-full md:block;
+	border-collapse: collapse;
+	
+	/* Make tables horizontally scrollable on mobile */
+	@apply max-md:block max-md:overflow-x-auto max-md:whitespace-nowrap max-md:text-sm;
+}
+
+th,
+td {
+	@apply text-left p-2 border-b border-gray-200 dark:border-gray-700 max-md:px-2 max-md:py-3;
+	min-width: 100px;
+}
+
+th:first-child,
+td:first-child {
+	@apply max-md:sticky max-md:left-0 max-md:bg-inherit max-md:z-10;
+}
+
+thead {
+	@apply bg-gray-100 dark:bg-gray-800;
+}
+
+tr {
+	@apply dark:bg-gray-900;
+}
+
+tr:nth-child(even) {
+	@apply dark:bg-gray-800;
+}
+
+th {
+	@apply font-bold text-gray-600 dark:text-gray-300 uppercase text-sm py-4 border-b-2 border-gray-300 dark:border-gray-600;
+}
+
+th.sortable {
+	@apply cursor-pointer text-blue-600 hover:text-blue-800 dark:text-yellow-400 dark:hover:text-yellow-300;
+}
+
+tr:hover td {
+	@apply dark:bg-gray-800;
+}
+
+td button {
+	@apply block hover:underline text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-yellow-400;
+}
+
+/* Table column sizing classes */
+.actions {
+	@apply min-w-[80px] md:max-w-[10px];
+}
+
+.image {
+	@apply w-8 h-8 md:w-12 md:h-12 p-0 m-0 max-md:w-6 max-md:h-6;
+}
+
+/* Selected state styling for pagination */
+.pagination .selected {
+	@apply font-bold bg-yellow-400 text-black dark:bg-yellow-400 dark:text-black border-yellow-400 dark:border-yellow-400;
+}
+
+/* Admin heading styles */
+h1 button {
+	@apply align-middle text-sm border border-gray-400 dark:border-gray-500 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-sm hover:bg-gray-100 hover:border-gray-500 hover:text-gray-800 dark:hover:bg-gray-700 dark:hover:text-gray-100 dark:hover:border-gray-400;
+	@apply block mt-2 ml-0 sm:inline-block sm:mt-0 sm:ml-2 md:ml-4;
+}
+
+/* Form improvements for mobile */
+input,
+textarea,
+select {
+	@apply text-base;
+	/* Prevent zoom on iOS */
+	font-size: 16px;
+}
+
+/* Edit button styling */
+.edit {
+	@apply text-primary border-2 border-primary hover:bg-primary hover:text-white dark:hover:text-black hover:no-underline rounded-sm text-sm uppercase no-underline font-bold px-3 py-2 m-0 mx-1 dark:text-yellow-400 dark:border-yellow-400 dark:hover:bg-yellow-400;
 }

@@ -306,12 +306,24 @@
 		<h1>Edit {collection.title}</h1>
 
 		<div class="tabs">
-			<button on:click={() => switchTab('artworks')} class:active={activeTab === 'artworks'}
-				>Artworks</button
-			>
-			<button on:click={() => switchTab('details')} class:active={activeTab === 'details'}
-				>Collection Details</button
-			>
+			<div class="flex border-b border-gray-200 dark:border-gray-700">
+				<button 
+					class="px-6 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'artworks'
+						? 'border-yellow-400 text-gray-900 dark:text-yellow-400'
+						: 'border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-yellow-300'}"
+					on:click={() => switchTab('artworks')}
+				>
+					Artworks
+				</button>
+				<button 
+					class="px-6 py-3 text-sm font-medium transition-colors border-b-2 {activeTab === 'details'
+						? 'border-yellow-400 text-gray-900 dark:text-yellow-400'
+						: 'border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-yellow-300'}"
+					on:click={() => switchTab('details')}
+				>
+					Collection Details
+				</button>
+			</div>
 		</div>
 
 		{#if activeTab === 'artworks'}
@@ -389,15 +401,7 @@
 	}
 
 	.tabs {
-		@apply relative flex items-stretch -mx-6 -mb-6 border-b border-gray-200 dark:border-gray-700;
-	}
-
-	.tabs button {
-		@apply z-10 border-b-2 border-b-transparent px-6 flex items-center font-medium;
-	}
-
-	.tabs button.active {
-		@apply border-primary dark:border-primary-dark;
+		@apply mb-6;
 	}
 
 	.details-tab form {
