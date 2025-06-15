@@ -310,7 +310,7 @@
 								>
 									<div class="artist-name">{artist.name}</div>
 									<div class="artwork-count">
-										{artist.artworks.length} artwork{artist.artworks.length !== 1 ? 's' : ''}
+										{artist.artworkCount} artwork{artist.artworkCount !== 1 ? 's' : ''}
 									</div>
 								</button>
 							{/each}

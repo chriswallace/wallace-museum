@@ -201,6 +201,11 @@
 
 	.thumbnail-image img,
 	.thumbnail-image video{
+		@apply max-h-full max-w-full;
+	}
+
+	.artwork-page .thumbnail-image img,
+	.artwork-page .thumbnail-image video{
 		@apply max-h-[80%] max-w-[80%];
 	}
 

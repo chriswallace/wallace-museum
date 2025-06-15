@@ -237,12 +237,6 @@
 		@apply w-full h-full object-cover;
 	}
 
-	/* Override global thumbnail-image constraints for feed artworks */
-	.artwork-feed :global(.thumbnail-image img),
-	.artwork-feed :global(.thumbnail-image video) {
-		@apply max-w-full max-h-full;
-	}
-
 	.thumbnail-placeholder {
 		@apply w-full h-full flex items-center justify-center text-gray-500;
 	}

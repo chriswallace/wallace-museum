@@ -21,6 +21,7 @@ export interface ArtistWithPreview {
 	name: string;
 	previewArtwork: PreviewArtwork | null;
 	artworks: PreviewArtwork[]; // Add all artworks for preloading
+	artworkCount: number; // Add total artwork count without pagination
 }
 
 export const load: ServerLoad = async () => {
@@ -40,7 +41,12 @@ export const load: ServerLoad = async () => {
 						mime: true, // Include MIME type
 						dimensions: true
 					},
-					take: 10 // Limit artworks per artist
+					take: 10 // Limit artworks per artist for preview
+				},
+				_count: {
+					select: {
+						Artwork: true // Get the total count of artworks
+					}
 				}
 			},
 			orderBy: {
@@ -63,12 +69,13 @@ export const load: ServerLoad = async () => {
 				id: artist.id,
 				name: artist.name,
 				previewArtwork: transformedArtworks.length > 0 ? transformedArtworks[0] : null,
-				artworks: transformedArtworks
+				artworks: transformedArtworks,
+				artworkCount: artist._count.Artwork // Use the actual total count
 			};
 		});
 
 		// Filter to only include artists with artworks
-		const artistsWithArtworks = artistsWithPreview.filter((artist) => artist.artworks.length > 0);
+		const artistsWithArtworks = artistsWithPreview.filter((artist) => artist.artworkCount > 0);
 
 		// If no artists with artworks, return all artists anyway for debugging
 		if (artistsWithArtworks.length === 0 && artists.length > 0) {
@@ -76,7 +83,8 @@ export const load: ServerLoad = async () => {
 				id: artist.id,
 				name: artist.name,
 				previewArtwork: null,
-				artworks: []
+				artworks: [],
+				artworkCount: artist._count.Artwork
 			}));
 			
 			return {
