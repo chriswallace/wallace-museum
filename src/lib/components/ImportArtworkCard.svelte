@@ -188,7 +188,7 @@
 				<!-- Video display optimized for grid -->
 				<video
 					src={displayAnimationUrl}
-					class="w-full h-full object-cover"
+					class="w-full h-full object-contain"
 					width="300"
 					height="300"
 					autoplay
@@ -209,10 +209,10 @@
 					width={300}
 					height={300}
 					aspectRatio="1/1"
-					fit="cover"
+					fit="contain"
 					format="auto"
 					quality={85}
-					className="w-full h-full object-cover"
+					className="w-full h-full object-contain"
 					fallbackSrc="/images/medici-image.png"
 					loading="lazy"
 					on:error={handleImageError}
@@ -408,7 +408,7 @@
 					<!-- Video thumbnail -->
 					<video
 						src={displayAnimationUrl}
-						class="w-full h-full object-cover"
+						class="w-full h-full object-contain"
 						width="48"
 						height="48"
 						autoplay
@@ -429,10 +429,10 @@
 						width={48}
 						height={48}
 						aspectRatio="1/1"
-						fit="cover"
+						fit="contain"
 						format="auto"
 						quality={85}
-						className="w-full h-full object-cover"
+						className="w-full h-full object-contain"
 						fallbackSrc="/images/medici-image.png"
 						loading="lazy"
 						on:error={handleImageError}

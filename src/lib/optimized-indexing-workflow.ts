@@ -62,10 +62,10 @@ export class OptimizedIndexingWorkflow {
     const allNfts: MinimalNFTData[] = [];
     let nextCursor: string | undefined = undefined;
     let pageCount = 0;
-    const maxPages = options.maxPages || 100;
+    const maxPages = options.maxPages || 200;
     const pageSize = options.pageSize || 50;
     let consecutiveFailures = 0;
-    const maxConsecutiveFailures = 15; // Increased from 5 to handle OpenSea rate limiting better
+    const maxConsecutiveFailures = 50;
 
     // Determine enrichment strategy based on options
     const enrichmentLevel = options.enrichmentLevel || 'standard';
@@ -233,8 +233,8 @@ export class OptimizedIndexingWorkflow {
    */
   private calculatePageDelay(currentDelay: number): number {
     // More conservative delay for page requests to avoid rate limits
-    // Minimum 2 seconds between requests, with 50% buffer on current delay
-    return Math.max(2000, currentDelay * 1.5); // Increased from 1000ms min and 1.2x to 2000ms min and 1.5x
+    // Minimum 3 seconds between requests, with 50% buffer on current delay
+    return Math.max(3000, currentDelay * 1.5); // Increased from 2000ms to 3000ms for better rate limit handling
   }
 
   /**

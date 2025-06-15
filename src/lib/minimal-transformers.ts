@@ -10,6 +10,7 @@ import { WRAPPED_TEZOS_CONTRACT, isProblematicThumbnail, isVersumOrHicEtNuncCont
 import { detectBlockchainFromContract } from './utils/walletUtils';
 import { EnhancedFieldProcessor } from './enhanced-field-processor';
 import { fileTypeFromBuffer } from 'file-type';
+import { isFxhashContract } from './utils';
 
 /**
  * Minimal data transformer - only extracts fields we actually store in the database
@@ -343,15 +344,18 @@ export class MinimalNFTTransformer {
       };
     }
     
-    // Enhanced collection extraction - prioritize gallery information over FA contract
+    // Enhanced collection extraction - only use galleries for fxhash contracts
     let collection: MinimalNFTData['collection'];
     
-    // First, check if there's gallery information available
-    if (actualToken.galleries && Array.isArray(actualToken.galleries) && actualToken.galleries.length > 0) {
+    // Check if this is an fxhash contract
+    const isFxhashContractAddress = actualToken.fa?.contract && isFxhashContract(actualToken.fa.contract);
+    
+    // For fxhash contracts, ONLY use the first gallery if available (original/official collection)
+    if (isFxhashContractAddress && actualToken.galleries && Array.isArray(actualToken.galleries) && actualToken.galleries.length > 0) {
       const gallery = actualToken.galleries[0].gallery;
       
       if (gallery) {
-        console.log(`[MinimalNFTTransformer] Using gallery information for collection: ${gallery.name} (${gallery.slug})`);
+        console.log(`[MinimalNFTTransformer] fxhash contract - using FIRST gallery for collection: ${gallery.name} (${gallery.slug})`);
         
         collection = {
           slug: gallery.slug || gallery.gallery_id,
@@ -360,11 +364,11 @@ export class MinimalNFTTransformer {
           contractAddress: actualToken.fa?.contract || '', // Keep the contract address from fa
           websiteUrl: undefined, // Gallery data doesn't typically include website
           imageUrl: gallery.logo,
-          isGenerativeArt: this.isGenerativeCollection(actualToken.fa?.contract || ''),
+          isGenerativeArt: true, // fxhash is always generative art
           isSharedContract: false // Tezos doesn't have shared contracts like OpenSea
         };
       } else {
-        // Fallback to FA contract information
+        // Fallback to FA contract information for fxhash if no gallery
         collection = {
           slug: actualToken.fa.contract,
           title: actualToken.fa.name || 'Unknown Collection',
@@ -372,13 +376,14 @@ export class MinimalNFTTransformer {
           contractAddress: actualToken.fa.contract,
           websiteUrl: actualToken.fa.website,
           imageUrl: actualToken.fa.logo,
-          isGenerativeArt: this.isGenerativeCollection(actualToken.fa.contract),
+          isGenerativeArt: true, // fxhash is always generative art
           isSharedContract: false // Tezos doesn't have shared contracts like OpenSea
         };
       }
     } else {
-      // Fallback to FA contract information if no gallery data
-      console.log(`[MinimalNFTTransformer] Using FA contract information for collection: ${actualToken.fa?.name} (${actualToken.fa?.contract})`);
+      // For non-fxhash contracts, SKIP gallery information entirely (can be user-generated)
+      // and use FA contract information directly
+      console.log(`[MinimalNFTTransformer] Non-fxhash contract - using FA contract information for collection: ${actualToken.fa?.name} (${actualToken.fa?.contract})`);
       
       collection = {
         slug: actualToken.fa.contract,

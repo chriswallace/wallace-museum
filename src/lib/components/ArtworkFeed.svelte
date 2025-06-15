@@ -34,7 +34,7 @@
 		try {
 			const excludeIds = reset ? [] : artworks.map(a => a.id);
 			const params = new URLSearchParams({
-				limit: '6',
+				limit: '12',
 				t: Date.now().toString(), // Add timestamp to prevent caching
 				...(excludeIds.length > 0 && { exclude: excludeIds.join(',') })
 			});
@@ -72,7 +72,7 @@
 
 		const options = {
 			root: null,
-			rootMargin: '100px',
+			rootMargin: '300px',
 			threshold: 0.1
 		};
 
@@ -207,7 +207,7 @@
 
 <style lang="scss">
 	.artwork-feed {
-		@apply w-full max-w-[560px] mx-auto py-8;
+		@apply w-full max-w-[560px] mx-auto pb-8 md:pt-8;
 	}
 
 	.artworks-stack {
@@ -234,7 +234,7 @@
 	}
 
 	:global(.thumbnail-image) {
-		@apply w-full h-full object-cover;
+		@apply w-full h-full object-contain;
 	}
 
 	.thumbnail-placeholder {

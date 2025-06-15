@@ -779,7 +779,7 @@ export class MinimalIndexingWorkflow {
       const allNfts: MinimalNFTData[] = [];
       let nextCursor: string | undefined = undefined;
       let pageCount = 0;
-      const maxPages = 100; // Safety limit to prevent infinite loops
+      const maxPages = 200; // Increased from 100 to 200 to handle larger wallets
       
       do {
         console.log(`[MinimalIndexingWorkflow] Fetching page ${pageCount + 1} for wallet ${walletAddress}${nextCursor ? ` (cursor: ${nextCursor.substring(0, 20)}...)` : ''}`);
@@ -812,7 +812,7 @@ export class MinimalIndexingWorkflow {
       const limit = 500;
       let hasMore = true;
       let pageCount = 0;
-      const maxPages = 100; // Safety limit to prevent infinite loops
+      const maxPages = 200; // Increased from 100 to 200 to handle larger wallets
       
       while (hasMore && pageCount < maxPages) {
         console.log(`[MinimalIndexingWorkflow] Fetching page ${pageCount + 1} for Tezos wallet ${walletAddress} (offset: ${offset})`);

@@ -36,7 +36,7 @@
 		thumbnailUrl?: string | null;
 		thumbnail_url?: string | null;
 		generatorUrl?: string | null;
-		artists?: Artist[];
+		Artist?: Artist[];
 		collectionId: number | null;
 		mime?: string | null;
 		attributes?: string | null;
@@ -63,7 +63,7 @@
 		animationUrl: null,
 		thumbnailUrl: null,
 		generatorUrl: null,
-		artists: [],
+		Artist: [],
 		collectionId: null,
 		mime: null,
 		attributes: null,
@@ -140,10 +140,10 @@
 			description: artwork.description,
 			collectionId: artwork.collectionId,
 			artistIds: selectedArtistIds,
-			image_url: artwork.imageUrl,
-			animation_url: artwork.animationUrl,
-			thumbnail_url: artwork.thumbnailUrl,
-			generator_url: artwork.generatorUrl,
+			imageUrl: artwork.imageUrl,
+			animationUrl: artwork.animationUrl,
+			thumbnailUrl: artwork.thumbnailUrl,
+			generatorUrl: artwork.generatorUrl,
 			mime: artwork.mime,
 			metadataUrl: artwork.metadataUrl,
 			externalUrl: artwork.externalUrl,
@@ -165,7 +165,7 @@
 			showToast('Artwork saved.', 'success');
 			const updatedData = await response.json();
 			artwork = updatedData;
-			selectedArtistIds = artwork.artists?.map((a) => a.id) || [];
+			selectedArtistIds = artwork.Artist?.map((a) => a.id) || [];
 		} else {
 			const errorData = await response.json();
 			showToast(
@@ -215,7 +215,7 @@
 				if (result.success) {
 					// Update the artwork with the fresh data
 					artwork = result.artwork;
-					selectedArtistIds = artwork.artists?.map((a) => a.id) || [];
+					selectedArtistIds = artwork.Artist?.map((a) => a.id) || [];
 					
 					// Show success message with updated fields
 					const updatedFields = result.updatedFields || [];
@@ -252,7 +252,7 @@
 
 			if (artworkRes.ok) {
 				artwork = await artworkRes.json();
-				selectedArtistIds = artwork.artists?.map((a) => a.id) || [];
+				selectedArtistIds = artwork.Artist?.map((a) => a.id) || [];
 			} else {
 				error = 'Failed to fetch artwork';
 			}

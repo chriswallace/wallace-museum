@@ -206,7 +206,7 @@
 
 	.artwork-page .thumbnail-image img,
 	.artwork-page .thumbnail-image video{
-		@apply max-h-[80%] max-w-[80%];
+		@apply md:max-h-[80%] md:max-w-[80%];
 	}
 
 	dl {

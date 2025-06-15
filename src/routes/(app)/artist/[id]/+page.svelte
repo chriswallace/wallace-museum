@@ -628,7 +628,7 @@
 	}
 
 	.thumbnail-image {
-		@apply w-full h-full object-cover;
+		@apply w-full h-full object-contain;
 	}
 
 	.thumbnail-placeholder {

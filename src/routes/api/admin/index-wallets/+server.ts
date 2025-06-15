@@ -40,7 +40,7 @@ async function processWallet(
 				'ethereum', 
 				'owned',
 				{ 
-					maxPages: 200,
+					maxPages: 300,
 					pageSize: 50,
 					enrichmentLevel: 'comprehensive' // Keep comprehensive data fetching
 				}

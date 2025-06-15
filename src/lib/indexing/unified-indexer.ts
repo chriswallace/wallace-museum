@@ -206,7 +206,8 @@ export class UnifiedIndexer {
       const mergedData = {
         ...indexerData,
         // Override with enhanced fields if they provide better data (and are not undefined)
-        ...(enhancedFields.mime && { mime: enhancedFields.mime }),
+        // BUT preserve original video MIME types since enhanced processing might incorrectly override them for IPFS URLs
+        ...(enhancedFields.mime && !indexerData.mime?.startsWith('video/') && { mime: enhancedFields.mime }),
         ...(enhancedFields.dimensions && { dimensions: enhancedFields.dimensions }),
         ...(enhancedFields.attributes && { attributes: enhancedFields.attributes }),
         ...(enhancedFields.features && { features: enhancedFields.features }),
@@ -218,6 +219,13 @@ export class UnifiedIndexer {
         ...(enhancedFields.thumbnailUrl && { thumbnailUrl: enhancedFields.thumbnailUrl }),
         ...(enhancedFields.metadataUrl && { metadataUrl: enhancedFields.metadataUrl })
       };
+
+      // Log MIME type handling for debugging
+      if (indexerData.mime?.startsWith('video/') && enhancedFields.mime && enhancedFields.mime !== indexerData.mime) {
+        console.log(`[UnifiedIndexer] Preserving original video MIME type "${indexerData.mime}" over enhanced detection "${enhancedFields.mime}" for ${indexRecord.contractAddress}:${indexRecord.tokenId}`);
+      } else if (enhancedFields.mime && enhancedFields.mime !== indexerData.mime) {
+        console.log(`[UnifiedIndexer] Using enhanced MIME type "${enhancedFields.mime}" over original "${indexerData.mime || 'none'}" for ${indexRecord.contractAddress}:${indexRecord.tokenId}`);
+      }
 
       // Step 1: Create/update Artist with wallet addresses stored as JSON
       let artistId: number | undefined;
