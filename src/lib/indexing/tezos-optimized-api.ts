@@ -75,38 +75,63 @@ export class OptimizedTezosAPI {
 
     console.log(`[OptimizedTezosAPI] Fetching ${type} NFTs for ${walletAddress} (limit: ${limit}, offset: ${offset})`);
 
-    const query = type === 'owned' ? FETCH_WALLET_NFTS_QUERY : FETCH_CREATED_NFTS_QUERY;
-    const response = await this.executeQuery<any>(query, variables);
-    
-    // Extract tokens based on query type
-    let tokens: any[] = [];
-    if (type === 'owned' && response.token_holder) {
-      tokens = response.token_holder.map((th: any) => th.token);
-    } else if (type === 'created' && response.token) {
-      tokens = response.token;
-    }
-
-    // Filter out wrapped Tezos tokens - these are not real NFTs
-    const filteredTokens = tokens.filter(token => {
-      const contractAddress = token?.fa?.contract;
-      if (contractAddress === WRAPPED_TEZOS_CONTRACT) {
-        console.log(`[OptimizedTezosAPI] Filtering out wrapped Tezos token from contract ${contractAddress}`);
-        return false;
+    try {
+      const query = type === 'owned' ? FETCH_WALLET_NFTS_QUERY : FETCH_CREATED_NFTS_QUERY;
+      const response = await this.executeQuery<any>(query, variables);
+      
+      console.log(`[OptimizedTezosAPI] GraphQL response received for ${walletAddress} (${type}):`, {
+        hasTokenHolder: !!response.token_holder,
+        hasToken: !!response.token,
+        tokenHolderLength: response.token_holder?.length || 0,
+        tokenLength: response.token?.length || 0
+      });
+      
+      // Extract tokens based on query type
+      let tokens: any[] = [];
+      if (type === 'owned' && response.token_holder) {
+        tokens = response.token_holder.map((th: any) => th.token);
+        console.log(`[OptimizedTezosAPI] Extracted ${tokens.length} tokens from token_holder array`);
+      } else if (type === 'created' && response.token) {
+        tokens = response.token;
+        console.log(`[OptimizedTezosAPI] Extracted ${tokens.length} tokens from token array`);
+      } else {
+        console.warn(`[OptimizedTezosAPI] No tokens found in response for ${type} query:`, Object.keys(response));
       }
-      return true;
-    });
 
-    console.log(`[OptimizedTezosAPI] Filtered ${tokens.length - filteredTokens.length} wrapped Tezos tokens, ${filteredTokens.length} remaining`);
+      // Filter out wrapped Tezos tokens - these are not real NFTs
+      const filteredTokens = tokens.filter(token => {
+        const contractAddress = token?.fa?.contract;
+        if (contractAddress === WRAPPED_TEZOS_CONTRACT) {
+          console.log(`[OptimizedTezosAPI] Filtering out wrapped Tezos token from contract ${contractAddress}`);
+          return false;
+        }
+        return true;
+      });
 
-    // Transform tokens to MinimalNFTData - properly await async transformations
-    const nfts = await Promise.all(
-      filteredTokens.map(token => this.transformer.transformTezosToken(token))
-    );
+      console.log(`[OptimizedTezosAPI] Filtered ${tokens.length - filteredTokens.length} wrapped Tezos tokens, ${filteredTokens.length} remaining`);
 
-    return {
-      nfts,
-      hasMore: tokens.length === limit
-    };
+      // Transform tokens to MinimalNFTData - properly await async transformations
+      const nfts = await Promise.all(
+        filteredTokens.map(token => this.transformer.transformTezosToken(token))
+      );
+
+      // More robust hasMore logic:
+      // 1. If we got fewer raw tokens than requested, there are no more
+      // 2. If we got exactly the limit of raw tokens, there might be more
+      // 3. Account for filtering that might reduce the final count
+      const hasMore = tokens.length === limit && tokens.length > 0;
+      
+      console.log(`[OptimizedTezosAPI] Pagination check: requested ${limit}, got ${tokens.length} raw tokens, ${filteredTokens.length} after filtering, ${nfts.length} final NFTs, hasMore: ${hasMore}`);
+
+      return {
+        nfts,
+        hasMore
+      };
+      
+    } catch (error) {
+      console.error(`[OptimizedTezosAPI] Error fetching ${type} NFTs for ${walletAddress}:`, error);
+      throw error; // Re-throw to let the workflow handle it
+    }
   }
 
   /**

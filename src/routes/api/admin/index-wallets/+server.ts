@@ -56,21 +56,29 @@ async function processWallet(
 			result.errors = storeResult.errors.map(e => e.error);
 			
 		} else if (blockchain === 'tezos') {
-			// Fetch owned NFTs
+			// Fetch owned NFTs with higher pagination limits
 			const ownedNFTs = await indexingWorkflow.indexWalletNFTs(
 				walletAddress, 
 				'tezos', 
-				'owned'
+				'owned',
+				{
+					maxPages: 50, // 50 pages × 500 NFTs = 25,000 NFT capacity
+					pageSize: 500
+				}
 			);
 			
 			// Add delay between API calls
 			await sleep(WALLET_DELAY);
 			
-			// Fetch created NFTs
+			// Fetch created NFTs with higher pagination limits
 			const createdNFTs = await indexingWorkflow.indexWalletNFTs(
 				walletAddress, 
 				'tezos', 
-				'created'
+				'created',
+				{
+					maxPages: 50, // 50 pages × 500 NFTs = 25,000 NFT capacity
+					pageSize: 500
+				}
 			);
 			
 			console.log(`[ProcessWallet] Fetched ${ownedNFTs.length} owned + ${createdNFTs.length} created NFTs for ${walletAddress}`);

@@ -207,24 +207,70 @@ export class OptimizedIndexingWorkflow {
     let offset = 0;
     const limit = options.pageSize || 500;
     let hasMore = true;
+    let pageCount = 0;
+    const maxPages = options.maxPages || 50; // Add pagination limit for Tezos (50 pages × 500 = 25,000 NFTs max)
+    let consecutiveFailures = 0;
+    const maxConsecutiveFailures = 10; // Allow up to 10 consecutive failures for Tezos
 
-    while (hasMore) {
-      console.log(`[OptimizedIndexingWorkflow] Fetching Tezos NFTs: offset ${offset}, limit ${limit}`);
+    while (hasMore && pageCount < maxPages) {
+      console.log(`[OptimizedIndexingWorkflow] Fetching Tezos NFTs page ${pageCount + 1}: offset ${offset}, limit ${limit}`);
 
-      const result = await this.tezosAPI.fetchWalletNFTs(walletAddress, type, limit, offset);
-      allNfts.push(...result.nfts);
-      hasMore = result.hasMore;
-      offset += limit;
+      try {
+        const result = await this.tezosAPI.fetchWalletNFTs(walletAddress, type, limit, offset);
+        
+        // Check if we got a successful result
+        if (result.nfts && result.nfts.length > 0) {
+          allNfts.push(...result.nfts);
+          hasMore = result.hasMore;
+          offset += limit;
+          pageCount++;
+          consecutiveFailures = 0; // Reset failure counter on success
 
-      console.log(`[OptimizedIndexingWorkflow] Tezos batch: fetched ${result.nfts.length} NFTs, total so far: ${allNfts.length}, hasMore: ${hasMore}`);
+          console.log(`[OptimizedIndexingWorkflow] Tezos page ${pageCount}: fetched ${result.nfts.length} NFTs, total so far: ${allNfts.length}, hasMore: ${hasMore}`);
 
-      // Add delay for Tezos API
-      if (hasMore) {
-        await this.sleep(1000);
+          // Add delay for Tezos API
+          if (hasMore) {
+            await this.sleep(1000);
+          }
+        } else {
+          // Empty result - could be end of data or API issue
+          console.log(`[OptimizedIndexingWorkflow] Tezos page ${pageCount + 1}: received empty result`);
+          
+          if (!result.hasMore) {
+            console.log(`[OptimizedIndexingWorkflow] No more Tezos NFTs available (hasMore is false)`);
+            break; // No more data available
+          } else {
+            // Empty result but hasMore is true - this might be an API issue
+            console.log(`[OptimizedIndexingWorkflow] Empty result but hasMore is true - treating as API error`);
+            throw new Error('Empty result with hasMore true - likely API issue');
+          }
+        }
+
+      } catch (error) {
+        consecutiveFailures++;
+        console.error(`[OptimizedIndexingWorkflow] Tezos error on page ${pageCount + 1} (failure ${consecutiveFailures}/${maxConsecutiveFailures}):`, error);
+        
+        // Check if we've hit too many consecutive failures
+        if (consecutiveFailures >= maxConsecutiveFailures) {
+          console.error(`[OptimizedIndexingWorkflow] Too many consecutive Tezos failures (${consecutiveFailures}), stopping pagination`);
+          break;
+        }
+
+        // For Tezos API errors, wait and retry
+        const backoffDelay = Math.min(2000 * Math.pow(1.5, consecutiveFailures - 1), 30000); // More conservative backoff for Tezos
+        console.log(`[OptimizedIndexingWorkflow] Tezos API error, waiting ${backoffDelay}ms before retry ${consecutiveFailures}/${maxConsecutiveFailures}...`);
+        await this.sleep(backoffDelay);
+        
+        // Don't increment pageCount or offset - retry the same page
+        continue;
       }
     }
 
-    console.log(`[OptimizedIndexingWorkflow] Completed Tezos indexing: ${allNfts.length} total NFTs`);
+    if (pageCount >= maxPages) {
+      console.warn(`[OptimizedIndexingWorkflow] Tezos indexing stopped at maximum pages limit (${maxPages}). Total NFTs: ${allNfts.length}`);
+    }
+
+    console.log(`[OptimizedIndexingWorkflow] Completed Tezos indexing: ${allNfts.length} total NFTs across ${pageCount} pages (${consecutiveFailures} final consecutive failures)`);
     return allNfts;
   }
 
