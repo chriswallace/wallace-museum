@@ -302,7 +302,7 @@
 						{#if artwork.animationUrl || artwork.generatorUrl}
 							{#if artwork.mime?.startsWith('video/')}
 								<video 
-									src={artwork.animationUrl || artwork.generatorUrl} 
+									src={ipfsToHttpUrl(artwork.animationUrl || artwork.generatorUrl || '', undefined, true, artwork.mime || undefined)} 
 									controls 
 									muted 
 									autoplay 
