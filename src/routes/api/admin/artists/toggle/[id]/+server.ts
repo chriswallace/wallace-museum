@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/prisma';
+import { cachedArtistQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 export const POST: RequestHandler = async ({ params }) => {
 	const { id } = params;
@@ -27,6 +28,12 @@ export const POST: RequestHandler = async ({ params }) => {
 			where: { id: artistId },
 			data: { isVerified: !currentArtist.isVerified }
 		});
+
+		// Invalidate artist-related cache since verification status changed
+		await cachedArtistQueries.invalidate(artistId);
+
+		// Invalidate search cache since artist data has changed
+		await cachedSearchQueries.invalidate();
 		
 		return json({ 
 			success: true, 

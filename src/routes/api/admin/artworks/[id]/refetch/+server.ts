@@ -6,6 +6,7 @@ import { EnhancedFieldProcessor } from '$lib/enhanced-field-processor';
 import { MediaAnalyzer } from '$lib/utils/mediaAnalyzer.js';
 import { detectBlockchainFromContract } from '$lib/utils/walletUtils';
 import { OPENSEA_API_KEY } from '$env/static/private';
+import { cachedArtworkQueries, cachedCollectionQueries, cachedArtistQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 export const POST: RequestHandler = async ({ params }) => {
 	const { id } = params;
@@ -198,6 +199,22 @@ export const POST: RequestHandler = async ({ params }) => {
 				Artist: true
 			}
 		});
+
+		// Invalidate artwork cache since it was updated
+		await cachedArtworkQueries.invalidate(artworkId, updatedArtwork.uid || undefined);
+
+		// Invalidate collection cache if artwork is in a collection
+		if (updatedArtwork.collectionId) {
+			await cachedCollectionQueries.invalidate(updatedArtwork.collectionId);
+		}
+
+		// Invalidate artist cache for all artists associated with this artwork
+		for (const artist of updatedArtwork.Artist) {
+			await cachedArtistQueries.invalidate(artist.id);
+		}
+
+		// Invalidate search cache since artwork data has changed
+		await cachedSearchQueries.invalidate();
 
 		// Pin any new IPFS URLs to Pinata
 		try {

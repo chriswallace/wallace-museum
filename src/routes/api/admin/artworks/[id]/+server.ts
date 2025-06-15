@@ -1,5 +1,6 @@
 import { prismaRead, prismaWrite } from '$lib/prisma';
 import { Prisma } from '@prisma/client';
+import { cachedArtworkQueries, cachedCollectionQueries, cachedArtistQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 // GET: Fetch Artwork Details
 export async function GET({ params }) {
@@ -60,6 +61,27 @@ export async function PUT({ params, request }) {
 	const requestData = (await request.json()) as ArtworkUpdateRequestData;
 
 	try {
+		// Get the current artwork to track changes for cache invalidation
+		const currentArtwork = await prismaRead.artwork.findUnique({
+			where: { id: artworkId },
+			select: {
+				id: true,
+				uid: true,
+				collectionId: true,
+				Artist: { select: { id: true } }
+			}
+		});
+
+		if (!currentArtwork) {
+			return new Response(
+				JSON.stringify({ error: 'Artwork not found to update.' }),
+				{
+					status: 404,
+					headers: { 'Content-Type': 'application/json' }
+				}
+			);
+		}
+
 		const updateData: Prisma.ArtworkUpdateInput = {};
 
 		// Map fields directly
@@ -122,6 +144,36 @@ export async function PUT({ params, request }) {
 			}
 		});
 
+		// Invalidate artwork cache since it was updated
+		await cachedArtworkQueries.invalidate(artworkId, currentArtwork.uid || undefined);
+
+		// Invalidate collection cache if collection relationship changed
+		if (requestData.collectionId !== undefined) {
+			// Invalidate old collection if it existed
+			if (currentArtwork.collectionId) {
+				await cachedCollectionQueries.invalidate(currentArtwork.collectionId);
+			}
+			// Invalidate new collection if it was set
+			if (requestData.collectionId) {
+				await cachedCollectionQueries.invalidate(requestData.collectionId);
+			}
+		}
+
+		// Invalidate artist cache if artist relationship changed
+		if (requestData.artistIds !== undefined) {
+			// Invalidate old artists
+			for (const artist of currentArtwork.Artist) {
+				await cachedArtistQueries.invalidate(artist.id);
+			}
+			// Invalidate new artists
+			for (const artistId of requestData.artistIds) {
+				await cachedArtistQueries.invalidate(artistId);
+			}
+		}
+
+		// Invalidate search cache since artwork data has changed
+		await cachedSearchQueries.invalidate();
+
 		return new Response(JSON.stringify(updatedArtwork), {
 			status: 200,
 			headers: { 'Content-Type': 'application/json' }
@@ -155,8 +207,20 @@ export async function DELETE({ params }) {
 	const { id } = params;
 
 	try {
+		// First, get the artwork and related data for cache invalidation
 		const artwork = await prismaRead.artwork.findUnique({
-			where: { id: parseInt(id, 10) }
+			where: { id: parseInt(id, 10) },
+			select: {
+				id: true,
+				uid: true,
+				title: true,
+				imageUrl: true,
+				thumbnailUrl: true,
+				animationUrl: true,
+				metadataUrl: true,
+				collectionId: true,
+				Artist: { select: { id: true } }
+			}
 		});
 
 		if (!artwork) {
@@ -169,9 +233,51 @@ export async function DELETE({ params }) {
 			);
 		}
 
+		// Unpin files from Pinata if they exist
+		try {
+			const { unpinArtworkCids } = await import('$lib/pinataHelpers');
+			await unpinArtworkCids({
+				title: artwork.title,
+				imageUrl: artwork.imageUrl,
+				thumbnailUrl: artwork.thumbnailUrl,
+				animationUrl: artwork.animationUrl,
+				metadataUrl: artwork.metadataUrl
+			});
+			console.log(`Unpinned files for artwork: ${artwork.title}`);
+		} catch (unpinError) {
+			console.error(`Error unpinning artwork files for ${artwork.title}:`, unpinError);
+			// Continue with deletion even if unpinning fails
+		}
+
+		// Disconnect ArtworkIndex records
+		await prismaWrite.artworkIndex.updateMany({
+			where: { artworkId: parseInt(id, 10) },
+			data: { 
+				artworkId: null,
+				importStatus: 'pending'
+			}
+		});
+
+		// Delete the artwork
 		await prismaWrite.artwork.delete({
 			where: { id: parseInt(id, 10) }
 		});
+
+		// Invalidate artwork cache
+		await cachedArtworkQueries.invalidate(parseInt(id, 10), artwork.uid || undefined);
+
+		// Invalidate collection cache if artwork was in a collection
+		if (artwork.collectionId) {
+			await cachedCollectionQueries.invalidate(artwork.collectionId);
+		}
+
+		// Invalidate artist cache for all artists associated with this artwork
+		for (const artist of artwork.Artist) {
+			await cachedArtistQueries.invalidate(artist.id);
+		}
+
+		// Invalidate search cache since artwork data has changed
+		await cachedSearchQueries.invalidate();
 
 		return new Response(null, { status: 204 });
 	} catch (error) {

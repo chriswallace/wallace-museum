@@ -51,8 +51,7 @@
 	<div class="ui-header bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
 		<nav>
 			<a class="logo-link" href="/">
-				<img src="/images/wallace-museum-red.svg" alt="Wallace Museum" class="logo-svg logo-light" />
-				<img src="/images/wallace-museum-yellow.svg" alt="Wallace Museum" class="logo-svg logo-dark" />
+				<img src="/images/app-icon.png" alt="Wallace Museum" class="logo-img" />
 			</a>
 
 			<!-- Mobile hamburger menu next to logo - ONLY visible on mobile -->
@@ -189,18 +188,9 @@
 			padding: 0;
 		}
 
-		.logo-svg {
+		.logo-img {
 			@apply w-auto;
 			height: 64px;
-		}
-
-		/* Logo visibility using Tailwind dark: prefix */
-		.logo-light {
-			@apply block dark:hidden;
-		}
-
-		.logo-dark {
-			@apply hidden dark:block;
 		}
 
 		/* Mobile menu styles */

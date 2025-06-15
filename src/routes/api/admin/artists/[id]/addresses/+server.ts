@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
 import { prismaWrite } from '$lib/prisma';
+import { cachedArtistQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 // POST: Add a new address to an artist
 export const POST: RequestHandler = async ({ params, request }) => {
@@ -58,6 +59,12 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				walletAddresses: updatedWallets as any
 			}
 		});
+
+		// Invalidate artist cache since address data changed
+		await cachedArtistQueries.invalidate(artistId);
+
+		// Invalidate search cache since artist data has changed
+		await cachedSearchQueries.invalidate();
 
 		// Return the new address with an index-based ID for frontend compatibility
 		const addressWithId = {

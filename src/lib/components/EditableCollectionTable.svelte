@@ -147,7 +147,7 @@
 	textarea {
 		border: 1px solid gray;
 		border-radius: 6px;
-		padding: 6px 10px;
+		padding: 8px 12px;
 	}
 
 	textarea {

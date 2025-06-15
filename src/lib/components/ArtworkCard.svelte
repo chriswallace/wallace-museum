@@ -187,11 +187,18 @@
 		@apply absolute top-2 right-2 bg-primary dark:bg-primary-dark text-white dark:text-black px-2 py-1 rounded-md text-sm;
 	}
 
-	.remove-button {
-		@apply absolute top-[-8px] right-[-8px] bg-red-600 hover:bg-red-700 rounded-full p-1 z-20 transition-colors;
+	.artwork-card .remove-button {
+		@apply absolute top-2 -right-2 bg-red-600 hover:bg-red-700 rounded-full z-20 transition-colors w-[34px] h-[34px] p-0 min-h-0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: none;
+		cursor: pointer;
+		font-size: inherit;
+		line-height: 1;
 
 		svg {
-			@apply w-[20px] h-[20px];
+			@apply w-6 h-6;
 		}
 
 		path {

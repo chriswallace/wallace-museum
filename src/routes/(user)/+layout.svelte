@@ -3,13 +3,13 @@
 	<link rel="stylesheet" href="https://use.typekit.net/dpg0jya.css" />
 </svelte:head>
 
-<div class="app-frame">
-	<main>
-		<div class="surface">
-			<img class="logo" src="/images/compendium.svg" alt="" width="200" height="60">
-			<slot />
+<div class="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+	<div class="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md dark:bg-gray-800">
+		<div class="text-center">
+			<img class="logo" src="/images/app-icon.png" alt="Wallace Museum" width="200" height="60">
 		</div>
-	</main>
+		<slot />
+	</div>
 </div>
 
 <style lang="scss" global>
@@ -55,7 +55,8 @@
 
 	:global(input[type='text']),
 	:global(input[type='email']),
-	:global(input[type='password']) {
+	:global(input[type='password']),
+	:global(textarea) {
 		@apply mb-6 p-4 box-border dark:bg-gray-900/0 block w-full border border-white/40 dark:border-gray-600 rounded-[8px] text-base text-gray-700 dark:text-white/70 placeholder-gray-400/60 focus:outline-none focus:ring-[#C57142] focus:border-[#C57142];
 		appearance: none;
 		-webkit-appearance: none;

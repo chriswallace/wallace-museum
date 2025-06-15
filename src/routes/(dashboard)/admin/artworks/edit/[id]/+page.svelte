@@ -550,8 +550,8 @@
 						</small>
 					</div>
 					<div class="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-						<h3 class="text-sm font-medium text-blue-800 dark:text-yellow-400 mb-2">Refetch Data</h3>
-						<p class="text-sm text-blue-700 dark:text-yellow-300">
+						<h3 class="text-sm font-medium text-gray-800 dark:text-yellow-400 mb-2">Refetch Data</h3>
+						<p class="text-sm text-gray-700 dark:text-yellow-300">
 							Use "Refetch Data" to fetch the latest information from external APIs (OpenSea for Ethereum, Objkt for Tezos). 
 							This will update the artwork's metadata, images, and other properties with the most current data available.
 						</p>

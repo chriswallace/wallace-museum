@@ -547,8 +547,8 @@
 	}
 
 	.read-more-button {
-		@apply bg-transparent border-none text-red-500 cursor-pointer text-sm p-0 underline;
-		@apply hover:text-red-500/80 transition-colors duration-200;
+		@apply bg-transparent border-none text-gray500 cursor-pointer text-sm p-0 underline;
+		@apply hover:text-gray500/80 transition-colors duration-200;
 		@apply inline ml-1;
 	}
 

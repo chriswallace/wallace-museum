@@ -19,7 +19,17 @@ export async function GET({ params }) {
 		});
 	}
 
-	return new Response(JSON.stringify(collection), {
+	// Transform the response to match frontend expectations
+	const transformedCollection = {
+		...collection,
+		artworks: collection.Artwork,
+		artists: collection.Artist,
+		// Remove the original capitalized properties
+		Artwork: undefined,
+		Artist: undefined
+	};
+
+	return new Response(JSON.stringify(transformedCollection), {
 		status: 200,
 		headers: { 'Content-Type': 'application/json' }
 	});

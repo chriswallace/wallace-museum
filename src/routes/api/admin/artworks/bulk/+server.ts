@@ -1,6 +1,6 @@
 import { prismaRead, prismaWrite } from '$lib/prisma';
 import type { RequestHandler } from './$types';
-import { cachedArtworkQueries } from '$lib/cache/db-cache.js';
+import { cachedArtworkQueries, cachedCollectionQueries, cachedArtistQueries, cachedSearchQueries } from '$lib/cache/db-cache.js';
 
 export const POST: RequestHandler = async ({ request }): Promise<Response> => {
 	try {
@@ -56,9 +56,24 @@ async function handleBulkDelete(artworkIds: number[]): Promise<Response> {
 				imageUrl: true,
 				thumbnailUrl: true,
 				animationUrl: true,
-				metadataUrl: true
+				metadataUrl: true,
+				collectionId: true,
+				Artist: { select: { id: true } }
 			}
 		});
+
+		// Collect unique collection and artist IDs for cache invalidation
+		const collectionIds = new Set<number>();
+		const artistIds = new Set<number>();
+
+		for (const artwork of artworks) {
+			if (artwork.collectionId) {
+				collectionIds.add(artwork.collectionId);
+			}
+			for (const artist of artwork.Artist) {
+				artistIds.add(artist.id);
+			}
+		}
 
 		// Unpin files from Pinata for each artwork
 		for (const artwork of artworks) {
@@ -97,6 +112,19 @@ async function handleBulkDelete(artworkIds: number[]): Promise<Response> {
 			await cachedArtworkQueries.invalidate(artwork.id, artwork.uid || undefined);
 		}
 
+		// Invalidate collection cache for all affected collections
+		for (const collectionId of collectionIds) {
+			await cachedCollectionQueries.invalidate(collectionId);
+		}
+
+		// Invalidate artist cache for all affected artists
+		for (const artistId of artistIds) {
+			await cachedArtistQueries.invalidate(artistId);
+		}
+
+		// Invalidate search cache since artwork data has changed
+		await cachedSearchQueries.invalidate();
+
 		return new Response(
 			JSON.stringify({ 
 				success: true, 
@@ -122,6 +150,30 @@ async function handleBulkDelete(artworkIds: number[]): Promise<Response> {
 
 async function handleBulkEdit(artworkIds: number[], data: any): Promise<Response> {
 	try {
+		// Get current artwork data to track changes for cache invalidation
+		const currentArtworks = await prismaRead.artwork.findMany({
+			where: { id: { in: artworkIds } },
+			select: {
+				id: true,
+				uid: true,
+				collectionId: true,
+				Artist: { select: { id: true } }
+			}
+		});
+
+		// Collect current collection and artist IDs for cache invalidation
+		const oldCollectionIds = new Set<number>();
+		const oldArtistIds = new Set<number>();
+
+		for (const artwork of currentArtworks) {
+			if (artwork.collectionId) {
+				oldCollectionIds.add(artwork.collectionId);
+			}
+			for (const artist of artwork.Artist) {
+				oldArtistIds.add(artist.id);
+			}
+		}
+
 		const updateData: any = {};
 
 		// Handle artist assignment
@@ -170,9 +222,34 @@ async function handleBulkEdit(artworkIds: number[], data: any): Promise<Response
 		const updatedArtworks = await Promise.all(updatePromises);
 
 		// Invalidate cache for all affected artworks
-		for (const artworkId of artworkIds) {
-			await cachedArtworkQueries.invalidate(artworkId);
+		for (const artwork of currentArtworks) {
+			await cachedArtworkQueries.invalidate(artwork.id, artwork.uid || undefined);
 		}
+
+		// Invalidate old collection cache
+		for (const collectionId of oldCollectionIds) {
+			await cachedCollectionQueries.invalidate(collectionId);
+		}
+
+		// Invalidate new collection cache if collection was changed
+		if (data.collectionId !== undefined && data.collectionId) {
+			await cachedCollectionQueries.invalidate(data.collectionId);
+		}
+
+		// Invalidate old artist cache
+		for (const artistId of oldArtistIds) {
+			await cachedArtistQueries.invalidate(artistId);
+		}
+
+		// Invalidate new artist cache if artists were changed
+		if (data.artistIds !== undefined && Array.isArray(data.artistIds)) {
+			for (const artistId of data.artistIds) {
+				await cachedArtistQueries.invalidate(artistId);
+			}
+		}
+
+		// Invalidate search cache since artwork data has changed
+		await cachedSearchQueries.invalidate();
 
 		// Update artwork indexes
 		try {

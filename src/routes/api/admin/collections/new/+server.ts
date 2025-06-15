@@ -1,5 +1,6 @@
 import { prismaWrite } from '$lib/prisma';
 import slugify from 'slugify';
+import { cachedCollectionQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 // POST: Create a New Collection
 export async function POST({ request }: { request: Request }): Promise<Response> {
@@ -14,6 +15,12 @@ export async function POST({ request }: { request: Request }): Promise<Response>
 				enabled
 			}
 		});
+
+		// Invalidate collection cache since a new collection was created
+		await cachedCollectionQueries.invalidate();
+
+		// Invalidate search cache since collection data has changed
+		await cachedSearchQueries.invalidate();
 
 		return new Response(JSON.stringify(newCollection), {
 			status: 201,

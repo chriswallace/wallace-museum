@@ -1,5 +1,6 @@
 import { prismaWrite } from '$lib/prisma';
 import { uploadAvatarImage } from '$lib/avatarUpload';
+import { cachedArtistQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 export async function POST({ request }) {
 	try {
@@ -32,6 +33,12 @@ export async function POST({ request }) {
 		const newArtist = await prismaWrite.artist.create({
 			data: newArtistData
 		});
+
+		// Invalidate artist cache since a new artist was created
+		await cachedArtistQueries.invalidate();
+
+		// Invalidate search cache since artist data has changed
+		await cachedSearchQueries.invalidate();
 
 		return new Response(JSON.stringify(newArtist), {
 			status: 201,

@@ -139,14 +139,13 @@
 	<!-- Mobile Layout (small screens) -->
 	<div class="mobile-nav md:hidden">
 		<!-- Museum Logo -->
-		<button 
+		<a
+			href="/"
 			class="mobile-logo"
-			on:click={handleTitleClick}
-			aria-label="Return to homepage"
+			aria-label="Wallace Museum"
 		>
-			<img src="/images/wallace-museum-red.svg" alt="Wallace Museum" class="logo-svg logo-light" />
-			<img src="/images/wallace-museum-yellow.svg" alt="Wallace Museum" class="logo-svg logo-dark" />
-		</button>
+			<img src="/images/app-icon.png" alt="Wallace Museum" class="logo-img" />
+		</a>
 
 		<!-- Hamburger Menu Button -->
 		<button 
@@ -166,14 +165,13 @@
 	<!-- Desktop Layout (medium screens and up) -->
 	<div class="desktop-nav hidden md:flex">
 		<!-- Museum Logo - positioned at left edge -->
-		<button 
+		<a
+			href="/"
 			class="page-logo"
-			on:click={handleTitleClick}
-			aria-label="Return to homepage"
+			aria-label="Wallace Museum"
 		>
-			<img src="/images/wallace-museum-red.svg" alt="Wallace Museum" class="logo-svg logo-light" />
-			<img src="/images/wallace-museum-yellow.svg" alt="Wallace Museum" class="logo-svg logo-dark" />
-		</button>
+			<img src="/images/app-icon.png" alt="Wallace Museum" class="logo-img" />
+		</a>
 
 		<div class="nav-container">
 			<!-- Center - Navigation tabs -->
@@ -300,28 +298,8 @@
 		@apply bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity duration-200 focus:opacity-80 focus:outline-none;
 	}
 
-	.logo-svg {
+	.logo-img {
 		@apply h-8 w-auto;
-	}
-
-	/* Show red logo in light mode, hide yellow logo */
-	.logo-light {
-		display: block;
-	}
-
-	.logo-dark {
-		display: none;
-	}
-
-	/* Show yellow logo in dark mode, hide red logo */
-	@media (prefers-color-scheme: dark) {
-		.logo-light {
-			display: none;
-		}
-
-		.logo-dark {
-			display: block;
-		}
 	}
 
 	.hamburger-button {

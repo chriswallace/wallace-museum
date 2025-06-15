@@ -12,19 +12,19 @@ module.exports = {
 		extend: {
 			colors: {
 				primary: {
-					// Light mode: Red theme
-					DEFAULT: '#FF1111',
-					50: '#FFF5F5',
-					100: '#FFE3E3',
-					200: '#FFC9C9',
-					300: '#FFA8A8',
-					400: '#FF8787',
-					500: '#FF1111',
-					600: '#E60E0E',
-					700: '#CC0C0C',
-					800: '#B30A0A',
-					900: '#990808',
-					950: '#660505'
+					// Light mode: Cool gray theme
+					DEFAULT: '#6B7280',
+					50: '#F9FAFB',
+					100: '#F3F4F6',
+					200: '#E5E7EB',
+					300: '#D1D5DB',
+					400: '#9CA3AF',
+					500: '#6B7280',
+					600: '#4B5563',
+					700: '#374151',
+					800: '#1F2937',
+					900: '#111827',
+					950: '#030712'
 				},
 				'primary-dark': {
 					// Dark mode: Yellow theme
@@ -43,7 +43,7 @@ module.exports = {
 				},
 				// Add utility classes for theme-aware colors
 				'theme-primary': {
-					DEFAULT: '#FF1111', // Red for light mode
+					DEFAULT: '#424242', // Cool gray for light mode
 					dark: '#FCED1C' // Yellow for dark mode
 				},
 				secondary: 'var(--color-secondary)',

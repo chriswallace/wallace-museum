@@ -216,7 +216,6 @@
 >
 	<div class="md:col-span-1">
 		<div class="mb-6">
-			<label class="block text-sm font-medium mb-2">Avatar</label>
 			<div class="relative group w-full aspect-square">
 				{#if artist.avatarUrl}
 					{#key avatarKey}
@@ -230,7 +229,7 @@
 							format="auto"
 							quality={90}
 							aspectRatio="1/1"
-							className="w-full h-full object-cover"
+							className="w-full h-full object-cover rounded-full"
 							fallbackSrc="/images/medici-image.png"
 						/>
 					{/key}

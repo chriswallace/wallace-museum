@@ -313,7 +313,7 @@
 		display: block;
 		margin-bottom: 1rem;
 		width: 100%;
-		padding: 0.75rem;
+		padding: 0.5rem 0.75rem;
 	}
 
 	label {

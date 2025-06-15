@@ -3,7 +3,7 @@ import { uploadToPinata } from '$lib/pinataHelpers';
 import { convertToIpfsUrl } from '$lib/pinataHelpers';
 import slugify from 'slugify';
 import { Prisma } from '@prisma/client';
-import { cachedArtworkQueries } from '$lib/cache/db-cache.js';
+import { cachedArtworkQueries, cachedCollectionQueries, cachedArtistQueries, cachedSearchQueries } from '$lib/cache/db-cache.js';
 
 // Simple function to guess mime type from URL
 function guessMimeTypeFromUrl(url: string): string | null {
@@ -265,6 +265,19 @@ export async function POST({ request }) {
 
 		// Invalidate artwork-related cache after creation
 		await cachedArtworkQueries.invalidate();
+
+		// Invalidate collection cache if artwork was added to a collection
+		if (collectionId) {
+			await cachedCollectionQueries.invalidate(collectionId);
+		}
+
+		// Invalidate artist cache if artwork was linked to an artist
+		if (artistId) {
+			await cachedArtistQueries.invalidate(artistId);
+		}
+
+		// Invalidate search cache since new artwork data was added
+		await cachedSearchQueries.invalidate();
 
 		// Link artist to artwork if we have one
 		if (artistId) {

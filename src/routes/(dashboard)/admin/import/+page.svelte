@@ -847,9 +847,6 @@
 	<!-- Search & Controls -->
 	<div class="mb-2 flex items-end gap-4">
 		<div class="flex-1 flex flex-col">
-			<label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-				>Search</label
-			>
 			<div class="relative flex items-center">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"

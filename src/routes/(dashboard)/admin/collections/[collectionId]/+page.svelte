@@ -407,4 +407,17 @@
 	.details-tab form {
 		@apply max-w-4xl block;
 	}
+
+	// Modal button overrides to ensure proper padding
+	:global(.modal) {
+		button.primary,
+		button.save {
+			@apply px-4 py-2 text-sm;
+			min-height: 44px;
+		}
+
+		button.primary.mt-0 {
+			margin-top: 0;
+		}
+	}
 </style>
