@@ -57,6 +57,8 @@ export function extensionFromMimeType(mimeType: string): string {
 			return '.pdf';
 		case 'text/html':
 			return '.html';
+		case 'application/x-directory':
+			return '.html';
 		default:
 			console.error(`Unsupported MIME type for extension: ${mimeType}`);
 			return '';
@@ -76,7 +78,8 @@ export function isValidMimeType(mimeType: string): boolean {
 		'application/pdf',
 		'text/html',
 		'text/javascript',
-		'application/json'
+		'application/json',
+		'application/x-directory'
 	];
 	return validMimeTypes.includes(mimeType);
 }
@@ -87,7 +90,7 @@ export function getMediaType(
 	if (mimeType.startsWith('image/')) return 'image';
 	if (mimeType.startsWith('video/')) return 'video';
 	if (mimeType === 'application/pdf') return 'document';
-	if (mimeType === 'text/html' || mimeType === 'text/javascript' || mimeType === 'application/json')
+	if (mimeType === 'text/html' || mimeType === 'text/javascript' || mimeType === 'application/json' || mimeType === 'application/x-directory')
 		return 'interactive';
 	return 'unknown';
 }

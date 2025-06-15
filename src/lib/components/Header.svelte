@@ -38,6 +38,8 @@
 		attributes?: { trait_type: string; value: string }[];
 		ArtistArtworks?: ArtistArtwork[];
 		blockchain?: string;
+		contractAddress?: string;
+		tokenId?: string;
 	}
 
 	let artworkDetails: Artwork | null = null;
@@ -151,24 +153,24 @@
 							<dt class="mint-date">Minted</dt>
 							<dd>{formatDate(artworkDetails.mintDate)}</dd>
 						{/if}
-						{#if artworkDetails.tokenID}
+						{#if artworkDetails.tokenId || artworkDetails.tokenID}
 							<dt>Token ID</dt>
-							<dd>{artworkDetails.tokenID}</dd>
+							<dd>{artworkDetails.tokenId || artworkDetails.tokenID}</dd>
 						{/if}
 						{#if artworkDetails.tokenStandard}
 							<dt>Token Standard</dt>
 							<dd>{artworkDetails.tokenStandard?.toUpperCase()}</dd>
 						{/if}
-						{#if artworkDetails.contractAddr && artworkDetails.tokenID}
+						{#if (artworkDetails.contractAddress || artworkDetails.contractAddr) && (artworkDetails.tokenId || artworkDetails.tokenID)}
 							<dt>Contract</dt>
 							<dd>
 								<a
 									target="_blank"
 									href={getContractUrl(
-										artworkDetails.contractAddr,
+										artworkDetails.contractAddress || artworkDetails.contractAddr,
 										artworkDetails.blockchain,
-										artworkDetails.tokenID
-									)}>{getContractName(artworkDetails.contractAddr, artworkDetails.contractAlias)}</a
+										artworkDetails.tokenId || artworkDetails.tokenID
+									)}>{getContractName(artworkDetails.contractAddress || artworkDetails.contractAddr, artworkDetails.contractAlias)}</a
 								>
 							</dd>
 						{/if}

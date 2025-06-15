@@ -592,8 +592,8 @@
 				{#if currentArtwork.mintDate}
 				"dateCreated": "{currentArtwork.mintDate}",
 				{/if}
-				{#if currentArtwork.tokenID}
-				"identifier": "{currentArtwork.tokenID}",
+				{#if currentArtwork.tokenId || currentArtwork.tokenID}
+				"identifier": "{currentArtwork.tokenId || currentArtwork.tokenID}",
 				{/if}
 				"isPartOf": {
 					"@type": "Collection",
@@ -761,39 +761,39 @@
 											<span>{dimensionsObj.width} × {dimensionsObj.height}</span>
 										</div>
 									{/if}
-									{#if currentArtwork.contractAddr}
+									{#if currentArtwork.contractAddress || currentArtwork.contractAddr}
 										<div class="metadata-item">
 											<strong>Contract</strong>
-											{#if getContractUrl(currentArtwork.contractAddr, currentArtwork.blockchain, currentArtwork.tokenID)}
+											{#if getContractUrl(currentArtwork.contractAddress || currentArtwork.contractAddr, currentArtwork.blockchain, currentArtwork.tokenId || currentArtwork.tokenID)}
 												<a
 													href={getContractUrl(
-														currentArtwork.contractAddr,
+														currentArtwork.contractAddress || currentArtwork.contractAddr,
 														currentArtwork.blockchain,
-														currentArtwork.tokenID
+														currentArtwork.tokenId || currentArtwork.tokenID
 													)}
 													target="_blank"
 													rel="noopener noreferrer"
 													class="contract-link"
 												>
 													{getContractName(
-														currentArtwork.contractAddr,
+														currentArtwork.contractAddress || currentArtwork.contractAddr,
 														currentArtwork.contractAlias
 													)}
 												</a>
 											{:else}
 												<span>
 													{getContractName(
-														currentArtwork.contractAddr,
+														currentArtwork.contractAddress || currentArtwork.contractAddr,
 														currentArtwork.contractAlias
 													)}
 												</span>
 											{/if}
 										</div>
 									{/if}
-									{#if currentArtwork.tokenID}
+									{#if currentArtwork.tokenId || currentArtwork.tokenID}
 										<div class="metadata-item">
 											<strong>Token ID</strong>
-											<span>{currentArtwork.tokenID}</span>
+											<span>{currentArtwork.tokenId || currentArtwork.tokenID}</span>
 										</div>
 									{/if}
 									{#if currentArtwork.tokenStandard}

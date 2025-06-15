@@ -1036,7 +1036,8 @@ export class MinimalNFTTransformer {
       'text/html',
       'application/javascript',
       'application/json',
-      'application/pdf'
+      'application/pdf',
+      'application/zip'
     ];
     
     return validMimeTypes.some(valid => mimeType.startsWith(valid.split('/')[0] + '/'));

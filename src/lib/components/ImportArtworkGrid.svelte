@@ -49,15 +49,15 @@
 	export let onToggleSelectAll: (() => void) | null = null;
 
 	// Helper function to create unique key from contract address and token ID
-	function createUniqueKey(artwork: any): string {
-		return `${artwork.contractAddr || 'unknown'}-${artwork.tokenID || artwork.id}`;
+	function getArtworkKey(artwork: any): string {
+		return `${artwork.contractAddress || artwork.contractAddr || 'unknown'}-${artwork.tokenId || artwork.tokenID || artwork.id}`;
 	}
 
 	// Deduplicate artworks by contract address + token ID
 	$: uniqueArtworks = (() => {
 		const seen = new Set<string>();
 		return artworks.filter(artwork => {
-			const key = createUniqueKey(artwork);
+			const key = getArtworkKey(artwork);
 			if (seen.has(key)) {
 				return false;
 			}
@@ -70,7 +70,7 @@
 {#if viewMode === 'grid'}
 	<!-- Grid View -->
 	<div class="artwork-grid">
-		{#each uniqueArtworks as artwork (createUniqueKey(artwork))}
+		{#each uniqueArtworks as artwork (getArtworkKey(artwork))}
 			<ImportArtworkCard
 				{artwork}
 				isSelected={selectedIds.includes(artwork.id)}
@@ -103,7 +103,7 @@
 				</tr>
 			</thead>
 			<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-				{#each uniqueArtworks as artwork (createUniqueKey(artwork))}
+				{#each uniqueArtworks as artwork (getArtworkKey(artwork))}
 					<ImportArtworkCard
 						{artwork}
 						isSelected={selectedIds.includes(artwork.id)}

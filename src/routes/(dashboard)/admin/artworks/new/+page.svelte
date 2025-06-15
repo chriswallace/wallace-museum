@@ -57,6 +57,7 @@
 		{ value: 'video/ogg', label: 'OGG Video (video/ogg)' },
 		{ value: 'text/html', label: 'HTML Document (text/html)' },
 		{ value: 'application/javascript', label: 'JavaScript (application/javascript)' },
+		{ value: 'application/x-directory', label: 'Directory/Archive (application/x-directory)' },
 		{ value: 'model/gltf+json', label: 'glTF Model (model/gltf+json)' },
 		{ value: 'model/gltf-binary', label: 'glTF Binary (model/gltf-binary)' },
 		{ value: 'application/pdf', label: 'PDF Document (application/pdf)' },

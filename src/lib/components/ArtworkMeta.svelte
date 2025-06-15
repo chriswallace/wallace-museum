@@ -13,7 +13,7 @@
 	{/if}
 	<div class="non-editable">
 		<h3>Token ID</h3>
-		<p class="truncate">{artwork.tokenID}</p>
+		<p class="truncate">{artwork.tokenId || artwork.tokenID}</p>
 	</div>
 	<div class="non-editable">
 		<h3>Blockchain</h3>
@@ -26,16 +26,16 @@
 	<div class="non-editable">
 		<h3>Contract</h3>
 		<p>
-			{#if getContractUrl(artwork.contractAddr, artwork.blockchain, artwork.tokenID)}
+			{#if getContractUrl(artwork.contractAddress || artwork.contractAddr, artwork.blockchain, artwork.tokenId || artwork.tokenID)}
 				<a
-					href={getContractUrl(artwork.contractAddr, artwork.blockchain, artwork.tokenID)}
+					href={getContractUrl(artwork.contractAddress || artwork.contractAddr, artwork.blockchain, artwork.tokenId || artwork.tokenID)}
 					target="_blank"
 					rel="noopener noreferrer"
 				>
-					{getContractName(artwork.contractAddr, artwork.contractAlias)}
+					{getContractName(artwork.contractAddress || artwork.contractAddr, artwork.contractAlias)}
 				</a>
 			{:else}
-				{getContractName(artwork.contractAddr, artwork.contractAlias)}
+				{getContractName(artwork.contractAddress || artwork.contractAddr, artwork.contractAlias)}
 			{/if}
 		</p>
 	</div>

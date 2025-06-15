@@ -971,7 +971,9 @@ function guessMimeTypeFromUrl(url: string): string | null {
 		// Interactive content
 		html: 'text/html',
 		htm: 'text/html',
-		js: 'application/javascript'
+		js: 'application/javascript',
+		// Archive content
+		zip: 'application/zip'
 	};
 
 	return commonTypes[extension] || null;

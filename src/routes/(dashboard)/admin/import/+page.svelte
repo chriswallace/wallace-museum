@@ -246,15 +246,15 @@
 	}
 
 	// Helper function to create unique key from contract address and token ID
-	function createUniqueKey(artwork: ExtendedArtwork): string {
-		return `${artwork.contractAddr || 'unknown'}-${artwork.tokenID || artwork.id}`;
+	function getArtworkKey(artwork: any): string {
+		return `${artwork.contractAddress || artwork.contractAddr || 'unknown'}-${artwork.tokenId || artwork.tokenID || artwork.id}`;
 	}
 
 	// Helper function to deduplicate artworks by contract address + token ID
 	function deduplicateArtworks(artworks: ExtendedArtwork[]): ExtendedArtwork[] {
 		const seen = new Set<string>();
 		return artworks.filter(artwork => {
-			const key = createUniqueKey(artwork);
+			const key = getArtworkKey(artwork);
 			if (seen.has(key)) {
 				return false;
 			}

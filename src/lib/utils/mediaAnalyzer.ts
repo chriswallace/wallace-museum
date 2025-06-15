@@ -188,7 +188,8 @@ export class MediaAnalyzer {
       'text/html',
       'application/javascript',
       'application/json',
-      'application/pdf'
+      'application/pdf',
+      'application/x-directory'
     ];
     
     return validMimeTypes.some(valid => mimeType.startsWith(valid.split('/')[0] + '/'));

@@ -1391,7 +1391,7 @@ export class EnhancedFieldProcessor {
       'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
       'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime',
       'text/html', 'text/javascript', 'application/javascript',
-      'application/pdf', 'application/json'
+      'application/pdf', 'application/json', 'application/x-directory'
     ];
     
     return validMimeTypes.includes(mimeType.toLowerCase());
@@ -1449,7 +1449,8 @@ export class EnhancedFieldProcessor {
         'htm': 'text/html',
         'js': 'application/javascript',
         'json': 'application/json',
-        'pdf': 'application/pdf'
+        'pdf': 'application/pdf',
+        'zip': 'application/zip'
       };
       
       if (mimeMap[ext]) {

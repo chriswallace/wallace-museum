@@ -25,7 +25,8 @@ function guessMimeTypeFromUrl(url: string): string | null {
 		glb: 'model/gltf-binary',
 		html: 'text/html',
 		htm: 'text/html',
-		pdf: 'application/pdf'
+		pdf: 'application/pdf',
+		zip: 'application/zip'
 	};
 	return commonTypes[extension] || null;
 }
