@@ -5,6 +5,7 @@
 	import { quintOut } from 'svelte/easing';
 	import { getContractUrl, getContractName, truncateAddress } from '$lib/utils';
 	import { getTwitterUrl, getInstagramUrl, formatSocialHandle } from '$lib/utils/socialMediaUtils';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 
 	export let data: { artist?: any; error?: string };
@@ -149,6 +150,38 @@
 		? `${data.artist.name} - ${primaryDescription || 'Digital artist at the Wallace Museum showcasing innovative computational and algorithmic art.'}`
 		: 'Artist profile at the Wallace Museum';
 	$: artworkCount = data.artist?.artworks?.length || 0;
+
+	// Debug: Log GIF artworks to help identify MIME type issues
+	$: if (data.artist.artworks && typeof window !== 'undefined') {
+		const gifArtworks = data.artist.artworks.filter((artwork: any) => 
+			artwork.image_url?.toLowerCase().includes('.gif') || 
+			artwork.mime === 'image/gif'
+		);
+		if (gifArtworks.length > 0) {
+			console.log(`[Artist Page] Found ${gifArtworks.length} potential GIF artworks:`, 
+				gifArtworks.map((a: any) => ({
+					id: a.id,
+					title: a.title,
+					image_url: a.image_url,
+					mime: a.mime,
+					hasGifExtension: a.image_url?.toLowerCase().includes('.gif'),
+					hasGifMime: a.mime === 'image/gif'
+				}))
+			);
+		}
+	}
+
+	function isVideoUrl(url: string | null | undefined): boolean {
+		if (!url) return false;
+		const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv', '.m4v'];
+		const lowerUrl = url.toLowerCase();
+		return videoExtensions.some(ext => lowerUrl.includes(ext));
+	}
+
+	function isVideoMimeType(mimeType: string | null | undefined): boolean {
+		if (!mimeType) return false;
+		return mimeType.startsWith('video/');
+	}
 </script>
 
 <svelte:head>
@@ -388,18 +421,64 @@
 								<button class="artwork-container" on:click={() => goto(`/artist/${data.artist.id}/${artwork.id}`)}>
 									<div class="artwork-thumbnail">
 										{#if artwork.image_url}
-											<OptimizedImage
-												src={artwork.image_url}
-												alt={artwork.title}
-												width={800}
-												height={800}
-												fit="contain"
-												format="auto"
-												quality={70}
-												className="thumbnail-image"
-												fallbackSrc="/images/medici-image.png"
-												mimeType={artwork.mime}
-											/>
+											{#if isVideoUrl(artwork.image_url) || isVideoMimeType(artwork.mime)}
+												<!-- Show video directly when image_url contains video content -->
+												<video
+													src={ipfsToHttpUrl(artwork.image_url)}
+													class="thumbnail-video"
+													muted
+													autoplay
+													loop
+													playsinline
+													preload="metadata"
+													on:error={() => {
+														// If video fails to load, we'll show the placeholder
+														console.log('Video failed to load:', artwork.image_url);
+													}}
+												>
+													<!-- Fallback for browsers that don't support the video -->
+													<div class="thumbnail-placeholder">
+														<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
+															<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+														</svg>
+													</div>
+												</video>
+											{:else}
+												<OptimizedImage
+													src={artwork.image_url}
+													alt={artwork.title}
+													width={800}
+													height={800}
+													fit="contain"
+													format="auto"
+													quality={70}
+													className="thumbnail-image"
+													fallbackSrc="/images/medici-image.png"
+													mimeType={artwork.mime}
+												/>
+											{/if}
+										{:else if artwork.animation_url}
+											<!-- Show video directly when no thumbnail is available -->
+											<video
+												src={ipfsToHttpUrl(artwork.animation_url)}
+												class="thumbnail-video"
+												muted
+												autoplay
+												loop
+												playsinline
+												preload="metadata"
+												on:error={() => {
+													// If video fails to load, we'll show the placeholder
+													console.log('Video failed to load:', artwork.animation_url);
+												}}
+											>
+												<!-- Fallback for browsers that don't support the video -->
+												<div class="thumbnail-placeholder">
+													<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
+														<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+													</svg>
+												</div>
+											</video>
 										{:else}
 											<div class="thumbnail-placeholder">
 												<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
@@ -628,6 +707,10 @@
 	}
 
 	.thumbnail-image {
+		@apply w-full h-full object-contain;
+	}
+
+	.thumbnail-video {
 		@apply w-full h-full object-contain;
 	}
 

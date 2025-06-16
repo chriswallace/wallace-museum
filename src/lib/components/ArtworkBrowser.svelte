@@ -13,6 +13,9 @@
 		title: string;
 		imageUrl: string; // Original URL that needs transformation
 		animationUrl?: string; // Optional animation URL
+		generatorUrl?: string;
+		thumbnailUrl?: string;
+		mime?: string;
 		description?: string;
 		year?: number;
 		artistId: string;
@@ -166,6 +169,7 @@
 					quality={85}
 					className="w-full h-auto"
 					fallbackSrc="/images/medici-image.png"
+					mimeType={currentArtwork.mime}
 				/>
 			</div>
 			<button

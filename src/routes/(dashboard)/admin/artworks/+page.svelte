@@ -14,6 +14,7 @@
 		image_url?: string;
 		animationUrl?: string;
 		animation_url?: string;
+		mime?: string;
 		artists?: Artist[];
 		collection?: { id: number | string; title: string };
 		// Add other fields as needed
@@ -547,6 +548,7 @@
 								showSkeleton={true}
 								skeletonBorderRadius="4px"
 								className="w-full h-full object-cover"
+								mimeType={artwork.mime}
 							/>
 						</button>
 					</td>

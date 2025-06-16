@@ -45,6 +45,7 @@
 	let isLoaded = false;
 	let isLoading = false;
 	let hasTriedDirectIpfs = false;
+	let hasTriedBasicIpfs = false;
 
 	/**
 	 * Detect if a URL points to an SVG file
@@ -113,7 +114,12 @@
 
 	// Debug logging
 	$: if (src && mimeType && isGif) {
-		console.log(`[OptimizedImage] GIF detected - src: ${src}, mimeType: ${mimeType}, optimizedSrc: ${optimizedSrc}`);
+		console.log(`[OptimizedImage] GIF detected - src: ${src}, mimeType: ${mimeType}, optimizedSrc: ${optimizedSrc}, directIpfsSrc: ${directIpfsSrc}, basicIpfsSrc: ${basicIpfsSrc}`);
+	}
+
+	// Additional debugging for cases where we might expect a GIF but it's not detected
+	$: if (src && (src.toLowerCase().includes('.gif') || (mimeType && mimeType.includes('gif')))) {
+		console.log(`[OptimizedImage] Potential GIF - src: ${src}, mimeType: ${mimeType}, isGif: ${isGif}, isIpfs: ${isIpfs}, canOptimize: ${canOptimize}, currentSrc: ${currentSrc}`);
 	}
 
 	// Build optimization options - don't apply format conversion to SVGs or GIFs
@@ -127,7 +133,8 @@
 		dpr: retina ? 2 : dpr,
 		sharpen,
 		animation,
-		metadata: 'copyright'
+		metadata: 'copyright',
+		mimeType
 	} as ImageOptimizationOptions;
 
 	// Generate optimized URLs - only for IPFS URLs that can be optimized
@@ -168,6 +175,11 @@
 			return directIpfsSrc || basicIpfsSrc || src;
 		}
 		
+		if (isGif && isIpfs && basicIpfsSrc && !hasTriedBasicIpfs) {
+			// Special case for GIFs - try basic IPFS gateway
+			return basicIpfsSrc;
+		}
+		
 		if (showFallbackOnError) {
 			// Final fallback - use generic fallback image
 			return finalFallbackSrc;
@@ -194,7 +206,8 @@
 		dpr: optimizationOptions.dpr,
 		sharpen: optimizationOptions.sharpen,
 		animation: optimizationOptions.animation,
-		metadata: optimizationOptions.metadata
+		metadata: optimizationOptions.metadata,
+		mimeType: optimizationOptions.mimeType
 	}) : '';
 
 	// Generate retina URLs if enabled - only for IPFS URLs that can be optimized
@@ -206,7 +219,8 @@
 		gravity: optimizationOptions.gravity,
 		sharpen: optimizationOptions.sharpen,
 		animation: optimizationOptions.animation,
-		metadata: optimizationOptions.metadata
+		metadata: optimizationOptions.metadata,
+		mimeType: optimizationOptions.mimeType
 	}) : null;
 
 	// Calculate aspect ratio
@@ -236,6 +250,12 @@
 			hasTriedDirectIpfs = true;
 			hasError = true;
 			isLoaded = false;
+		} else if (isGif && isIpfs && !hasTriedBasicIpfs) {
+			// Special handling for GIFs - try basic IPFS gateway before giving up
+			console.log(`[OptimizedImage] GIF failed, trying basic IPFS gateway: ${basicIpfsSrc}`);
+			hasTriedBasicIpfs = true;
+			hasError = true;
+			isLoaded = false;
 		} else if (showFallbackOnError && currentSrc !== finalFallbackSrc) {
 			// Try final fallback
 			console.log(`[OptimizedImage] Trying final fallback for: ${src}`);
@@ -253,6 +273,7 @@
 		if (imageElement && src) {
 			hasError = false;
 			hasTriedDirectIpfs = false;
+			hasTriedBasicIpfs = false;
 			isLoaded = false;
 			isLoading = true;
 		}
@@ -264,6 +285,7 @@
 		isLoaded = false;
 		hasError = false;
 		hasTriedDirectIpfs = false;
+		hasTriedBasicIpfs = false;
 	}
 </script>
 

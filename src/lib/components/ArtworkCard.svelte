@@ -74,6 +74,7 @@
 						quality={85}
 						className="w-full aspect-square object-contain rounded-md mb-3"
 						fallbackSrc="/images/medici-image.png"
+						mimeType={artwork.mime}
 					/>
 				{/if}
 				<p class="artwork-title">{artwork.title}</p>
@@ -112,6 +113,7 @@
 					quality={85}
 					className="w-full aspect-square object-contain rounded-md mb-3"
 					fallbackSrc="/images/medici-image.png"
+					mimeType={artwork.mime}
 				/>
 			{/if}
 			<h3 class="artwork-title">{artwork.title}</h3>
