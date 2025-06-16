@@ -231,6 +231,7 @@ export class MinimalDBOperations {
   }> {
     const stored: number[] = [];
     const errors: Array<{ index: number; error: string; nft: MinimalNFTData }> = [];
+    let skipped = 0;
 
     console.log(`[MinimalDBOperations] Storing batch of ${nfts.length} NFTs with type: ${type}${indexingWalletAddress ? ` for wallet: ${indexingWalletAddress}` : ''}`);
 
@@ -246,13 +247,27 @@ export class MinimalDBOperations {
         const nft = batch[j];
         const index = i + j;
         
+        // Validate NFT data before attempting to store
+        if (!nft.contractAddress || !nft.tokenId) {
+          console.warn(`[MinimalDBOperations] Skipping NFT ${index} due to missing required fields:`, {
+            contractAddress: nft.contractAddress,
+            tokenId: nft.tokenId,
+            title: nft.title
+          });
+          skipped++;
+          continue;
+        }
+        
         let retries = 3;
         let lastError: Error | null = null;
+        let stored_successfully = false;
         
         while (retries > 0) {
           try {
             const result = await this.storeNFT(nft, type, indexingWalletAddress);
             stored.push(result.indexId);
+            stored_successfully = true;
+            console.log(`[MinimalDBOperations] Successfully stored NFT ${nft.contractAddress}:${nft.tokenId} with index ID: ${result.indexId}`);
             break; // Success, exit retry loop
           } catch (error: any) {
             lastError = error;
@@ -261,7 +276,6 @@ export class MinimalDBOperations {
             console.error(`[MinimalDBOperations] Error storing NFT ${nft.contractAddress}:${nft.tokenId} (attempt ${4 - retries}/3):`, {
               error: error.message,
               code: error.code,
-              stack: error.stack,
               nftData: {
                 contractAddress: nft.contractAddress,
                 tokenId: nft.tokenId,
@@ -283,13 +297,13 @@ export class MinimalDBOperations {
           }
         }
         
-        if (retries === 0 && lastError) {
+        if (!stored_successfully) {
           errors.push({
             index,
-            error: lastError.message || 'Unknown error',
+            error: lastError?.message || 'Unknown error',
             nft
           });
-          console.error(`[MinimalDBOperations] Failed to store NFT ${nft.contractAddress}:${nft.tokenId} after all retries:`, lastError.message);
+          console.error(`[MinimalDBOperations] Failed to store NFT ${nft.contractAddress}:${nft.tokenId} after all retries:`, lastError?.message);
         }
       }
       
@@ -300,7 +314,7 @@ export class MinimalDBOperations {
       }
     }
 
-    console.log(`[MinimalDBOperations] Batch complete: ${stored.length} stored, ${errors.length} errors`);
+    console.log(`[MinimalDBOperations] Batch complete: ${stored.length} stored, ${errors.length} errors, ${skipped} skipped due to missing data (total processed: ${stored.length + errors.length + skipped}/${nfts.length})`);
     return { stored: stored.length, errors };
   }
   

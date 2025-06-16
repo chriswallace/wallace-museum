@@ -133,7 +133,10 @@
 		if (response.ok) {
 			const responseData = await response.json();
 			showToast('Artwork added successfully', 'success');
-			goto(`/admin/artworks/edit/${responseData.id}`);
+			// Add a small delay to ensure database sync between write and read operations
+			setTimeout(() => {
+				goto(`/admin/artworks/edit/${responseData.id}`);
+			}, 100);
 		} else {
 			const { error } = await response.json();
 			showToast(error, 'error');

@@ -42,6 +42,7 @@
 	let bulkEditArtistIds: number[] = [];
 	let bulkEditCollectionId: number | null = null;
 	let bulkEditMimeType: string = '';
+	let lastSelectedIndex: number | null = null; // Track last selected index for shift+click
 
 	// Common MIME types for artworks
 	const commonMimeTypes = [
@@ -136,18 +137,39 @@
 		}
 	}
 
-	function toggleArtworkSelection(artworkId: number | string) {
-		if (selectedArtworks.has(artworkId)) {
-			selectedArtworks.delete(artworkId);
+	function toggleArtworkSelection(artworkId: number | string, event?: MouseEvent, currentIndex?: number) {
+		// Handle shift+click for range selection
+		if (event?.shiftKey && lastSelectedIndex !== null && currentIndex !== undefined) {
+			const startIndex = Math.min(lastSelectedIndex, currentIndex);
+			const endIndex = Math.max(lastSelectedIndex, currentIndex);
+			
+			// Select all artworks in the range
+			for (let i = startIndex; i <= endIndex; i++) {
+				if (i < artworks.length) {
+					selectedArtworks.add(artworks[i].id);
+				}
+			}
+			selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
 		} else {
-			selectedArtworks.add(artworkId);
+			// Normal toggle behavior
+			if (selectedArtworks.has(artworkId)) {
+				selectedArtworks.delete(artworkId);
+			} else {
+				selectedArtworks.add(artworkId);
+			}
+			selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
+			
+			// Update last selected index for future shift+click operations
+			if (currentIndex !== undefined) {
+				lastSelectedIndex = currentIndex;
+			}
 		}
-		selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
 	}
 
 	function toggleSelectAll() {
 		if (allSelected) {
 			selectedArtworks.clear();
+			lastSelectedIndex = null; // Clear last selected index when deselecting all
 		} else {
 			selectedArtworks = new Set(artworks.map(artwork => artwork.id));
 		}
@@ -399,31 +421,15 @@
 
 <h1>Artworks <button class="ghost" on:click={() => addNew()}>+ Add new</button></h1>
 
-<input
-	type="text"
-	placeholder="Search by Title, Artist, or Collection"
-	class="search"
-	bind:value={searchQuery}
-	on:input={handleSearchInput}
-/>
+<div class="sticky-controls">
+	<input
+		type="text"
+		placeholder="Search by Title, Artist, or Collection"
+		class="search"
+		bind:value={searchQuery}
+		on:input={handleSearchInput}
+	/>
 
-{#if isLoading}
-	<div class="loading">
-		<p>Loading artworks...</p>
-	</div>
-{:else if error}
-	<div class="error">
-		<p>Error: {error}</p>
-		<button class="primary" on:click={() => fetchArtworks(page)}>Retry</button>
-	</div>
-{:else if artworks.length === 0}
-	<div class="empty">
-		<p>No artworks found.</p>
-		{#if searchQuery}
-			<p>Try adjusting your search or <button class="link" on:click={() => { searchQuery = ''; fetchArtworks(1); }}>clear the search</button>.</p>
-		{/if}
-	</div>
-{:else}
 	<!-- Bulk Actions Bar -->
 	{#if selectedCount > 0}
 		<div class="bulk-actions-bar">
@@ -463,7 +469,25 @@
 			</div>
 		</div>
 	{/if}
+</div>
 
+{#if isLoading}
+	<div class="loading">
+		<p>Loading artworks...</p>
+	</div>
+{:else if error}
+	<div class="error">
+		<p>Error: {error}</p>
+		<button class="primary" on:click={() => fetchArtworks(page)}>Retry</button>
+	</div>
+{:else if artworks.length === 0}
+	<div class="empty">
+		<p>No artworks found.</p>
+		{#if searchQuery}
+			<p>Try adjusting your search or <button class="link" on:click={() => { searchQuery = ''; fetchArtworks(1); }}>clear the search</button>.</p>
+		{/if}
+	</div>
+{:else}
 	<table>
 		<thead>
 			<tr>
@@ -493,15 +517,20 @@
 				</th>
 				<th class="actions">Actions</th>
 			</tr>
+			<tr class="help-row">
+				<td colspan="6">
+					<small class="help-text">Tip: Hold Shift and click to select a range of artworks</small>
+				</td>
+			</tr>
 		</thead>
 		<tbody>
-			{#each artworks as artwork}
+			{#each artworks as artwork, index}
 				<tr>
 					<td>
 						<input
 							type="checkbox"
 							checked={selectedArtworks.has(artwork.id)}
-							on:change={() => toggleArtworkSelection(artwork.id)}
+							on:click={(event) => toggleArtworkSelection(artwork.id, event, index)}
 						/>
 					</td>
 					<td>
@@ -613,6 +642,15 @@
 {/if}
 
 <style lang="scss">
+	.sticky-controls {
+		@apply sticky top-0 z-40 bg-white dark:bg-gray-900 pt-4 pb-4 mb-4;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+		
+		.search {
+			@apply mb-0;
+		}
+	}
+
 	.select {
 		@apply w-8 md:w-12;
 	}
@@ -638,9 +676,7 @@
 	}
 
 	.bulk-actions-bar {
-		@apply flex flex-col sm:flex-row sm:items-center sm:justify-between border rounded-md p-3 md:p-4 mb-4 gap-3 sm:gap-0;
-		background-color: rgba(255, 255, 255, 0.1);
-		border-color: rgba(255, 255, 255, 0.3);
+		@apply flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 gap-3 sm:gap-0;
 		
 		.selected-count {
 			color: rgb(149, 149, 149);
@@ -737,6 +773,25 @@
 		
 		.link {
 			@apply text-primary hover:text-primary/80 underline cursor-pointer;
+		}
+	}
+
+	.help-text {
+		@apply text-xs text-gray-500 dark:text-gray-400;
+	}
+
+	.help-row {
+		@apply border-b border-gray-200 dark:border-gray-700;
+		
+		td {
+			@apply py-2 px-3 text-center;
+			background-color: rgba(0, 0, 0, 0.02);
+		}
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.help-row td {
+			background-color: rgba(255, 255, 255, 0.02);
 		}
 	}
 </style>

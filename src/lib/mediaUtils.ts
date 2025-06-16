@@ -259,7 +259,7 @@ export function ipfsToHttpUrl(
 	if (!uri || typeof uri !== 'string') return '';
 
 	// For HTML content, always use ipfs.io gateway to avoid authentication issues
-	if (mimeType === 'text/html' || mimeType === 'text/javascript' || mimeType === 'application/javascript') {
+	if (mimeType === 'text/html' || mimeType === 'text/javascript' || mimeType === 'application/javascript' || mimeType === 'application/x-directory') {
 		return ipfsToHttpUrlForHtml(uri, mimeType);
 	}
 

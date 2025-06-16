@@ -1,11 +1,11 @@
 <script lang="ts">
-	import EnhancedVideoPlayer from '$lib/components/EnhancedVideoPlayer.svelte';
+	import MediaChromeVideoPlayer from '$lib/components/MediaChromeVideoPlayer.svelte';
 
 	// Test video URL
 	const testVideo = {
 		src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
 		title: 'Big Buck Bunny',
-		description: 'A sample video to test the enhanced video player',
+		description: 'A sample video to test the Media Chrome video player',
 		aspectRatio: '16/9'
 	};
 </script>
@@ -15,38 +15,60 @@
 </svelte:head>
 
 <main class="container">
-	<h1>Enhanced Video Player Test</h1>
-	<p>Testing the web component-based video player with advanced features.</p>
+	<h1>Media Chrome Video Player Test</h1>
+	<p>Testing the new Media Chrome web component-based video player with modern features.</p>
 
 	<div class="video-section">
 		<h2>{testVideo.title}</h2>
 		<div class="video-container">
-			<EnhancedVideoPlayer
+			<MediaChromeVideoPlayer
 				src={testVideo.src}
 				title={testVideo.title}
-				description={testVideo.description}
 				aspectRatio={testVideo.aspectRatio}
 				autoplay={false}
 				loop={true}
 				muted={true}
-				themeColor="#3b82f6"
 				className="test-video-player"
 			/>
 		</div>
 	</div>
 
 	<div class="features">
-		<h3>Features</h3>
+		<h3>Media Chrome Features</h3>
 		<ul>
-			<li>✅ Custom video controls with smooth animations</li>
-			<li>✅ Touch device detection and adaptive UI</li>
-			<li>✅ Keyboard shortcuts (Space/K for play/pause, M for mute, F for fullscreen)</li>
-			<li>✅ Volume control with visual bars</li>
-			<li>✅ Progress bar with seeking</li>
-			<li>✅ Fullscreen support</li>
-			<li>✅ Auto-pause when out of view</li>
-			<li>✅ Accessibility features</li>
+			<li>✅ Modern web component architecture</li>
+			<li>✅ Framework agnostic (works with any JS framework)</li>
+			<li>✅ Fully customizable with CSS variables</li>
+			<li>✅ Accessibility built-in</li>
+			<li>✅ Picture-in-picture support</li>
+			<li>✅ Keyboard shortcuts</li>
+			<li>✅ Touch-friendly controls</li>
+			<li>✅ Professional video player controls</li>
+			<li>✅ Works with any video source (MP4, HLS, DASH, etc.)</li>
+			<li>✅ Actively maintained by Mux</li>
 		</ul>
+	</div>
+
+	<div class="comparison">
+		<h3>Why Media Chrome?</h3>
+		<div class="comparison-grid">
+			<div class="comparison-item">
+				<h4>🚀 Modern</h4>
+				<p>Built with modern web standards and actively maintained by video experts at Mux.</p>
+			</div>
+			<div class="comparison-item">
+				<h4>🎨 Customizable</h4>
+				<p>Fully customizable with CSS variables and modular components.</p>
+			</div>
+			<div class="comparison-item">
+				<h4>🌐 Universal</h4>
+				<p>Works with React, Vue, Svelte, Angular, or vanilla HTML/JS.</p>
+			</div>
+			<div class="comparison-item">
+				<h4>♿ Accessible</h4>
+				<p>Built-in accessibility features and keyboard navigation.</p>
+			</div>
+		</div>
 	</div>
 </main>
 
@@ -78,6 +100,13 @@
 		color: #374151;
 	}
 
+	h4 {
+		font-size: 1.1rem;
+		font-weight: 600;
+		margin-bottom: 0.5rem;
+		color: #1f2937;
+	}
+
 	.video-section {
 		margin-bottom: 3rem;
 	}
@@ -100,6 +129,7 @@
 		padding: 2rem;
 		border-radius: 12px;
 		border: 1px solid #e5e7eb;
+		margin-bottom: 3rem;
 	}
 
 	.features ul {
@@ -114,6 +144,33 @@
 		color: #374151;
 	}
 
+	.comparison {
+		background: #fff;
+		padding: 2rem;
+		border-radius: 12px;
+		border: 1px solid #e5e7eb;
+	}
+
+	.comparison-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+		gap: 1.5rem;
+		margin-top: 1rem;
+	}
+
+	.comparison-item {
+		padding: 1.5rem;
+		background: #f8fafc;
+		border-radius: 8px;
+		border: 1px solid #e2e8f0;
+	}
+
+	.comparison-item p {
+		margin: 0;
+		color: #64748b;
+		line-height: 1.6;
+	}
+
 	@media (max-width: 768px) {
 		.container {
 			padding: 1rem;
@@ -125,6 +182,10 @@
 
 		.video-container {
 			max-width: 100%;
+		}
+
+		.comparison-grid {
+			grid-template-columns: 1fr;
 		}
 	}
 </style> 

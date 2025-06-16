@@ -1061,14 +1061,14 @@
 	/* Desktop hover styles - only apply on medium screens and larger */
 	@media (min-width: 768px) {
 		.nav-button:hover {
-			@apply bg-primary text-black;
+			@apply bg-primary text-white;
 		}
 	}
 
 	/* Desktop dark mode hover styles */
 	@media (min-width: 768px) and (prefers-color-scheme: dark) {
 		.nav-button:hover {
-			@apply bg-primary-dark text-black;
+			@apply bg-primary-dark text-white;
 		}
 	}
 

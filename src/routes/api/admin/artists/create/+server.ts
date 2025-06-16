@@ -40,7 +40,16 @@ export async function POST({ request }) {
 		// Invalidate search cache since artist data has changed
 		await cachedSearchQueries.invalidate();
 
-		return new Response(JSON.stringify(newArtist), {
+		// Fetch the complete artist data with all relationships for immediate use
+		const completeArtist = await prismaWrite.artist.findUnique({
+			where: { id: newArtist.id },
+			include: {
+				Collection: true,
+				Artwork: true
+			}
+		});
+
+		return new Response(JSON.stringify(completeArtist || newArtist), {
 			status: 201,
 			headers: { 'Content-Type': 'application/json' }
 		});

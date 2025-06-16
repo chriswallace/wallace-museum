@@ -41,7 +41,9 @@
 
 		if (response.ok && responseData.id) {
 			showToast('Collection updated', 'success');
-			goto(`/admin/collections/${responseData.id}`);
+			setTimeout(() => {
+				goto(`/admin/collections/${responseData.id}`);
+			}, 100);
 		} else if (response.status === 400) {
 			showToast(response.body, 'error');
 		}

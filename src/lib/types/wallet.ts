@@ -3,4 +3,5 @@ export interface WalletAddress {
 	blockchain: string;
 	alias?: string;
 	createdAt: string;
+	artworkCount?: number;
 } 

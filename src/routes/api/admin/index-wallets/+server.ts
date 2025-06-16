@@ -56,42 +56,48 @@ async function processWallet(
 			result.errors = storeResult.errors.map(e => e.error);
 			
 		} else if (blockchain === 'tezos') {
-			// Fetch owned NFTs with higher pagination limits
+			// Fetch owned NFTs - run until no more data
 			const ownedNFTs = await indexingWorkflow.indexWalletNFTs(
 				walletAddress, 
 				'tezos', 
 				'owned',
 				{
-					maxPages: 50, // 50 pages × 500 NFTs = 25,000 NFT capacity
-					pageSize: 500
+					pageSize: 500 // No maxPages limit - run until completion
 				}
 			);
 			
 			// Add delay between API calls
 			await sleep(WALLET_DELAY);
 			
-			// Fetch created NFTs with higher pagination limits
+			// Fetch created NFTs - run until no more data
 			const createdNFTs = await indexingWorkflow.indexWalletNFTs(
 				walletAddress, 
 				'tezos', 
 				'created',
 				{
-					maxPages: 50, // 50 pages × 500 NFTs = 25,000 NFT capacity
-					pageSize: 500
+					pageSize: 500 // No maxPages limit - run until completion
 				}
 			);
 			
-			console.log(`[ProcessWallet] Fetched ${ownedNFTs.length} owned + ${createdNFTs.length} created NFTs for ${walletAddress}`);
+			console.log(`[ProcessWallet] Fetched ${ownedNFTs.length} owned + ${createdNFTs.length} created NFTs for ${walletAddress} (total fetched: ${ownedNFTs.length + createdNFTs.length})`);
 			
 			// Store owned NFTs
 			const ownedStoreResult = await dbOps.batchStoreNFTs(ownedNFTs, 'owned', walletAddress);
+			console.log(`[ProcessWallet] Owned NFTs storage: ${ownedStoreResult.stored} stored out of ${ownedNFTs.length} fetched (${ownedStoreResult.errors.length} errors)`);
 			
 			// Store created NFTs
 			const createdStoreResult = await dbOps.batchStoreNFTs(createdNFTs, 'created', walletAddress);
+			console.log(`[ProcessWallet] Created NFTs storage: ${createdStoreResult.stored} stored out of ${createdNFTs.length} fetched (${createdStoreResult.errors.length} errors)`);
 			
-			result.indexed = ownedStoreResult.stored + createdStoreResult.stored;
-			result.new = ownedStoreResult.stored + createdStoreResult.stored;
+			const totalFetched = ownedNFTs.length + createdNFTs.length;
+			const totalStored = ownedStoreResult.stored + createdStoreResult.stored;
+			const totalErrors = ownedStoreResult.errors.length + createdStoreResult.errors.length;
+			
+			result.indexed = totalStored; // Report actual stored count, not fetched count
+			result.new = totalStored;
 			result.errors = [...ownedStoreResult.errors.map(e => e.error), ...createdStoreResult.errors.map(e => e.error)];
+			
+			console.log(`[ProcessWallet] Storage summary for ${walletAddress}: ${totalStored} stored out of ${totalFetched} fetched (${totalErrors} storage errors, ${totalFetched - totalStored - totalErrors} other discrepancies)`);
 		}
 
 		// Get final stats
@@ -111,6 +117,7 @@ export const GET: RequestHandler = async ({ url, request, cookies, locals }) => 
 	const walletAddressParam = url.searchParams.get('walletAddress');
 	const forceRefresh = url.searchParams.get('forceRefresh') === 'true' || url.searchParams.get('force') === 'true';
 	const blockchainParam = url.searchParams.get('blockchain');
+	const walletIndexParam = url.searchParams.get('walletIndex'); // New parameter to process specific wallet by index
 
 	if (!env.OPENSEA_API_KEY) {
 		return json({ error: 'OpenSea API key not configured' }, { status: 500 });
@@ -134,11 +141,50 @@ export const GET: RequestHandler = async ({ url, request, cookies, locals }) => 
 				});
 			}
 
-			console.log(`[IndexWallets] Processing ${configuredWallets.length} configured wallets with comprehensive indexing`);
+			console.log(`[IndexWallets] Found ${configuredWallets.length} configured wallets:`);
+			configuredWallets.forEach((wallet, index) => {
+				console.log(`[IndexWallets] ${index + 1}. ${wallet.address} (${wallet.blockchain}) - ${wallet.alias || 'No alias'}`);
+			});
+
+			// If walletIndex is specified, process only that wallet
+			if (walletIndexParam) {
+				const walletIndex = parseInt(walletIndexParam);
+				if (walletIndex < 0 || walletIndex >= configuredWallets.length) {
+					return json({ 
+						error: `Invalid wallet index ${walletIndex}. Must be between 0 and ${configuredWallets.length - 1}`,
+						availableWallets: configuredWallets.map((w, i) => ({ index: i, address: w.address, blockchain: w.blockchain, alias: w.alias }))
+					}, { status: 400 });
+				}
+
+				const wallet = configuredWallets[walletIndex];
+				console.log(`[IndexWallets] Processing single wallet by index ${walletIndex}: ${wallet.address} (${wallet.blockchain})`);
+
+				const walletResult = await processWallet(
+					wallet.address, 
+					wallet.blockchain, 
+					indexingWorkflow, 
+					dbOps
+				);
+
+				return json({
+					success: true,
+					result: walletResult,
+					walletIndex: walletIndex,
+					totalWallets: configuredWallets.length,
+					finalStats: indexingWorkflow.getStats()
+				}, { status: 200 });
+			}
+
+			console.log(`[IndexWallets] Processing all ${configuredWallets.length} configured wallets with comprehensive indexing`);
 
 			const results = [];
 			
-			for (const wallet of configuredWallets) {
+			for (let i = 0; i < configuredWallets.length; i++) {
+				const wallet = configuredWallets[i];
+				console.log(`[IndexWallets] ========================================`);
+				console.log(`[IndexWallets] Processing wallet ${i + 1}/${configuredWallets.length}: ${wallet.address} (${wallet.blockchain}) - ${wallet.alias || 'No alias'}`);
+				console.log(`[IndexWallets] ========================================`);
+
 				const walletResult = await processWallet(
 					wallet.address, 
 					wallet.blockchain, 
@@ -146,10 +192,16 @@ export const GET: RequestHandler = async ({ url, request, cookies, locals }) => 
 					dbOps
 				);
 				
-				results.push(walletResult);
+				results.push({
+					...walletResult,
+					walletIndex: i,
+					alias: wallet.alias
+				});
+				
+				console.log(`[IndexWallets] Completed wallet ${i + 1}/${configuredWallets.length}: ${walletResult.indexed} NFTs indexed`);
 				
 				// Add delay between wallets to avoid overwhelming the API
-				if (configuredWallets.indexOf(wallet) < configuredWallets.length - 1) {
+				if (i < configuredWallets.length - 1) {
 					console.log(`[IndexWallets] Waiting ${WALLET_DELAY}ms before next wallet...`);
 					await sleep(WALLET_DELAY);
 				}
@@ -157,6 +209,16 @@ export const GET: RequestHandler = async ({ url, request, cookies, locals }) => 
 
 			// Get final comprehensive stats
 			const finalStats = indexingWorkflow.getStats();
+
+			console.log(`[IndexWallets] ========================================`);
+			console.log(`[IndexWallets] FINAL SUMMARY:`);
+			console.log(`[IndexWallets] Total wallets processed: ${results.length}`);
+			console.log(`[IndexWallets] Total NFTs indexed: ${results.reduce((sum, r) => sum + r.indexed, 0)}`);
+			console.log(`[IndexWallets] Total errors: ${results.reduce((sum, r) => sum + r.errors.length, 0)}`);
+			results.forEach((result, index) => {
+				console.log(`[IndexWallets] Wallet ${index + 1} (${result.walletAddress}): ${result.indexed} NFTs, ${result.errors.length} errors`);
+			});
+			console.log(`[IndexWallets] ========================================`);
 
 			return json({
 				success: true,

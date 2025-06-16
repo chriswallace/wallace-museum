@@ -44,7 +44,7 @@
 </svelte:head>
 
 <div class="max-w-6xl mx-auto p-6 space-y-12">
-	<h1 class="text-3xl font-bold mb-8">Artist Components Demo</h1>
+	<h1 class="mb-8">Artist Components Demo</h1>
 
 	<!-- ArtistAvatar Component -->
 	<section class="space-y-4">

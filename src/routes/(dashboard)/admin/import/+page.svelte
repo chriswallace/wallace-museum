@@ -9,6 +9,7 @@
 	import WalletAddressManager from '$lib/components/WalletAddressManager.svelte';
 	import ImportArtworkCard from '$lib/components/ImportArtworkCard.svelte';
 	import ImportArtworkGrid from '$lib/components/ImportArtworkGrid.svelte';
+	import SelectiveWalletImporter from '$lib/components/SelectiveWalletImporter.svelte';
 	import { finalizeImport } from '$lib/importHandler';
 	import { get } from 'svelte/store';
 	import { onMount } from 'svelte';
@@ -81,6 +82,7 @@
 	export let data;
 	let savedWalletAddresses = data.walletAddresses || [];
 	let showAddressManager = false;
+	let showSelectiveImporter = false;
 
 	// State for search
 	let searchResults: ExtendedArtwork[] = [];
@@ -690,6 +692,56 @@
 		
 		return 'Unknown ID';
 	}
+
+	// Handle selective wallet import
+	async function handleSelectiveImport(selectedWallets: any[]) {
+		try {
+			console.log('handleSelectiveImport called with:', selectedWallets);
+			showSelectiveImporter = false;
+			isSearching = true;
+			
+			// Clear current search results
+			searchResults = [];
+			currentOffset = 0;
+			
+			console.log('Calling selective import API...');
+			// Call the selective import API
+			const response = await fetch('/api/admin/import/selective', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					selectedWallets,
+					filter: 'all' // Use 'all' filter for selective import to get all artworks from selected wallets
+				})
+			});
+			
+			const data = await response.json();
+			console.log('Selective import API response:', data);
+			
+			if (response.ok) {
+				searchResults = data.results || [];
+				totalResults = data.total || 0;
+				hasMore = false; // Selective import loads all results at once
+				
+				console.log(`Loaded ${searchResults.length} artworks from ${selectedWallets.length} selected wallets`);
+				
+				// Show success message
+				toast.push(`Loaded ${searchResults.length} artworks from ${selectedWallets.length} selected wallet${selectedWallets.length !== 1 ? 's' : ''}`, {
+					theme: { '--toastBackground': 'var(--color-success)', '--toastColor': 'white' }
+				});
+			} else {
+				console.error('Selective import error:', data.error);
+				toast.push(`Error: ${data.error || 'Failed to load artworks from selected wallets'}`);
+			}
+		} catch (error) {
+			console.error('Selective import error:', error);
+			toast.push(`Error: ${error instanceof Error ? error.message : 'Failed to load artworks from selected wallets'}`);
+		} finally {
+			isSearching = false;
+		}
+	}
 </script>
 
 <!-- Redesigned Import NFTs Screen -->
@@ -699,7 +751,7 @@
 		class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 border-b border-gray-200 dark:border-gray-700 pb-4"
 	>
 		<div>
-			<h1 class="text-3xl font-medium mb-1">Import NFTs</h1>
+			<h1 class="mb-1">Import NFTs</h1>
 			<p class="text-gray-600 dark:text-gray-400 text-base">
 				Import NFTs from indexed wallets into your Compendium.
 			</p>
@@ -820,26 +872,46 @@
 
 			<div>
 				<h3 class="font-medium text-lg mb-2">Wallet Management</h3>
-				<button class="secondary button py-2 px-4" on:click={() => (showAddressManager = true)}>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5 mr-1 inline-block"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-						/></svg
-					>
-					Edit Wallet Addresses
-					<span class="ml-1 text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">
-						{savedWalletAddresses.length}
-					</span>
-				</button>
+				<div class="flex gap-3 flex-wrap">
+					<button class="secondary button py-2 px-4" on:click={() => (showAddressManager = true)}>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5 mr-1 inline-block"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+							/></svg
+						>
+						Edit Wallet Addresses
+						<span class="ml-1 text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full">
+							{savedWalletAddresses.length}
+						</span>
+					</button>
+					
+					<button class="primary button py-2 px-4" on:click={() => (showSelectiveImporter = true)}>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5 mr-1 inline-block"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+							/>
+						</svg>
+						Select Wallets to Import
+					</button>
+				</div>
 			</div>
 		</div>
 	{/if}
@@ -1073,6 +1145,14 @@
 		onClose={() => (showAddressManager = false)}
 		onAdd={handleAddWalletAddress}
 		onRemove={handleRemoveWalletAddress}
+	/>
+{/if}
+
+<!-- Modal for Selective Wallet Import -->
+{#if showSelectiveImporter}
+	<SelectiveWalletImporter
+		onClose={() => (showSelectiveImporter = false)}
+		onImport={handleSelectiveImport}
 	/>
 {/if}
 

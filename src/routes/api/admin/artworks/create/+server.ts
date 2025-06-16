@@ -326,7 +326,16 @@ export async function POST({ request }) {
 			// Don't fail the creation if pinning fails
 		}
 
-		return new Response(JSON.stringify(newArtwork), {
+		// Fetch the complete artwork data with all relationships for immediate use
+		const completeArtwork = await prismaWrite.artwork.findUnique({
+			where: { id: newArtwork.id },
+			include: {
+				Collection: true,
+				Artist: true
+			}
+		});
+
+		return new Response(JSON.stringify(completeArtwork || newArtwork), {
 			status: 201,
 			headers: { 'Content-Type': 'application/json' }
 		});

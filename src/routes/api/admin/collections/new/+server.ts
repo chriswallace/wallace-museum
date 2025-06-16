@@ -22,7 +22,16 @@ export async function POST({ request }: { request: Request }): Promise<Response>
 		// Invalidate search cache since collection data has changed
 		await cachedSearchQueries.invalidate();
 
-		return new Response(JSON.stringify(newCollection), {
+		// Fetch the complete collection data with all relationships for immediate use
+		const completeCollection = await prismaWrite.collection.findUnique({
+			where: { id: newCollection.id },
+			include: {
+				Artwork: true,
+				Artist: true
+			}
+		});
+
+		return new Response(JSON.stringify(completeCollection || newCollection), {
 			status: 201,
 			headers: { 'Content-Type': 'application/json' }
 		});

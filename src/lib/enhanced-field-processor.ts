@@ -330,23 +330,61 @@ export class EnhancedFieldProcessor {
     // Check if URL contains hints about the content type
     const urlLower = url.toLowerCase();
     
-    // Video indicators
-    if (urlLower.includes('video') || urlLower.includes('animation') || urlLower.includes('mp4')) {
-      return 'video/mp4';
-    }
-    
-    // Interactive/HTML indicators
+    // Interactive/HTML indicators (high priority)
     if (urlLower.includes('generator') || urlLower.includes('interactive') || urlLower.includes('html')) {
       return 'text/html';
     }
     
-    // Image indicators (default assumption for most NFTs)
-    if (urlLower.includes('image') || urlLower.includes('display') || urlLower.includes('artifact')) {
-      return 'image/png'; // Safe default for most NFT images
+    // Video indicators
+    if (urlLower.includes('video') || urlLower.includes('animation') || urlLower.includes('mp4')) {
+      // But check if it might be interactive content disguised as animation
+      if (urlLower.includes('live') || urlLower.includes('render') || urlLower.includes('viewer')) {
+        return 'text/html';
+      }
+      return 'video/mp4';
     }
     
-    // Default to image for most NFT content
-    return 'image/png';
+    // Image indicators
+    if (urlLower.includes('image') || urlLower.includes('display') || urlLower.includes('thumbnail')) {
+      return 'image/png';
+    }
+    
+    // Artifact URI often contains the primary content - could be interactive
+    if (urlLower.includes('artifact') && !urlLower.includes('display') && !urlLower.includes('thumbnail')) {
+      // For artifact URIs without clear extension, assume it might be interactive content
+      // This is especially common with fxhash and other generative art platforms
+      return 'application/x-directory'; // Use this as a marker for potentially interactive content
+    }
+    
+    // Default to image for most NFT content, but be more conservative
+    // IPFS with no extension - make educated guesses based on context
+    if (url.includes('ipfs')) {
+      // Check for interactive/generative content indicators
+      if (url.includes('generator') || url.includes('interactive') || url.includes('html')) {
+        return 'text/html';
+      }
+      // If it's in an animation_url field, could be video or interactive
+      if (url.includes('animation')) {
+        // Check if it looks more like interactive content
+        if (url.includes('live') || url.includes('render') || url.includes('viewer')) {
+          return 'text/html';
+        }
+        return 'video/mp4';
+      }
+      if (url.includes('video')) {
+        return 'video/mp4';
+      }
+      // Default assumption for IPFS without extension - could be interactive content
+      // Check the context more carefully
+      const urlLower = url.toLowerCase();
+      if (urlLower.includes('artifact') && !urlLower.includes('display') && !urlLower.includes('thumbnail')) {
+        // artifact_uri often contains the primary content, which could be interactive
+        return 'application/x-directory'; // Use this as a marker for potentially interactive content
+      }
+      return 'image/png';
+    }
+    
+    return null;
   }
   
   /**
@@ -1230,14 +1268,28 @@ export class EnhancedFieldProcessor {
     result.mintDate = await this.extractMintDate(rawData, metadata, contractAddress, tokenId, blockchain) || undefined;
     
     // Technical details with enhanced detection
-    // Always prioritize animation URL if it's clearly a video
+    // Enhanced URL prioritization for MIME type detection
     let primaryUrl: string | null = null;
     
-    if (animationUrl && this.isVideoUrl(animationUrl)) {
+    // Priority 1: Generator URL (always highest priority for interactive content)
+    const generatorUrl = this.extractGeneratorUrl(rawData, metadata);
+    if (generatorUrl) {
+      primaryUrl = generatorUrl;
+    }
+    // Priority 2: Animation URL if it's clearly a video
+    else if (animationUrl && this.isVideoUrl(animationUrl)) {
       primaryUrl = animationUrl;
-    } else if (this.shouldPrioritizeAnimationForMime(rawData, animationUrl, imageUrl)) {
+    }
+    // Priority 3: Animation URL if it looks like interactive/generative content
+    else if (animationUrl && (this.isAnimationUrl(animationUrl) || this.isGeneratorUrl(animationUrl))) {
+      primaryUrl = animationUrl;
+    }
+    // Priority 4: Use shouldPrioritizeAnimationForMime logic for other cases
+    else if (this.shouldPrioritizeAnimationForMime(rawData, animationUrl, imageUrl)) {
       primaryUrl = animationUrl || imageUrl;
-    } else {
+    }
+    // Priority 5: Default to image URL, then animation URL as fallback
+    else {
       primaryUrl = imageUrl || animationUrl;
     }
     
@@ -1460,11 +1512,28 @@ export class EnhancedFieldProcessor {
     
     // IPFS with no extension - make educated guesses based on context
     if (url.includes('ipfs')) {
-      // If it's in an animation_url field, likely video
-      if (url.includes('animation') || url.includes('video')) {
+      // Check for interactive/generative content indicators
+      if (url.includes('generator') || url.includes('interactive') || url.includes('html')) {
+        return 'text/html';
+      }
+      // If it's in an animation_url field, could be video or interactive
+      if (url.includes('animation')) {
+        // Check if it looks more like interactive content
+        if (url.includes('live') || url.includes('render') || url.includes('viewer')) {
+          return 'text/html';
+        }
         return 'video/mp4';
       }
-      // Default assumption for IPFS without extension
+      if (url.includes('video')) {
+        return 'video/mp4';
+      }
+      // Default assumption for IPFS without extension - could be interactive content
+      // Check the context more carefully
+      const urlLower = url.toLowerCase();
+      if (urlLower.includes('artifact') && !urlLower.includes('display') && !urlLower.includes('thumbnail')) {
+        // artifact_uri often contains the primary content, which could be interactive
+        return 'application/x-directory'; // Use this as a marker for potentially interactive content
+      }
       return 'image/png';
     }
     
@@ -1476,7 +1545,7 @@ export class EnhancedFieldProcessor {
    */
   private shouldPrioritizeAnimationForMime(rawData: any, animationUrl: string | null, imageUrl: string | null): boolean {
     // For Art Blocks and other generative art, prioritize animation/generator URL for MIME detection
-    if (rawData.is_generative_art === true) {
+    if (rawData.is_generative_art === true || rawData.isGenerativeArt === true) {
       return true;
     }
     
@@ -1485,13 +1554,34 @@ export class EnhancedFieldProcessor {
       return true;
     }
     
-    // If animation URL exists and looks like a video, prioritize it
+    // If animation URL exists and looks like interactive content, prioritize it
     if (animationUrl && this.isAnimationUrl(animationUrl)) {
       return true;
     }
     
-    // If image URL looks like a generator URL, prioritize it
-    if (imageUrl && this.isGeneratorUrl(imageUrl)) {
+    // If image URL looks like a generator URL, prioritize it (but animation URL takes precedence)
+    if (imageUrl && this.isGeneratorUrl(imageUrl) && !animationUrl) {
+      return true;
+    }
+    
+    // Check for fxhash generative content
+    if (this.isFxhashGenerativeContent(rawData)) {
+      return true;
+    }
+    
+    // Check for Art Blocks patterns in URLs
+    if (animationUrl && (animationUrl.includes('artblocks.io') || animationUrl.includes('generator'))) {
+      return true;
+    }
+    
+    // Check for interactive content indicators in metadata
+    if (rawData.metadata?.animation_url || rawData.metadata?.generator_url) {
+      return true;
+    }
+    
+    // Check for IPFS URLs that might be interactive content
+    if (animationUrl && animationUrl.includes('ipfs') && 
+        (animationUrl.includes('generator') || animationUrl.includes('interactive') || animationUrl.includes('html'))) {
       return true;
     }
     

@@ -208,11 +208,10 @@ export class OptimizedIndexingWorkflow {
     const limit = options.pageSize || 500;
     let hasMore = true;
     let pageCount = 0;
-    const maxPages = options.maxPages || 50; // Add pagination limit for Tezos (50 pages × 500 = 25,000 NFTs max)
     let consecutiveFailures = 0;
     const maxConsecutiveFailures = 10; // Allow up to 10 consecutive failures for Tezos
 
-    while (hasMore && pageCount < maxPages) {
+    while (hasMore) { // Removed maxPages limit - run until no more data
       console.log(`[OptimizedIndexingWorkflow] Fetching Tezos NFTs page ${pageCount + 1}: offset ${offset}, limit ${limit}`);
 
       try {
@@ -264,10 +263,6 @@ export class OptimizedIndexingWorkflow {
         // Don't increment pageCount or offset - retry the same page
         continue;
       }
-    }
-
-    if (pageCount >= maxPages) {
-      console.warn(`[OptimizedIndexingWorkflow] Tezos indexing stopped at maximum pages limit (${maxPages}). Total NFTs: ${allNfts.length}`);
     }
 
     console.log(`[OptimizedIndexingWorkflow] Completed Tezos indexing: ${allNfts.length} total NFTs across ${pageCount} pages (${consecutiveFailures} final consecutive failures)`);

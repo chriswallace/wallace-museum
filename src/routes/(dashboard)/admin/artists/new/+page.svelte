@@ -48,7 +48,9 @@
 			if (response.ok) {
 				const responseData = await response.json();
 				showToast('Artist added successfully', 'success');
-				goto(`/admin/artists/edit/${responseData.id}`);
+				setTimeout(() => {
+					goto(`/admin/artists/edit/${responseData.id}`);
+				}, 100);
 			} else {
 				const { error } = await response.json();
 				showToast(error, 'error');

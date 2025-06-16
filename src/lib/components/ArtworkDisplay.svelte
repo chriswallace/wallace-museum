@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { ipfsToHttpUrl, IPFS_GATEWAYS } from '$lib/mediaUtils';
+	import { ipfsToHttpUrl, ipfsToHttpUrlForHtml, IPFS_GATEWAYS } from '$lib/mediaUtils';
 	import { getBestMediaUrl, getMediaDisplayType } from '$lib/utils/mediaHelpers';
 	import { buildOptimizedImageUrl, buildDirectImageUrl } from '$lib/imageOptimization';
-	import EnhancedVideoPlayer from './EnhancedVideoPlayer.svelte';
+	import MediaChromeVideoPlayer from './MediaChromeVideoPlayer.svelte';
 
 	interface Artwork {
 		generatorUrl?: string | null;
@@ -47,8 +47,12 @@
 	$: displayUrl = bestMedia?.url || '';
 	$: mediaType = getMediaDisplayType(bestMedia, artwork.mime);
 
-	// Transform URLs
-	$: transformedUrl = displayUrl ? ipfsToHttpUrl(displayUrl, IPFS_GATEWAYS[0], true, artwork.mime || undefined) : '';
+	// Transform URLs - use different functions based on media type
+	$: transformedUrl = displayUrl 
+		? (mediaType === 'iframe' 
+			? ipfsToHttpUrlForHtml(displayUrl, artwork.mime || undefined)
+			: ipfsToHttpUrl(displayUrl, IPFS_GATEWAYS[0], true, artwork.mime || undefined))
+		: '';
 	
 	$: optimizedImageUrl = mediaType === 'image' && displayUrl 
 		? buildOptimizedImageUrl(displayUrl, { width: 1200, fit: 'contain', format: 'auto', quality: 85, mimeType: artwork.mime })
@@ -195,10 +199,10 @@
 			<p>No media available</p>
 		</div>
 	{:else if mediaType === 'video'}
-		<EnhancedVideoPlayer
+		<MediaChromeVideoPlayer
 			src={transformedUrl}
 			title={artwork.title}
-			{aspectRatio}
+			aspectRatio={aspectRatio}
 			autoplay={true}
 			loop={true}
 			muted={true}

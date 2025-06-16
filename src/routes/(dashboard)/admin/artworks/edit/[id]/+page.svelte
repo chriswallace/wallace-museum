@@ -242,7 +242,10 @@
 		}
 	}
 
-	async function fetchArtwork() {
+	async function fetchArtwork(retryCount = 0) {
+		const maxRetries = 3;
+		const retryDelay = Math.pow(2, retryCount) * 200; // 200ms, 400ms, 800ms
+		
 		try {
 			const [artworkRes, artistsRes, collectionsRes] = await Promise.all([
 				fetch(`/api/admin/artworks/${artworkId}`),
@@ -253,6 +256,13 @@
 			if (artworkRes.ok) {
 				artwork = await artworkRes.json();
 				selectedArtistIds = artwork.Artist?.map((a) => a.id) || [];
+			} else if (artworkRes.status === 404 && retryCount < maxRetries) {
+				// Artwork not found, might be database replication lag - retry
+				console.log(`Artwork not found, retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries + 1})`);
+				setTimeout(() => {
+					fetchArtwork(retryCount + 1);
+				}, retryDelay);
+				return; // Don't set isLoading to false yet
 			} else {
 				error = 'Failed to fetch artwork';
 			}
@@ -266,9 +276,20 @@
 				collections = collectionsData.collections;
 			}
 		} catch (e) {
+			if (retryCount < maxRetries) {
+				// Network error, retry
+				console.log(`Network error, retrying in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries + 1})`);
+				setTimeout(() => {
+					fetchArtwork(retryCount + 1);
+				}, retryDelay);
+				return; // Don't set isLoading to false yet
+			}
 			error = (e as Error).message;
 		} finally {
-			isLoading = false;
+			// Only set loading to false if we're not retrying
+			if (retryCount >= maxRetries || !error.includes('Failed to fetch artwork')) {
+				isLoading = false;
+			}
 		}
 	}
 

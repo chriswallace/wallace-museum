@@ -7,6 +7,7 @@
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
 	import { cleanTwitterHandle, cleanInstagramHandle } from '$lib/utils/socialMediaUtils';
+	import { detectBlockchain } from '$lib/utils/walletUtils';
 	import OptimizedImage from './OptimizedImage.svelte';
 
 	interface Artwork {
@@ -89,6 +90,16 @@
 		img.src = originalUrl;
 	}
 
+	// Function to detect blockchain when address changes
+	function handleAddressInput() {
+		if (newAddress.address.trim()) {
+			const detectedBlockchain = detectBlockchain(newAddress.address.trim());
+			if (detectedBlockchain !== 'unknown') {
+				newAddress.blockchain = detectedBlockchain;
+			}
+		}
+	}
+
 	async function confirmAndDelete() {
 		const artworksMessage =
 			artist.artworks && artist.artworks.length > 0
@@ -149,6 +160,16 @@
 
 	async function addAddress() {
 		if (!newAddress.address) return;
+
+		// Auto-detect blockchain before adding
+		const detectedBlockchain = detectBlockchain(newAddress.address.trim());
+		if (detectedBlockchain === 'unknown') {
+			showToast('Invalid address format. Please enter a valid Ethereum or Tezos address.', 'error');
+			return;
+		}
+		
+		// Update the blockchain to the detected one
+		newAddress.blockchain = detectedBlockchain;
 
 		try {
 			console.log('Sending request to add address:', newAddress);
@@ -216,16 +237,16 @@
 >
 	<div class="md:col-span-1">
 		<div class="mb-6">
-			<div class="relative group w-full aspect-square">
+			<div class="relative group w-full max-w-[800px] aspect-square mx-auto">
 				{#if artist.avatarUrl}
 					{#key avatarKey}
 						<OptimizedImage
 							src={artist.avatarUrl}
 							alt={artist.name}
-							width={120}
-							height={120}
+							width={800}
+							height={800}
 							fit="crop"
-							gravity="auto"
+							gravity="face"
 							format="auto"
 							quality={90}
 							aspectRatio="1/1"
@@ -234,7 +255,7 @@
 						/>
 					{/key}
 				{:else}
-					<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-md">
+					<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-full">
 						<span class="text-gray-500 dark:text-gray-400 text-lg">No Avatar</span>
 					</div>
 				{/if}
@@ -266,7 +287,7 @@
 
 				<!-- Loading overlay -->
 				{#if isUploadingAvatar}
-					<div class="absolute inset-0 bg-black bg-opacity-50 rounded-md flex items-center justify-center z-20">
+					<div class="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center z-20">
 						<div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
 					</div>
 				{/if}
@@ -330,23 +351,34 @@
 				<p class="text-gray-500 dark:text-gray-400">No addresses added yet.</p>
 			{/if}
 
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-				<div class="mb-4">
-					<label for="newAddress">New Address</label>
-					<input type="text" id="newAddress" bind:value={newAddress.address} placeholder="0x..." />
-				</div>
-				<div class="mb-4">
-					<label for="blockchain">Blockchain</label>
-					<select id="blockchain" bind:value={newAddress.blockchain}>
-						<option value="ethereum">Ethereum</option>
-						<option value="polygon">Polygon</option>
-						<option value="tezos">Tezos</option>
-					</select>
+			<div class="mt-4">
+				<label for="newAddress">New Address</label>
+				<div class="flex items-center gap-4 mt-2">
+					<div class="flex-1">
+						<input 
+							type="text" 
+							id="newAddress" 
+							bind:value={newAddress.address} 
+							on:input={handleAddressInput}
+							placeholder="0x... or tz1..." 
+							class="w-full h-12 mb-0"
+						/>
+						{#if newAddress.address.trim()}
+							<p class="text-sm text-gray-600 dark:text-gray-300 mt-1">
+								Detected: {newAddress.blockchain === 'ethereum' ? 'Ethereum' : newAddress.blockchain === 'tezos' ? 'Tezos' : 'Unknown format'}
+							</p>
+						{/if}
+					</div>
+					<button 
+						type="button" 
+						class="primary h-12 px-4 py-2" 
+						on:click={addAddress} 
+						disabled={!newAddress.address.trim() || detectBlockchain(newAddress.address.trim()) === 'unknown'}
+					>
+						Add Address
+					</button>
 				</div>
 			</div>
-			<button type="button" class="primary" on:click={addAddress} disabled={!newAddress.address}>
-				Add Address
-			</button>
 		</div>
 	</div>
 	<div class="md:col-span-3 flex justify-between mt-4">
