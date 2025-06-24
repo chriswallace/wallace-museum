@@ -224,6 +224,7 @@
 			src={currentImageUrl}
 			alt={artwork.title}
 			style="object-fit: contain; {mediaStyle}"
+			loading="eager"
 			on:load={handleMediaLoad}
 			on:error={handleImageError}
 		/>

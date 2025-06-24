@@ -79,14 +79,21 @@
 	<title>Collections | Wallace Museum Admin</title>
 </svelte:head>
 
-<h1>Collections <button class="ghost" on:click={addNew}>+ Add new</button></h1>
+<div class="admin-header">
+	<h1>Collections</h1>
+	<div class="header-actions">
+		<button class="ghost" on:click={addNew}>+ Add new</button>
+	</div>
+</div>
 
-<input
-	type="text"
-	placeholder="Search by Collection Title"
-	class="search"
-	on:input={handleSearchInput}
-/>
+<div class="admin-search">
+	<input
+		type="text"
+		placeholder="Search by Collection Title"
+		class="search"
+		on:input={handleSearchInput}
+	/>
+</div>
 
 {#if collections.length === 0}
 	<div class="empty">

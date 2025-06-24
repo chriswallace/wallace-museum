@@ -71,7 +71,9 @@
 		<p class="error">{error}</p>
 	{:else}
 		<button class="back-btn" on:click={goBack}>&lt; Back</button>
-		<h1>Add Artist</h1>
+		<div class="admin-header">
+			<h1>Add Artist</h1>
+		</div>
 		<div class="grid grid-cols-2 gap-8">
 			<div>
 				<div class="file-uploader">

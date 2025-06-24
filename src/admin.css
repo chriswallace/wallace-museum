@@ -100,7 +100,7 @@
 	}
 
 	h1 {
-		@apply text-3xl font-medium mb-6 md:mb-8 max-w-5xl;
+		@apply text-2xl font-medium mb-2 max-w-5xl;
 	}
 
 	h1 a {
@@ -207,7 +207,7 @@
 	}
 
 	.ghost {
-		@apply bg-transparent text-gray-500 dark:text-gray-300 border border-gray-500 dark:border-gray-600;
+		@apply bg-transparent text-gray-500 dark:text-gray-300 border border-transparent;
 	}
 
 	.ghost:hover {
@@ -463,13 +463,13 @@ input[type='url'],
 input[type='date'],
 textarea,
 select:not([multiple]) {
-	@apply px-3 py-2 rounded-sm text-base md:text-sm;
+	@apply px-3 py-2 rounded-sm;
 	/* Prevent zoom on iOS */
 	font-size: 16px;
 }
 
 select[multiple] {
-	@apply px-3 py-2 rounded-sm min-h-[150px] text-base md:text-sm;
+	@apply px-3 py-2 rounded-sm min-h-[150px];
 	font-size: 16px;
 }
 
@@ -751,12 +751,6 @@ td button {
 	@apply font-bold bg-yellow-400 text-black dark:bg-yellow-400 dark:text-black border-yellow-400 dark:border-yellow-400;
 }
 
-/* Admin heading styles */
-h1 button {
-	@apply align-middle text-sm border border-gray-400 dark:border-gray-500 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-sm hover:bg-gray-100 hover:border-gray-500 hover:text-gray-800 dark:hover:bg-gray-700 dark:hover:text-gray-100 dark:hover:border-gray-400;
-	@apply block mt-2 ml-0 sm:inline-block sm:mt-0 sm:ml-2 md:ml-4;
-}
-
 /* Form improvements for mobile */
 input,
 textarea,
@@ -769,4 +763,48 @@ select {
 /* Edit button styling */
 .edit {
 	@apply text-primary border-2 border-primary hover:bg-primary hover:text-white dark:hover:text-black hover:no-underline rounded-sm text-sm uppercase no-underline font-bold px-3 py-2 m-0 mx-1 dark:text-yellow-400 dark:border-yellow-400 dark:hover:bg-yellow-400;
+}
+
+/* Admin page header consistency */
+.admin-header {
+	@apply flex items-start justify-between mb-6;
+	/* Use items-start to handle cases where h1 wraps to multiple lines */
+}
+
+.admin-header h1 {
+	@apply mb-0 flex-1 mr-4;
+	/* Add right margin to ensure spacing from buttons */
+}
+
+.admin-header .header-actions {
+	@apply flex items-center gap-3 flex-shrink-0;
+	/* Prevent buttons from shrinking */
+}
+
+.admin-header .header-actions button {
+	@apply px-3 py-2 text-sm whitespace-nowrap;
+	/* Ensure buttons don't wrap text and have consistent size */
+}
+
+.admin-search {
+	@apply mb-6;
+}
+
+.admin-search input {
+	@apply mb-0;
+}
+
+/* Ensure consistent input field styling across admin */
+.admin-search input[type="text"],
+.admin-search input[type="search"] {
+	@apply h-11 px-4 py-2;
+	font-size: 16px;
+}
+
+/* Consistent form field spacing */
+.admin-header + form,
+.admin-header + .admin-search + form,
+.admin-search + form,
+.admin-header + div form {
+	@apply mt-0;
 }

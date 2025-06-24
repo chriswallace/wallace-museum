@@ -104,8 +104,16 @@
 	<title>Artists | Wallace Museum Admin</title>
 </svelte:head>
 
-<h1>Artists <button class="ghost" on:click={addNew}>+ Add new</button></h1>
-<input type="text" placeholder="Search artists..." class="search" on:input={handleSearchInput} />
+<div class="admin-header">
+	<h1>Artists</h1>
+	<div class="header-actions">
+		<button class="ghost" on:click={addNew}>+ Add new</button>
+	</div>
+</div>
+
+<div class="admin-search">
+	<input type="text" placeholder="Search artists..." class="search" on:input={handleSearchInput} />
+</div>
 
 {#if artists.length === 0}
 	<div class="empty">
@@ -186,8 +194,6 @@
 	}
 
 	.search {
-		@apply mb-5 w-full p-2.5 text-base md:text-lg;
-		/* Prevent zoom on iOS */
-		font-size: 16px;
+		@apply mb-5 w-full p-4;
 	}
 </style>

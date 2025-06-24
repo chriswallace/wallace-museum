@@ -315,7 +315,9 @@
 		<p class="error">{error}</p>
 	{:else}
 		<button class="back-btn" on:click={goBack}>&lt; Back</button>
-		<h1>Edit artwork</h1>
+		<div class="admin-header">
+			<h1>Edit artwork</h1>
+		</div>
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 			<div>
 				<div class="artwork-preview-container">

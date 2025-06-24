@@ -57,7 +57,9 @@
 <div class="max-w-3xl mx-auto">
 	<a class="back-btn" href="/admin/collections">&lt; Back to Collections</a>
 
-	<h1>New collection</h1>
+	<div class="admin-header">
+		<h1>New collection</h1>
+	</div>
 
 	<form on:submit|preventDefault={addCollection}>
 		<div class="mb-4">

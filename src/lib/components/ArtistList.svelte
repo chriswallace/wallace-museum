@@ -17,7 +17,6 @@
 	export let linkToArtist = false;
 	export let showPopover = false;
 	export let maxDisplay = 0; // 0 means show all
-	export let separator = ', ';
 	export let className = '';
 	export let itemClassName = '';
 	export let debugSkeletonMode = false;
@@ -41,7 +40,7 @@
 				className={itemClassName}
 			/>
 			{#if i < displayArtists.length - 1}
-				<span class="text-gray-500 dark:text-gray-400">{separator.trim()}</span>
+				<span class="text-gray-500 dark:text-gray-400 mx-0.5">×</span>
 			{/if}
 		{/each}
 		{#if hasMore}
@@ -73,7 +72,7 @@
 {:else if layout === 'badges'}
 	<div class="flex flex-wrap gap-2 {className}">
 		{#each displayArtists as artist}
-			<span class="flex items-center gap-1 text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded {itemClassName}">
+			<span class="flex items-center gap-1 text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-sm {itemClassName}">
 				<ArtistNameWithAvatar 
 					{artist} 
 					{size} 
@@ -87,7 +86,7 @@
 			</span>
 		{/each}
 		{#if hasMore}
-			<span class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-500 dark:text-gray-400">
+			<span class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-sm text-gray-500 dark:text-gray-400">
 				+{remainingCount}
 			</span>
 		{/if}

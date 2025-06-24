@@ -196,7 +196,7 @@
 							type="checkbox"
 							bind:checked={selectAll}
 							on:change={toggleSelectAll}
-							class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+							class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-sm"
 						/>
 						<span class="font-medium dark:text-gray-100">
 							Select All ({wallets.length} wallets)
@@ -218,7 +218,7 @@
 									type="checkbox"
 									checked={selectedWallets.has(getWalletKey(wallet))}
 									on:change={() => toggleWallet(wallet)}
-									class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+									class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-sm"
 								/>
 								
 								<div class="flex-1 min-w-0">

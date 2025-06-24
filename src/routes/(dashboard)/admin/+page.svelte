@@ -2,7 +2,9 @@
 	<title>Dashboard | Wallace Museum Admin</title>
 </svelte:head>
 
-<h1>Dashboard</h1>
+<div class="admin-header">
+	<h1>Dashboard</h1>
+</div>
 <p>This is the admin page.</p>
 
 <style lang="scss">

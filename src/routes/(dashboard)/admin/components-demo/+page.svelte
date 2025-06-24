@@ -88,32 +88,32 @@
 		<p class="text-gray-600 dark:text-gray-400">Artist name with avatar, supporting links, prefixes, and popover functionality.</p>
 		
 		<div class="space-y-3">
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">Basic display:</p>
 				<ArtistNameWithAvatar artist={sampleArtists[0]} />
 			</div>
 			
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">With website link:</p>
 				<ArtistNameWithAvatar artist={sampleArtists[0]} linkToWebsite={true} />
 			</div>
 			
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">With prefix:</p>
 				<ArtistNameWithAvatar artist={sampleArtists[0]} prefix="by" />
 			</div>
 			
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">Without avatar:</p>
 				<ArtistNameWithAvatar artist={sampleArtists[0]} showAvatar={false} />
 			</div>
 			
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">Large size:</p>
 				<ArtistNameWithAvatar artist={sampleArtists[0]} size="lg" />
 			</div>
 
-			<div class="p-3 border rounded bg-blue-50 dark:bg-blue-900/20">
+			<div class="p-3 border rounded-sm bg-blue-50 dark:bg-blue-900/20">
 				<p class="text-sm text-gray-500 mb-2">🆕 With popover (click artist name):</p>
 				<ArtistNameWithAvatar 
 					artist={{
@@ -135,32 +135,32 @@
 		<p class="text-gray-600 dark:text-gray-400">Multiple artists in different layouts.</p>
 		
 		<div class="space-y-4">
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">Horizontal layout:</p>
 				<ArtistList artists={sampleArtists.slice(0, 3)} layout="horizontal" />
 			</div>
 			
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">Badges layout:</p>
 				<ArtistList artists={sampleArtists.slice(0, 3)} layout="badges" />
 			</div>
 			
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">Vertical layout:</p>
 				<ArtistList artists={sampleArtists.slice(0, 3)} layout="vertical" />
 			</div>
 			
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">With website links:</p>
 				<ArtistList artists={sampleArtists.slice(0, 3)} layout="badges" linkToWebsite={true} />
 			</div>
 			
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">Max display (2 of 5):</p>
 				<ArtistList artists={sampleArtists} layout="badges" maxDisplay={2} />
 			</div>
 			
-			<div class="p-3 border rounded">
+			<div class="p-3 border rounded-sm">
 				<p class="text-sm text-gray-500 mb-2">Without avatars:</p>
 				<ArtistList artists={sampleArtists.slice(0, 3)} layout="horizontal" showAvatars={false} />
 			</div>
@@ -172,7 +172,7 @@
 		<h2 class="text-2xl font-semibold">ArtistTableCell Component</h2>
 		<p class="text-gray-600 dark:text-gray-400">Specialized component for table cells.</p>
 		
-		<div class="border rounded overflow-hidden">
+		<div class="border rounded-sm overflow-hidden">
 			<table class="w-full">
 				<thead class="bg-gray-50 dark:bg-gray-800">
 					<tr>
@@ -214,28 +214,28 @@
 		<p class="text-gray-600 dark:text-gray-400">Code examples for implementing these components.</p>
 		
 		<div class="space-y-4">
-			<div class="p-4 bg-gray-100 dark:bg-gray-800 rounded">
+			<div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-sm">
 				<h3 class="font-semibold mb-2">Basic Artist Avatar:</h3>
 				<code class="text-sm">
 					&lt;ArtistAvatar artist=&#123;&#123;name: "Artist Name", avatarUrl: "url"&#125;&#125; size="md" /&gt;
 				</code>
 			</div>
 			
-			<div class="p-4 bg-gray-100 dark:bg-gray-800 rounded">
+			<div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-sm">
 				<h3 class="font-semibold mb-2">Artist Name with Avatar and Link:</h3>
 				<code class="text-sm">
 					&lt;ArtistNameWithAvatar artist=&#123;&#123;...&#125;&#125; linkToWebsite=&#123;true&#125; prefix="by" /&gt;
 				</code>
 			</div>
 			
-			<div class="p-4 bg-gray-100 dark:bg-gray-800 rounded">
+			<div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-sm">
 				<h3 class="font-semibold mb-2">Artist List in Badges Layout:</h3>
 				<code class="text-sm">
 					&lt;ArtistList artists=&#123;artistsArray&#125; layout="badges" maxDisplay=&#123;3&#125; /&gt;
 				</code>
 			</div>
 			
-			<div class="p-4 bg-gray-100 dark:bg-gray-800 rounded">
+			<div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-sm">
 				<h3 class="font-semibold mb-2">Table Cell with Artists:</h3>
 				<code class="text-sm">
 					&lt;ArtistTableCell artists=&#123;artistsArray&#125; linkToArtist=&#123;true&#125; /&gt;

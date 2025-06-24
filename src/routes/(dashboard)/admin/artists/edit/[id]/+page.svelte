@@ -121,7 +121,9 @@
 		<p class="error">{error}</p>
 	{:else}
 		<button class="back-btn" on:click={goBack}>&lt; Back</button>
-		<h1>Edit Artist</h1>
+		<div class="admin-header">
+			<h1>Edit Artist</h1>
+		</div>
 		<ArtistEditor {artist} />
 	{/if}
 </div>

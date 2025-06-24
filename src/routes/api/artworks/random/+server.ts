@@ -25,6 +25,29 @@ export const GET: RequestHandler = async ({ url }) => {
 		const limit = parseInt(url.searchParams.get('limit') || '10');
 		const excludeIds = url.searchParams.get('exclude')?.split(',').filter(Boolean) || [];
 		
+		// Get total count for random selection
+		const eligibleCount = await prisma.artwork.count({
+			where: {
+				AND: [
+					{
+						OR: [
+							{ imageUrl: { not: null } },
+							{ animationUrl: { not: null } }
+						]
+					},
+					excludeIds.length > 0 ? {
+						id: {
+							notIn: excludeIds.map(id => parseInt(id))
+						}
+					} : {}
+				]
+			}
+		});
+
+		// Generate random offset, but ensure we don't exceed available artworks
+		const maxOffset = Math.max(0, eligibleCount - limit);
+		const randomOffset = Math.floor(Math.random() * (maxOffset + 1));
+
 		const artworks = await prisma.artwork.findMany({
 			where: {
 				AND: [
@@ -57,10 +80,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					}
 				}
 			},
-			orderBy: [
-				{ mintDate: 'desc' }, // Order by mint date, newest first
-				{ id: 'desc' } // Secondary sort by ID for consistent ordering when mintDate is null
-			],
+			skip: randomOffset,
 			take: limit
 		});
 

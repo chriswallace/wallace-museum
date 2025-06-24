@@ -420,16 +420,23 @@
 	<title>Artworks | Wallace Museum Admin</title>
 </svelte:head>
 
-<h1>Artworks <button class="ghost" on:click={() => addNew()}>+ Add new</button></h1>
+<div class="admin-header !mb-2">
+	<h1>Artworks</h1>
+	<div class="header-actions">
+		<button class="ghost" on:click={() => addNew()}>+ Add new</button>
+	</div>
+</div>
 
 <div class="sticky-controls">
-	<input
-		type="text"
-		placeholder="Search by Title, Artist, or Collection"
-		class="search"
-		bind:value={searchQuery}
-		on:input={handleSearchInput}
-	/>
+	<div class="admin-search">
+		<input
+			type="text"
+			placeholder="Search by Title, Artist, or Collection"
+			class="search"
+			bind:value={searchQuery}
+			on:input={handleSearchInput}
+		/>
+	</div>
 
 	<!-- Bulk Actions Bar -->
 	{#if selectedCount > 0}

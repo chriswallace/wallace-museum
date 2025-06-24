@@ -303,7 +303,9 @@
 			<a class="back-btn" href="/admin/collections">&lt; Back to Collections</a>
 		</div>
 
-		<h1>Edit {collection.title}</h1>
+		<div class="admin-header">
+			<h1>Edit {collection.title}</h1>
+		</div>
 
 		<div class="tabs">
 			<div class="flex border-b border-gray-200 dark:border-gray-700">

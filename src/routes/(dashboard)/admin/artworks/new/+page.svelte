@@ -174,7 +174,9 @@
 		<div>
 			<button class="back-btn" on:click={goBack}>&lt; Back</button>
 		</div>
-		<h1 class="mb-12">Add new artwork</h1>
+		<div class="admin-header">
+			<h1>Add new artwork</h1>
+		</div>
 		<div class="edit-form">
 			<div>
 				<div class="file-uploader">

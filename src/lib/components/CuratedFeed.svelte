@@ -227,6 +227,7 @@
 														className="artwork-image"
 														fallbackSrc="/images/medici-image.png"
 														mimeType={artwork.mime}
+														loading="eager"
 													/>
 												{:else}
 													<div class="image-placeholder">
@@ -282,6 +283,7 @@
 														className="artwork-image"
 														fallbackSrc="/images/medici-image.png"
 														mimeType={artwork.mime}
+														loading="lazy"
 													/>
 												{:else}
 													<div class="image-placeholder">
@@ -335,6 +337,7 @@
 														className="artwork-image"
 														fallbackSrc="/images/medici-image.png"
 														mimeType={artwork.mime}
+														loading="lazy"
 													/>
 												{:else}
 													<div class="image-placeholder">

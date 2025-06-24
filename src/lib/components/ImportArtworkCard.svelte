@@ -293,7 +293,7 @@
 			<!-- Video indicator -->
 			{#if shouldShowVideo}
 				<div
-					class="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white rounded px-1.5 py-0.5 text-xs font-medium"
+					class="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white rounded-sm px-1.5 py-0.5 text-xs font-medium"
 					title="Video content"
 				>
 					VIDEO

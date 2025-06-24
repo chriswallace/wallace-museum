@@ -420,9 +420,31 @@
 							{#each data.artist.artworks as artwork}
 								<button class="artwork-container" on:click={() => goto(`/artist/${data.artist.id}/${artwork.id}`)}>
 									<div class="artwork-thumbnail">
-										{#if artwork.image_url}
-											{#if isVideoUrl(artwork.image_url) || isVideoMimeType(artwork.mime)}
-												<!-- Show video directly when image_url contains video content -->
+										{#if (isVideoMimeType(artwork.mime) || isVideoUrl(artwork.animation_url)) && artwork.animation_url}
+											<!-- Prioritize video content: show animation_url when it's a video -->
+											<video
+												src={ipfsToHttpUrl(artwork.animation_url)}
+												class="thumbnail-video"
+												muted
+												autoplay
+												loop
+												playsinline
+												preload="metadata"
+												on:error={() => {
+													// If video fails to load, we'll show the placeholder
+													console.log('Video failed to load:', artwork.animation_url);
+												}}
+											>
+												<!-- Fallback for browsers that don't support the video -->
+												<div class="thumbnail-placeholder">
+													<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
+														<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+													</svg>
+												</div>
+											</video>
+										{:else if artwork.image_url}
+											{#if isVideoUrl(artwork.image_url)}
+												<!-- Show video when image_url contains video content -->
 												<video
 													src={ipfsToHttpUrl(artwork.image_url)}
 													class="thumbnail-video"
@@ -444,6 +466,7 @@
 													</div>
 												</video>
 											{:else}
+												<!-- Show image -->
 												<OptimizedImage
 													src={artwork.image_url}
 													alt={artwork.title}
@@ -458,7 +481,7 @@
 												/>
 											{/if}
 										{:else if artwork.animation_url}
-											<!-- Show video directly when no thumbnail is available -->
+											<!-- Fallback: show animation_url as video when no image is available -->
 											<video
 												src={ipfsToHttpUrl(artwork.animation_url)}
 												class="thumbnail-video"
@@ -682,8 +705,7 @@
 	}
 
 	.artworks-main {
-		@apply flex-1 min-h-0;
-		@apply px-0 md:px-8 py-0 lg:py-8;
+		@apply flex-1 min-h-0 px-0 md:px-8 py-0 lg:py-8;
 	}
 
 	.artworks-header {

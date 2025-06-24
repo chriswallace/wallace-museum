@@ -2,7 +2,8 @@
 	import type { PageData } from './$types';
 	export let data: PageData;
 
-	import ArtworkFeed from '$lib/components/ArtworkFeed.svelte';
+	import FeaturedArtwork from '$lib/components/FeaturedArtwork.svelte';
+	import CuratedFeed from '$lib/components/CuratedFeed.svelte';
 
 	// SEO constants
 	const siteTitle = 'Wallace Museum | Digital Art Collection';
@@ -103,7 +104,8 @@
 </svelte:head>
 
 <div class="homepage-container">
-	<ArtworkFeed />
+	<FeaturedArtwork />
+	<CuratedFeed />
 </div>
 
 <style lang="scss">

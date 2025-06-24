@@ -127,6 +127,7 @@
 									className="thumbnail-image"
 									fallbackSrc="/images/medici-image.png"
 									mimeType={artwork.mime}
+									loading="lazy"
 								/>
 							{:else}
 								<div class="thumbnail-placeholder">
@@ -161,6 +162,7 @@
 													quality={85}
 													className="avatar-image"
 													fallbackSrc="/images/medici-image.png"
+													loading="lazy"
 												/>
 											</div>
 										{:else}

@@ -214,6 +214,8 @@ export class UnifiedIndexer {
         ...(enhancedFields.features && { features: enhancedFields.features }),
         ...(enhancedFields.supply && { supply: enhancedFields.supply }),
         ...(enhancedFields.generatorUrl && { generatorUrl: enhancedFields.generatorUrl }),
+        // Enhanced mint date detection - prioritize enhanced mint date if available (more accurate from blockchain events)
+        ...(enhancedFields.mintDate && { mintDate: enhancedFields.mintDate }),
         // Ensure we have the best media URLs (only if they exist)
         ...(enhancedFields.imageUrl && { imageUrl: enhancedFields.imageUrl }),
         ...(enhancedFields.animationUrl && { animationUrl: enhancedFields.animationUrl }),
@@ -226,6 +228,15 @@ export class UnifiedIndexer {
         console.log(`[UnifiedIndexer] Preserving original indexed MIME type "${indexerData.mime}" over enhanced detection "${enhancedFields.mime}" for ${indexRecord.contractAddress}:${indexRecord.tokenId}`);
       } else if (enhancedFields.mime && !indexerData.mime) {
         console.log(`[UnifiedIndexer] Using enhanced MIME type "${enhancedFields.mime}" (no original MIME type) for ${indexRecord.contractAddress}:${indexRecord.tokenId}`);
+      }
+
+      // Log mint date handling for debugging
+      if (enhancedFields.mintDate && indexerData.mintDate && enhancedFields.mintDate !== indexerData.mintDate) {
+        console.log(`[UnifiedIndexer] Overriding original mint date "${indexerData.mintDate}" with enhanced detection "${enhancedFields.mintDate}" for ${indexRecord.contractAddress}:${indexRecord.tokenId}`);
+      } else if (enhancedFields.mintDate && !indexerData.mintDate) {
+        console.log(`[UnifiedIndexer] Using enhanced mint date "${enhancedFields.mintDate}" (no original mint date) for ${indexRecord.contractAddress}:${indexRecord.tokenId}`);
+      } else if (!enhancedFields.mintDate && !indexerData.mintDate) {
+        console.log(`[UnifiedIndexer] No mint date available from any source for ${indexRecord.contractAddress}:${indexRecord.tokenId}`);
       }
 
       // Step 1: Create/update Artist with wallet addresses stored as JSON
