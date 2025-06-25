@@ -25,7 +25,7 @@
 				width: 300,
 				height: 300,
 				fit: 'crop',
-				gravity: 'auto',
+				gravity: 'center',
 				format: 'auto',
 				quality: 85
 			});
@@ -131,6 +131,7 @@
 							width={48}
 							height={48}
 							fit="cover"
+							gravity="center"
 							format="auto"
 							quality={85}
 							aspectRatio="1/1"

@@ -116,6 +116,29 @@
 		if (!input.files?.length) return;
 
 		const file = input.files[0];
+		
+		// Validate file size (25MB limit)
+		const maxSize = 25 * 1024 * 1024; // 25MB in bytes
+		if (file.size > maxSize) {
+			showToast('File too large. Please select an image under 25MB.', 'error');
+			input.value = '';
+			return;
+		}
+		
+		// Validate file type
+		if (!file.type.startsWith('image/')) {
+			showToast('Please select a valid image file.', 'error');
+			input.value = '';
+			return;
+		}
+		
+		console.log('[AVATAR_UPLOAD] Starting upload for file:', {
+			name: file.name,
+			type: file.type,
+			size: file.size,
+			artistId: artist.id
+		});
+		
 		isUploadingAvatar = true;
 		showToast('Uploading avatar...', 'info');
 
@@ -124,30 +147,35 @@
 			formData.append('image', file);
 			formData.append('artistId', artist.id.toString());
 
+			console.log('[AVATAR_UPLOAD] Sending request to /api/admin/artists/avatar');
 			const response = await fetch('/api/admin/artists/avatar', {
 				method: 'POST',
 				body: formData
 			});
 
+			console.log('[AVATAR_UPLOAD] Response status:', response.status);
+
 			if (response.ok) {
 				const data = await response.json();
+				console.log('[AVATAR_UPLOAD] Upload successful:', data);
 				artist.avatarUrl = data.avatarUrl;
 				avatarKey++;
 				showToast('Avatar updated successfully.', 'success');
 			} else {
 				// Try to get detailed error message from server
-				let errorMessage = 'Failed to upload avatar';
+				let errorMessage = `Failed to upload avatar (${response.status})`;
 				try {
 					const errorData = await response.json();
-					console.error('Server error response:', errorData);
+					console.error('[AVATAR_UPLOAD] Server error response:', errorData);
 					errorMessage = errorData.details || errorData.error || errorMessage;
 				} catch (e) {
-					console.error('Could not parse error response');
+					console.error('[AVATAR_UPLOAD] Could not parse error response');
+					errorMessage = `Upload failed with status ${response.status}`;
 				}
 				throw new Error(errorMessage);
 			}
 		} catch (error) {
-			console.error('Error uploading avatar:', error);
+			console.error('[AVATAR_UPLOAD] Error uploading avatar:', error);
 			const message = error instanceof Error ? error.message : 'Unknown error';
 			showToast(`Avatar upload failed: ${message}`, 'error');
 		} finally {
@@ -240,19 +268,23 @@
 			<div class="relative group w-full max-w-[800px] aspect-square mx-auto">
 				{#if artist.avatarUrl}
 					{#key avatarKey}
+
+						<!-- Use center gravity for avatar cropping (face detection not available) -->
 						<OptimizedImage
 							src={artist.avatarUrl}
 							alt={artist.name}
 							width={800}
 							height={800}
 							fit="crop"
-							gravity="face"
+							gravity="center"
 							format="auto"
 							quality={90}
 							aspectRatio="1/1"
 							className="w-full h-full object-cover rounded-full"
 							fallbackSrc="/images/medici-image.png"
+							showFallbackOnError={true}
 						/>
+
 					{/key}
 				{:else}
 					<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-full">

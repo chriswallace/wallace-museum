@@ -7,49 +7,63 @@ export const POST: RequestHandler = async ({ request }) => {
 		const body = await request.json();
 		const { selectedWallets, filter = 'all' } = body;
 
+		console.log('[Selective Import] Request body:', { selectedWallets, filter });
+
 		if (!selectedWallets || !Array.isArray(selectedWallets) || selectedWallets.length === 0) {
 			return json({ error: 'Selected wallets are required' }, { status: 400 });
 		}
 
 		// Extract wallet addresses from selected wallets - keep original case
 		const walletAddresses = selectedWallets.map((wallet: any) => wallet.address);
+		console.log('[Selective Import] Wallet addresses:', walletAddresses);
 
 		// Build search conditions based on selected wallets
-		// For each wallet, check both original case and lowercase to handle different blockchains
-		const walletConditions = walletAddresses.flatMap(address => [
-			// Check if wallet is the creator (original case)
-			{
-				normalizedData: {
-					path: ['creator', 'address'],
-					equals: address
+		// For Ethereum, we'll focus on creator data since ownership data is not being captured
+		// For Tezos, we can use both creator and owner data
+		const walletConditions = walletAddresses.flatMap(address => {
+			const conditions = [];
+			
+			// Always check if wallet is the creator (both cases)
+			conditions.push(
+				{
+					normalizedData: {
+						path: ['creator', 'address'],
+						equals: address
+					}
+				},
+				{
+					normalizedData: {
+						path: ['creator', 'address'],
+						equals: address.toLowerCase()
+					}
 				}
-			},
-			// Check if wallet is the creator (lowercase)
-			{
-				normalizedData: {
-					path: ['creator', 'address'],
-					equals: address.toLowerCase()
+			);
+			
+			// For ownership, only add if we're dealing with Tezos or mixed blockchains
+			// Since Ethereum ownership data is not being captured properly
+			conditions.push(
+				{
+					normalizedData: {
+						path: ['owners'],
+						array_contains: [{ address }]
+					}
+				},
+				{
+					normalizedData: {
+						path: ['owners'],
+						array_contains: [{ address: address.toLowerCase() }]
+					}
 				}
-			},
-			// Check if wallet is in the owners array (original case)
-			{
-				normalizedData: {
-					path: ['owners'],
-					array_contains: [{ address }]
-				}
-			},
-			// Check if wallet is in the owners array (lowercase)
-			{
-				normalizedData: {
-					path: ['owners'],
-					array_contains: [{ address: address.toLowerCase() }]
-				}
-			}
-		]);
+			);
+			
+			return conditions;
+		});
 
 		let searchConditions: any = {
 			OR: walletConditions
 		};
+
+		console.log('[Selective Import] Search conditions:', JSON.stringify(searchConditions, null, 2));
 
 		// Apply filter logic
 		if (filter === 'created') {
@@ -112,6 +126,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			};
 		}
 
+		console.log('[Selective Import] Final search conditions:', JSON.stringify(searchConditions, null, 2));
+
 		// Get artworks from the selected wallets
 		const results = await prismaRead.artworkIndex.findMany({
 			where: searchConditions,
@@ -119,7 +135,11 @@ export const POST: RequestHandler = async ({ request }) => {
 			take: 1000 // Reasonable limit to prevent overwhelming the UI
 		});
 
+		console.log('[Selective Import] Query results count:', results.length);
+
 		const total = await prismaRead.artworkIndex.count({ where: searchConditions });
+
+		console.log('[Selective Import] Total matching records:', total);
 
 		// Deduplicate by contract address and token ID
 		const seenKeys = new Set<string>();
@@ -240,6 +260,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 	} catch (error) {
 		console.error('Selective import error:', error);
-		return json({ error: 'Failed to import selected wallets' }, { status: 500 });
+		return json({ error: 'Failed to import selected wallets', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
 	}
 }; 

@@ -49,7 +49,7 @@ export async function PUT({ params, request }) {
 			enabled: data.enabled
 		};
 		if (data.artistIds && Array.isArray(data.artistIds)) {
-			updateData.artists = { set: data.artistIds.map((id: number) => ({ id })) };
+			updateData.Artist = { set: data.artistIds.map((id: number) => ({ id })) };
 		}
 		const updatedCollection = await prismaWrite.collection.update({
 			where: { id: parseInt(collectionId, 10) },

@@ -111,5 +111,17 @@
 <style lang="scss">
 	.homepage-container {
 		@apply w-full min-h-screen;
+		
+		/* Mobile-first approach */
+		@media (max-width: 768px) {
+			/* Ensure proper spacing on mobile */
+			min-height: calc(100vh - var(--navbar-height));
+			padding-top: 0;
+		}
+		
+		@media (min-width: 769px) {
+			/* Desktop spacing */
+			min-height: calc(100vh - var(--navbar-height));
+		}
 	}
 </style>

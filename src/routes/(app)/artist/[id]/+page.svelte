@@ -468,7 +468,7 @@
 											{:else}
 												<!-- Show image -->
 												<OptimizedImage
-													src={artwork.image_url}
+													src={artwork.thumbnail_url || artwork.image_url}
 													alt={artwork.title}
 													width={800}
 													height={800}
@@ -478,6 +478,7 @@
 													className="thumbnail-image"
 													fallbackSrc="/images/medici-image.png"
 													mimeType={artwork.mime}
+													loading="lazy"
 												/>
 											{/if}
 										{:else if artwork.animation_url}

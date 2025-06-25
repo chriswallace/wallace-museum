@@ -38,7 +38,7 @@
 			width={sizeConfig.width}
 			height={sizeConfig.height}
 			fit="crop"
-			gravity="auto"
+			gravity="center"
 			format="auto"
 			quality={85}
 			aspectRatio="1/1"

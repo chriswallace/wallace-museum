@@ -137,33 +137,99 @@
 
 	.page-container {
 		@apply min-h-screen flex flex-col relative;
+		
+		/* Mobile-first padding */
 		padding-top: var(--navbar-height);
+		
+		/* Ensure proper spacing on mobile */
+		@media (max-width: 768px) {
+			padding-top: var(--navbar-height);
+			/* Add a small buffer for mobile to prevent tight spacing */
+			min-height: calc(100vh - var(--navbar-height));
+		}
 	}
 
 	/* PWA iOS specific layout adjustments */
 	.page-container.pwa-ios {
 		/* Account for both navbar height and iOS status bar */
 		padding-top: calc(var(--navbar-height) + env(safe-area-inset-top));
+		
+		/* Ensure proper spacing on mobile PWA */
+		@media (max-width: 768px) {
+			padding-top: calc(var(--navbar-height) + env(safe-area-inset-top));
+			min-height: calc(100vh - var(--navbar-height) - env(safe-area-inset-top));
+		}
 	}
 
 	.content {
 		@apply flex-grow;
+		
+		/* Mobile-first approach */
+		@media (max-width: 768px) {
+			/* Ensure content doesn't get cut off */
+			min-height: calc(100vh - var(--navbar-height) - 200px); /* 200px for footer */
+			padding-bottom: 1rem;
+		}
+		
+		@media (min-width: 769px) {
+			padding-bottom: 2rem;
+		}
 	}
 
 	.site-footer {
-		@apply py-16 md:px-4 border-t border-gray-200 dark:border-gray-800 relative z-10;
+		@apply border-t border-gray-200 dark:border-gray-800 relative z-10;
+		
+		/* Mobile-first padding */
+		padding-top: 2rem;
+		padding-bottom: 2rem;
+		
+		@media (max-width: 768px) {
+			padding-left: 1rem;
+			padding-right: 1rem;
+		}
+		
+		@media (min-width: 769px) {
+			padding-top: 4rem;
+			padding-bottom: 4rem;
+			padding-left: 1rem;
+			padding-right: 1rem;
+		}
 	}
 
 	.footer-content {
-		@apply max-w-full mx-auto px-8 text-sm md:flex;
+		@apply max-w-full mx-auto text-sm;
+		
+		/* Mobile-first layout */
+		padding-left: 1rem;
+		padding-right: 1rem;
+		
+		@media (max-width: 768px) {
+			text-align: center;
+		}
+		
+		@media (min-width: 769px) {
+			@apply md:flex;
+			padding-left: 2rem;
+			padding-right: 2rem;
+		}
 	}
 
 	.copyright {
 		@apply text-sm text-gray-600 tracking-tight;
+		
+		/* Mobile-first spacing */
+		@media (max-width: 768px) {
+			margin-bottom: 1rem;
+		}
 	}
 
 	.copyright p {
-		@apply m-0 mb-0 text-sm;
+		@apply m-0 text-sm;
+		
+		/* Mobile-first spacing */
+		@media (max-width: 768px) {
+			margin-bottom: 0.5rem;
+		}
 	}
 
 	.copyright p.text-white {
@@ -175,6 +241,17 @@
 	}
 
 	.social-link {
-		@apply font-bold text-gray-600 no-underline hover:underline transition-colors first:mr-4 text-sm;
+		@apply font-bold text-gray-600 no-underline hover:underline transition-colors text-sm;
+		
+		/* Mobile-first spacing */
+		@media (max-width: 768px) {
+			display: inline-block;
+			margin-right: 1rem;
+			margin-bottom: 0.5rem;
+		}
+		
+		@media (min-width: 769px) {
+			@apply first:mr-4;
+		}
 	}
 </style>

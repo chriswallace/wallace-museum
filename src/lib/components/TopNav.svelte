@@ -6,7 +6,7 @@
 
 	// Define navigation items
 	const navItems = [
-		{ label: 'Feed', path: '/' },
+		{ label: 'Home', path: '/' },
 		{ label: 'Artists', path: '/artists' },
 		{ label: 'About', path: '/about' }
 	];
@@ -232,7 +232,8 @@
 	.top-nav {
 		@apply bg-white/90 backdrop-blur-sm border-b border-gray-200 fixed top-0 left-0 right-0 z-40;
 		height: var(--navbar-height);
-		/* Removed transition since we're no longer hiding the navbar */
+		/* Ensure consistent behavior across devices */
+		min-height: var(--navbar-height);
 	}
 
 	/* PWA iOS specific styles - extend behind status bar */
@@ -243,6 +244,7 @@
 		top: calc(-1 * env(safe-area-inset-top));
 		/* Adjust height to include the status bar area */
 		height: calc(var(--navbar-height) + env(safe-area-inset-top));
+		min-height: calc(var(--navbar-height) + env(safe-area-inset-top));
 	}
 
 	/* Mobile nav positioning - add top padding to push content below status bar */
@@ -250,6 +252,7 @@
 		height: var(--navbar-height);
 		/* Add padding to push content below status bar */
 		padding-top: env(safe-area-inset-top);
+		min-height: calc(var(--navbar-height) + env(safe-area-inset-top));
 	}
 
 	/* Desktop nav positioning - add top padding to push content below status bar */
@@ -257,6 +260,7 @@
 		height: var(--navbar-height);
 		/* Add padding to push content below status bar */
 		padding-top: env(safe-area-inset-top);
+		min-height: calc(var(--navbar-height) + env(safe-area-inset-top));
 	}
 
 	.top-nav.pwa-ios .page-logo {
@@ -285,8 +289,13 @@
 
 	/* Mobile Navigation Styles */
 	.mobile-nav {
-		@apply flex items-center justify-between px-4;
+		@apply flex items-center justify-between;
 		height: var(--navbar-height);
+		min-height: var(--navbar-height);
+		
+		/* Mobile-first padding */
+		padding-left: 1rem;
+		padding-right: 1rem;
 		
 		/* Ensure it's hidden on medium screens and above */
 		@media (min-width: 768px) {
@@ -296,14 +305,27 @@
 
 	.mobile-logo {
 		@apply bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity duration-200 focus:opacity-80 focus:outline-none;
+		/* Ensure logo doesn't get cut off */
+		flex-shrink: 0;
 	}
 
 	.logo-img {
 		@apply h-8 w-auto;
+		/* Ensure consistent sizing */
+		min-height: 2rem;
+		max-height: 2rem;
 	}
 
 	.hamburger-button {
 		@apply bg-transparent border-none cursor-pointer p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 rounded-sm;
+		/* Ensure button doesn't get cut off */
+		flex-shrink: 0;
+		/* Improve touch target */
+		min-width: 44px;
+		min-height: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.hamburger-lines {
@@ -346,6 +368,7 @@
 	.desktop-nav {
 		@apply w-full relative;
 		height: var(--navbar-height);
+		min-height: var(--navbar-height);
 		
 		/* Ensure it's hidden on small screens */
 		@media (max-width: 767px) {
@@ -357,16 +380,19 @@
 		@apply m-0 p-0 bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity duration-200 focus:opacity-80 focus:outline-none;
 		@apply absolute left-4 top-0 flex items-center z-10;
 		height: var(--navbar-height);
+		min-height: var(--navbar-height);
 	}
 
 	.nav-container {
 		@apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center;
 		height: var(--navbar-height);
+		min-height: var(--navbar-height);
 	}
 
 	.nav-center {
 		@apply flex items-center justify-center;
 		height: var(--navbar-height);
+		min-height: var(--navbar-height);
 	}
 
 	.nav-tabs {
@@ -378,6 +404,7 @@
 		@apply bg-none border-none cursor-pointer outline-none;
 		@apply relative flex items-center;
 		height: var(--navbar-height);
+		min-height: var(--navbar-height);
 	}
 
 	.nav-tab.active {
@@ -398,28 +425,58 @@
 	.mobile-menu-overlay {
 		@apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
 		animation: fadeIn 0.25s ease-in-out;
+		/* Ensure overlay covers the entire screen including status bar */
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
 	}
 
 	.mobile-menu-panel {
-		@apply fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white/95 backdrop-blur-md border-l border-gray-200 z-50;
+		@apply fixed top-0 right-0 h-full bg-white/95 backdrop-blur-md border-l border-gray-200 z-50;
 		animation: slideIn 0.25s ease-in-out;
 		padding: 0;
+		
+		/* Mobile-first width */
+		width: 280px;
+		max-width: 85vw;
+		
+		/* Ensure panel covers full height including status bar on iOS */
+		height: 100vh;
+		height: 100dvh; /* Dynamic viewport height for better mobile support */
 	}
 
 	.mobile-menu-nav {
-		@apply flex flex-col p-4 pt-16 space-y-0;
+		@apply flex flex-col space-y-0;
 		display: flex !important;
 		flex-direction: column !important;
+		
+		/* Mobile-first padding */
+		padding: 1rem;
+		padding-top: calc(var(--navbar-height) + 1rem);
+		
+		/* Account for iOS safe areas */
+		padding-top: calc(var(--navbar-height) + env(safe-area-inset-top) + 1rem);
 	}
 
 	.mobile-nav-item {
-		@apply w-full text-left px-6 py-4 text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 bg-transparent border-none cursor-pointer focus:outline-none focus:ring-0 block;
+		@apply w-full text-left font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 bg-transparent border-none cursor-pointer focus:outline-none focus:ring-0 block;
 		display: block !important;
 		width: 100% !important;
 		flex: none !important;
 		margin: 0 !important;
-		border-radius: 0 !important;
+		border-radius: 0.5rem !important;
 		border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+		
+		/* Mobile-first padding and sizing */
+		padding: 1rem 1.5rem;
+		font-size: 1rem;
+		line-height: 1.4;
+		
+		/* Improve touch targets */
+		min-height: 48px;
+		display: flex !important;
+		align-items: center;
 	}
 
 	.mobile-nav-item.active {

@@ -55,6 +55,30 @@ export class MinimalDBOperations {
         nftType = 'created';
       }
     }
+
+    // Create enhanced normalized data that includes ownership information
+    let enhancedNormalizedData: any = { ...nftData };
+    
+    // If we have an indexing wallet address, ensure it's included in the owners array
+    if (indexingWalletAddress) {
+      // Initialize owners array if it doesn't exist
+      if (!enhancedNormalizedData.owners) {
+        enhancedNormalizedData.owners = [];
+      }
+      
+      // Add the indexing wallet as an owner if it's not already there
+      const existingOwner = enhancedNormalizedData.owners.find((owner: any) => 
+        owner.address?.toLowerCase() === indexingWalletAddress.toLowerCase()
+      );
+      
+      if (!existingOwner) {
+        enhancedNormalizedData.owners.push({
+          address: indexingWalletAddress,
+          quantity: 1 // Default quantity for ERC721 tokens
+        });
+        console.log(`[MinimalDBOperations] Added wallet ${indexingWalletAddress} as owner for ${uid}`);
+      }
+    }
     
     // Check if record already exists
     const existingRecord = await this.prisma.artworkIndex.findUnique({
@@ -71,7 +95,8 @@ export class MinimalDBOperations {
       // and update lastAttempt to track that we tried to import this
       const updateData: any = {
         lastAttempt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        normalizedData: enhancedNormalizedData as unknown as Prisma.InputJsonValue // Update with enhanced data
       };
       
       // Only update type if we're upgrading from 'owned' to 'created'
@@ -101,7 +126,7 @@ export class MinimalDBOperations {
           contractAddress: contractAddress,
           tokenId: nftData.tokenId,
           rawResponse: nftData as unknown as Prisma.InputJsonValue,
-          normalizedData: nftData as unknown as Prisma.InputJsonValue,
+          normalizedData: enhancedNormalizedData as unknown as Prisma.InputJsonValue, // Use enhanced data
           importStatus: 'pending', // Set to pending for later import
           updatedAt: new Date()
         }
