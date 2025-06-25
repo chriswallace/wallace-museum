@@ -19,7 +19,7 @@
 	export let quality: number = 85;
 	export let format: 'auto' | 'webp' | 'avif' | 'jpeg' | 'png' = 'auto';
 	export let fit: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad' = 'contain';
-	export let gravity: 'auto' | 'side' | string = 'auto';
+	export let gravity: 'auto' | 'side' | string = 'center';
 	export let dpr: 1 | 2 | 3 = 1;
 	export let sharpen: number | undefined = undefined;
 	export let animation: boolean = true;

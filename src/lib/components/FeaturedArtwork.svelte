@@ -37,6 +37,8 @@
 	let featuredArtwork: FeaturedArtworkData | null = null;
 	let loading = true;
 	let error = false;
+	let sectionElement: HTMLElement;
+	let isVisible = false;
 
 	// Format mint date for display
 	function formatMintDate(mintDate: Date | null): string | null {
@@ -92,12 +94,38 @@
 		}
 	}
 
+	function setupIntersectionObserver() {
+		if (!sectionElement) return;
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						isVisible = true;
+						observer.unobserve(entry.target);
+					}
+				});
+			},
+			{
+				threshold: 0.1,
+				rootMargin: '50px'
+			}
+		);
+
+		observer.observe(sectionElement);
+
+		return () => observer.disconnect();
+	}
+
 	onMount(() => {
 		loadFeaturedArtwork();
+		const cleanup = setupIntersectionObserver();
+		
+		return cleanup;
 	});
 </script>
 
-<div class="featured-section">
+<div class="featured-section" class:visible={isVisible} bind:this={sectionElement}>
 	{#if loading}
 		<div class="loading-container">
 			<LoaderWrapper width="100%" height="400px" />
@@ -117,20 +145,49 @@
 					aria-label="View {featuredArtwork.title}"
 				>
 					<div class="stage">
-						{#if featuredArtwork.generatorUrl || featuredArtwork.animationUrl || featuredArtwork.imageUrl}
-							<ArtworkDisplay 
-								artwork={{
-									generatorUrl: featuredArtwork.generatorUrl,
-									animationUrl: featuredArtwork.animationUrl,
-									imageUrl: featuredArtwork.imageUrl,
-									thumbnailUrl: null,
-									mime: featuredArtwork.mime,
-									title: featuredArtwork.title,
-									dimensions: featuredArtwork.dimensions,
-									fullscreen: false
-								}}
-								isInFullscreenMode={false}
-							/>
+						{#if featuredArtwork.animationUrl || featuredArtwork.imageUrl || featuredArtwork.generatorUrl}
+							{@const displayUrl = featuredArtwork.imageUrl || featuredArtwork.animationUrl || featuredArtwork.generatorUrl}
+							{@const isVideo = featuredArtwork.mime?.startsWith('video/') || featuredArtwork.animationUrl?.match(/\.(mp4|webm|mov|avi)$/i)}
+							{@const forcedMimeType = isVideo ? featuredArtwork.mime : 'image/png'}
+							
+							{#if isVideo && featuredArtwork.animationUrl}
+								<video
+									src={featuredArtwork.animationUrl}
+									class="featured-video"
+									muted
+									autoplay
+									loop
+									playsinline
+									preload="metadata"
+								>
+									<!-- Fallback to image if video fails -->
+									{#if featuredArtwork.imageUrl}
+										<OptimizedImage
+											src={featuredArtwork.imageUrl}
+											alt={featuredArtwork.title}
+											fit="contain"
+											format="auto"
+											quality={85}
+											className="featured-image"
+											fallbackSrc="/images/medici-image.png"
+											loading="eager"
+											mimeType={forcedMimeType}
+										/>
+									{/if}
+								</video>
+							{:else if displayUrl}
+								<OptimizedImage
+									src={displayUrl}
+									alt={featuredArtwork.title}
+									fit="contain"
+									format="auto"
+									quality={85}
+									className="featured-image"
+									fallbackSrc="/images/medici-image.png"
+									loading="eager"
+									mimeType={forcedMimeType}
+								/>
+							{/if}
 						{:else}
 							<div class="image-placeholder">
 								<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
@@ -246,17 +303,51 @@
 
 <style lang="scss">
 	.featured-section {
-		@apply w-full max-w-7xl mx-auto mb-16 px-4;
+		@apply w-full max-w-7xl mx-auto px-4;
 		@apply relative;
-		/* Use viewport height minus navbar height and some margin for spacing */
-		min-height: calc(100vh - var(--navbar-height) - 4rem);
-		max-height: calc(100vh - var(--navbar-height) - 2rem);
+		
+		/* Increased spacing for better pacing */
+		margin-bottom: 8rem;
+		
+		/* Mobile-first approach */
+		@media (max-width: 768px) {
+			min-height: auto;
+			margin-bottom: 4rem;
+			padding-left: 1rem;
+			padding-right: 1rem;
+		}
+		
+		/* Tablet and up */
+		@media (min-width: 769px) {
+			margin-bottom: 10rem;
+		}
+		
+		/* Desktop */
+		@media (min-width: 1024px) {
+			margin-bottom: 12rem;
+		}
+		
+		/* Fade-in animation */
+		opacity: 0;
+		transform: translateY(40px);
+		transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+		           transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		
+		&.visible {
+			opacity: 1;
+			transform: translateY(0);
+		}
 		
 		&::before {
 			content: '';
 			@apply absolute -inset-x-4 -inset-y-8 bg-gradient-to-b from-transparent via-gray-50/20 to-transparent dark:via-gray-900/20;
 			@apply pointer-events-none;
 			border-radius: 2rem;
+			
+			/* Hide gradient on mobile for cleaner look */
+			@media (max-width: 768px) {
+				display: none;
+			}
 		}
 		
 		> * {
@@ -277,12 +368,34 @@
 	}
 
 	.featured-content {
-		@apply grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 h-full items-center;
-		min-height: calc(100vh - var(--navbar-height) - 6rem);
+		@apply grid grid-cols-1 gap-6 items-center;
+		
+		/* Mobile-first: single column with smaller gaps */
+		@media (max-width: 768px) {
+			gap: 1.5rem;
+			min-height: auto;
+		}
+		
+		/* Tablet: still single column but larger gaps */
+		@media (min-width: 769px) and (max-width: 1023px) {
+			gap: 2rem;
+			min-height: calc(100vh - var(--navbar-height) - 6rem);
+		}
+		
+		/* Desktop: two columns */
+		@media (min-width: 1024px) {
+			@apply lg:grid-cols-2 lg:gap-16;
+			min-height: calc(100vh - var(--navbar-height) - 6rem);
+		}
 	}
 
 	.artwork-display {
-		@apply w-full h-full flex items-center justify-center;
+		@apply w-full flex items-center justify-center;
+		
+		/* Mobile: ensure proper order and sizing */
+		@media (max-width: 1023px) {
+			order: 1;
+		}
 	}
 
 	.artwork-stage {
@@ -292,14 +405,20 @@
 
 	.stage {
 		@apply bg-gray-100 dark:bg-gray-950/70 w-full overflow-hidden flex items-center justify-center;
-		@apply rounded-lg shadow-2xl;
-		/* Make the artwork much larger - use more of the available height */
-		height: calc(100vh - var(--navbar-height) - 8rem);
-		max-height: 80vh;
-		min-height: 500px;
+		@apply shadow-2xl;
+		
+		/* Set to 1:1 square aspect ratio and fill available width */
+		aspect-ratio: 1 / 1;
+		width: 100%;
 	}
 
+	.featured-video {
+		@apply w-full h-full object-contain;
+	}
 
+	:global(.featured-image) {
+		@apply w-full h-full object-contain;
+	}
 
 	.image-placeholder {
 		@apply w-full h-full flex items-center justify-center text-gray-500;
@@ -310,8 +429,24 @@
 	}
 
 	.artwork-details {
-		@apply space-y-6 flex flex-col justify-center h-full max-h-full overflow-y-auto;
+		@apply space-y-4 flex flex-col justify-center overflow-y-auto;
 		padding: 1rem 0;
+		
+		/* Mobile: ensure proper spacing and order */
+		@media (max-width: 1023px) {
+			order: 2;
+			space-y: 1rem;
+			padding: 0.5rem 0;
+			height: auto;
+			max-height: none;
+		}
+		
+		/* Desktop */
+		@media (min-width: 1024px) {
+			@apply space-y-6;
+			height: 100%;
+			max-height: 100%;
+		}
 	}
 
 	.featured-label {
@@ -328,8 +463,28 @@
 	}
 
 	.artwork-title {
-		@apply text-3xl lg:text-4xl font-bold leading-tight mb-3;
+		@apply font-bold leading-tight mb-3;
 		word-break: break-word;
+		
+		/* Mobile-first typography */
+		font-size: 1.5rem; /* 24px */
+		line-height: 1.2;
+		
+		@media (min-width: 480px) {
+			font-size: 1.75rem; /* 28px */
+		}
+		
+		@media (min-width: 768px) {
+			font-size: 2rem; /* 32px */
+		}
+		
+		@media (min-width: 1024px) {
+			font-size: 2.25rem; /* 36px */
+		}
+		
+		@media (min-width: 1280px) {
+			font-size: 2.5rem; /* 40px */
+		}
 	}
 
 	.artwork-description {
@@ -414,25 +569,30 @@
 
 	/* Responsive adjustments using Tailwind prefixes */
 	.featured-section {
-		@apply lg:min-h-[calc(100svh-var(--navbar-height))] lg:max-h-[calc(100svh-var(--navbar-height))];
+		/* Remove these conflicting rules */
+		/* @apply lg:min-h-[calc(100svh-var(--navbar-height))] lg:max-h-[calc(100svh-var(--navbar-height))]; */
 	}
 
 	.featured-content {
-		@apply lg:min-h-[calc(100svh-var(--navbar-height))];
+		/* Remove this conflicting rule */
+		/* @apply lg:min-h-[calc(100svh-var(--navbar-height))]; */
 	}
 
 	.artwork-display {
-		@apply lg:order-none order-1;
+		/* Remove this conflicting rule */
+		/* @apply lg:order-none order-1; */
 	}
 
 	.artwork-details {
-		@apply lg:order-none lg:h-full lg:max-h-full order-2 h-auto max-h-none;
+		/* Remove these conflicting rules */
+		/* @apply lg:order-none lg:h-full lg:max-h-full order-2 h-auto max-h-none; */
 	}
 
 	.stage {
-		@apply lg:h-[calc(100vh-var(--navbar-height)-8rem)] lg:max-h-[80vh] lg:min-h-[500px] 
+		/* Remove these conflicting rules that were causing mobile issues */
+		/* @apply lg:h-[calc(100vh-var(--navbar-height)-8rem)] lg:max-h-[80vh] lg:min-h-[500px] 
 			   md:h-[60vh] md:min-h-[400px] md:max-h-[600px]
-			   sm:h-[50vh] sm:min-h-[300px] sm:max-h-[500px];
+			   sm:h-[50vh] sm:min-h-[300px] sm:max-h-[500px]; */
 	}
 
 	.artwork-title {

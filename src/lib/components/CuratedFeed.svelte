@@ -11,6 +11,11 @@
 	let feedContainer: HTMLElement;
 	let intersectionTarget: HTMLElement;
 	let currentObserver: IntersectionObserver | null = null;
+	let visibilityObserver: IntersectionObserver | null = null;
+	let artworkVisibilityObserver: IntersectionObserver | null = null;
+	let visibleCollections = new Set<number>();
+	let visibleArtworks = new Set<string>();
+	let loadedArtworks = new Set<string>();
 
 	// Format mint date for display
 	function formatMintDate(mintDate: Date | null): string | null {
@@ -69,6 +74,25 @@
 		return { type: 'expanded-grid', displayCount: Math.min(4, artworkCount) };
 	}
 
+	// Generate unique artwork key for tracking
+	function getArtworkKey(collectionId: number, artworkId: string): string {
+		return `${collectionId}-${artworkId}`;
+	}
+
+	// Handle artwork image load
+	function handleArtworkLoad(collectionId: number, artworkId: string) {
+		const key = getArtworkKey(collectionId, artworkId);
+		loadedArtworks.add(key);
+		loadedArtworks = loadedArtworks; // Trigger reactivity
+	}
+
+	// Handle artwork image error
+	function handleArtworkError(collectionId: number, artworkId: string) {
+		const key = getArtworkKey(collectionId, artworkId);
+		loadedArtworks.add(key); // Still mark as "loaded" to hide skeleton
+		loadedArtworks = loadedArtworks; // Trigger reactivity
+	}
+
 	async function loadCollections(reset = false) {
 		if (loading || (!hasMore && !reset)) return;
 
@@ -89,6 +113,9 @@
 			if (response.ok) {
 				if (reset) {
 					collections = data.collections;
+					visibleCollections.clear();
+					visibleArtworks.clear();
+					loadedArtworks.clear();
 				} else {
 					collections = [...collections, ...data.collections];
 				}
@@ -139,12 +166,74 @@
 		currentObserver.observe(intersectionTarget);
 	}
 
+	function setupVisibilityObserver() {
+		if (!feedContainer) return;
+
+		visibilityObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						const collectionId = parseInt(entry.target.getAttribute('data-collection-id') || '0');
+						if (collectionId) {
+							visibleCollections.add(collectionId);
+							visibleCollections = visibleCollections; // Trigger reactivity
+						}
+					}
+				});
+			},
+			{
+				threshold: 0.1,
+				rootMargin: '100px'
+			}
+		);
+
+		// Observe all collection sections
+		const collectionSections = feedContainer.querySelectorAll('.collection-section');
+		collectionSections.forEach(section => {
+			visibilityObserver?.observe(section);
+		});
+	}
+
+	function setupArtworkVisibilityObserver() {
+		if (!feedContainer) return;
+
+		artworkVisibilityObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						const artworkKey = entry.target.getAttribute('data-artwork-key');
+						if (artworkKey) {
+							visibleArtworks.add(artworkKey);
+							visibleArtworks = visibleArtworks; // Trigger reactivity
+						}
+					}
+				});
+			},
+			{
+				threshold: 0.1,
+				rootMargin: '50px'
+			}
+		);
+
+		// Observe all artwork items
+		const artworkItems = feedContainer.querySelectorAll('.artwork-item');
+		artworkItems.forEach(item => {
+			artworkVisibilityObserver?.observe(item);
+		});
+	}
+
 	onMount(() => {
 		loadCollections(true);
 		
 		return () => {
 			if (currentObserver) {
 				currentObserver.disconnect();
+			}
+			if (visibilityObserver) {
+				visibilityObserver.disconnect();
+			}
+			if (artworkVisibilityObserver) {
+				artworkVisibilityObserver.disconnect();
 			}
 		};
 	});
@@ -153,13 +242,16 @@
 		if (intersectionTarget && !currentObserver) {
 			setupIntersectionObserver();
 		}
+		if (feedContainer && collections.length > 0) {
+			setupVisibilityObserver();
+			setupArtworkVisibilityObserver();
+		}
 	});
 </script>
 
 <div class="curated-feed" bind:this={feedContainer}>
 	<div class="feed-header">
 		<h2>Collections</h2>
-		<p>Exploring cohesive bodies of work and artistic progressions</p>
 	</div>
 
 	<div class="collections-container">
@@ -167,8 +259,13 @@
 			{@const layout = getCollectionLayout(collection)}
 			{@const displayArtworks = collection.artworks.slice(0, layout.displayCount)}
 			{@const singleArtist = getCollectionArtist(collection)}
+			{@const isVisible = visibleCollections.has(collection.id)}
 			
-			<section class="collection-section {layout.type}">
+			<section 
+				class="collection-section {layout.type}" 
+				class:visible={isVisible}
+				data-collection-id={collection.id}
+			>
 				<!-- Collection Header -->
 				<div class="collection-header">
 					<button 
@@ -209,14 +306,31 @@
 					{#if layout.type === 'single-featured'}
 						<div class="single-featured-layout">
 							{#each displayArtworks as artwork}
-								<article class="artwork-item featured">
+								{@const artworkKey = getArtworkKey(collection.id, artwork.id)}
+								{@const isArtworkVisible = visibleArtworks.has(artworkKey)}
+								{@const isArtworkLoaded = loadedArtworks.has(artworkKey)}
+								
+								<article 
+									class="artwork-item featured" 
+									class:visible={isArtworkVisible}
+									data-artwork-key={artworkKey}
+								>
 									<button 
 										class="artwork-container" 
 										on:click={() => handleArtworkClick(artwork)}
 										aria-label="View {artwork.title}"
 									>
 										<div class="artwork-stage">
-											<div class="stage featured">
+											<div class="stage featured" data-loaded={isArtworkLoaded}>
+												{#if !isArtworkLoaded}
+													<LoaderWrapper 
+														width="100%"
+														height="100%"
+														aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : "4/3"}
+														borderRadius="0.5rem"
+													/>
+												{/if}
+												
 												{#if artwork.imageUrl}
 													<OptimizedImage
 														src={artwork.imageUrl}
@@ -227,10 +341,12 @@
 														className="artwork-image"
 														fallbackSrc="/images/medici-image.png"
 														mimeType={artwork.mime}
-														loading="eager"
+														loading="lazy"
+														on:load={() => handleArtworkLoad(collection.id, artwork.id)}
+														on:error={() => handleArtworkError(collection.id, artwork.id)}
 													/>
 												{:else}
-													<div class="image-placeholder">
+													<div class="image-placeholder" class:loaded={true}>
 														<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
 															<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
 														</svg>
@@ -265,14 +381,31 @@
 					{:else if layout.type === 'dual-showcase'}
 						<div class="dual-showcase-layout">
 							{#each displayArtworks as artwork}
-								<article class="artwork-item medium">
+								{@const artworkKey = getArtworkKey(collection.id, artwork.id)}
+								{@const isArtworkVisible = visibleArtworks.has(artworkKey)}
+								{@const isArtworkLoaded = loadedArtworks.has(artworkKey)}
+								
+								<article 
+									class="artwork-item medium" 
+									class:visible={isArtworkVisible}
+									data-artwork-key={artworkKey}
+								>
 									<button 
 										class="artwork-container" 
 										on:click={() => handleArtworkClick(artwork)}
 										aria-label="View {artwork.title}"
 									>
 										<div class="artwork-stage">
-											<div class="stage medium">
+											<div class="stage medium" data-loaded={isArtworkLoaded}>
+												{#if !isArtworkLoaded}
+													<LoaderWrapper 
+														width="100%"
+														height="100%"
+														aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : "1/1"}
+														borderRadius="0.5rem"
+													/>
+												{/if}
+												
 												{#if artwork.imageUrl}
 													<OptimizedImage
 														src={artwork.imageUrl}
@@ -284,9 +417,11 @@
 														fallbackSrc="/images/medici-image.png"
 														mimeType={artwork.mime}
 														loading="lazy"
+														on:load={() => handleArtworkLoad(collection.id, artwork.id)}
+														on:error={() => handleArtworkError(collection.id, artwork.id)}
 													/>
 												{:else}
-													<div class="image-placeholder">
+													<div class="image-placeholder" class:loaded={true}>
 														<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
 															<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
 														</svg>
@@ -319,14 +454,31 @@
 						<!-- Grid layouts for collections with multiple works -->
 						<div class="grid-layout {layout.type}">
 							{#each displayArtworks as artwork}
-								<article class="artwork-item small">
+								{@const artworkKey = getArtworkKey(collection.id, artwork.id)}
+								{@const isArtworkVisible = visibleArtworks.has(artworkKey)}
+								{@const isArtworkLoaded = loadedArtworks.has(artworkKey)}
+								
+								<article 
+									class="artwork-item small" 
+									class:visible={isArtworkVisible}
+									data-artwork-key={artworkKey}
+								>
 									<button 
 										class="artwork-container" 
 										on:click={() => handleArtworkClick(artwork)}
 										aria-label="View {artwork.title}"
 									>
 										<div class="artwork-stage">
-											<div class="stage small">
+											<div class="stage small" data-loaded={isArtworkLoaded}>
+												{#if !isArtworkLoaded}
+													<LoaderWrapper 
+														width="100%"
+														height="100%"
+														aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : "1/1"}
+														borderRadius="0.5rem"
+													/>
+												{/if}
+												
 												{#if artwork.imageUrl}
 													<OptimizedImage
 														src={artwork.imageUrl}
@@ -338,9 +490,11 @@
 														fallbackSrc="/images/medici-image.png"
 														mimeType={artwork.mime}
 														loading="lazy"
+														on:load={() => handleArtworkLoad(collection.id, artwork.id)}
+														on:error={() => handleArtworkError(collection.id, artwork.id)}
 													/>
 												{:else}
-													<div class="image-placeholder">
+													<div class="image-placeholder" class:loaded={true}>
 														<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
 															<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
 														</svg>
@@ -408,11 +562,27 @@
 
 <style lang="scss">
 	.curated-feed {
-		@apply w-full max-w-7xl mx-auto pb-20;
+		@apply w-full max-w-7xl mx-auto;
+		
+		/* Increased bottom padding for better pacing */
+		padding-bottom: 8rem;
+		
+		/* Mobile-first padding */
+		@media (max-width: 768px) {
+			padding-bottom: 4rem;
+		}
+		
+		@media (min-width: 769px) {
+			padding-bottom: 10rem;
+		}
+		
+		@media (min-width: 1024px) {
+			padding-bottom: 12rem;
+		}
 	}
 
 	.feed-header {
-		@apply text-center mb-20 px-4 relative;
+		@apply mb-4 lg:mb-8;
 		
 		&::after {
 			content: '';
@@ -420,25 +590,95 @@
 		}
 		
 		h2 {
-			@apply text-3xl md:text-4xl font-bold mb-3;
+			@apply font-bold mb-3;
+			
+			/* Mobile-first typography */
+			font-size: 1.75rem; /* 28px */
+			
+			@media (min-width: 768px) {
+				font-size: 2.25rem; /* 36px */
+			}
+			
+			@media (min-width: 1024px) {
+				font-size: 2.5rem; /* 40px */
+			}
 		}
 		
 		p {
-			@apply text-gray-600 dark:text-gray-400 text-base md:text-lg mb-8;
+			@apply text-gray-600 dark:text-gray-400 mb-6;
 			@apply max-w-2xl mx-auto;
+			
+			/* Mobile-first typography */
+			font-size: 0.875rem; /* 14px */
+			line-height: 1.4;
+			
+			@media (min-width: 768px) {
+				font-size: 1rem; /* 16px */
+				line-height: 1.5;
+				margin-bottom: 2rem;
+			}
+			
+			@media (min-width: 1024px) {
+				font-size: 1.125rem; /* 18px */
+				line-height: 1.6;
+			}
 		}
 	}
 
 	.collections-container {
-		@apply space-y-24 md:space-y-32;
+		/* Significantly increased spacing between collections */
+		@apply space-y-20;
+		
+		/* Mobile-first spacing */
+		@media (max-width: 768px) {
+			@apply space-y-12;
+		}
+		
+		@media (min-width: 769px) {
+			@apply space-y-24;
+		}
+		
+		@media (min-width: 1024px) {
+			@apply space-y-32;
+		}
+		
+		@media (min-width: 1280px) {
+			@apply space-y-40;
+		}
 	}
 
 	.collection-section {
 		@apply px-4;
+		
+		/* Mobile-first padding */
+		@media (max-width: 768px) {
+			padding-left: 1rem;
+			padding-right: 1rem;
+		}
+		
+		/* Fade-in animation */
+		opacity: 0;
+		transform: translateY(60px);
+		transition: opacity 1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+		           transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		
+		&.visible {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.collection-header {
-		@apply mb-8;
+		@apply mb-6;
+		
+		/* Mobile-first spacing */
+		@media (max-width: 768px) {
+			margin-bottom: 1rem;
+		}
+		
+		@media (min-width: 769px) {
+			margin-bottom: 2rem;
+		}
 	}
 
 	.collection-title-button {
@@ -447,7 +687,19 @@
 	}
 
 	.collection-title {
-		@apply text-2xl md:text-3xl font-bold mb-2;
+		@apply font-bold mb-2;
+		
+		/* Mobile-first typography */
+		font-size: 1.25rem; /* 20px */
+		line-height: 1.3;
+		
+		@media (min-width: 768px) {
+			font-size: 1.5rem; /* 24px */
+		}
+		
+		@media (min-width: 1024px) {
+			font-size: 1.75rem; /* 28px */
+		}
 	}
 
 	.by-artist {
@@ -476,31 +728,89 @@
 		@apply text-sm leading-relaxed;
 	}
 
-	/* Layout Grids */
+	/* Layout Grids - Mobile-first approach */
 	.single-featured-layout {
 		@apply max-w-3xl mx-auto;
 	}
 
 	.dual-showcase-layout {
-		@apply grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8;
+		@apply grid gap-4;
+		
+		/* Mobile: single column */
+		grid-template-columns: 1fr;
+		
+		/* Tablet and up: two columns */
+		@media (min-width: 768px) {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 1.5rem;
+		}
+		
+		@media (min-width: 1024px) {
+			gap: 2rem;
+		}
+		
 		@apply max-w-5xl mx-auto;
 	}
 
 	.grid-layout {
-		@apply grid gap-3 md:gap-4;
+		@apply grid gap-2;
+		
+		/* Mobile-first grid */
+		grid-template-columns: repeat(2, 1fr);
+		
+		@media (min-width: 480px) {
+			gap: 0.75rem;
+		}
+		
+		@media (min-width: 768px) {
+			gap: 1rem;
+		}
 		
 		&.collection-grid {
-			@apply grid-cols-2 md:grid-cols-4;
+			/* Mobile: 2 columns */
+			grid-template-columns: repeat(2, 1fr);
+			
+			/* Tablet: 3 columns */
+			@media (min-width: 768px) {
+				grid-template-columns: repeat(3, 1fr);
+			}
+			
+			/* Desktop: 4 columns */
+			@media (min-width: 1024px) {
+				grid-template-columns: repeat(4, 1fr);
+			}
 		}
 		
 		&.expanded-grid {
-			@apply grid-cols-2 md:grid-cols-3 lg:grid-cols-4;
+			/* Mobile: 2 columns */
+			grid-template-columns: repeat(2, 1fr);
+			
+			/* Tablet: 3 columns */
+			@media (min-width: 768px) {
+				grid-template-columns: repeat(3, 1fr);
+			}
+			
+			/* Desktop: 4 columns */
+			@media (min-width: 1024px) {
+				grid-template-columns: repeat(4, 1fr);
+			}
 		}
 	}
 
 	/* Artwork Items */
 	.artwork-item {
 		@apply relative;
+		
+		/* Fade-in animation for individual artworks */
+		opacity: 0;
+		transform: translateY(30px);
+		transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+		           transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		
+		&.visible {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 
 	.artwork-container {
@@ -509,15 +819,40 @@
 	}
 
 	.artwork-stage {
-		@apply mb-4;
+		@apply mb-3;
+		@apply relative; /* For skeleton loader positioning */
+		
+		/* Mobile-first spacing */
+		@media (max-width: 768px) {
+			margin-bottom: 0.75rem;
+		}
+		
+		@media (min-width: 769px) {
+			margin-bottom: 1rem;
+		}
 	}
 
 	.stage {
 		@apply bg-gray-100 dark:bg-gray-950/70 overflow-hidden flex items-center justify-center;
-		@apply aspect-square;
+		@apply aspect-square rounded-md;
+		@apply relative; /* For skeleton loader positioning */
+		
+		/* Mobile-first border radius */
+		@media (max-width: 768px) {
+			border-radius: 0.375rem; /* 6px */
+		}
+		
+		@media (min-width: 769px) {
+			border-radius: 0.5rem; /* 8px */
+		}
 		
 		&.featured {
 			@apply aspect-[4/3];
+			
+			/* Mobile: adjust aspect ratio for better fit */
+			@media (max-width: 768px) {
+				aspect-ratio: 3/2;
+			}
 		}
 		
 		&.medium {
@@ -529,12 +864,35 @@
 		}
 	}
 
+	/* Skeleton loader positioning within stage */
+	.stage :global(.loader-wrapper) {
+		@apply absolute inset-0 z-20;
+		@apply flex items-center justify-center;
+		width: 100% !important;
+		height: 100% !important;
+		opacity: 1;
+		transition: opacity 0.3s ease-out;
+	}
+
+	/* Hide skeleton loader when artwork is loaded */
+	.stage[data-loaded="true"] :global(.loader-wrapper) {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	/* Artwork image positioning */
 	:global(.artwork-image) {
 		@apply w-full h-full object-contain;
+		@apply relative z-10;
 	}
 
 	.image-placeholder {
 		@apply w-full h-full flex items-center justify-center text-gray-500;
+		@apply relative z-20;
+		
+		&.loaded {
+			@apply opacity-100;
+		}
 	}
 
 	.placeholder-icon {
@@ -555,11 +913,29 @@
 
 	.artwork-title {
 		@apply font-semibold text-gray-900 dark:text-gray-100 leading-tight;
-		@apply text-lg;
 		word-break: break-word;
 		
+		/* Mobile-first typography */
+		font-size: 0.875rem; /* 14px */
+		line-height: 1.3;
+		
+		@media (min-width: 480px) {
+			font-size: 1rem; /* 16px */
+		}
+		
+		@media (min-width: 768px) {
+			font-size: 1.125rem; /* 18px */
+			line-height: 1.4;
+		}
+		
 		.artwork-item.small & {
-			@apply text-sm mb-0;
+			font-size: 0.75rem; /* 12px */
+			line-height: 1.2;
+			margin-bottom: 0;
+			
+			@media (min-width: 480px) {
+				font-size: 0.875rem; /* 14px */
+			}
 		}
 	}
 
@@ -623,37 +999,6 @@
 		
 		p {
 			@apply text-gray-500 dark:text-gray-400 text-sm;
-		}
-	}
-
-	/* Responsive adjustments */
-	@media (max-width: 768px) {
-		.collections-container {
-			@apply space-y-16;
-		}
-		
-		.collection-header {
-			@apply mb-6;
-		}
-		
-		.collection-title {
-			@apply text-xl;
-		}
-		
-		.dual-showcase-layout {
-			@apply grid-cols-1 gap-4;
-		}
-		
-		.grid-layout {
-			@apply gap-2;
-			
-			&.collection-grid {
-				@apply grid-cols-2;
-			}
-			
-			&.expanded-grid {
-				@apply grid-cols-2;
-			}
 		}
 	}
 </style> 
