@@ -1,21 +1,12 @@
 <script lang="ts">
-	import { onMount, afterUpdate } from 'svelte';
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import OptimizedImage from './OptimizedImage.svelte';
-	import LoaderWrapper from './LoaderWrapper.svelte';
 	import type { CollectionGroup } from '../../routes/api/artworks/collections/+server';
 
 	let collections: CollectionGroup[] = [];
 	let loading = false;
 	let hasMore = true;
-	let feedContainer: HTMLElement;
-	let intersectionTarget: HTMLElement;
-	let currentObserver: IntersectionObserver | null = null;
-	let visibilityObserver: IntersectionObserver | null = null;
-	let artworkVisibilityObserver: IntersectionObserver | null = null;
-	let visibleCollections = new Set<number>();
-	let visibleArtworks = new Set<string>();
-	let loadedArtworks = new Set<string>();
 
 	// Format mint date for display
 	function formatMintDate(mintDate: Date | null): string | null {
@@ -51,74 +42,32 @@
 		return null;
 	}
 
-	// Determine layout based on collection characteristics and artwork count
-	function getCollectionLayout(collection: CollectionGroup) {
-		const artworkCount = collection.artworks.length;
-		
-		// Single artwork collections get featured treatment
-		if (artworkCount === 1) {
-			return { type: 'single-featured', displayCount: 1 };
-		}
-		
-		// Small collections (2-3 works) get dual layout
-		if (artworkCount <= 3) {
-			return { type: 'dual-showcase', displayCount: Math.min(2, artworkCount) };
-		}
-		
-		// Medium collections (4-6 works) get grid treatment
-		if (artworkCount <= 6) {
-			return { type: 'collection-grid', displayCount: Math.min(4, artworkCount) };
-		}
-		
-		// Large collections get expanded grid (max 4 to match grid columns)
-		return { type: 'expanded-grid', displayCount: Math.min(4, artworkCount) };
+	// Determine grid layout based on artwork count
+	function getGridColumns(artworkCount: number): string {
+		if (artworkCount === 1) return 'grid-cols-1';
+		if (artworkCount === 2) return 'grid-cols-2';
+		if (artworkCount === 3) return 'grid-cols-3';
+		return 'grid-cols-2 lg:grid-cols-4'; // 4 on desktop, 2 on mobile
 	}
 
-	// Generate unique artwork key for tracking
-	function getArtworkKey(collectionId: number, artworkId: string): string {
-		return `${collectionId}-${artworkId}`;
-	}
-
-	// Handle artwork image load
-	function handleArtworkLoad(collectionId: number, artworkId: string) {
-		const key = getArtworkKey(collectionId, artworkId);
-		loadedArtworks.add(key);
-		loadedArtworks = loadedArtworks; // Trigger reactivity
-	}
-
-	// Handle artwork image error
-	function handleArtworkError(collectionId: number, artworkId: string) {
-		const key = getArtworkKey(collectionId, artworkId);
-		loadedArtworks.add(key); // Still mark as "loaded" to hide skeleton
-		loadedArtworks = loadedArtworks; // Trigger reactivity
-	}
-
-	async function loadCollections(reset = false) {
-		if (loading || (!hasMore && !reset)) return;
+	async function loadCollections() {
+		if (loading || !hasMore) return;
 
 		loading = true;
 
 		try {
-			const excludeIds = reset ? [] : collections.map(c => c.id);
-			const params = new URLSearchParams({
-				limit: '4', // Fewer collections for more meaningful curation
-				...(excludeIds.length > 0 && { excludeCollections: excludeIds.join(',') })
-			});
+			const excludeIds = collections.map(c => c.id);
+			const params = new URLSearchParams();
+			params.set('limit', '6');
+			if (excludeIds.length > 0) {
+				params.set('excludeCollections', excludeIds.join(','));
+			}
 
-			const response = await fetch(`/api/artworks/collections?${params}`, {
-				cache: 'no-cache'
-			});
+			const response = await fetch(`/api/artworks/collections?${params}`);
 			const data = await response.json();
 
 			if (response.ok) {
-				if (reset) {
-					collections = data.collections;
-					visibleCollections.clear();
-					visibleArtworks.clear();
-					loadedArtworks.clear();
-				} else {
-					collections = [...collections, ...data.collections];
-				}
+				collections = [...collections, ...data.collections];
 				hasMore = data.hasMore;
 			} else {
 				console.error('Failed to load collections:', data.error);
@@ -146,139 +95,36 @@
 		goto(`/collection/${collection.slug}`);
 	}
 
-	function setupIntersectionObserver() {
-		if (!intersectionTarget) return;
-
-		const options = {
-			root: null,
-			rootMargin: '400px',
-			threshold: 0.1
-		};
-
-		currentObserver = new IntersectionObserver((entries) => {
-			entries.forEach((entry) => {
-				if (entry.isIntersecting && hasMore && !loading) {
-					loadCollections();
-				}
-			});
-		}, options);
-
-		currentObserver.observe(intersectionTarget);
-	}
-
-	function setupVisibilityObserver() {
-		if (!feedContainer) return;
-
-		visibilityObserver = new IntersectionObserver(
-			(entries) => {
-				entries.forEach((entry) => {
-					if (entry.isIntersecting) {
-						const collectionId = parseInt(entry.target.getAttribute('data-collection-id') || '0');
-						if (collectionId) {
-							visibleCollections.add(collectionId);
-							visibleCollections = visibleCollections; // Trigger reactivity
-						}
-					}
-				});
-			},
-			{
-				threshold: 0.1,
-				rootMargin: '100px'
-			}
-		);
-
-		// Observe all collection sections
-		const collectionSections = feedContainer.querySelectorAll('.collection-section');
-		collectionSections.forEach(section => {
-			visibilityObserver?.observe(section);
-		});
-	}
-
-	function setupArtworkVisibilityObserver() {
-		if (!feedContainer) return;
-
-		artworkVisibilityObserver = new IntersectionObserver(
-			(entries) => {
-				entries.forEach((entry) => {
-					if (entry.isIntersecting) {
-						const artworkKey = entry.target.getAttribute('data-artwork-key');
-						if (artworkKey) {
-							visibleArtworks.add(artworkKey);
-							visibleArtworks = visibleArtworks; // Trigger reactivity
-						}
-					}
-				});
-			},
-			{
-				threshold: 0.1,
-				rootMargin: '50px'
-			}
-		);
-
-		// Observe all artwork items
-		const artworkItems = feedContainer.querySelectorAll('.artwork-item');
-		artworkItems.forEach(item => {
-			artworkVisibilityObserver?.observe(item);
-		});
-	}
-
 	onMount(() => {
-		loadCollections(true);
-		
-		return () => {
-			if (currentObserver) {
-				currentObserver.disconnect();
-			}
-			if (visibilityObserver) {
-				visibilityObserver.disconnect();
-			}
-			if (artworkVisibilityObserver) {
-				artworkVisibilityObserver.disconnect();
-			}
-		};
-	});
-
-	afterUpdate(() => {
-		if (intersectionTarget && !currentObserver) {
-			setupIntersectionObserver();
-		}
-		if (feedContainer && collections.length > 0) {
-			setupVisibilityObserver();
-			setupArtworkVisibilityObserver();
-		}
+		loadCollections();
 	});
 </script>
 
-<div class="curated-feed" bind:this={feedContainer}>
+<div class="curated-feed">
 	<div class="feed-header">
 		<h2>Collections</h2>
+		<p>Discover curated collections of digital artworks from pioneering artists</p>
 	</div>
 
-	<div class="collections-container">
+	<div class="collections-grid">
 		{#each collections as collection (collection.id)}
-			{@const layout = getCollectionLayout(collection)}
-			{@const displayArtworks = collection.artworks.slice(0, layout.displayCount)}
 			{@const singleArtist = getCollectionArtist(collection)}
-			{@const isVisible = visibleCollections.has(collection.id)}
+			{@const displayArtworks = collection.artworks.slice(0, 4)}
+			{@const gridCols = getGridColumns(displayArtworks.length)}
 			
-			<section 
-				class="collection-section {layout.type}" 
-				class:visible={isVisible}
-				data-collection-id={collection.id}
-			>
+			<div class="collection-card">
 				<!-- Collection Header -->
 				<div class="collection-header">
 					<button 
-						class="collection-title-button"
+						class="collection-title-btn"
 						on:click={(e) => handleCollectionClick(e, collection)}
-						aria-label="View {collection.title} collection"
 					>
 						<h3 class="collection-title">
 							{collection.title}
 							{#if singleArtist}
 								<span class="by-artist">by 
 									<button 
-										class="artist-name-link"
+										class="artist-link"
 										on:click={(e) => handleArtistClick(e, singleArtist.id)}
 									>
 										{singleArtist.name}
@@ -286,271 +132,125 @@
 								</span>
 							{/if}
 						</h3>
-						<div class="collection-meta">
-							<span class="artwork-count">
-								{#if layout.displayCount < collection.artworkCount}
-									{layout.displayCount} of {collection.artworkCount} work{collection.artworkCount !== 1 ? 's' : ''}
-								{:else}
-									{collection.artworkCount} work{collection.artworkCount !== 1 ? 's' : ''}
-								{/if}
-							</span>
-							{#if collection.description}
-								<span class="collection-description">{collection.description}</span>
-							{/if}
-						</div>
 					</button>
+					
+					<div class="collection-meta">
+						<span class="artwork-count">
+							{collection.artworkCount} artwork{collection.artworkCount !== 1 ? 's' : ''}
+						</span>
+						{#if collection.description}
+							<p class="collection-description">{collection.description}</p>
+						{/if}
+					</div>
 				</div>
 
-				<!-- Collection Artworks -->
-				<div class="artworks-display {layout.type}">
-					{#if layout.type === 'single-featured'}
-						<div class="single-featured-layout">
+				<!-- Artworks Grid (Desktop) / Swiper (Mobile) -->
+				<div class="artworks-container">
+					<!-- Mobile Swiper -->
+					<div class="mobile-swiper md:hidden">
+						<div class="swiper-track">
 							{#each displayArtworks as artwork}
-								{@const artworkKey = getArtworkKey(collection.id, artwork.id)}
-								{@const isArtworkVisible = visibleArtworks.has(artworkKey)}
-								{@const isArtworkLoaded = loadedArtworks.has(artworkKey)}
-								
-								<article 
-									class="artwork-item featured" 
-									class:visible={isArtworkVisible}
-									data-artwork-key={artworkKey}
-								>
+								<div class="artwork-slide">
 									<button 
-										class="artwork-container" 
+										class="artwork-btn"
 										on:click={() => handleArtworkClick(artwork)}
-										aria-label="View {artwork.title}"
 									>
-										<div class="artwork-stage">
-											<div class="stage featured" data-loaded={isArtworkLoaded}>
-												{#if !isArtworkLoaded}
-													<LoaderWrapper 
-														width="100%"
-														height="100%"
-														aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : "4/3"}
-														borderRadius="0.5rem"
-													/>
-												{/if}
-												
-												{#if artwork.imageUrl}
-													<OptimizedImage
-														src={artwork.imageUrl}
-														alt={artwork.title}
-														fit="contain"
-														format="auto"
-														quality={85}
-														className="artwork-image"
-														fallbackSrc="/images/medici-image.png"
-														mimeType={artwork.mime}
-														loading="lazy"
-														on:load={() => handleArtworkLoad(collection.id, artwork.id)}
-														on:error={() => handleArtworkError(collection.id, artwork.id)}
-													/>
-												{:else}
-													<div class="image-placeholder" class:loaded={true}>
-														<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-															<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-														</svg>
-													</div>
-												{/if}
-											</div>
+										<div class="artwork-image-container">
+											{#if artwork.imageUrl}
+												<OptimizedImage
+													src={artwork.imageUrl}
+													alt={artwork.title}
+													className="artwork-image"
+													fit="cover"
+													quality={80}
+													loading="lazy"
+													mimeType={artwork.mime}
+												/>
+											{:else}
+												<div class="image-placeholder">
+													<svg viewBox="0 0 24 24" fill="currentColor">
+														<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+													</svg>
+												</div>
+											{/if}
 										</div>
 										<div class="artwork-info">
 											<h4 class="artwork-title">{artwork.title}</h4>
 											{#if formatMintDate(artwork.mintDate)}
-												<div class="mint-date">{formatMintDate(artwork.mintDate)}</div>
+												<span class="mint-date">{formatMintDate(artwork.mintDate)}</span>
 											{/if}
-											{#if !singleArtist}
-												<div class="artists">
-													{#each artwork.artists as artist, index}
-														<button 
-															class="artist-link"
-															on:click={(e) => handleArtistClick(e, artist.id)}
-														>
-															{artist.name}
-														</button>
-														{#if index < artwork.artists.length - 1}<span class="separator">, </span>{/if}
-													{/each}
-												</div>
+											{#if !singleArtist && artwork.artists.length > 0}
+												<span class="artist-name">{artwork.artists[0].name}</span>
 											{/if}
 										</div>
 									</button>
-								</article>
+								</div>
 							{/each}
 						</div>
+					</div>
 
-					{:else if layout.type === 'dual-showcase'}
-						<div class="dual-showcase-layout">
-							{#each displayArtworks as artwork}
-								{@const artworkKey = getArtworkKey(collection.id, artwork.id)}
-								{@const isArtworkVisible = visibleArtworks.has(artworkKey)}
-								{@const isArtworkLoaded = loadedArtworks.has(artworkKey)}
-								
-								<article 
-									class="artwork-item medium" 
-									class:visible={isArtworkVisible}
-									data-artwork-key={artworkKey}
-								>
-									<button 
-										class="artwork-container" 
-										on:click={() => handleArtworkClick(artwork)}
-										aria-label="View {artwork.title}"
-									>
-										<div class="artwork-stage">
-											<div class="stage medium" data-loaded={isArtworkLoaded}>
-												{#if !isArtworkLoaded}
-													<LoaderWrapper 
-														width="100%"
-														height="100%"
-														aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : "1/1"}
-														borderRadius="0.5rem"
-													/>
-												{/if}
-												
-												{#if artwork.imageUrl}
-													<OptimizedImage
-														src={artwork.imageUrl}
-														alt={artwork.title}
-														fit="contain"
-														format="auto"
-														quality={80}
-														className="artwork-image"
-														fallbackSrc="/images/medici-image.png"
-														mimeType={artwork.mime}
-														loading="lazy"
-														on:load={() => handleArtworkLoad(collection.id, artwork.id)}
-														on:error={() => handleArtworkError(collection.id, artwork.id)}
-													/>
-												{:else}
-													<div class="image-placeholder" class:loaded={true}>
-														<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-															<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-														</svg>
-													</div>
-												{/if}
-											</div>
-										</div>
-										<div class="artwork-info compact">
-											<h4 class="artwork-title">{artwork.title}</h4>
-											{#if !singleArtist}
-												<div class="artists">
-													{#each artwork.artists as artist, index}
-														<button 
-															class="artist-link"
-															on:click={(e) => handleArtistClick(e, artist.id)}
-														>
-															{artist.name}
-														</button>
-														{#if index < artwork.artists.length - 1}<span class="separator">, </span>{/if}
-													{/each}
-												</div>
-											{/if}
-										</div>
-									</button>
-								</article>
-							{/each}
-						</div>
-
-					{:else}
-						<!-- Grid layouts for collections with multiple works -->
-						<div class="grid-layout {layout.type}">
-							{#each displayArtworks as artwork}
-								{@const artworkKey = getArtworkKey(collection.id, artwork.id)}
-								{@const isArtworkVisible = visibleArtworks.has(artworkKey)}
-								{@const isArtworkLoaded = loadedArtworks.has(artworkKey)}
-								
-								<article 
-									class="artwork-item small" 
-									class:visible={isArtworkVisible}
-									data-artwork-key={artworkKey}
-								>
-									<button 
-										class="artwork-container" 
-										on:click={() => handleArtworkClick(artwork)}
-										aria-label="View {artwork.title}"
-									>
-										<div class="artwork-stage">
-											<div class="stage small" data-loaded={isArtworkLoaded}>
-												{#if !isArtworkLoaded}
-													<LoaderWrapper 
-														width="100%"
-														height="100%"
-														aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : "1/1"}
-														borderRadius="0.5rem"
-													/>
-												{/if}
-												
-												{#if artwork.imageUrl}
-													<OptimizedImage
-														src={artwork.imageUrl}
-														alt={artwork.title}
-														fit="contain"
-														format="auto"
-														quality={75}
-														className="artwork-image"
-														fallbackSrc="/images/medici-image.png"
-														mimeType={artwork.mime}
-														loading="lazy"
-														on:load={() => handleArtworkLoad(collection.id, artwork.id)}
-														on:error={() => handleArtworkError(collection.id, artwork.id)}
-													/>
-												{:else}
-													<div class="image-placeholder" class:loaded={true}>
-														<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-															<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-														</svg>
-													</div>
-												{/if}
-											</div>
-										</div>
-										<div class="artwork-info compact">
-											<h4 class="artwork-title">{artwork.title}</h4>
-											{#if !singleArtist}
-												<div class="artists">
-													{#each artwork.artists as artist, index}
-														<button 
-															class="artist-link"
-															on:click={(e) => handleArtistClick(e, artist.id)}
-														>
-															{artist.name}
-														</button>
-														{#if index < artwork.artists.length - 1}<span class="separator">, </span>{/if}
-													{/each}
-												</div>
-											{/if}
-										</div>
-									</button>
-								</article>
-							{/each}
-						</div>
-					{/if}
-
-					<!-- Show more indicator if collection has additional works -->
-					{#if collection.artworkCount > layout.displayCount}
-						<div class="more-works-indicator">
+					<!-- Desktop Grid -->
+					<div class="desktop-grid hidden md:grid {gridCols}">
+						{#each displayArtworks as artwork}
 							<button 
-								class="more-works-button"
-								on:click={(e) => handleCollectionClick(e, collection)}
+								class="artwork-btn"
+								on:click={() => handleArtworkClick(artwork)}
 							>
-								<span class="plus-icon">+</span>
-								<span class="more-count">{collection.artworkCount - layout.displayCount} more</span>
+								<div class="artwork-image-container">
+									{#if artwork.imageUrl}
+										<OptimizedImage
+											src={artwork.imageUrl}
+											alt={artwork.title}
+											className="artwork-image"
+											fit="cover"
+											quality={80}
+											loading="lazy"
+											mimeType={artwork.mime}
+										/>
+									{:else}
+										<div class="image-placeholder">
+											<svg viewBox="0 0 24 24" fill="currentColor">
+												<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+											</svg>
+										</div>
+									{/if}
+								</div>
+								<div class="artwork-info">
+									<h4 class="artwork-title">{artwork.title}</h4>
+									{#if formatMintDate(artwork.mintDate)}
+										<span class="mint-date">{formatMintDate(artwork.mintDate)}</span>
+									{/if}
+									{#if !singleArtist && artwork.artists.length > 0}
+										<span class="artist-name">{artwork.artists[0].name}</span>
+									{/if}
+								</div>
 							</button>
-						</div>
+						{/each}
+					</div>
+
+					<!-- Show More Button -->
+					{#if collection.artworkCount > 4}
+						<button 
+							class="show-more-btn"
+							on:click={(e) => handleCollectionClick(e, collection)}
+						>
+							+{collection.artworkCount - 4} more
+						</button>
 					{/if}
 				</div>
-			</section>
+			</div>
 		{/each}
 	</div>
 
-	<!-- Intersection target for infinite scroll -->
+	<!-- Load More Button -->
 	{#if hasMore}
-		<div bind:this={intersectionTarget} class="intersection-target">
+		<div class="load-more-container">
 			{#if loading}
-				<div class="loading-indicator">
-					<LoaderWrapper width="100%" height="60px" />
-					<p class="loading-text">Discovering more collections...</p>
-				</div>
+				<div class="loading-spinner">Loading more collections...</div>
 			{:else}
-				<div class="load-more-placeholder"></div>
+				<button class="load-more-btn" on:click={loadCollections}>
+					Load More Collections
+				</button>
 			{/if}
 		</div>
 	{:else if collections.length > 0}
@@ -560,445 +260,373 @@
 	{/if}
 </div>
 
-<style lang="scss">
+<style>
 	.curated-feed {
-		@apply w-full max-w-7xl mx-auto;
-		
-		/* Increased bottom padding for better pacing */
-		padding-bottom: 8rem;
-		
-		/* Mobile-first padding */
-		@media (max-width: 768px) {
-			padding-bottom: 4rem;
-		}
-		
-		@media (min-width: 769px) {
-			padding-bottom: 10rem;
-		}
-		
-		@media (min-width: 1024px) {
-			padding-bottom: 12rem;
-		}
+		width: 100%;
+		max-width: 80rem;
+		margin: 0 auto;
+		padding: 0 1rem 4rem;
 	}
 
 	.feed-header {
-		@apply mb-4 lg:mb-8;
-		
-		&::after {
-			content: '';
-			@apply absolute bottom-0 left-1/2 transform -translate-x-1/2 w-16 h-px bg-gray-300 dark:bg-gray-600;
-		}
-		
-		h2 {
-			@apply font-bold mb-3;
-			
-			/* Mobile-first typography */
-			font-size: 1.75rem; /* 28px */
-			
-			@media (min-width: 768px) {
-				font-size: 2.25rem; /* 36px */
-			}
-			
-			@media (min-width: 1024px) {
-				font-size: 2.5rem; /* 40px */
-			}
-		}
-		
-		p {
-			@apply text-gray-600 dark:text-gray-400 mb-6;
-			@apply max-w-2xl mx-auto;
-			
-			/* Mobile-first typography */
-			font-size: 0.875rem; /* 14px */
-			line-height: 1.4;
-			
-			@media (min-width: 768px) {
-				font-size: 1rem; /* 16px */
-				line-height: 1.5;
-				margin-bottom: 2rem;
-			}
-			
-			@media (min-width: 1024px) {
-				font-size: 1.125rem; /* 18px */
-				line-height: 1.6;
-			}
+		margin-bottom: 3rem;
+		text-align: center;
+	}
+
+	.feed-header h2 {
+		font-size: 1.875rem;
+		font-weight: 700;
+		margin-bottom: 1rem;
+		color: #111827;
+	}
+
+	@media (min-width: 768px) {
+		.feed-header h2 {
+			font-size: 2.25rem;
 		}
 	}
 
-	.collections-container {
-		/* Significantly increased spacing between collections */
-		@apply space-y-20;
-		
-		/* Mobile-first spacing */
-		@media (max-width: 768px) {
-			@apply space-y-12;
-		}
-		
-		@media (min-width: 769px) {
-			@apply space-y-24;
-		}
-		
-		@media (min-width: 1024px) {
-			@apply space-y-32;
-		}
-		
-		@media (min-width: 1280px) {
-			@apply space-y-40;
-		}
+	.feed-header p {
+		color: #6b7280;
+		font-size: 1.125rem;
+		max-width: 42rem;
+		margin: 0 auto;
 	}
 
-	.collection-section {
-		@apply px-4;
-		
-		/* Mobile-first padding */
-		@media (max-width: 768px) {
-			padding-left: 1rem;
-			padding-right: 1rem;
-		}
-		
-		/* Fade-in animation */
-		opacity: 0;
-		transform: translateY(60px);
-		transition: opacity 1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-		           transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-		
-		&.visible {
-			opacity: 1;
-			transform: translateY(0);
-		}
+	.collections-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 4rem;
+	}
+
+	.collection-card {
+		background-color: white;
+		border-radius: 0.75rem;
+		padding: 1.5rem;
+		border: 1px solid #e5e7eb;
 	}
 
 	.collection-header {
-		@apply mb-6;
-		
-		/* Mobile-first spacing */
-		@media (max-width: 768px) {
-			margin-bottom: 1rem;
-		}
-		
-		@media (min-width: 769px) {
-			margin-bottom: 2rem;
-		}
+		margin-bottom: 1.5rem;
 	}
 
-	.collection-title-button {
-		@apply w-full text-left bg-transparent border-none p-0 cursor-pointer;
-		@apply transition-colors duration-200 hover:text-gray-600 dark:hover:text-gray-300;
+	.collection-title-btn {
+		width: 100%;
+		text-align: left;
+		background: transparent;
+		border: none;
+		padding: 0;
+		cursor: pointer;
 	}
 
 	.collection-title {
-		@apply font-bold mb-2;
-		
-		/* Mobile-first typography */
-		font-size: 1.25rem; /* 20px */
-		line-height: 1.3;
-		
-		@media (min-width: 768px) {
-			font-size: 1.5rem; /* 24px */
-		}
-		
-		@media (min-width: 1024px) {
-			font-size: 1.75rem; /* 28px */
-		}
+		font-size: 1.5rem;
+		font-weight: 700;
+		margin-bottom: 0.5rem;
+		color: #111827;
 	}
 
 	.by-artist {
-		@apply font-normal text-gray-600 dark:text-gray-400 ml-2;
-	}
-
-	.artist-name-link {
-		@apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100;
-		@apply transition-colors duration-200 underline decoration-transparent hover:decoration-current;
-		@apply bg-transparent border-none p-0 cursor-pointer;
-	}
-
-	.collection-meta {
-		@apply flex flex-wrap items-center gap-3 text-gray-600 dark:text-gray-400;
-	}
-
-	.artwork-count {
-		@apply text-sm font-medium uppercase tracking-wide;
-	}
-
-	.total-collection-size {
-		@apply font-normal text-xs text-gray-500 dark:text-gray-500 ml-1;
-	}
-
-	.collection-description {
-		@apply text-sm leading-relaxed;
-	}
-
-	/* Layout Grids - Mobile-first approach */
-	.single-featured-layout {
-		@apply max-w-3xl mx-auto;
-	}
-
-	.dual-showcase-layout {
-		@apply grid gap-4;
-		
-		/* Mobile: single column */
-		grid-template-columns: 1fr;
-		
-		/* Tablet and up: two columns */
-		@media (min-width: 768px) {
-			grid-template-columns: repeat(2, 1fr);
-			gap: 1.5rem;
-		}
-		
-		@media (min-width: 1024px) {
-			gap: 2rem;
-		}
-		
-		@apply max-w-5xl mx-auto;
-	}
-
-	.grid-layout {
-		@apply grid gap-2;
-		
-		/* Mobile-first grid */
-		grid-template-columns: repeat(2, 1fr);
-		
-		@media (min-width: 480px) {
-			gap: 0.75rem;
-		}
-		
-		@media (min-width: 768px) {
-			gap: 1rem;
-		}
-		
-		&.collection-grid {
-			/* Mobile: 2 columns */
-			grid-template-columns: repeat(2, 1fr);
-			
-			/* Tablet: 3 columns */
-			@media (min-width: 768px) {
-				grid-template-columns: repeat(3, 1fr);
-			}
-			
-			/* Desktop: 4 columns */
-			@media (min-width: 1024px) {
-				grid-template-columns: repeat(4, 1fr);
-			}
-		}
-		
-		&.expanded-grid {
-			/* Mobile: 2 columns */
-			grid-template-columns: repeat(2, 1fr);
-			
-			/* Tablet: 3 columns */
-			@media (min-width: 768px) {
-				grid-template-columns: repeat(3, 1fr);
-			}
-			
-			/* Desktop: 4 columns */
-			@media (min-width: 1024px) {
-				grid-template-columns: repeat(4, 1fr);
-			}
-		}
-	}
-
-	/* Artwork Items */
-	.artwork-item {
-		@apply relative;
-		
-		/* Fade-in animation for individual artworks */
-		opacity: 0;
-		transform: translateY(30px);
-		transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-		           transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-		
-		&.visible {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	.artwork-container {
-		@apply w-full bg-transparent border-none p-0 cursor-pointer block text-left;
-		@apply transition-transform duration-300 hover:scale-[1.02] focus:outline-none focus:scale-[1.02];
-	}
-
-	.artwork-stage {
-		@apply mb-3;
-		@apply relative; /* For skeleton loader positioning */
-		
-		/* Mobile-first spacing */
-		@media (max-width: 768px) {
-			margin-bottom: 0.75rem;
-		}
-		
-		@media (min-width: 769px) {
-			margin-bottom: 1rem;
-		}
-	}
-
-	.stage {
-		@apply bg-gray-100 dark:bg-gray-950/70 overflow-hidden flex items-center justify-center;
-		@apply aspect-square rounded-md;
-		@apply relative; /* For skeleton loader positioning */
-		
-		/* Mobile-first border radius */
-		@media (max-width: 768px) {
-			border-radius: 0.375rem; /* 6px */
-		}
-		
-		@media (min-width: 769px) {
-			border-radius: 0.5rem; /* 8px */
-		}
-		
-		&.featured {
-			@apply aspect-[4/3];
-			
-			/* Mobile: adjust aspect ratio for better fit */
-			@media (max-width: 768px) {
-				aspect-ratio: 3/2;
-			}
-		}
-		
-		&.medium {
-			@apply aspect-square;
-		}
-		
-		&.small {
-			@apply aspect-square;
-		}
-	}
-
-	/* Skeleton loader positioning within stage */
-	.stage :global(.loader-wrapper) {
-		@apply absolute inset-0 z-20;
-		@apply flex items-center justify-center;
-		width: 100% !important;
-		height: 100% !important;
-		opacity: 1;
-		transition: opacity 0.3s ease-out;
-	}
-
-	/* Hide skeleton loader when artwork is loaded */
-	.stage[data-loaded="true"] :global(.loader-wrapper) {
-		opacity: 0;
-		pointer-events: none;
-	}
-
-	/* Artwork image positioning */
-	:global(.artwork-image) {
-		@apply w-full h-full object-contain;
-		@apply relative z-10;
-	}
-
-	.image-placeholder {
-		@apply w-full h-full flex items-center justify-center text-gray-500;
-		@apply relative z-20;
-		
-		&.loaded {
-			@apply opacity-100;
-		}
-	}
-
-	.placeholder-icon {
-		@apply w-16 h-16;
-		
-		.artwork-item.small & {
-			@apply w-8 h-8;
-		}
-	}
-
-	.artwork-info {
-		@apply space-y-2;
-		
-		&.compact {
-			@apply space-y-1;
-		}
-	}
-
-	.artwork-title {
-		@apply font-semibold text-gray-900 dark:text-gray-100 leading-tight;
-		word-break: break-word;
-		
-		/* Mobile-first typography */
-		font-size: 0.875rem; /* 14px */
-		line-height: 1.3;
-		
-		@media (min-width: 480px) {
-			font-size: 1rem; /* 16px */
-		}
-		
-		@media (min-width: 768px) {
-			font-size: 1.125rem; /* 18px */
-			line-height: 1.4;
-		}
-		
-		.artwork-item.small & {
-			font-size: 0.75rem; /* 12px */
-			line-height: 1.2;
-			margin-bottom: 0;
-			
-			@media (min-width: 480px) {
-				font-size: 0.875rem; /* 14px */
-			}
-		}
-	}
-
-	.mint-date {
-		@apply text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide;
-	}
-
-	.artists {
-		@apply flex flex-wrap items-center gap-1;
+		color: #6b7280;
+		font-weight: 400;
+		margin-left: 0.5rem;
 	}
 
 	.artist-link {
-		@apply text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100;
-		@apply transition-colors duration-200 underline decoration-transparent hover:decoration-current;
-		@apply text-sm bg-transparent border-none p-0 cursor-pointer;
-		
-		.artwork-item.small & {
-			@apply text-xs;
+		color: #374151;
+		text-decoration: underline;
+		background: transparent;
+		border: none;
+		cursor: pointer;
+	}
+
+	.artist-link:hover {
+		color: #111827;
+	}
+
+	.collection-meta {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.artwork-count {
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.collection-description {
+		color: #6b7280;
+		font-size: 0.875rem;
+		line-height: 1.625;
+	}
+
+	.artworks-container {
+		position: relative;
+	}
+
+	/* Mobile Swiper */
+	.mobile-swiper {
+		overflow: hidden;
+	}
+
+	@media (min-width: 768px) {
+		.mobile-swiper {
+			display: none;
 		}
 	}
 
-	.separator {
-		@apply text-gray-400;
+	.swiper-track {
+		display: flex;
+		gap: 1rem;
+		overflow-x: auto;
+		padding-bottom: 1rem;
+		scroll-snap-type: x mandatory;
+		scrollbar-width: none;
+		-ms-overflow-style: none;
 	}
 
-	/* More Works Indicator */
-	.more-works-indicator {
-		@apply mt-6 flex justify-center;
+	.swiper-track::-webkit-scrollbar {
+		display: none;
 	}
 
-	.more-works-button {
-		@apply flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full;
-		@apply hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200;
-		@apply text-gray-700 dark:text-gray-300 text-sm font-medium;
-		@apply border-none cursor-pointer;
+	.artwork-slide {
+		flex-shrink: 0;
+		width: 16rem;
+		scroll-snap-align: start;
 	}
 
-	.plus-icon {
-		@apply w-4 h-4 flex items-center justify-center bg-gray-300 dark:bg-gray-600 rounded-full text-xs;
+	/* Desktop Grid */
+	.desktop-grid {
+		display: none;
+		gap: 1rem;
 	}
 
-	/* Loading and End States */
-	.intersection-target {
-		@apply mt-24 px-4;
+	@media (min-width: 768px) {
+		.desktop-grid {
+			display: grid;
+		}
+
+		.desktop-grid.grid-cols-1 {
+			grid-template-columns: 1fr;
+		}
+
+		.desktop-grid.grid-cols-2 {
+			grid-template-columns: repeat(2, 1fr);
+		}
+
+		.desktop-grid.grid-cols-3 {
+			grid-template-columns: repeat(3, 1fr);
+		}
+
+		.desktop-grid.grid-cols-2.lg\\:grid-cols-4 {
+			grid-template-columns: repeat(2, 1fr);
+		}
 	}
 
-	.loading-indicator {
-		@apply flex flex-col items-center gap-4 py-16;
+	@media (min-width: 1024px) {
+		.desktop-grid.grid-cols-2.lg\\:grid-cols-4 {
+			grid-template-columns: repeat(4, 1fr);
+		}
 	}
 
-	.loading-text {
-		@apply text-gray-500 dark:text-gray-400 text-sm;
+	.artwork-btn {
+		width: 100%;
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		text-align: left;
 	}
 
-	.load-more-placeholder {
-		@apply h-4;
+	.artwork-image-container {
+		aspect-ratio: 1;
+		border-radius: 0.5rem;
+		overflow: hidden;
+		margin-bottom: 0.75rem;
+		background-color: #f3f4f6;
+		transition: transform 0.2s;
+	}
+
+	.artwork-btn:hover .artwork-image-container {
+		transform: scale(1.05);
+	}
+
+	.artwork-image {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.image-placeholder {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #9ca3af;
+	}
+
+	.image-placeholder svg {
+		width: 3rem;
+		height: 3rem;
+	}
+
+	.artwork-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.artwork-title {
+		font-weight: 500;
+		color: #111827;
+		font-size: 0.875rem;
+		line-height: 1.25;
+	}
+
+	.mint-date {
+		font-size: 0.75rem;
+		color: #6b7280;
+	}
+
+	.artist-name {
+		font-size: 0.75rem;
+		color: #6b7280;
+	}
+
+	.show-more-btn {
+		position: absolute;
+		bottom: -0.5rem;
+		right: 0;
+		background-color: #f3f4f6;
+		padding: 0.25rem 0.75rem;
+		border-radius: 9999px;
+		font-size: 0.875rem;
+		font-weight: 500;
+		transition: background-color 0.2s;
+		border: none;
+		cursor: pointer;
+	}
+
+	.show-more-btn:hover {
+		background-color: #e5e7eb;
+	}
+
+	.load-more-container {
+		display: flex;
+		justify-content: center;
+		margin-top: 3rem;
+	}
+
+	.load-more-btn {
+		background-color: #111827;
+		color: white;
+		padding: 0.75rem 2rem;
+		border-radius: 0.5rem;
+		font-weight: 500;
+		border: none;
+		cursor: pointer;
+		transition: background-color 0.2s;
+	}
+
+	.load-more-btn:hover {
+		background-color: #1f2937;
+	}
+
+	.loading-spinner {
+		color: #6b7280;
 	}
 
 	.end-message {
-		@apply text-center py-16;
-		
-		p {
-			@apply text-gray-500 dark:text-gray-400 text-sm;
+		text-align: center;
+		margin-top: 3rem;
+	}
+
+	.end-message p {
+		color: #6b7280;
+	}
+
+	/* Dark mode styles */
+	@media (prefers-color-scheme: dark) {
+		.feed-header h2 {
+			color: #f9fafb;
+		}
+
+		.feed-header p {
+			color: #9ca3af;
+		}
+
+		.collection-card {
+			background-color: #111827;
+			border-color: #1f2937;
+		}
+
+		.collection-title {
+			color: #f9fafb;
+		}
+
+		.by-artist {
+			color: #9ca3af;
+		}
+
+		.artist-link {
+			color: #d1d5db;
+		}
+
+		.artist-link:hover {
+			color: #f9fafb;
+		}
+
+		.artwork-count {
+			color: #9ca3af;
+		}
+
+		.collection-description {
+			color: #9ca3af;
+		}
+
+		.artwork-image-container {
+			background-color: #1f2937;
+		}
+
+		.artwork-title {
+			color: #f9fafb;
+		}
+
+		.mint-date {
+			color: #9ca3af;
+		}
+
+		.artist-name {
+			color: #9ca3af;
+		}
+
+		.show-more-btn {
+			background-color: #1f2937;
+		}
+
+		.show-more-btn:hover {
+			background-color: #374151;
+		}
+
+		.load-more-btn {
+			background-color: #f9fafb;
+			color: #111827;
+		}
+
+		.load-more-btn:hover {
+			background-color: #e5e7eb;
+		}
+
+		.loading-spinner {
+			color: #9ca3af;
+		}
+
+		.end-message p {
+			color: #9ca3af;
 		}
 	}
 </style> 
