@@ -261,29 +261,41 @@ export function buildOptimizedImageUrl(
 		return ipfsToHttpUrl(cleanImageUrl);
 	}
 
-	// Build optimized URL using Pinata's image optimization via gateway
-	const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}`);
-	
-	// Add the Pinata gateway token for authentication
-	url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
-	
-	// Add image optimization parameters using Pinata's naming conventions
-	if (options.width) url.searchParams.set('img-width', options.width.toString());
-	if (options.height) url.searchParams.set('img-height', options.height.toString());
-	if (options.dpr) url.searchParams.set('img-dpr', options.dpr.toString());
-	if (options.fit) url.searchParams.set('img-fit', options.fit);
-	if (options.gravity) url.searchParams.set('img-gravity', options.gravity);
-	if (options.quality) url.searchParams.set('img-quality', options.quality.toString());
-	if (options.format) url.searchParams.set('img-format', options.format);
-	if (options.animation !== undefined) url.searchParams.set('img-anim', options.animation.toString());
-	if (options.sharpen) url.searchParams.set('img-sharpen', options.sharpen.toString());
-	if (options.metadata) url.searchParams.set('img-metadata', options.metadata);
+	// For now, bypass the optimization service due to authentication issues
+	// and use the direct Pinata gateway
+	return `https://gateway.pinata.cloud/ipfs/${cid}`;
 
-	return url.toString();
+	// TODO: Re-enable optimization service when authentication is fixed
+	// Build optimized URL using Pinata's image optimization via gateway
+	// const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}`);
+	// 
+	// // Add the Pinata gateway token for authentication
+	// url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+	// 
+	// // Add image optimization parameters using Pinata's naming conventions
+	// if (options.width) url.searchParams.set('img-width', options.width.toString());
+	// if (options.height) url.searchParams.set('img-height', options.height.toString());
+	// if (options.dpr) url.searchParams.set('img-dpr', options.dpr.toString());
+	// if (options.fit) url.searchParams.set('img-fit', options.fit);
+	// if (options.gravity) {
+	// 	// Handle face detection specifically
+	// 	if (options.gravity === 'face' || options.gravity === 'faces') {
+	// 		url.searchParams.set('img-gravity', 'face');
+	// 	} else {
+	// 		url.searchParams.set('img-gravity', options.gravity);
+	// 	}
+	// }
+	// if (options.quality) url.searchParams.set('img-quality', options.quality.toString());
+	// if (options.format) url.searchParams.set('img-format', options.format);
+	// if (options.animation !== undefined) url.searchParams.set('img-anim', options.animation.toString());
+	// if (options.sharpen) url.searchParams.set('img-sharpen', options.sharpen.toString());
+	// if (options.metadata) url.searchParams.set('img-metadata', options.metadata);
+
+	// return url.toString();
 }
 
 /**
- * Build a direct CID URL using the Wallace Museum IPFS reverse proxy
+ * Build a direct CID URL using the standard Pinata gateway
  */
 export function buildDirectImageUrl(imageUrl: string | null | undefined): string {
 	if (!imageUrl) return '';
@@ -304,9 +316,7 @@ export function buildDirectImageUrl(imageUrl: string | null | undefined): string
 	const cidAndPath = extractCidAndPath(cleanImageUrl);
 	if (cidAndPath) {
 		const { cid, path } = cidAndPath;
-		const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}${path ? `/${path}` : ''}`);
-		url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
-		return url.toString();
+		return `https://gateway.pinata.cloud/ipfs/${cid}${path ? `/${path}` : ''}`;
 	}
 
 	// Fallback: extract just the CID (for backwards compatibility)
@@ -315,9 +325,7 @@ export function buildDirectImageUrl(imageUrl: string | null | undefined): string
 		return ipfsToHttpUrl(cleanImageUrl);
 	}
 
-	const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}`);
-	url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
-	return url.toString();
+	return `https://gateway.pinata.cloud/ipfs/${cid}`;
 }
 
 /**
