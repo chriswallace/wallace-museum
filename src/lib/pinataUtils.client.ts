@@ -61,9 +61,9 @@ export function getPinataTransformedUrl(
 		metadata?: 'keep' | 'copyright' | 'none';
 	} = {}
 ): string {
-	// Use Wallace Museum custom gateway that routes to Pinata with authentication token
+	// Use Wallace Museum Pinata proxy for media transformations
 	const gatewayToken = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
-	const baseUrl = `https://dweb.link/ipfs/${cid}`; // Use public gateway for client-side operations
+	const baseUrl = `https://ipfs.wallacemuseum.com/ipfs/${cid}`; // Use Wallace Museum proxy
 	
 	// Build query parameters for transformations using correct Pinata naming conventions
 	const params = new URLSearchParams();

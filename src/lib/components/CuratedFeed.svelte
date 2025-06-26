@@ -208,9 +208,9 @@
 									</div>
 								{/each}
 								
-								<!-- Mobile "+ x more" button - keep as card for consistency -->
+								<!-- Mobile "+ x more" button - hidden on small screens to avoid duplication -->
 								{#if collection.artworkCount > 4}
-									<div class="artwork-slide">
+									<div class="artwork-slide hidden sm:block">
 										<button 
 											class="more-artworks-card mobile-more-card"
 											on:click={() => goto(`/collection/${collection.slug}`)}

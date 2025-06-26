@@ -7,6 +7,7 @@
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import ArtistAvatar from '$lib/components/ArtistAvatar.svelte';
+		import { getResponsiveImageProps, shouldUseLazyLoading, getEnhancedResponsiveProps } from '$lib/utils/imageHelpers';
 
 	export let data: { collection?: any; error?: string };
 
@@ -413,7 +414,7 @@
 				<main class="artworks-main">
 					{#if data.collection.artworks && data.collection.artworks.length > 0}
 						<div class="artworks-grid">
-							{#each data.collection.artworks as artwork}
+							{#each data.collection.artworks as artwork, artworkIndex}
 								<button class="artwork-container" on:click={() => {
 									if (artwork.artists && artwork.artists.length > 0) {
 										goto(`/artist/${artwork.artists[0].id}/${artwork.id}`);
@@ -464,17 +465,20 @@
 													</div>
 												</video>
 											{:else}
-												<!-- Show image -->
+												<!-- Show image with responsive optimization -->
 												<OptimizedImage
 													src={artwork.image_url}
 													alt={artwork.title}
-													width={800}
-													height={800}
-													fit="contain"
-													format="auto"
-													quality={70}
+													width={300}
+													sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+													responsive={true}
+													responsiveSizes={[200, 300, 400, 500]}
+													quality={80}
+													fit="cover"
+													format="webp"
 													className="thumbnail-image"
 													fallbackSrc="/images/medici-image.png"
+													loading={shouldUseLazyLoading(artworkIndex, artworkIndex < 4)}
 													mimeType={artwork.mime}
 												/>
 											{/if}

@@ -9,22 +9,23 @@ import crypto from 'crypto';
 // 	'https://dweb.link/ipfs/',
 // 	'https://ipfs.io/ipfs/'
 // ];
-const DEFAULT_IPFS_GATEWAY = 'https://dweb.link/ipfs/'; // Use public gateway for indexing
+// Note: For frontend media (images/videos), use Wallace Museum Pinata proxy
+// For HTML content and indexing operations, use public IPFS gateways
+const DEFAULT_IPFS_GATEWAY = 'https://ipfs.wallacemuseum.com/ipfs/'; // Use Wallace Museum proxy for media
 const ONCHFS_GATEWAY = 'https://onchfs.fxhash2.xyz/';
 const ARWEAVE_GATEWAY = 'https://arweave.net/';
 
-// Note: For indexing operations, use public IPFS gateways instead of wallacemuseum.com
-// The indexing process will use reliable public gateways for IPFS access
-const IPFS_MICROSERVICE_ENDPOINT = 'https://dweb.link/ipfs/'; // Use public gateway for indexing
-const PINATA_GATEWAY_TOKEN = ''; // Not needed for public gateways during indexing
+// For frontend media delivery, use Wallace Museum gateway with Pinata authentication
+const IPFS_MICROSERVICE_ENDPOINT = 'https://ipfs.wallacemuseum.com/ipfs/'; // Use Wallace Museum proxy for media
+const PINATA_GATEWAY_TOKEN = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
 
 /**
- * A set of reliable IPFS gateways to try in sequence for indexing
- * Note: Wallace Museum gateway excluded for indexing operations
- * Note: Cloudflare IPFS gateway permanently offline, excluded
+ * IPFS gateways for media content (images/videos) - use Wallace Museum proxy first
+ * For HTML content, we'll use ipfs.io gateway to avoid authentication issues
  */
 export const IPFS_GATEWAYS = [
-	'https://dweb.link/ipfs/',               // Primary: Protocol Labs gateway for indexing
+	'https://ipfs.wallacemuseum.com/ipfs/',  // Primary: Wallace Museum Pinata proxy for media
+	'https://dweb.link/ipfs/',               // Fallback: Protocol Labs gateway
 	'https://ipfs.io/ipfs/',                 // Fallback: Public IPFS.io gateway
 	'https://nftstorage.link/ipfs/',         // Fallback: NFT.Storage gateway
 	'https://gateway.pinata.cloud/ipfs/'     // Fallback: Pinata public gateway
@@ -321,7 +322,7 @@ export function ipfsToHttpUrl(
 			if (match && match[1]) {
 				const cidAndPath = match[1];
 
-				// Use our IPFS microservice for IPFS access
+				// Use Wallace Museum IPFS proxy for media access
 				if (useProxy) {
 					const pathParts = cidAndPath.split('/');
 					const cid = pathParts[0];
@@ -333,13 +334,12 @@ export function ipfsToHttpUrl(
 						return cleanUri; // Return original if CID is invalid
 					}
 
-					// Build public gateway URL manually to preserve existing encoding
-					let gatewayUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
-					if (path) {
-						gatewayUrl += `/${path}`;
+					// Build Wallace Museum gateway URL with Pinata authentication
+					const url = new URL(`${IPFS_MICROSERVICE_ENDPOINT}${cid}${path ? `/${path}` : ''}`);
+					if (PINATA_GATEWAY_TOKEN) {
+						url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
 					}
-					// No token needed for public gateways during indexing
-					return gatewayUrl;
+					return url.toString();
 				}
 
 				return gateway + cidAndPath;
@@ -355,7 +355,7 @@ export function ipfsToHttpUrl(
 		// Remove ipfs:// or ipfs:/ prefix
 		let cleaned = cleanUri.replace(/^ipfs:\/\//, '').replace(/^ipfs:\//, '');
 
-		// Use public IPFS gateway for indexing operations
+		// Use Wallace Museum IPFS proxy for media operations
 		if (useProxy) {
 			const pathParts = cleaned.split('/');
 			const cid = pathParts[0];
@@ -369,13 +369,12 @@ export function ipfsToHttpUrl(
 				return ''; // Return empty for invalid IPFS URIs
 			}
 
-			// Build public gateway URL manually to preserve existing encoding
-			let gatewayUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
-			if (path) {
-				gatewayUrl += `/${path}`;
+			// Build Wallace Museum gateway URL with Pinata authentication
+			const url = new URL(`${IPFS_MICROSERVICE_ENDPOINT}${cid}${path ? `/${path}` : ''}`);
+			if (PINATA_GATEWAY_TOKEN) {
+				url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
 			}
-			// No token needed for public gateways during indexing
-			return gatewayUrl;
+			return url.toString();
 		}
 
 		return gateway + cleaned;
@@ -383,19 +382,18 @@ export function ipfsToHttpUrl(
 
 	// Handle IPFS paths without protocol (raw CIDs or CID/path)
 	if (cleanUri.startsWith('Qm') || cleanUri.startsWith('bafy')) {
-		// Use public IPFS gateway for indexing operations
+		// Use Wallace Museum IPFS proxy for media operations
 		if (useProxy) {
 			const pathParts = cleanUri.split('/');
 			const cid = pathParts[0];
 			const path = pathParts.slice(1).join('/');
 
-			// Build public gateway URL manually to preserve existing encoding
-			let gatewayUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
-			if (path) {
-				gatewayUrl += `/${path}`;
+			// Build Wallace Museum gateway URL with Pinata authentication
+			const url = new URL(`${IPFS_MICROSERVICE_ENDPOINT}${cid}${path ? `/${path}` : ''}`);
+			if (PINATA_GATEWAY_TOKEN) {
+				url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
 			}
-			// No token needed for public gateways during indexing
-			return gatewayUrl;
+			return url.toString();
 		}
 
 		return gateway + cleanUri;

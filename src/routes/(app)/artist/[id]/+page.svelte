@@ -8,6 +8,7 @@
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import ArtistAvatar from '$lib/components/ArtistAvatar.svelte';
+	import { getResponsiveImageProps, shouldUseLazyLoading } from '$lib/utils/imageHelpers';
 
 	export let data: { artist?: any; error?: string };
 
@@ -409,7 +410,7 @@
 							<h2>Artworks ({data.artist.artworks.length})</h2>
 						</div>
 						<div class="artworks-grid">
-							{#each data.artist.artworks as artwork}
+							{#each data.artist.artworks as artwork, artworkIndex}
 								<button class="artwork-container" on:click={() => goto(`/artist/${data.artist.id}/${artwork.id}`)}>
 									<div class="artwork-thumbnail">
 										{#if (isVideoMimeType(artwork.mime) || isVideoUrl(artwork.animation_url)) && artwork.animation_url}
@@ -458,19 +459,21 @@
 													</div>
 												</video>
 											{:else}
-												<!-- Show image -->
+												<!-- Show image with responsive optimization -->
 												<OptimizedImage
 													src={artwork.thumbnail_url || artwork.image_url}
 													alt={artwork.title}
-													width={800}
-													height={800}
-													fit="contain"
-													format="auto"
-													quality={70}
+													width={300}
+													sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+													responsive={true}
+													responsiveSizes={[200, 300, 400, 500]}
+													quality={75}
+													fit="cover"
+													format="webp"
 													className="thumbnail-image"
 													fallbackSrc="/images/medici-image.png"
+													loading={shouldUseLazyLoading(artworkIndex, artworkIndex < 6)}
 													mimeType={artwork.mime}
-													loading="lazy"
 												/>
 											{/if}
 										{:else if artwork.animation_url}

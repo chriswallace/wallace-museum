@@ -1,12 +1,12 @@
 /**
- * Image optimization utilities using public IPFS gateways
- * Uses reliable public gateways for consistent IPFS access during indexing
+ * Image optimization utilities using Wallace Museum Pinata proxy
+ * Uses ipfs.wallacemuseum.com for reliable IPFS access with Pinata authentication
  */
 
 import { ipfsToHttpUrl } from './mediaUtils';
 
-// Use public gateway for reliable access during indexing
-const IPFS_DIRECT_ENDPOINT = 'https://dweb.link/ipfs';
+// Use Wallace Museum Pinata proxy for images and videos
+const IPFS_DIRECT_ENDPOINT = 'https://ipfs.wallacemuseum.com/ipfs';
 const PINATA_GATEWAY_TOKEN = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
 
 export interface ImageOptimizationOptions {
