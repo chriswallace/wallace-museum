@@ -17,7 +17,7 @@
 		sm: { width: 20, height: 20, class: 'w-5 h-5' },
 		md: { width: 32, height: 32, class: 'w-8 h-8' },
 		lg: { width: 48, height: 48, class: 'w-12 h-12' },
-		xl: { width: 300, height: 300, class: '' }
+		xl: { width: 64, height: 64, class: 'w-16 h-16' }
 	};
 
 	$: sizeConfig = sizeMap[size];
