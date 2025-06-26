@@ -195,7 +195,7 @@
 	</div>
 </div>
 
-<style>
+<style lang="scss">
 	.modal-overlay {
 		position: fixed;
 		top: 0;
@@ -210,27 +210,10 @@
 	}
 
 	.modal-container {
-		width: 90%;
-		max-width: 800px;
-		max-height: 90vh;
-		overflow-y: auto;
+		@apply w-[95%] sm:w-[90%] max-w-none sm:max-w-3xl max-h-[90vh] overflow-y-auto;
 	}
 
 	.address-text {
-		max-width: 200px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	@media (max-width: 640px) {
-		.modal-container {
-			width: 95%;
-			max-width: none;
-		}
-
-		.address-text {
-			max-width: 120px;
-		}
+		@apply max-w-[120px] sm:max-w-[200px] whitespace-nowrap overflow-hidden text-ellipsis;
 	}
 </style>

@@ -59,13 +59,13 @@ async function getFfmpeg() {
 	}
 }
 
-// Add a list of IPFS gateways to try
+// Add a list of IPFS gateways to try (excluding wallacemuseum.com and cloudflare-ipfs.com for indexing)
 const IPFS_GATEWAYS = [
-	'https://ipfs.wallacemuseum.com/ipfs/?pinataGatewayToken=ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6', // Wallace Museum custom gateway with auth token
-	'https://nftstorage.link/ipfs/', // Added NFT.Storage
-	'https://dweb.link/ipfs/', // Added Dweb
-	'https://ipfs.io/ipfs/' // Kept ipfs.io
-	// Add more gateways here if needed
+	'https://dweb.link/ipfs/', // Primary for indexing
+	'https://ipfs.io/ipfs/', // Fallback
+	'https://nftstorage.link/ipfs/', // NFT.Storage fallback
+	'https://gateway.pinata.cloud/ipfs/' // Pinata fallback
+	// Note: wallacemuseum.com and cloudflare-ipfs.com gateways excluded for indexing operations
 ];
 
 // Define simple dimension type

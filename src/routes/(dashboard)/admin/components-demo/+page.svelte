@@ -80,6 +80,22 @@
 				<p class="text-xs mt-1">No avatar (fallback)</p>
 			</div>
 		</div>
+
+		<!-- NEW: Test section for placeholder avatars -->
+		<div class="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+			<h3 class="text-lg font-semibold mb-4">🔧 New Placeholder Avatar System</h3>
+			<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+				Testing the new local SVG-based placeholder avatars (no external service dependency)
+			</p>
+			<div class="flex items-center gap-4 flex-wrap">
+				{#each ['Alice Johnson', 'Bob Smith', 'Carol Williams', 'David Brown', 'Eva Martinez', 'Frank Wilson', 'Grace Lee', 'Henry Davis'] as testName}
+					<div class="text-center">
+						<ArtistAvatar artist={{ name: testName, avatarUrl: null }} size="lg" />
+						<p class="text-xs mt-1">{testName}</p>
+					</div>
+				{/each}
+			</div>
+		</div>
 	</section>
 
 	<!-- ArtistNameWithAvatar Component -->

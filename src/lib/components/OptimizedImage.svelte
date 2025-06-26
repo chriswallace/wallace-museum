@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { buildOptimizedImageUrl, createResponsiveSrcSet, createRetinaUrls, buildDirectImageUrl } from '$lib/imageOptimization';
 	import type { ImageOptimizationOptions } from '$lib/imageOptimization';
-	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import { ipfsToHttpUrl, IPFS_GATEWAYS } from '$lib/mediaUtils';
 	import SkeletonLoader from './SkeletonLoader.svelte';
 
 	// Props
@@ -45,7 +45,46 @@
 	let isLoaded = false;
 	let isLoading = false;
 	let hasTriedDirectIpfs = false;
-	let hasTriedBasicIpfs = false;
+	let hasTriedAlternativeGateways = false;
+	let currentGatewayIndex = 0;
+
+	/**
+	 * Extract CID from IPFS URL for fallback gateway usage
+	 */
+	function extractCidFromUrl(url: string): string | null {
+		if (!url) return null;
+
+		// If it's already just a CID (starts with Qm or bafy)
+		if (url.startsWith('Qm') || url.startsWith('bafy')) {
+			return url;
+		}
+
+		// Handle ipfs:// protocol
+		if (url.startsWith('ipfs://')) {
+			const cleaned = url.replace('ipfs://', '');
+			const cidPart = cleaned.split('/')[0];
+			return cidPart;
+		}
+
+		// Handle various gateway URLs
+		const gatewayPatterns = [
+			/https?:\/\/[^/]+\/ipfs\/([^/?#]+)/,
+			/https?:\/\/gateway\.pinata\.cloud\/([^/?#]+)/,
+			/https?:\/\/[^/]+\/([^/?#]+)/
+		];
+
+		for (const pattern of gatewayPatterns) {
+			const match = url.match(pattern);
+			if (match && match[1]) {
+				const potentialCid = match[1];
+				if (potentialCid.startsWith('Qm') || potentialCid.startsWith('bafy')) {
+					return potentialCid;
+				}
+			}
+		}
+
+		return null;
+	}
 
 	/**
 	 * Detect if a URL points to an SVG file
@@ -159,6 +198,14 @@
 	// Create different fallback levels for IPFS content
 	$: directIpfsSrc = src && isIpfs ? buildDirectImageUrl(src) : '';
 	$: basicIpfsSrc = src && isIpfs ? ipfsToHttpUrl(src) : '';
+	$: alternativeGatewaySrc = (() => {
+		if (!src || !isIpfs || !hasTriedDirectIpfs || currentGatewayIndex >= IPFS_GATEWAYS.length) return '';
+		
+		const cid = extractCidFromUrl(src);
+		if (!cid) return '';
+		
+		return IPFS_GATEWAYS[currentGatewayIndex] + cid;
+	})();
 	$: finalFallbackSrc = fallbackSrc;
 	
 	// Determine which source to use based on error state and attempts
@@ -175,9 +222,9 @@
 			return directIpfsSrc || basicIpfsSrc || src;
 		}
 		
-		if (isGif && isIpfs && basicIpfsSrc && !hasTriedBasicIpfs) {
-			// Special case for GIFs - try basic IPFS gateway
-			return basicIpfsSrc;
+		if (isIpfs && !hasTriedAlternativeGateways && alternativeGatewaySrc) {
+			// Try alternative IPFS gateways
+			return alternativeGatewaySrc;
 		}
 		
 		if (showFallbackOnError) {
@@ -250,10 +297,16 @@
 			hasTriedDirectIpfs = true;
 			hasError = true;
 			isLoaded = false;
-		} else if (isGif && isIpfs && !hasTriedBasicIpfs) {
-			// Special handling for GIFs - try basic IPFS gateway before giving up
-			console.log(`[OptimizedImage] GIF failed, trying basic IPFS gateway: ${basicIpfsSrc}`);
-			hasTriedBasicIpfs = true;
+		} else if (isIpfs && !hasTriedAlternativeGateways && currentGatewayIndex < IPFS_GATEWAYS.length) {
+			// Try alternative IPFS gateways
+			console.log(`[OptimizedImage] Trying alternative IPFS gateway ${currentGatewayIndex + 1}/${IPFS_GATEWAYS.length}: ${IPFS_GATEWAYS[currentGatewayIndex]}`);
+			currentGatewayIndex++;
+			
+			// If we've tried all gateways, mark as having tried alternatives
+			if (currentGatewayIndex >= IPFS_GATEWAYS.length) {
+				hasTriedAlternativeGateways = true;
+			}
+			
 			hasError = true;
 			isLoaded = false;
 		} else if (showFallbackOnError && currentSrc !== finalFallbackSrc) {
@@ -273,7 +326,8 @@
 		if (imageElement && src) {
 			hasError = false;
 			hasTriedDirectIpfs = false;
-			hasTriedBasicIpfs = false;
+			hasTriedAlternativeGateways = false;
+			currentGatewayIndex = 0;
 			isLoaded = false;
 			isLoading = true;
 		}
@@ -285,7 +339,8 @@
 		isLoaded = false;
 		hasError = false;
 		hasTriedDirectIpfs = false;
-		hasTriedBasicIpfs = false;
+		hasTriedAlternativeGateways = false;
+		currentGatewayIndex = 0;
 	}
 </script>
 
@@ -328,25 +383,13 @@
 	{/if}
 </div>
 
-<style>
+<style lang="scss">
 	.image-container {
-		position: relative;
-		box-sizing: border-box;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		@apply relative box-border flex items-center justify-center;
 	}
 
 	.skeleton-overlay {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1;
+		@apply absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center z-[1];
 	}
 
 	img {
@@ -354,7 +397,6 @@
 	}
 
 	img.hidden {
-		opacity: 0;
-		pointer-events: none;
+		@apply opacity-0 pointer-events-none;
 	}
 </style> 

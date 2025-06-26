@@ -17,7 +17,7 @@ interface RateLimitConfig {
   adaptiveThreshold?: number;
 }
 
-interface APICallResult<T> {
+export interface APICallResult<T> {
   success: boolean;
   data?: T;
   error?: string;

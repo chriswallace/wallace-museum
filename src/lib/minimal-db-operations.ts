@@ -1,7 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import type { MinimalNFTData, MinimalCollectionData, MinimalCreatorData } from './types/minimal-nft';
 import { detectBlockchainFromContract, detectBlockchain } from '$lib/utils/walletUtils.js';
-import { cachedArtworkQueries, cachedCollectionQueries, cachedSystemQueries, cachedArtistQueries } from '$lib/cache/db-cache.js';
+import { cachedArtworkQueries, cachedCollectionQueries, cachedSystemQueries, cachedArtistQueries, cachedSearchQueries } from '$lib/cache/db-cache.js';
 
 /**
  * Minimal database operations - direct mapping from minimal data to Prisma schema
@@ -160,7 +160,7 @@ export class MinimalDBOperations {
     // Determine blockchain based on contract address format
     const blockchain = detectBlockchainFromContract(contractAddress);
     
-    return this.prisma.collection.upsert({
+    const collection = await this.prisma.collection.upsert({
       where: { slug: collectionData.slug },
       create: {
         slug: collectionData.slug,
@@ -193,6 +193,14 @@ export class MinimalDBOperations {
         projectNumber: collectionData.projectNumber
       }
     });
+    
+    // Invalidate collection cache since collection was created/updated
+    await cachedCollectionQueries.invalidate(collection.id, collection.slug);
+    
+    // Invalidate search cache since collection data has changed
+    await cachedSearchQueries.invalidate();
+    
+    return collection;
   }
   
   /**

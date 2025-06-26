@@ -167,19 +167,27 @@
 	.collection-grid {
 		display: grid;
 		width: 100%;
-		gap: 1rem;
+		gap: 1.5rem;
 		grid-template-columns: 1fr;
 	}
 	
 	@media (min-width: 640px) {
 		.collection-grid {
 			grid-template-columns: 1fr 1fr;
+			gap: 2rem;
 		}
 	}
 	
 	@media (min-width: 1024px) {
 		.collection-grid {
 			grid-template-columns: 1fr 1fr 1fr;
+			gap: 2.5rem;
+		}
+	}
+	
+	@media (min-width: 1280px) {
+		.collection-grid {
+			gap: 3rem;
 		}
 	}
 	
@@ -246,7 +254,7 @@
 		justify-content: center;
 		align-items: center;
 		gap: 0.5rem;
-		margin-top: 1rem;
+		margin-top: 2rem;
 		margin-bottom: 1rem;
 		flex-wrap: wrap;
 	}

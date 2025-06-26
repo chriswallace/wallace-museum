@@ -4,6 +4,8 @@
 	import { toast } from '@zerodevx/svelte-toast';
 	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import ArtistAvatar from '$lib/components/ArtistAvatar.svelte';
+	import { placeholderAvatar } from '$lib/utils';
 
 	interface Artist {
 		id: number;
@@ -139,9 +141,11 @@
 							fallbackSrc="/images/medici-image.png"
 						/>
 					{:else}
-						<div class="avatar-placeholder">
-							{artist.name.charAt(0).toUpperCase()}
-						</div>
+						<img
+							src={placeholderAvatar(artist.name)}
+							alt="{artist.name} placeholder avatar"
+							class="w-full h-full object-cover rounded-full"
+						/>
 					{/if}
 				</div>
 				<span>{artist.name}</span>
@@ -178,9 +182,7 @@
 		@apply w-full h-full object-cover rounded-full;
 	}
 
-	.avatar-placeholder {
-		@apply w-full h-full flex items-center justify-center font-bold text-white bg-gray-500/20 border border-gray-500 rounded-full text-xl md:text-2xl;
-	}
+
 
 	.empty {
 		@apply text-center my-5;

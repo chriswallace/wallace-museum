@@ -3,6 +3,7 @@ import type { Collection } from '@prisma/client';
 import { fetchCollection as fetchObjktCollection } from './objktHelpers';
 import { fetchCollection as fetchOpenSeaCollection } from './openseaHelpers';
 import prisma from '$lib/prisma';
+import { cachedCollectionQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 interface CollectionData {
 	slug: string;
@@ -87,6 +88,12 @@ export async function syncCollection(
 			create: collectionData,
 			update: collectionData
 		});
+
+		// Invalidate collection cache since collection was created/updated
+		await cachedCollectionQueries.invalidate(updatedCollection.id, updatedCollection.slug);
+		
+		// Invalidate search cache since collection data has changed
+		await cachedSearchQueries.invalidate();
 
 		return updatedCollection;
 	} catch (error) {

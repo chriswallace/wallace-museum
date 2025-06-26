@@ -226,6 +226,12 @@ export async function POST({ request }) {
 				}
 			});
 			collectionId = newCollection.id;
+			
+			// Invalidate collection cache since a new collection was created
+			await cachedCollectionQueries.invalidate(newCollection.id, newCollection.slug);
+			
+			// Invalidate search cache since collection data has changed
+			await cachedSearchQueries.invalidate();
 		}
 
 		const mediaMetadata: any = {};

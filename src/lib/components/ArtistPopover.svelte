@@ -299,14 +299,12 @@
 	}
 
 	/* Responsive adjustments */
-	@media (max-width: 640px) {
-		.popover-content {
-			margin: 1rem;
-			max-width: calc(100vw - 2rem);
-		}
-		
-		.popover-scroll {
-			@apply p-4;
-		}
+	.popover-content {
+		@apply m-4 sm:m-0;
+		@apply max-w-[calc(100vw-2rem)] sm:max-w-[780px];
+	}
+	
+	.popover-scroll {
+		@apply p-4 sm:p-6;
 	}
 </style> 

@@ -39,7 +39,7 @@
 		@apply relative mt-6;
 
 		select {
-			@apply block w-full border-2 border-gray-300 rounded-sm shadow-sm p-3 pr-12 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm;
+			@apply block w-full border-2 border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 rounded-sm shadow-sm p-3 pr-12 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm;
 
 			-webkit-appearance: none; /* Remove default arrow in WebKit browsers */
 			-moz-appearance: none; /* Remove default arrow in Mozilla Firefox */
@@ -48,11 +48,11 @@
 			background-repeat: no-repeat;
 			background-position: right 0.8rem center; /* Adjust position of the arrow */
 			background-size: 1.5em; /* Adjust size of the arrow icon */
-
-			@media (prefers-color-scheme: dark) {
-				@apply bg-black text-gray-200 border-gray-800;
-				background-image: url('/images/caret-down-dark-mode.svg'); /* Path to your custom arrow icon */
-			}
 		}
+
+	}
+
+	:global(.dark .collection-dropdown select) {
+		background-image: url('/images/caret-down-dark-mode.svg'); /* Path to your custom arrow icon */
 	}
 </style>

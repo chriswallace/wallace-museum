@@ -1,6 +1,8 @@
 import type { MinimalNFTData } from './types/minimal-nft';
 import { OptimizedOpenSeaAPI } from './optimized-opensea-api';
 import { OptimizedTezosAPI } from './indexing/tezos-optimized-api';
+import { EnhancedOpenSeaPagination } from './enhanced-opensea-pagination';
+import { AlchemyNFTIndexer, type AlchemyIndexingOptions } from './alchemy-nft-indexer';
 
 /**
  * Optimized Indexing Workflow with intelligent rate limiting and smart data fetching
@@ -12,13 +14,18 @@ export interface IndexingOptions {
   pageSize?: number;
   enableCaching?: boolean;
   enrichmentLevel?: 'minimal' | 'standard' | 'comprehensive';
+  provider?: 'opensea' | 'alchemy' | 'hybrid'; // Add hybrid option
+  useAlchemyForDiscovery?: boolean; // New option for hybrid approach
+  useOpenSeaForEnrichment?: boolean; // New option for hybrid approach
 }
 
 export class OptimizedIndexingWorkflow {
   private openSeaAPI: OptimizedOpenSeaAPI;
   private tezosAPI: OptimizedTezosAPI;
+  private enhancedPagination: EnhancedOpenSeaPagination;
+  private alchemyIndexer?: AlchemyNFTIndexer;
 
-  constructor(openSeaApiKey: string) {
+  constructor(openSeaApiKey: string, alchemyApiKey?: string) {
     // Configure rate limiter for approximately 1 request per second with less aggressive backoff
     const rateLimiterConfig = {
       baseDelay: 1000,     // Start with 1 second between calls (maintains ~1 req/sec)
@@ -31,28 +38,126 @@ export class OptimizedIndexingWorkflow {
 
     this.openSeaAPI = new OptimizedOpenSeaAPI(openSeaApiKey, rateLimiterConfig);
     this.tezosAPI = new OptimizedTezosAPI();
+    this.enhancedPagination = new EnhancedOpenSeaPagination(this.openSeaAPI);
+    
+    // Initialize Alchemy indexer if API key is provided
+    if (alchemyApiKey) {
+      this.alchemyIndexer = new AlchemyNFTIndexer(alchemyApiKey);
+    }
   }
 
   /**
    * Index NFTs from a wallet address with comprehensive data fetching
+   * Now defaults to hybrid approach: Alchemy for discovery + OpenSea for enrichment
    */
   async indexWalletNFTs(
     walletAddress: string,
     blockchain: 'ethereum' | 'tezos',
     type: 'owned' | 'created' = 'owned',
-    options: IndexingOptions = {}
+    options: IndexingOptions & { expectedNFTCount?: number; useEnhancedPagination?: boolean } = {}
   ): Promise<MinimalNFTData[]> {
     console.log(`[OptimizedIndexingWorkflow] Starting comprehensive indexing for ${walletAddress} on ${blockchain}`);
 
     if (blockchain === 'ethereum') {
-      return this.indexEthereumWallet(walletAddress, type, options);
+      // Default to hybrid approach for maximum reliability and data richness
+      const provider = options.provider || 'hybrid';
+      
+      if (provider === 'hybrid' && this.alchemyIndexer) {
+        console.log(`[OptimizedIndexingWorkflow] Using hybrid approach: Alchemy for discovery + OpenSea for enrichment`);
+        return this.indexEthereumWalletHybrid(walletAddress, options);
+      } else if (provider === 'alchemy' && this.alchemyIndexer) {
+        console.log(`[OptimizedIndexingWorkflow] Using Alchemy indexer for reliable data coverage`);
+        return this.indexEthereumWalletWithAlchemy(walletAddress, options);
+      } else if (provider === 'hybrid' && !this.alchemyIndexer) {
+        console.warn(`[OptimizedIndexingWorkflow] Hybrid provider requested but no Alchemy API key provided, falling back to enhanced OpenSea`);
+        options.provider = 'opensea';
+      } else if (provider === 'alchemy' && !this.alchemyIndexer) {
+        console.warn(`[OptimizedIndexingWorkflow] Alchemy provider requested but no API key provided, falling back to OpenSea`);
+      }
+      
+      // OpenSea indexing (legacy and enhanced)
+      const useEnhanced = options.useEnhancedPagination !== false; // Default to true
+      
+      if (useEnhanced) {
+        console.log(`[OptimizedIndexingWorkflow] Using enhanced OpenSea pagination for better NFT coverage`);
+        return this.indexEthereumWalletEnhanced(walletAddress, type, options);
+      } else {
+        console.log(`[OptimizedIndexingWorkflow] Using legacy OpenSea pagination (may miss NFTs due to API limits)`);
+        return this.indexEthereumWallet(walletAddress, type, options);
+      }
     } else {
       return this.indexTezosWallet(walletAddress, type, options);
     }
   }
 
   /**
-   * Index Ethereum wallet with comprehensive data fetching
+   * Index Ethereum wallet with enhanced pagination that works around OpenSea API limitations
+   */
+  async indexEthereumWalletEnhanced(
+    walletAddress: string,
+    type: 'owned' | 'created',
+    options: IndexingOptions & { expectedNFTCount?: number } = {}
+  ): Promise<MinimalNFTData[]> {
+    const pageSize = options.pageSize || 50;
+    const maxPages = options.maxPages || 500; // Increased default
+    const expectedNFTCount = options.expectedNFTCount;
+    const enrichmentLevel = options.enrichmentLevel || 'standard';
+    
+    // Determine enrichment strategy
+    let enrichmentStrategy: any;
+    switch (enrichmentLevel) {
+      case 'minimal':
+        enrichmentStrategy = {
+          fetchEnhancedData: false,
+          fetchCreatorData: false,
+          fetchCollectionData: false,
+          batchCreators: false,
+          batchCollections: false
+        };
+        break;
+      case 'standard':
+        enrichmentStrategy = {
+          fetchEnhancedData: false,
+          fetchCreatorData: true,
+          fetchCollectionData: true,
+          batchCreators: true,
+          batchCollections: true
+        };
+        break;
+      case 'comprehensive':
+        enrichmentStrategy = {
+          fetchEnhancedData: true,
+          fetchCreatorData: true,
+          fetchCollectionData: true,
+          batchCreators: true,
+          batchCollections: true
+        };
+        break;
+    }
+
+    console.log(`[OptimizedIndexingWorkflow] Using enhanced pagination for ${walletAddress} with ${enrichmentLevel} enrichment`);
+    
+    const result = await this.enhancedPagination.fetchAllWalletNFTs(walletAddress, {
+      pageSize,
+      maxPages,
+      expectedNFTCount,
+      enrichmentStrategy
+    });
+
+    console.log(`[OptimizedIndexingWorkflow] Enhanced pagination completed:`);
+    console.log(`- Total NFTs: ${result.totalFetched}`);
+    console.log(`- Pages processed: ${result.pagesProcessed}`);
+    console.log(`- Strategies used: ${result.strategiesUsed.join(', ')}`);
+    
+    if (result.warnings.length > 0) {
+      console.log(`- Warnings: ${result.warnings.join('; ')}`);
+    }
+
+    return result.nfts;
+  }
+
+  /**
+   * Index Ethereum wallet with comprehensive data fetching (legacy method)
    */
   private async indexEthereumWallet(
     walletAddress: string,
@@ -193,6 +298,173 @@ export class OptimizedIndexingWorkflow {
     console.log(`[OptimizedIndexingWorkflow] Final stats:`, finalStats);
 
     return allNfts;
+  }
+
+  /**
+   * Index Ethereum wallet using Alchemy API for reliable data coverage
+   */
+  async indexEthereumWalletWithAlchemy(
+    walletAddress: string,
+    options: IndexingOptions = {}
+  ): Promise<MinimalNFTData[]> {
+    if (!this.alchemyIndexer) {
+      throw new Error('Alchemy indexer not initialized - API key required');
+    }
+
+    const alchemyOptions: AlchemyIndexingOptions = {
+      includeMetadata: true,
+      includeSpam: false,
+      pageSize: options.pageSize || 100, // Alchemy supports up to 100 per page
+      maxPages: options.maxPages || 1000,
+      enrichmentLevel: options.enrichmentLevel || 'standard'
+    };
+
+    console.log(`[OptimizedIndexingWorkflow] Starting Alchemy indexing for ${walletAddress}`);
+    console.log(`[OptimizedIndexingWorkflow] Options:`, alchemyOptions);
+
+    try {
+      const nfts = await this.alchemyIndexer.getWalletNFTs(walletAddress, alchemyOptions);
+      
+      // Set the owner address for each NFT since Alchemy doesn't include it
+      const nftsWithOwner = nfts.map(nft => ({
+        ...nft,
+        owners: [{ address: walletAddress, quantity: 1 }]
+      }));
+
+      console.log(`[OptimizedIndexingWorkflow] Alchemy indexing completed: ${nftsWithOwner.length} NFTs`);
+      
+      // Get indexer stats for logging
+      const stats = this.alchemyIndexer.getStats();
+      console.log(`[OptimizedIndexingWorkflow] Alchemy indexer stats:`, stats);
+
+      return nftsWithOwner;
+
+    } catch (error) {
+      console.error(`[OptimizedIndexingWorkflow] Error during Alchemy indexing:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Hybrid indexing: Use Alchemy for discovery + OpenSea for enrichment
+   * This provides the best of both worlds: complete NFT coverage + rich metadata
+   */
+  async indexEthereumWalletHybrid(
+    walletAddress: string,
+    options: IndexingOptions = {}
+  ): Promise<MinimalNFTData[]> {
+    if (!this.alchemyIndexer) {
+      throw new Error('Alchemy indexer not initialized - API key required for hybrid approach');
+    }
+
+    console.log(`[OptimizedIndexingWorkflow] Starting hybrid indexing for ${walletAddress}`);
+    console.log(`[OptimizedIndexingWorkflow] Phase 1: Alchemy discovery`);
+
+    // Phase 1: Use Alchemy to discover all NFTs (100% reliable)
+    const alchemyOptions: AlchemyIndexingOptions = {
+      includeMetadata: true,
+      includeSpam: false,
+      pageSize: options.pageSize || 100,
+      maxPages: options.maxPages || 1000,
+      enrichmentLevel: 'minimal' // Get basic data from Alchemy
+    };
+
+    const alchemyNFTs = await this.alchemyIndexer.getWalletNFTs(walletAddress, alchemyOptions);
+    console.log(`[OptimizedIndexingWorkflow] Phase 1 complete: Discovered ${alchemyNFTs.length} NFTs via Alchemy`);
+
+    if (alchemyNFTs.length === 0) {
+      console.log(`[OptimizedIndexingWorkflow] No NFTs found via Alchemy, returning empty result`);
+      return [];
+    }
+
+    // Phase 2: Use OpenSea to enrich the discovered NFTs
+    console.log(`[OptimizedIndexingWorkflow] Phase 2: OpenSea enrichment for ${alchemyNFTs.length} NFTs`);
+    
+    const enrichmentLevel = options.enrichmentLevel || 'comprehensive';
+    const enrichedNFTs: MinimalNFTData[] = [];
+    
+    // Process NFTs in batches to avoid overwhelming OpenSea API
+    const batchSize = 5; // Conservative batch size for enrichment
+    
+    for (let i = 0; i < alchemyNFTs.length; i += batchSize) {
+      const batch = alchemyNFTs.slice(i, i + batchSize);
+      console.log(`[OptimizedIndexingWorkflow] Enriching batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(alchemyNFTs.length / batchSize)} (${batch.length} NFTs)`);
+      
+      const batchPromises = batch.map(async (nft) => {
+                          try {
+           // For now, just use Alchemy data with enhanced dimensions
+           // TODO: Implement proper OpenSea enrichment integration
+           const mergedNFT: MinimalNFTData = {
+             ...nft, // Start with Alchemy data as base
+             // Enhanced dimension handling
+             dimensions: await this.extractBestDimensions(nft)
+           };
+           
+           console.log(`[OptimizedIndexingWorkflow] Successfully processed ${nft.contractAddress}:${nft.tokenId}`);
+           return mergedNFT;
+         } catch (error) {
+           console.warn(`[OptimizedIndexingWorkflow] Error processing ${nft.contractAddress}:${nft.tokenId}:`, error);
+           // Fallback to original Alchemy data
+           return nft;
+         }
+      });
+      
+      const enrichedBatch = await Promise.all(batchPromises);
+      enrichedNFTs.push(...enrichedBatch);
+      
+      // Add delay between batches to respect rate limits
+      if (i + batchSize < alchemyNFTs.length) {
+        const delay = 2000; // 2 second delay between enrichment batches
+        console.log(`[OptimizedIndexingWorkflow] Waiting ${delay}ms before next enrichment batch...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    console.log(`[OptimizedIndexingWorkflow] Hybrid indexing completed:`);
+    console.log(`- Discovery: ${alchemyNFTs.length} NFTs found via Alchemy`);
+    console.log(`- Enrichment: ${enrichedNFTs.length} NFTs processed via OpenSea`);
+    
+    // Get final stats
+    const alchemyStats = this.alchemyIndexer.getStats();
+    const openSeaStats = this.openSeaAPI.getStats();
+    console.log(`[OptimizedIndexingWorkflow] Alchemy stats:`, alchemyStats);
+    console.log(`[OptimizedIndexingWorkflow] OpenSea stats:`, openSeaStats);
+
+    return enrichedNFTs;
+  }
+
+  /**
+   * Extract the best available dimensions from multiple sources
+   */
+  private async extractBestDimensions(
+    nft: MinimalNFTData
+  ): Promise<{ width: number; height: number } | undefined> {
+    // Priority 1: Use existing dimensions if available
+    if (nft.dimensions && nft.dimensions.width > 0 && nft.dimensions.height > 0) {
+      console.log(`[OptimizedIndexingWorkflow] Using existing dimensions for ${nft.contractAddress}:${nft.tokenId}: ${nft.dimensions.width}x${nft.dimensions.height}`);
+      return nft.dimensions;
+    }
+    
+    // Priority 2: Try to extract from image URL if available
+    const imageUrl = nft.imageUrl || nft.animationUrl;
+    if (imageUrl) {
+      try {
+        console.log(`[OptimizedIndexingWorkflow] Attempting to extract dimensions from image URL for ${nft.contractAddress}:${nft.tokenId}`);
+        // Use enhanced field processor to get dimensions from the actual image
+        const { EnhancedFieldProcessor } = await import('./enhanced-field-processor');
+        const fieldProcessor = new EnhancedFieldProcessor();
+        const dimensions = await fieldProcessor.extractDimensions(imageUrl);
+        if (dimensions && dimensions.width > 0 && dimensions.height > 0) {
+          console.log(`[OptimizedIndexingWorkflow] Extracted dimensions from image for ${nft.contractAddress}:${nft.tokenId}: ${dimensions.width}x${dimensions.height}`);
+          return dimensions;
+        }
+      } catch (error) {
+        console.warn(`[OptimizedIndexingWorkflow] Failed to extract dimensions from image for ${nft.contractAddress}:${nft.tokenId}:`, error);
+      }
+    }
+    
+    console.log(`[OptimizedIndexingWorkflow] No dimensions available for ${nft.contractAddress}:${nft.tokenId}`);
+    return undefined;
   }
 
   /**

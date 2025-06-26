@@ -11,6 +11,7 @@ import { EnhancedFieldProcessor } from '../enhanced-field-processor';
 import { MinimalNFTTransformer } from '$lib/minimal-transformers';
 import { handleMediaUpload } from '$lib/mediaHelpers';
 import { detectBlockchainFromContract } from '$lib/utils/walletUtils.js';
+import { cachedCollectionQueries, cachedArtworkQueries, cachedArtistQueries, cachedSearchQueries } from '../cache/db-cache';
 
 // Unified indexer format (stored as json string in database)
 export interface IndexerData {
@@ -458,6 +459,12 @@ export class UnifiedIndexer {
           collectionId = collection.id;
           result.collectionId = collection.id;
           result.createdRecords.collection = true;
+          
+          // Invalidate collection cache since collection was created/updated
+          await cachedCollectionQueries.invalidate(collection.id, collection.slug);
+          
+          // Invalidate search cache since collection data has changed
+          await cachedSearchQueries.invalidate();
         } catch (error) {
           // Silently continue if collection creation fails
         }

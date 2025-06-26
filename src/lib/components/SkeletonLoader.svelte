@@ -30,17 +30,15 @@
 		contain: paint;
 	}
 
-	@media (prefers-color-scheme: dark) {
-		.shimmer {
-			background: linear-gradient(
-				90deg,
-				rgba(120, 120, 120, 0) 0%,
-				rgba(160, 160, 160, 0.3) 20%,
-				rgba(200, 200, 200, 0.5) 50%,
-				rgba(160, 160, 160, 0.3) 80%,
-				rgba(120, 120, 120, 0) 100%
-			);
-		}
+	:global(.dark) .shimmer {
+		background: linear-gradient(
+			90deg,
+			rgba(120, 120, 120, 0) 0%,
+			rgba(160, 160, 160, 0.3) 20%,
+			rgba(200, 200, 200, 0.5) 50%,
+			rgba(160, 160, 160, 0.3) 80%,
+			rgba(120, 120, 120, 0) 100%
+		);
 	}
 
 	@keyframes shimmer {

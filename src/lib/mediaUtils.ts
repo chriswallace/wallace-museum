@@ -9,22 +9,25 @@ import crypto from 'crypto';
 // 	'https://dweb.link/ipfs/',
 // 	'https://ipfs.io/ipfs/'
 // ];
-const DEFAULT_IPFS_GATEWAY = 'https://nftstorage.link/ipfs/';
+const DEFAULT_IPFS_GATEWAY = 'https://dweb.link/ipfs/'; // Use public gateway for indexing
 const ONCHFS_GATEWAY = 'https://onchfs.fxhash2.xyz/';
 const ARWEAVE_GATEWAY = 'https://arweave.net/';
 
-// Note: IPFS content will be handled by the Wallace Museum IPFS microservice
-// The client-side code will use the external microservice for IPFS access
-const IPFS_MICROSERVICE_ENDPOINT = 'https://ipfs.wallacemuseum.com/ipfs/';
-const PINATA_GATEWAY_TOKEN = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
+// Note: For indexing operations, use public IPFS gateways instead of wallacemuseum.com
+// The indexing process will use reliable public gateways for IPFS access
+const IPFS_MICROSERVICE_ENDPOINT = 'https://dweb.link/ipfs/'; // Use public gateway for indexing
+const PINATA_GATEWAY_TOKEN = ''; // Not needed for public gateways during indexing
 
 /**
- * A set of reliable IPFS gateways to try in sequence
- * Note: Primary IPFS access is via Wallace Museum IPFS microservice
+ * A set of reliable IPFS gateways to try in sequence for indexing
+ * Note: Wallace Museum gateway excluded for indexing operations
+ * Note: Cloudflare IPFS gateway permanently offline, excluded
  */
 export const IPFS_GATEWAYS = [
-	'https://nftstorage.link/ipfs/',
-	'https://ipfs.io/ipfs/'
+	'https://dweb.link/ipfs/',               // Primary: Protocol Labs gateway for indexing
+	'https://ipfs.io/ipfs/',                 // Fallback: Public IPFS.io gateway
+	'https://nftstorage.link/ipfs/',         // Fallback: NFT.Storage gateway
+	'https://gateway.pinata.cloud/ipfs/'     // Fallback: Pinata public gateway
 ];
 
 export function createHashForString(inputString: string | null | undefined): string {
@@ -200,7 +203,6 @@ export function ipfsToHttpUrlForHtml(
 			/https?:\/\/gateway\.pinata\.cloud\/ipfs\/(.+)/,
 			/https?:\/\/.*\.mypinata\.cloud\/ipfs\/(.+)/,
 			/https?:\/\/nftstorage\.link\/ipfs\/(.+)/,
-			/https?:\/\/cloudflare-ipfs\.com\/ipfs\/(.+)/,
 			/https?:\/\/ipfs\.io\/ipfs\/(.+)/,
 			/https?:\/\/ipfs\.wallacemuseum\.com\/ipfs\/(.+)/,
 			/https?:\/\/.*\/ipfs\/(.+)/
@@ -310,7 +312,6 @@ export function ipfsToHttpUrl(
 			/https?:\/\/gateway\.pinata\.cloud\/ipfs\/(.+)/,
 			/https?:\/\/.*\.mypinata\.cloud\/ipfs\/(.+)/,
 			/https?:\/\/nftstorage\.link\/ipfs\/(.+)/,
-			/https?:\/\/cloudflare-ipfs\.com\/ipfs\/(.+)/,
 			/https?:\/\/ipfs\.io\/ipfs\/(.+)/,
 			/https?:\/\/.*\/ipfs\/(.+)/
 		];
@@ -332,13 +333,13 @@ export function ipfsToHttpUrl(
 						return cleanUri; // Return original if CID is invalid
 					}
 
-					// Build microservice URL manually to preserve existing encoding
-					let microserviceUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
+					// Build public gateway URL manually to preserve existing encoding
+					let gatewayUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
 					if (path) {
-						microserviceUrl += `/${path}`;
+						gatewayUrl += `/${path}`;
 					}
-					microserviceUrl += `?pinataGatewayToken=${PINATA_GATEWAY_TOKEN}`;
-					return microserviceUrl;
+					// No token needed for public gateways during indexing
+					return gatewayUrl;
 				}
 
 				return gateway + cidAndPath;
@@ -354,7 +355,7 @@ export function ipfsToHttpUrl(
 		// Remove ipfs:// or ipfs:/ prefix
 		let cleaned = cleanUri.replace(/^ipfs:\/\//, '').replace(/^ipfs:\//, '');
 
-		// Use our IPFS microservice for authenticated access
+		// Use public IPFS gateway for indexing operations
 		if (useProxy) {
 			const pathParts = cleaned.split('/');
 			const cid = pathParts[0];
@@ -368,13 +369,13 @@ export function ipfsToHttpUrl(
 				return ''; // Return empty for invalid IPFS URIs
 			}
 
-			// Build microservice URL manually to preserve existing encoding
-			let microserviceUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
+			// Build public gateway URL manually to preserve existing encoding
+			let gatewayUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
 			if (path) {
-				microserviceUrl += `/${path}`;
+				gatewayUrl += `/${path}`;
 			}
-			microserviceUrl += `?pinataGatewayToken=${PINATA_GATEWAY_TOKEN}`;
-			return microserviceUrl;
+			// No token needed for public gateways during indexing
+			return gatewayUrl;
 		}
 
 		return gateway + cleaned;
@@ -382,19 +383,19 @@ export function ipfsToHttpUrl(
 
 	// Handle IPFS paths without protocol (raw CIDs or CID/path)
 	if (cleanUri.startsWith('Qm') || cleanUri.startsWith('bafy')) {
-		// Use our IPFS microservice for IPFS access
+		// Use public IPFS gateway for indexing operations
 		if (useProxy) {
 			const pathParts = cleanUri.split('/');
 			const cid = pathParts[0];
 			const path = pathParts.slice(1).join('/');
 
-			// Build microservice URL manually to preserve existing encoding
-			let microserviceUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
+			// Build public gateway URL manually to preserve existing encoding
+			let gatewayUrl = IPFS_MICROSERVICE_ENDPOINT + cid;
 			if (path) {
-				microserviceUrl += `/${path}`;
+				gatewayUrl += `/${path}`;
 			}
-			microserviceUrl += `?pinataGatewayToken=${PINATA_GATEWAY_TOKEN}`;
-			return microserviceUrl;
+			// No token needed for public gateways during indexing
+			return gatewayUrl;
 		}
 
 		return gateway + cleanUri;

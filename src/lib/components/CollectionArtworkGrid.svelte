@@ -45,10 +45,26 @@
 
 <style lang="scss">
 	.artwork-grid {
-		@apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4;
+		@apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3;
 
 		&.search-grid {
-			@apply grid-cols-4 gap-4 w-full max-h-[60vh] overflow-y-scroll mt-8 items-start justify-start;
+			@apply grid-cols-4 gap-3 w-full max-h-[60vh] overflow-y-scroll mt-8 items-start justify-start;
+		}
+		
+		@media (min-width: 768px) {
+			@apply gap-4;
+			
+			&.search-grid {
+				@apply gap-4;
+			}
+		}
+		
+		@media (min-width: 1024px) {
+			@apply gap-4;
+			
+			&.search-grid {
+				@apply gap-4;
+			}
 		}
 	}
 

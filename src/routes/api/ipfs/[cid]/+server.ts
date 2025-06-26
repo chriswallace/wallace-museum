@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-const IPFS_GATEWAY = 'https://ipfs.wallacemuseum.com/ipfs/';
+const IPFS_GATEWAY = 'https://dweb.link/ipfs/'; // Use public gateway for reliability
 const PINATA_GATEWAY_TOKEN = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
 
 export const GET: RequestHandler = async ({ params, url, fetch }) => {

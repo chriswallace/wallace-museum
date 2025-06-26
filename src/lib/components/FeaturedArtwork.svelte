@@ -3,7 +3,9 @@
 	import { goto } from '$app/navigation';
 	import OptimizedImage from './OptimizedImage.svelte';
 	import LoaderWrapper from './LoaderWrapper.svelte';
-	import ArtworkDisplay from './ArtworkDisplay.svelte';
+	import ArtworkStage from './ArtworkStage.svelte';
+	import ArtistAvatar from './ArtistAvatar.svelte';
+	import { ipfsToHttpUrl } from '$lib/mediaUtils.js';
 
 	interface FeaturedArtworkData {
 		id: string;
@@ -139,64 +141,22 @@
 		<div class="featured-content">
 			<!-- Featured Artwork Display -->
 			<div class="artwork-display">
-				<button 
-					class="artwork-stage" 
-					on:click={handleArtworkClick}
-					aria-label="View {featuredArtwork.title}"
-				>
-					<div class="stage">
-						{#if featuredArtwork.animationUrl || featuredArtwork.imageUrl || featuredArtwork.generatorUrl}
-							{@const displayUrl = featuredArtwork.imageUrl || featuredArtwork.animationUrl || featuredArtwork.generatorUrl}
-							{@const isVideo = featuredArtwork.mime?.startsWith('video/') || featuredArtwork.animationUrl?.match(/\.(mp4|webm|mov|avi)$/i)}
-							{@const forcedMimeType = isVideo ? featuredArtwork.mime : 'image/png'}
-							
-							{#if isVideo && featuredArtwork.animationUrl}
-								<video
-									src={featuredArtwork.animationUrl}
-									class="featured-video"
-									muted
-									autoplay
-									loop
-									playsinline
-									preload="metadata"
-								>
-									<!-- Fallback to image if video fails -->
-									{#if featuredArtwork.imageUrl}
-										<OptimizedImage
-											src={featuredArtwork.imageUrl}
-											alt={featuredArtwork.title}
-											fit="contain"
-											format="auto"
-											quality={85}
-											className="featured-image"
-											fallbackSrc="/images/medici-image.png"
-											loading="eager"
-											mimeType={forcedMimeType}
-										/>
-									{/if}
-								</video>
-							{:else if displayUrl}
-								<OptimizedImage
-									src={displayUrl}
-									alt={featuredArtwork.title}
-									fit="contain"
-									format="auto"
-									quality={85}
-									className="featured-image"
-									fallbackSrc="/images/medici-image.png"
-									loading="eager"
-									mimeType={forcedMimeType}
-								/>
-							{/if}
-						{:else}
-							<div class="image-placeholder">
-								<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-									<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-								</svg>
-							</div>
-						{/if}
-					</div>
-				</button>
+				<ArtworkStage
+					artwork={{
+						id: featuredArtwork.id,
+						title: featuredArtwork.title,
+						imageUrl: featuredArtwork.imageUrl,
+						animationUrl: featuredArtwork.animationUrl,
+						mime: featuredArtwork.mime,
+						dimensions: featuredArtwork.dimensions
+					}}
+					aspectRatio="auto"
+					onClick={handleArtworkClick}
+					className="featured-stage"
+					loading="eager"
+					quality={90}
+					showShadow={true}
+				/>
 			</div>
 
 			<!-- Artwork Information -->
@@ -223,28 +183,13 @@
 								on:click={() => handleArtistClick(artist.id)}
 								aria-label="View {artist.name}'s profile"
 							>
-								{#if artist.avatarUrl}
-									<div class="artist-avatar">
-										<OptimizedImage
-											src={artist.avatarUrl}
-											alt="{artist.name} avatar"
-											width={48}
-											height={48}
-											fit="cover"
-											format="auto"
-											quality={85}
-											className="avatar-image"
-											fallbackSrc="/images/medici-image.png"
-											loading="eager"
-										/>
-									</div>
-								{:else}
-									<div class="artist-avatar-placeholder">
-										<svg viewBox="0 0 24 24" fill="currentColor" class="avatar-icon">
-											<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-										</svg>
-									</div>
-								{/if}
+								<div class="artist-avatar">
+									<ArtistAvatar 
+										artist={artist} 
+										size="lg" 
+										className="avatar-image"
+									/>
+								</div>
 								<div class="artist-info">
 									<div class="artist-name">{artist.name}</div>
 									<div class="artist-stats">
@@ -268,7 +213,7 @@
 							{#if featuredArtwork.collection.imageUrl}
 								<div class="collection-image">
 									<OptimizedImage
-										src={featuredArtwork.collection.imageUrl}
+										src={ipfsToHttpUrl(featuredArtwork.collection.imageUrl)}
 										alt="{featuredArtwork.collection.title} collection"
 										width={48}
 										height={48}
@@ -303,29 +248,8 @@
 
 <style lang="scss">
 	.featured-section {
-		@apply w-full max-w-7xl mx-auto px-4;
-		@apply relative;
-		
-		/* Increased spacing for better pacing */
-		margin-bottom: 8rem;
-		
-		/* Mobile-first approach */
-		@media (max-width: 768px) {
-			min-height: auto;
-			margin-bottom: 4rem;
-			padding-left: 1rem;
-			padding-right: 1rem;
-		}
-		
-		/* Tablet and up */
-		@media (min-width: 769px) {
-			margin-bottom: 10rem;
-		}
-		
-		/* Desktop */
-		@media (min-width: 1024px) {
-			margin-bottom: 12rem;
-		}
+		@apply w-full max-w-7xl mx-auto px-4 md:px-4 relative;
+		@apply mb-16 md:mb-40 lg:mb-48;
 		
 		/* Fade-in animation */
 		opacity: 0;
@@ -341,13 +265,8 @@
 		&::before {
 			content: '';
 			@apply absolute -inset-x-4 -inset-y-8 bg-gradient-to-b from-transparent via-gray-50/20 to-transparent dark:via-gray-900/20;
-			@apply pointer-events-none;
+			@apply pointer-events-none hidden md:block;
 			border-radius: 2rem;
-			
-			/* Hide gradient on mobile for cleaner look */
-			@media (max-width: 768px) {
-				display: none;
-			}
 		}
 		
 		> * {
@@ -368,56 +287,25 @@
 	}
 
 	.featured-content {
-		@apply grid grid-cols-1 gap-6 items-center;
+		@apply grid grid-cols-1 gap-2 md:gap-6 lg:gap-8 xl:gap-16 items-center;
+		@apply lg:grid-cols-2;
 		
-		/* Mobile-first: single column with smaller gaps */
-		@media (max-width: 768px) {
-			gap: 1.5rem;
-			min-height: auto;
-		}
-		
-		/* Tablet: still single column but larger gaps */
-		@media (min-width: 769px) and (max-width: 1023px) {
-			gap: 2rem;
-			min-height: calc(100vh - var(--navbar-height) - 6rem);
-		}
-		
-		/* Desktop: two columns */
-		@media (min-width: 1024px) {
-			@apply lg:grid-cols-2 lg:gap-16;
-			min-height: calc(100vh - var(--navbar-height) - 6rem);
+		/* Responsive min-height */
+		@media (min-width: 769px) {
+			min-height: calc(100vh - var(--navbar-height));
 		}
 	}
 
 	.artwork-display {
-		@apply w-full flex items-center justify-center;
-		
-		/* Mobile: ensure proper order and sizing */
-		@media (max-width: 1023px) {
-			order: 1;
-		}
+		@apply w-full flex items-center justify-center order-1 lg:order-none;
+		@apply h-[50vh] lg:h-[70vh] overflow-hidden;
+		max-height: calc(100vh - var(--navbar-height, 80px) - 8rem);
 	}
 
-	.artwork-stage {
-		@apply w-full bg-transparent border-none p-0 cursor-pointer block;
-		@apply transition-transform duration-300 hover:scale-[1.01] focus:outline-none focus:scale-[1.01];
-	}
-
-	.stage {
-		@apply bg-gray-100 dark:bg-gray-950/70 w-full overflow-hidden flex items-center justify-center;
-		@apply shadow-2xl;
-		
-		/* Set to 1:1 square aspect ratio and fill available width */
-		aspect-ratio: 1 / 1;
-		width: 100%;
-	}
-
-	.featured-video {
-		@apply w-full h-full object-contain;
-	}
-
-	:global(.featured-image) {
-		@apply w-full h-full object-contain;
+	:global(.featured-stage) {
+		@apply w-full h-full;
+		max-width: 100%;
+		max-height: 100%;
 	}
 
 	.image-placeholder {
@@ -429,24 +317,9 @@
 	}
 
 	.artwork-details {
-		@apply space-y-4 flex flex-col justify-center overflow-y-auto;
-		padding: 1rem 0;
-		
-		/* Mobile: ensure proper spacing and order */
-		@media (max-width: 1023px) {
-			order: 2;
-			space-y: 1rem;
-			padding: 0.5rem 0;
-			height: auto;
-			max-height: none;
-		}
-		
-		/* Desktop */
-		@media (min-width: 1024px) {
-			@apply space-y-6;
-			height: 100%;
-			max-height: 100%;
-		}
+		@apply space-y-4 lg:space-y-6 flex flex-col justify-center overflow-y-auto;
+		@apply py-2 lg:py-4 order-2 lg:order-none;
+		@apply h-auto max-h-none lg:h-full lg:max-h-full;
 	}
 
 	.featured-label {
@@ -464,27 +337,8 @@
 
 	.artwork-title {
 		@apply font-bold leading-tight mb-3;
+		@apply text-2xl sm:text-3xl md:text-4xl;
 		word-break: break-word;
-		
-		/* Mobile-first typography */
-		font-size: 1.5rem; /* 24px */
-		line-height: 1.2;
-		
-		@media (min-width: 480px) {
-			font-size: 1.75rem; /* 28px */
-		}
-		
-		@media (min-width: 768px) {
-			font-size: 2rem; /* 32px */
-		}
-		
-		@media (min-width: 1024px) {
-			font-size: 2.25rem; /* 36px */
-		}
-		
-		@media (min-width: 1280px) {
-			font-size: 2.5rem; /* 40px */
-		}
 	}
 
 	.artwork-description {
@@ -500,23 +354,15 @@
 	}
 
 	.artist-card {
-		@apply w-full flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-colors cursor-pointer border-none;
+		@apply w-full flex items-center gap-3 cursor-pointer mb-3;
 	}
 
 	.artist-avatar {
 		@apply w-12 h-12 rounded-full overflow-hidden bg-gray-700 flex-shrink-0;
 	}
 
-	.artist-avatar-placeholder {
-		@apply w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0;
-	}
-
 	:global(.avatar-image) {
 		@apply w-full h-full object-cover;
-	}
-
-	.avatar-icon {
-		@apply w-6 h-6 text-gray-400;
 	}
 
 	.artist-info {
@@ -536,7 +382,7 @@
 	}
 
 	.collection-card {
-		@apply w-full flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-colors cursor-pointer border-none;
+		@apply w-full flex items-center gap-3 cursor-pointer border-none;
 	}
 
 	.collection-image {
@@ -567,60 +413,5 @@
 		@apply text-sm text-gray-600 dark:text-gray-400;
 	}
 
-	/* Responsive adjustments using Tailwind prefixes */
-	.featured-section {
-		/* Remove these conflicting rules */
-		/* @apply lg:min-h-[calc(100svh-var(--navbar-height))] lg:max-h-[calc(100svh-var(--navbar-height))]; */
-	}
 
-	.featured-content {
-		/* Remove this conflicting rule */
-		/* @apply lg:min-h-[calc(100svh-var(--navbar-height))]; */
-	}
-
-	.artwork-display {
-		/* Remove this conflicting rule */
-		/* @apply lg:order-none order-1; */
-	}
-
-	.artwork-details {
-		/* Remove these conflicting rules */
-		/* @apply lg:order-none lg:h-full lg:max-h-full order-2 h-auto max-h-none; */
-	}
-
-	.stage {
-		/* Remove these conflicting rules that were causing mobile issues */
-		/* @apply lg:h-[calc(100vh-var(--navbar-height)-8rem)] lg:max-h-[80vh] lg:min-h-[500px] 
-			   md:h-[60vh] md:min-h-[400px] md:max-h-[600px]
-			   sm:h-[50vh] sm:min-h-[300px] sm:max-h-[500px]; */
-	}
-
-	.artwork-title {
-		@apply sm:text-2xl md:text-3xl lg:text-4xl;
-	}
-
-	.featured-label {
-		@apply sm:text-sm;
-	}
-
-	.artist-name, .collection-name {
-		@apply lg:text-base lg:font-medium;
-	}
-
-	.artist-stats, .collection-stats {
-		@apply lg:text-sm;
-	}
-
-	.artist-avatar, .artist-avatar-placeholder,
-	.collection-image, .collection-image-placeholder {
-		@apply lg:w-12 lg:h-12;
-	}
-
-	.avatar-icon, .collection-icon {
-		@apply lg:w-6 lg:h-6;
-	}
-
-	.artist-card, .collection-card {
-		@apply lg:gap-3 lg:p-3 lg:rounded-lg;
-	}
 </style> 

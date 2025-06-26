@@ -52,9 +52,12 @@ export const load: PageServerLoad = async ({ params }) => {
 			thumbnail_url: artwork.thumbnailUrl,
 			dimensions: artwork.dimensions,
 			contractAddr: artwork.contractAddress,
+			contractAddress: artwork.contractAddress, // Add this for platform links
 			contractAlias: null,
 			tokenStandard: artwork.tokenStandard,
 			tokenID: artwork.tokenId,
+			tokenId: artwork.tokenId, // Add this for platform links
+			blockchain: artwork.blockchain, // Add this for platform links
 			mintDate: artwork.mintDate,
 			mime: artwork.mime,
 			tags: null,

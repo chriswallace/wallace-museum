@@ -17,7 +17,8 @@ async function processWallet(
 	walletAddress: string, 
 	blockchain: string, 
 	indexingWorkflow: OptimizedIndexingWorkflow, 
-	dbOps: MinimalDBOperations
+	dbOps: MinimalDBOperations,
+	provider: 'opensea' | 'alchemy' = 'opensea'
 ) {
 	let result = {
 		walletAddress: walletAddress,
@@ -34,15 +35,18 @@ async function processWallet(
 	try {
 		// Process based on blockchain
 		if (blockchain === 'ethereum') {
-			// Fetch owned NFTs with comprehensive data
+			// Fetch owned NFTs with comprehensive data and enhanced pagination
 			const ownedNFTs = await indexingWorkflow.indexWalletNFTs(
 				walletAddress, 
 				'ethereum', 
 				'owned',
 				{ 
-					maxPages: 300,
+					maxPages: 500, // Increased for enhanced pagination
 					pageSize: 50,
-					enrichmentLevel: 'comprehensive' // Keep comprehensive data fetching
+					enrichmentLevel: 'comprehensive', // Keep comprehensive data fetching
+					useEnhancedPagination: true, // Enable enhanced pagination to work around OpenSea limits
+					expectedNFTCount: undefined, // We don't know the expected count, but enhanced pagination will adapt
+					provider: provider // Use the requested provider
 				}
 			);
 			
@@ -118,16 +122,21 @@ export const GET: RequestHandler = async ({ url, request, cookies, locals }) => 
 	const forceRefresh = url.searchParams.get('forceRefresh') === 'true' || url.searchParams.get('force') === 'true';
 	const blockchainParam = url.searchParams.get('blockchain');
 	const walletIndexParam = url.searchParams.get('walletIndex'); // New parameter to process specific wallet by index
+	const providerParam = url.searchParams.get('provider') || 'hybrid'; // Default to hybrid approach
 
 	if (!env.OPENSEA_API_KEY) {
 		return json({ error: 'OpenSea API key not configured' }, { status: 500 });
+	}
+
+	if (providerParam === 'alchemy' && !env.ALCHEMY_API_KEY) {
+		return json({ error: 'Alchemy API key not configured but Alchemy provider requested' }, { status: 500 });
 	}
 
 	console.log(`[IndexWallets] Starting comprehensive indexing`);
 
 	try {
 		// Initialize optimized workflow and database operations
-		const indexingWorkflow = new OptimizedIndexingWorkflow(env.OPENSEA_API_KEY);
+		const indexingWorkflow = new OptimizedIndexingWorkflow(env.OPENSEA_API_KEY, env.ALCHEMY_API_KEY);
 		const dbOps = new MinimalDBOperations(prismaWrite);
 
 		// If no wallet address is provided, index all configured wallet addresses
@@ -163,7 +172,8 @@ export const GET: RequestHandler = async ({ url, request, cookies, locals }) => 
 					wallet.address, 
 					wallet.blockchain, 
 					indexingWorkflow, 
-					dbOps
+					dbOps,
+					providerParam as 'opensea' | 'alchemy'
 				);
 
 				return json({
@@ -189,7 +199,8 @@ export const GET: RequestHandler = async ({ url, request, cookies, locals }) => 
 					wallet.address, 
 					wallet.blockchain, 
 					indexingWorkflow, 
-					dbOps
+					dbOps,
+					providerParam as 'opensea' | 'alchemy'
 				);
 				
 				results.push({
@@ -235,7 +246,7 @@ export const GET: RequestHandler = async ({ url, request, cookies, locals }) => 
 
 		console.log(`[IndexWallets] Processing single wallet ${walletAddressParam} on ${blockchain} with comprehensive indexing`);
 
-		const result = await processWallet(walletAddressParam, blockchain, indexingWorkflow, dbOps);
+		const result = await processWallet(walletAddressParam, blockchain, indexingWorkflow, dbOps, providerParam as 'opensea' | 'alchemy');
 
 		return json({
 			success: true,

@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import OptimizedImage from './OptimizedImage.svelte';
 	import LoaderWrapper from './LoaderWrapper.svelte';
+	import ArtistAvatar from './ArtistAvatar.svelte';
 	import type { FeedArtwork } from '../../routes/api/artworks/random/+server';
 
 	let artworks: FeedArtwork[] = [];
@@ -150,28 +151,13 @@
 							<div class="artwork-artists">
 								{#each artwork.artists as artist, index}
 									<div class="artist-info">
-										{#if artist.avatarUrl}
-											<div class="artist-avatar">
-												<OptimizedImage
-													src={artist.avatarUrl}
-													alt="{artist.name} avatar"
-													width={32}
-													height={32}
-													fit="cover"
-													format="auto"
-													quality={85}
-													className="avatar-image"
-													fallbackSrc="/images/medici-image.png"
-													loading="lazy"
-												/>
-											</div>
-										{:else}
-											<div class="artist-avatar-placeholder">
-												<svg viewBox="0 0 24 24" fill="currentColor" class="avatar-icon">
-													<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-												</svg>
-											</div>
-										{/if}
+										<div class="artist-avatar">
+											<ArtistAvatar 
+												artist={artist} 
+												size="md" 
+												className="avatar-image"
+											/>
+										</div>
 										<span class="artist-name">{artist.name}</span>
 									</div>
 									{#if index < artwork.artists.length - 1}
@@ -232,7 +218,7 @@
 	}
 
 	.stage {
-		@apply bg-gray-100 dark:bg-gray-950/70 w-full overflow-hidden aspect-square flex items-center justify-center;
+		@apply bg-gray-100 dark:bg-gray-950/70 w-full h-full overflow-hidden flex items-center justify-center;
 	}
 
 	:global(.thumbnail-image) {
@@ -279,16 +265,8 @@
 		@apply w-8 h-8 rounded-full overflow-hidden bg-gray-700 flex-shrink-0;
 	}
 
-	.artist-avatar-placeholder {
-		@apply w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0;
-	}
-
 	:global(.avatar-image) {
 		@apply w-full h-full object-cover;
-	}
-
-	.avatar-icon {
-		@apply w-4 h-4 text-gray-400;
 	}
 
 	.artist-name {

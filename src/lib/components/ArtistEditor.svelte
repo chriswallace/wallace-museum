@@ -287,8 +287,12 @@
 
 					{/key}
 				{:else}
-					<div class="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-full">
-						<span class="text-gray-500 dark:text-gray-400 text-lg">No Avatar</span>
+					<div class="w-full h-full flex items-center justify-center border-2 border-gray-300 dark:border-gray-600 rounded-full overflow-hidden">
+						<img
+							src={placeholderAvatar(artist.name)}
+							alt="{artist.name} placeholder avatar"
+							class="w-full h-full object-cover"
+						/>
 					</div>
 				{/if}
 				

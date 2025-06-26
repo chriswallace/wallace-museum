@@ -1,12 +1,12 @@
 /**
- * Image optimization utilities for the Wallace Museum IPFS reverse proxy
- * Leverages the image transformation capabilities of https://ipfs.wallacemuseum.com
+ * Image optimization utilities using public IPFS gateways
+ * Uses reliable public gateways for consistent IPFS access during indexing
  */
 
 import { ipfsToHttpUrl } from './mediaUtils';
 
-// The Wallace Museum IPFS microservice endpoint
-const IPFS_DIRECT_ENDPOINT = 'https://ipfs.wallacemuseum.com/ipfs';
+// Use public gateway for reliable access during indexing
+const IPFS_DIRECT_ENDPOINT = 'https://dweb.link/ipfs';
 const PINATA_GATEWAY_TOKEN = 'ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6';
 
 export interface ImageOptimizationOptions {
@@ -236,9 +236,8 @@ export function buildOptimizedImageUrl(
 	// For GIF files, bypass optimization and serve directly to preserve animation
 	if (isGifFile(cleanImageUrl, options.mimeType)) {
 		console.log(`[buildOptimizedImageUrl] GIF detected, serving directly: ${cleanImageUrl}`);
-		// If it's an IPFS GIF, use direct IPFS URL, otherwise use the original URL
-		const directUrl = isIpfsUrl(cleanImageUrl) ? buildDirectImageUrl(cleanImageUrl) : cleanImageUrl;
-		return directUrl;
+		// If it's an IPFS GIF, use direct URL to preserve animation
+		return isIpfsUrl(cleanImageUrl) ? buildDirectImageUrl(cleanImageUrl) : cleanImageUrl;
 	}
 
 	// For non-IPFS URLs (like Arweave, HTTP, etc.), serve them directly
@@ -261,41 +260,36 @@ export function buildOptimizedImageUrl(
 		return ipfsToHttpUrl(cleanImageUrl);
 	}
 
-	// For now, bypass the optimization service due to authentication issues
-	// and use the direct Pinata gateway
-	return `https://gateway.pinata.cloud/ipfs/${cid}`;
+	// Build optimized URL using the Wallace Museum IPFS service
+	const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}`);
+	
+	// Add the gateway token for authentication
+	url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+	
+	// Add image optimization parameters using Pinata's naming conventions
+	if (options.width) url.searchParams.set('img-width', options.width.toString());
+	if (options.height) url.searchParams.set('img-height', options.height.toString());
+	if (options.dpr) url.searchParams.set('img-dpr', options.dpr.toString());
+	if (options.fit) url.searchParams.set('img-fit', options.fit);
+	if (options.gravity) {
+		// Handle face detection specifically
+		if (options.gravity === 'face' || options.gravity === 'faces') {
+			url.searchParams.set('img-gravity', 'face');
+		} else {
+			url.searchParams.set('img-gravity', options.gravity);
+		}
+	}
+	if (options.quality) url.searchParams.set('img-quality', options.quality.toString());
+	if (options.format) url.searchParams.set('img-format', options.format);
+	if (options.animation !== undefined) url.searchParams.set('img-anim', options.animation.toString());
+	if (options.sharpen) url.searchParams.set('img-sharpen', options.sharpen.toString());
+	if (options.metadata) url.searchParams.set('img-metadata', options.metadata);
 
-	// TODO: Re-enable optimization service when authentication is fixed
-	// Build optimized URL using Pinata's image optimization via gateway
-	// const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}`);
-	// 
-	// // Add the Pinata gateway token for authentication
-	// url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
-	// 
-	// // Add image optimization parameters using Pinata's naming conventions
-	// if (options.width) url.searchParams.set('img-width', options.width.toString());
-	// if (options.height) url.searchParams.set('img-height', options.height.toString());
-	// if (options.dpr) url.searchParams.set('img-dpr', options.dpr.toString());
-	// if (options.fit) url.searchParams.set('img-fit', options.fit);
-	// if (options.gravity) {
-	// 	// Handle face detection specifically
-	// 	if (options.gravity === 'face' || options.gravity === 'faces') {
-	// 		url.searchParams.set('img-gravity', 'face');
-	// 	} else {
-	// 		url.searchParams.set('img-gravity', options.gravity);
-	// 	}
-	// }
-	// if (options.quality) url.searchParams.set('img-quality', options.quality.toString());
-	// if (options.format) url.searchParams.set('img-format', options.format);
-	// if (options.animation !== undefined) url.searchParams.set('img-anim', options.animation.toString());
-	// if (options.sharpen) url.searchParams.set('img-sharpen', options.sharpen.toString());
-	// if (options.metadata) url.searchParams.set('img-metadata', options.metadata);
-
-	// return url.toString();
+	return url.toString();
 }
 
 /**
- * Build a direct CID URL using the standard Pinata gateway
+ * Build a direct CID URL using the authenticated Pinata gateway
  */
 export function buildDirectImageUrl(imageUrl: string | null | undefined): string {
 	if (!imageUrl) return '';
@@ -316,7 +310,10 @@ export function buildDirectImageUrl(imageUrl: string | null | undefined): string
 	const cidAndPath = extractCidAndPath(cleanImageUrl);
 	if (cidAndPath) {
 		const { cid, path } = cidAndPath;
-		return `https://gateway.pinata.cloud/ipfs/${cid}${path ? `/${path}` : ''}`;
+		// Use Wallace Museum IPFS service with authentication
+		const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}${path ? `/${path}` : ''}`);
+		url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+		return url.toString();
 	}
 
 	// Fallback: extract just the CID (for backwards compatibility)
@@ -325,7 +322,10 @@ export function buildDirectImageUrl(imageUrl: string | null | undefined): string
 		return ipfsToHttpUrl(cleanImageUrl);
 	}
 
-	return `https://gateway.pinata.cloud/ipfs/${cid}`;
+	// Use Wallace Museum IPFS service with authentication
+	const url = new URL(`${IPFS_DIRECT_ENDPOINT}/${cid}`);
+	url.searchParams.set('pinataGatewayToken', PINATA_GATEWAY_TOKEN);
+	return url.toString();
 }
 
 /**

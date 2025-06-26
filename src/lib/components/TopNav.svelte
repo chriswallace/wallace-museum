@@ -289,18 +289,9 @@
 
 	/* Mobile Navigation Styles */
 	.mobile-nav {
-		@apply flex items-center justify-between;
+		@apply flex items-center justify-between px-4 md:hidden;
 		height: var(--navbar-height);
 		min-height: var(--navbar-height);
-		
-		/* Mobile-first padding */
-		padding-left: 1rem;
-		padding-right: 1rem;
-		
-		/* Ensure it's hidden on medium screens and above */
-		@media (min-width: 768px) {
-			display: none !important;
-		}
 	}
 
 	.mobile-logo {
@@ -366,14 +357,9 @@
 
 	/* Desktop Navigation Styles */
 	.desktop-nav {
-		@apply w-full relative;
+		@apply w-full relative hidden md:block;
 		height: var(--navbar-height);
 		min-height: var(--navbar-height);
-		
-		/* Ensure it's hidden on small screens */
-		@media (max-width: 767px) {
-			display: none !important;
-		}
 	}
 
 	.page-logo {

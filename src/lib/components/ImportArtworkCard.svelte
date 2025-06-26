@@ -483,15 +483,9 @@
 	</tr>
 {/if}
 
-<style>
+<style lang="scss">
 	.grid-item.selected {
-		box-shadow: 0 0 0 2px rgb(59 130 246), 0 0 0 4px rgb(255 255 255);
-	}
-	
-	@media (prefers-color-scheme: dark) {
-		.grid-item.selected {
-			box-shadow: 0 0 0 2px rgb(59 130 246), 0 0 0 4px rgb(17 24 39);
-		}
+		@apply shadow-[0_0_0_2px_rgb(59_130_246),0_0_0_4px_rgb(255_255_255)] dark:shadow-[0_0_0_2px_rgb(59_130_246),0_0_0_4px_rgb(17_24_39)];
 	}
 	
 	.line-clamp-1 {

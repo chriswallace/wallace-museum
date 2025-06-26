@@ -693,10 +693,10 @@
 		return 'Unknown ID';
 	}
 
-	// Handle selective wallet import
-	async function handleSelectiveImport(selectedWallets: any[]) {
+	// Handle selective wallet indexing
+	async function handleSelectiveIndexing(selectedWallets: any[]) {
 		try {
-			console.log('handleSelectiveImport called with:', selectedWallets);
+			console.log('handleSelectiveIndexing called with:', selectedWallets);
 			showSelectiveImporter = false;
 			isSearching = true;
 			
@@ -704,8 +704,14 @@
 			searchResults = [];
 			currentOffset = 0;
 			
-			console.log('Calling selective import API...');
-			// Call the selective import API
+			// Show indexing progress toast
+			const toastId = toast.push(`Indexing ${selectedWallets.length} selected wallet${selectedWallets.length !== 1 ? 's' : ''}...`, { 
+				initial: 0,
+				theme: { '--toastBackground': 'var(--color-primary)', '--toastColor': 'white' }
+			});
+			
+			console.log('Calling selective indexing API...');
+			// Call the selective indexing API
 			const response = await fetch('/api/admin/import/selective', {
 				method: 'POST',
 				headers: {
@@ -713,31 +719,38 @@
 				},
 				body: JSON.stringify({
 					selectedWallets,
-					filter: 'all' // Use 'all' filter for selective import to get all artworks from selected wallets
+					filter: 'all' // Use 'all' filter to get all artworks from selected wallets
 				})
 			});
 			
 			const data = await response.json();
-			console.log('Selective import API response:', data);
+			console.log('Selective indexing API response:', data);
 			
 			if (response.ok) {
 				searchResults = data.results || [];
 				totalResults = data.total || 0;
-				hasMore = false; // Selective import loads all results at once
+				hasMore = false; // Selective indexing loads all results at once
 				
-				console.log(`Loaded ${searchResults.length} artworks from ${selectedWallets.length} selected wallets`);
+				console.log(`Indexed ${searchResults.length} NFTs from ${selectedWallets.length} selected wallets`);
 				
-				// Show success message
-				toast.push(`Loaded ${searchResults.length} artworks from ${selectedWallets.length} selected wallet${selectedWallets.length !== 1 ? 's' : ''}`, {
+				// Update the toast with success message
+				toast.set(toastId, {
+					msg: `✅ Successfully indexed ${searchResults.length} NFTs from ${selectedWallets.length} wallet${selectedWallets.length !== 1 ? 's' : ''}. Select NFTs below to import into your collection.`,
 					theme: { '--toastBackground': 'var(--color-success)', '--toastColor': 'white' }
 				});
 			} else {
-				console.error('Selective import error:', data.error);
-				toast.push(`Error: ${data.error || 'Failed to load artworks from selected wallets'}`);
+				console.error('Selective indexing error:', data.error);
+				// Update the toast with error message
+				toast.set(toastId, {
+					msg: `❌ Error: ${data.error || 'Failed to index NFTs from selected wallets'}`,
+					theme: { '--toastBackground': 'var(--color-error)', '--toastColor': 'white' }
+				});
 			}
 		} catch (error) {
-			console.error('Selective import error:', error);
-			toast.push(`Error: ${error instanceof Error ? error.message : 'Failed to load artworks from selected wallets'}`);
+			console.error('Selective indexing error:', error);
+			toast.push(`❌ Error: ${error instanceof Error ? error.message : 'Failed to index NFTs from selected wallets'}`, {
+				theme: { '--toastBackground': 'var(--color-error)', '--toastColor': 'white' }
+			});
 		} finally {
 			isSearching = false;
 		}
@@ -749,9 +762,9 @@
 	<!-- Header -->
 	<div class="admin-header border-b border-gray-200 dark:border-gray-700 pb-4">
 		<div>
-			<h1>Import NFTs</h1>
+			<h1>Index & Import NFTs</h1>
 			<p class="text-gray-600 dark:text-gray-400 text-base">
-				Import NFTs from indexed wallets into your Compendium.
+				Index NFTs from wallets, then import selected ones into your Compendium.
 			</p>
 		</div>
 		<div class="header-actions">
@@ -909,7 +922,7 @@
 								d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
 							/>
 						</svg>
-						Select Wallets to Import
+						Index Wallets Selectively
 					</button>
 				</div>
 			</div>
@@ -983,14 +996,14 @@
 				{#if isSearching}
 					<p class="text-gray-600 dark:text-gray-400">Searching...</p>
 				{:else}
-					<p class="text-gray-600 dark:text-gray-400">No results found. Try a different search.</p>
+					<p class="text-gray-600 dark:text-gray-400">No indexed NFTs found. Try indexing some wallets first or use a different search.</p>
 				{/if}
 			</div>
 		{:else}
 			<!-- Result count and view toggle -->
 			<div class="mb-4 flex justify-between items-center">
 				<div class="text-gray-600 dark:text-gray-400">
-					Found {totalResults} result{totalResults !== 1 ? 's' : ''} 
+					Found {totalResults} indexed NFT{totalResults !== 1 ? 's' : ''} ready to import
 					<button class="secondary button ml-4" on:click={toggleSelectAll}>
 						{selectAllText}
 					</button>
@@ -1090,7 +1103,7 @@
 		<div class="container mx-auto px-4 py-3 flex items-center justify-between">
 			<div class="flex items-center">
 				<div class="text-blue-600 dark:text-yellow-400 font-semibold">
-					{selectedIds.length} item{selectedIds.length !== 1 ? 's' : ''} selected
+					{selectedIds.length} indexed NFT{selectedIds.length !== 1 ? 's' : ''} selected
 				</div>
 			</div>
 
@@ -1131,7 +1144,7 @@
 					on:click={handleImportSelected}
 					disabled={selectedIds.length === 0}
 				>
-					Import Selected ({selectedIds.length})
+					Import to Collection ({selectedIds.length})
 				</button>
 			</div>
 		</div>
@@ -1152,7 +1165,7 @@
 {#if showSelectiveImporter}
 	<SelectiveWalletImporter
 		onClose={() => (showSelectiveImporter = false)}
-		onImport={handleSelectiveImport}
+		onImport={handleSelectiveIndexing}
 	/>
 {/if}
 

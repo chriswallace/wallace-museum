@@ -50,53 +50,21 @@
 	</div>
 </div>
 
-<style>
+<style lang="scss">
 	.iframe-skeleton {
-		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		overflow: hidden;
+		@apply relative flex items-center justify-center overflow-hidden;
 		/* Remove aspect-ratio from here since it's now handled in the style attribute */
 	}
 
 	.iframe-skeleton-overlay {
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 12px;
-		z-index: 2;
-		pointer-events: none;
+		@apply absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center gap-3 z-[2] pointer-events-none;
 	}
 
 	.iframe-skeleton-icon {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: rgba(0, 0, 0, 0.3);
+		@apply flex items-center justify-center text-black/30 dark:text-white/30;
 	}
 
 	.iframe-skeleton-text {
-		font-size: 14px;
-		color: rgba(0, 0, 0, 0.5);
-		margin: 0;
-		text-align: center;
-		font-weight: 500;
-	}
-
-	@media (prefers-color-scheme: dark) {
-		.iframe-skeleton-icon {
-			color: rgba(255, 255, 255, 0.3);
-		}
-
-		.iframe-skeleton-text {
-			color: rgba(255, 255, 255, 0.5);
-		}
+		@apply text-sm text-black/50 dark:text-white/50 m-0 text-center font-medium;
 	}
 </style> 

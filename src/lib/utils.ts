@@ -19,8 +19,33 @@ export function getCoverImages(artworks: Artwork[], defaultImage: string, maxIma
 }
 
 export function placeholderAvatar(name: string): string {
-	const formattedName = name.trim().replace(/\s+/g, '');
-	return `https://avatar.iran.liara.run/username?username=${formattedName}&length=1`;
+	const initial = name.trim().charAt(0).toUpperCase() || '?';
+	
+	// Generate a color based on the name
+	const colors = [
+		'#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+		'#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+		'#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2'
+	];
+	
+	let hash = 0;
+	for (let i = 0; i < name.length; i++) {
+		hash = name.charCodeAt(i) + ((hash << 5) - hash);
+	}
+	const color = colors[Math.abs(hash) % colors.length];
+	
+	// Generate SVG data URL
+	const svg = `<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+		<circle cx="50" cy="50" r="50" fill="${color}"/>
+		<text x="50" y="50" font-family="Arial, sans-serif" font-size="40" font-weight="bold" text-anchor="middle" dominant-baseline="central" fill="white">${initial}</text>
+	</svg>`;
+	
+	// Use Buffer for Node.js environment, btoa for browser
+	const base64 = typeof btoa !== 'undefined' 
+		? btoa(svg) 
+		: Buffer.from(svg).toString('base64');
+	
+	return `data:image/svg+xml;base64,${base64}`;
 }
 
 // Helper function to find a specific attribute by name

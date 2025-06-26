@@ -4,6 +4,7 @@ import { indexArtwork } from './artworkIndexer';
 import { convertToIpfsUrl } from '$lib/pinataHelpers';
 import { detectBlockchainFromContract } from '$lib/utils/walletUtils.js';
 import { isProblematicThumbnail, isVersumOrHicEtNuncContract, generateObjktThumbnailUrl } from '$lib/constants/tezos';
+import { cachedCollectionQueries, cachedSearchQueries } from '$lib/cache/db-cache';
 
 // Define interfaces for expected data structures
 interface SocialMediaAccounts {
@@ -498,13 +499,11 @@ export async function processArtist(artistInfo: ArtistInfo) {
 }
 
 export async function processCollection(collectionInfo: CollectionInfo) {
-	//console.log('[processCollection] Received collectionInfo:', JSON.stringify(collectionInfo));
 	const upsertParams = {
 		where: { slug: collectionInfo.contract },
 		update: {
 			title: collectionInfo.name ?? '',
 			description: collectionInfo.description ?? '',
-			enabled: true,
 			curatorNotes: collectionInfo.curatorNotes ?? ''
 		},
 		create: {
@@ -516,7 +515,15 @@ export async function processCollection(collectionInfo: CollectionInfo) {
 		}
 	};
 	//console.log('[processCollection] Upsert params:', JSON.stringify(upsertParams));
-	return await prismaWrite.collection.upsert(upsertParams);
+	const collection = await prismaWrite.collection.upsert(upsertParams);
+	
+	// Invalidate collection cache since collection was created/updated
+	await cachedCollectionQueries.invalidate(collection.id, collection.slug);
+	
+	// Invalidate search cache since collection data has changed
+	await cachedSearchQueries.invalidate();
+	
+	return collection;
 }
 
 export async function saveArtwork(

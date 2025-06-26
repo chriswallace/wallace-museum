@@ -3,8 +3,31 @@ import type { RequestHandler } from './$types';
 import { getWalletAddresses, addWalletAddress, removeWalletAddress } from '$lib/settingsManager';
 import { prismaRead } from '$lib/prisma';
 import { env } from '$env/dynamic/private';
+import { AlchemyNFTIndexer } from '$lib/alchemy-nft-indexer';
 
-// Function to get NFT count from OpenSea API by paginating through all NFTs
+// Function to get NFT count from Alchemy API (more reliable than OpenSea)
+async function getAlchemyNFTCount(walletAddress: string): Promise<number> {
+	try {
+		const apiKey = env.ALCHEMY_API_KEY;
+		if (!apiKey) {
+			console.warn('Alchemy API key not configured, falling back to OpenSea');
+			return getOpenSeaNFTCount(walletAddress);
+		}
+
+		const alchemyIndexer = new AlchemyNFTIndexer(apiKey);
+		const count = await alchemyIndexer.getWalletNFTCount(walletAddress);
+		
+		console.log(`[Alchemy Count] ${walletAddress}: ${count} NFTs`);
+		return count;
+
+	} catch (error) {
+		console.error(`Error fetching Alchemy NFT count for ${walletAddress}:`, error);
+		// Fallback to OpenSea if Alchemy fails
+		return getOpenSeaNFTCount(walletAddress);
+	}
+}
+
+// Function to get NFT count from OpenSea API with enhanced pagination (simplified to prevent infinite loops)
 async function getOpenSeaNFTCount(walletAddress: string): Promise<number> {
 	try {
 		const apiKey = env.OPENSEA_API_KEY;
@@ -16,44 +39,88 @@ async function getOpenSeaNFTCount(walletAddress: string): Promise<number> {
 		let totalCount = 0;
 		let nextCursor: string | undefined = undefined;
 		let pageCount = 0;
-		const maxPages = 100; // Reasonable limit to prevent infinite loops
-		const limit = 50; // OpenSea API limit
+		const maxPages = 200; // Reasonable limit - if we need more than 40,000 NFTs, something is wrong
+		const limit = 200; // OpenSea API maximum limit per page
+		let consecutiveFailures = 0;
+		const maxConsecutiveFailures = 5;
 
-		do {
+		console.log(`[OpenSea Count] Starting count for ${walletAddress} (max ${maxPages} pages at ${limit} NFTs per page)`);
+
+		while (pageCount < maxPages) {
+			pageCount++;
+			
 			let url = `https://api.opensea.io/api/v2/chain/ethereum/account/${walletAddress}/nfts?limit=${limit}`;
 			if (nextCursor) {
 				url += `&next=${nextCursor}`;
 			}
 
-			const response = await fetch(url, {
-				headers: { 'X-API-KEY': apiKey }
-			});
+			try {
+				const response = await fetch(url, {
+					headers: { 'X-API-KEY': apiKey }
+				});
 
-			if (response.status === 429) {
-				// Rate limited - wait and continue with current count
-				console.warn(`Rate limited while counting NFTs for ${walletAddress}, returning partial count: ${totalCount}`);
-				break;
+				if (response.status === 429) {
+					// Rate limited - wait and retry
+					consecutiveFailures++;
+					if (consecutiveFailures >= maxConsecutiveFailures) {
+						console.warn(`[OpenSea Count] Too many rate limit failures, stopping at ${totalCount} NFTs`);
+						break;
+					}
+					
+					const backoffDelay = 5000 * consecutiveFailures;
+					console.warn(`[OpenSea Count] Rate limited on page ${pageCount}, waiting ${backoffDelay}ms`);
+					await new Promise(resolve => setTimeout(resolve, backoffDelay));
+					pageCount--; // Don't count this as a page
+					continue;
+				}
+
+				if (!response.ok) {
+					console.warn(`[OpenSea Count] API error ${response.status} on page ${pageCount}, stopping at ${totalCount} NFTs`);
+					break;
+				}
+
+				const data = await response.json();
+				const nfts = data.nfts || [];
+				
+				if (nfts.length === 0) {
+					console.log(`[OpenSea Count] Page ${pageCount}: No NFTs returned, ending pagination`);
+					break;
+				}
+
+				totalCount += nfts.length;
+				nextCursor = data.next;
+				consecutiveFailures = 0; // Reset on success
+				
+				console.log(`[OpenSea Count] Page ${pageCount}: +${nfts.length} NFTs (total: ${totalCount}), nextCursor: ${nextCursor ? 'present' : 'null'}`);
+
+				// If no nextCursor, we've reached the end
+				if (!nextCursor) {
+					console.log(`[OpenSea Count] No more pages available, ending pagination`);
+					break;
+				}
+
+				// Add delay between successful requests
+				await new Promise(resolve => setTimeout(resolve, 1000));
+
+			} catch (error) {
+				consecutiveFailures++;
+				console.error(`[OpenSea Count] Error on page ${pageCount}:`, error);
+				
+				if (consecutiveFailures >= maxConsecutiveFailures) {
+					console.warn(`[OpenSea Count] Too many consecutive failures, stopping at ${totalCount} NFTs`);
+					break;
+				}
+				
+				// Wait and retry
+				await new Promise(resolve => setTimeout(resolve, 2000));
+				pageCount--; // Don't count this as a page
+				continue;
 			}
+		}
 
-			if (!response.ok) {
-				console.warn(`OpenSea API error ${response.status} for ${walletAddress}, returning partial count: ${totalCount}`);
-				break;
-			}
-
-			const data = await response.json();
-			const nfts = data.nfts || [];
-			totalCount += nfts.length;
-			nextCursor = data.next;
-			pageCount++;
-
-			console.log(`[OpenSea Count] Page ${pageCount} for ${walletAddress}: +${nfts.length} NFTs (total: ${totalCount})`);
-
-			// Add small delay to respect rate limits
-			if (nextCursor && pageCount < maxPages) {
-				await new Promise(resolve => setTimeout(resolve, 100));
-			}
-
-		} while (nextCursor && pageCount < maxPages);
+		if (pageCount >= maxPages) {
+			console.warn(`[OpenSea Count] Hit maximum page limit (${maxPages}) for ${walletAddress}, count may be incomplete`);
+		}
 
 		console.log(`[OpenSea Count] Final count for ${walletAddress}: ${totalCount} NFTs across ${pageCount} pages`);
 		return totalCount;
@@ -200,10 +267,10 @@ export const GET: RequestHandler = async ({ request, url }) => {
 					let artworkCount = 0;
 					
 					if (wallet.blockchain === 'ethereum') {
-						// Get real count from OpenSea API
-						artworkCount = await getOpenSeaNFTCount(wallet.address);
+						// Get real count from Alchemy API (more reliable than OpenSea)
+						artworkCount = await getAlchemyNFTCount(wallet.address);
 						
-						// If OpenSea fails, fall back to indexed count
+						// If Alchemy fails, fall back to indexed count
 						if (artworkCount === 0) {
 							artworkCount = await getIndexedArtworkCount(wallet.address);
 						}

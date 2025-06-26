@@ -245,6 +245,109 @@
 		return `${address.slice(0, 6)}...${address.slice(-4)}`;
 	}
 
+	function getPlatformLink(contractAddress: string, tokenId: string, blockchain: string): { url: string; platform: string } | null {
+		if (!contractAddress || !tokenId) return null;
+
+		const lowerContract = contractAddress.toLowerCase();
+		
+		// Foundation (Ethereum)
+		if (lowerContract === '0x3b3ee1931dc30c1957379fac9aba94d1c48a5405') {
+			return {
+				url: `https://foundation.app/mint/eth/${contractAddress}/${tokenId}`,
+				platform: 'Foundation'
+			};
+		}
+
+		// Art Blocks (Ethereum)
+		const artBlocksContracts = [
+			'0x059edd72cd353df5106d2b9cc5ab83a52287ac3a', // Art Blocks Curated
+			'0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270', // Art Blocks Factory
+			'0x99a9b7c1116f9ceeb1652de04d5969cce509b069', // Art Blocks Playground
+			'0x0e6a21cf97d6a9d9d8f794d26dfb3e3baa49f3ac'  // Art Blocks Presents Flex
+		];
+		if (artBlocksContracts.includes(lowerContract)) {
+			return {
+				url: `https://opensea.io/assets/ethereum/${contractAddress}/${tokenId}`,
+				platform: 'OpenSea'
+			};
+		}
+
+		// SuperRare (Ethereum)
+		if (lowerContract === '0xb932a70a57673d89f4acffbe830e8ed7f75fb9e0') {
+			return {
+				url: `https://superrare.com/artwork/${contractAddress}/${tokenId}`,
+				platform: 'SuperRare'
+			};
+		}
+
+		// fxhash (Tezos) - direct to fxhash website using gentk format
+		const fxhashContracts = [
+			'kt1u6ehmnxjtkvawj4thczg4fsdahc21ssvi', // fxhash v1
+			'kt1kea8z6vwxdjrvqtmraedvzsvxat3khace', // fxhash v2
+			'kt1aaabso5ae6eo8fpen5xhcd4w3khstafxk', // fxhash gentk v1
+			'kt1xcoqnfupwk7sp8536efrxcp73lmt68nyr'  // fxhash gentk v2
+		];
+		if (fxhashContracts.includes(contractAddress.toLowerCase())) {
+			return {
+				url: `https://www.fxhash.xyz/gentk/${tokenId}`,
+				platform: 'fxhash'
+			};
+		}
+
+		// Versum (Tezos)
+		if (contractAddress === 'KT1LjmAdYQCLBjwv4S2oFkEzyHVkomAf5MrW') {
+			return {
+				url: `https://versum.xyz/token/versum/${tokenId}`,
+				platform: 'Versum'
+			};
+		}
+
+		// Teia Community (Tezos)
+		if (contractAddress === 'KT1My1wDZHDGweCrJnQJi3wcFaS67iksirvj') {
+			return {
+				url: `https://teia.art/objkt/${tokenId}`,
+				platform: 'Teia'
+			};
+		}
+
+		// hic et nunc / HEN (Tezos) - redirect to objkt
+		const henContracts = [
+			'KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton', // hic et nunc
+			'KT1Hkg5qeNhfwpKW4fXvq7HGZB9z2EnmCCA9'  // hic et nunc v2
+		];
+		if (henContracts.includes(contractAddress)) {
+			return {
+				url: `https://objkt.com/asset/${contractAddress}/${tokenId}`,
+				platform: 'Objkt'
+			};
+		}
+
+		// Kalamint (Tezos)
+		if (contractAddress === 'KT1EpGgjQs73QfFJs9z7m1Mxm5MTnpC2tqse') {
+			return {
+				url: `https://objkt.com/asset/${contractAddress}/${tokenId}`,
+				platform: 'Objkt'
+			};
+		}
+
+		// Generic fallbacks based on blockchain
+		if (blockchain?.toLowerCase() === 'tezos') {
+			// For other Tezos contracts, use objkt.com
+			return {
+				url: `https://objkt.com/asset/${contractAddress}/${tokenId}`,
+				platform: 'Objkt'
+			};
+		} else if (blockchain?.toLowerCase() === 'ethereum') {
+			// For other Ethereum contracts, use OpenSea
+			return {
+				url: `https://opensea.io/assets/ethereum/${contractAddress}/${tokenId}`,
+				platform: 'OpenSea'
+			};
+		}
+
+		return null;
+	}
+
 	function formatMedium(mime?: string): string {
 		if (!mime) return 'Digital Artwork';
 
@@ -332,10 +435,10 @@
 
 	// Transform artwork data to match ArtworkDisplay component interface
 	$: currentArtworkForDisplay = currentArtwork ? {
-		generatorUrl: currentArtwork.generator_url || currentArtwork.generatorUrl,
-		animationUrl: currentArtwork.animation_url || currentArtwork.animationUrl,
-		imageUrl: currentArtwork.image_url || currentArtwork.imageUrl,
-		thumbnailUrl: currentArtwork.thumbnail_url || currentArtwork.thumbnailUrl,
+		generatorUrl: currentArtwork.generator_url,
+		animationUrl: currentArtwork.animation_url,
+		imageUrl: currentArtwork.image_url,
+		thumbnailUrl: currentArtwork.thumbnail_url,
 		mime: currentArtwork.mime,
 		title: currentArtwork.title,
 		dimensions: dimensionsObj,
@@ -814,6 +917,22 @@
 											<span>{formatMedium(currentArtwork.mime)}</span>
 										</div>
 									{/if}
+									{#if currentArtwork.contractAddress || currentArtwork.contractAddr}
+										{@const platformLink = getPlatformLink(currentArtwork.contractAddress || currentArtwork.contractAddr, currentArtwork.tokenId || currentArtwork.tokenID, currentArtwork.blockchain)}
+										{#if platformLink}
+											<div class="metadata-item">
+												<strong>View on Platform</strong>
+												<a
+													href={platformLink.url}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="platform-link"
+												>
+													{platformLink.platform}
+												</a>
+											</div>
+										{/if}
+									{/if}
 								</div>
 							</div>
 
@@ -1123,6 +1242,11 @@
 
 	.contract-link {
 		@apply no-underline hover:text-primary-dark/80 hover:underline transition-colors duration-200;
+	}
+
+	.platform-link {
+		@apply no-underline text-blue-600 hover:text-blue-800 hover:underline transition-colors duration-200 font-medium;
+		@apply dark:text-blue-400 dark:hover:text-blue-300;
 	}
 
 	/* Keyboard shortcuts */

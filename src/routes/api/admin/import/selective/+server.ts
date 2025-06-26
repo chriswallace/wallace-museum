@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
+import type { RequestHandler } from '@sveltejs/kit';
 import { prismaRead } from '$lib/prisma';
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -7,24 +7,94 @@ export const POST: RequestHandler = async ({ request }) => {
 		const body = await request.json();
 		const { selectedWallets, filter = 'all' } = body;
 
-		console.log('[Selective Import] Request body:', { selectedWallets, filter });
+		console.log('[Selective Indexing] Request body:', JSON.stringify(body, null, 2));
 
-		if (!selectedWallets || !Array.isArray(selectedWallets) || selectedWallets.length === 0) {
-			return json({ error: 'Selected wallets are required' }, { status: 400 });
+		if (!selectedWallets || !Array.isArray(selectedWallets)) {
+			return json({ error: 'selectedWallets array is required' }, { status: 400 });
 		}
 
-		// Extract wallet addresses from selected wallets - keep original case
+		// Extract wallet addresses from the selected wallets
 		const walletAddresses = selectedWallets.map((wallet: any) => wallet.address);
-		console.log('[Selective Import] Wallet addresses:', walletAddresses);
+		console.log('[Selective Indexing] Wallet addresses:', walletAddresses);
 
-		// Build search conditions based on selected wallets
-		// For Ethereum, we'll focus on creator data since ownership data is not being captured
-		// For Tezos, we can use both creator and owner data
-		const walletConditions = walletAddresses.flatMap(address => {
-			const conditions = [];
+
+
+		// Always trigger indexing for selected wallets to ensure fresh data
+		console.log(`[Selective Indexing] Triggering indexing for ${selectedWallets.length} selected wallets...`);
+		
+		try {
+			// Call the indexer API for each selected wallet
+			const indexingPromises = selectedWallets.map(async (wallet: any) => {
+				console.log(`[Selective Indexing] Starting indexing for wallet: ${wallet.address} (${wallet.blockchain})`);
+				
+				// Construct the base URL from the request
+				const baseUrl = `${request.url.split('/api')[0]}`;
+				const indexerUrl = `${baseUrl}/api/admin/index-wallets?walletAddress=${encodeURIComponent(wallet.address)}&blockchain=${wallet.blockchain}`;
+				
+				console.log(`[Selective Indexing] Calling indexer URL: ${indexerUrl}`);
+				
+				const indexerResponse = await fetch(indexerUrl, {
+					method: 'GET',
+					headers: {
+						'Content-Type': 'application/json'
+					}
+				});
+				
+				if (!indexerResponse.ok) {
+					const errorText = await indexerResponse.text();
+					console.error(`[Selective Indexing] Failed to index wallet ${wallet.address}:`, errorText);
+					return { success: false, wallet: wallet.address, error: errorText };
+				}
+				
+				const indexerResult = await indexerResponse.json();
+				console.log(`[Selective Indexing] Successfully indexed wallet ${wallet.address}:`, {
+					indexed: indexerResult.result?.indexed || 0,
+					errors: indexerResult.result?.errors?.length || 0
+				});
+				
+				return { 
+					success: true, 
+					wallet: wallet.address, 
+					indexed: indexerResult.result?.indexed || 0,
+					result: indexerResult 
+				};
+			});
+
+			const indexingResults = await Promise.all(indexingPromises);
+			const successfulIndexing = indexingResults.filter(r => r.success);
+			const totalIndexed = successfulIndexing.reduce((sum, r) => sum + (r.indexed || 0), 0);
 			
-			// Always check if wallet is the creator (both cases)
-			conditions.push(
+			console.log(`[Selective Indexing] Indexing complete: ${successfulIndexing.length}/${selectedWallets.length} wallets indexed successfully`);
+			console.log(`[Selective Indexing] Total NFTs indexed: ${totalIndexed}`);
+			
+			// If no wallets were successfully indexed, return an error
+			if (successfulIndexing.length === 0) {
+				const errors = indexingResults.map(r => `${r.wallet}: ${r.error || 'Unknown error'}`);
+				return json({ 
+					error: 'Failed to index any of the selected wallets.',
+					details: errors,
+					walletsAttempted: selectedWallets.map(w => w.address)
+				}, { status: 500 });
+			}
+			
+			// If some wallets failed, log warnings but continue
+			if (successfulIndexing.length < selectedWallets.length) {
+				const failedWallets = indexingResults.filter(r => !r.success);
+				console.warn(`[Selective Indexing] Some wallets failed to index:`, failedWallets.map(r => r.wallet));
+			}
+			
+		} catch (indexingError) {
+			console.error('[Selective Indexing] Error during indexing:', indexingError);
+			return json({ 
+				error: 'Failed to index wallets before import.',
+				details: indexingError instanceof Error ? indexingError.message : 'Unknown indexing error'
+			}, { status: 500 });
+		}
+
+		// Now proceed with searching the indexed NFTs
+		// Build search conditions for selected wallets
+		let searchConditions: any = {
+			OR: walletAddresses.flatMap(address => [
 				{
 					normalizedData: {
 						path: ['creator', 'address'],
@@ -36,12 +106,7 @@ export const POST: RequestHandler = async ({ request }) => {
 						path: ['creator', 'address'],
 						equals: address.toLowerCase()
 					}
-				}
-			);
-			
-			// For ownership, only add if we're dealing with Tezos or mixed blockchains
-			// Since Ethereum ownership data is not being captured properly
-			conditions.push(
+				},
 				{
 					normalizedData: {
 						path: ['owners'],
@@ -54,16 +119,10 @@ export const POST: RequestHandler = async ({ request }) => {
 						array_contains: [{ address: address.toLowerCase() }]
 					}
 				}
-			);
-			
-			return conditions;
-		});
-
-		let searchConditions: any = {
-			OR: walletConditions
+			])
 		};
 
-		console.log('[Selective Import] Search conditions:', JSON.stringify(searchConditions, null, 2));
+		console.log('[Selective Indexing] Search conditions:', JSON.stringify(searchConditions, null, 2));
 
 		// Apply filter logic
 		if (filter === 'created') {
@@ -126,20 +185,20 @@ export const POST: RequestHandler = async ({ request }) => {
 			};
 		}
 
-		console.log('[Selective Import] Final search conditions:', JSON.stringify(searchConditions, null, 2));
+		console.log('[Selective Indexing] Final search conditions:', JSON.stringify(searchConditions, null, 2));
 
-		// Get artworks from the selected wallets
+		// Get indexed NFTs from the selected wallets
 		const results = await prismaRead.artworkIndex.findMany({
 			where: searchConditions,
 			orderBy: { createdAt: 'desc' },
 			take: 1000 // Reasonable limit to prevent overwhelming the UI
 		});
 
-		console.log('[Selective Import] Query results count:', results.length);
+		console.log('[Selective Indexing] Query results count:', results.length);
 
 		const total = await prismaRead.artworkIndex.count({ where: searchConditions });
 
-		console.log('[Selective Import] Total matching records:', total);
+		console.log('[Selective Indexing] Total matching records:', total);
 
 		// Deduplicate by contract address and token ID
 		const seenKeys = new Set<string>();
@@ -259,7 +318,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			filter
 		});
 	} catch (error) {
-		console.error('Selective import error:', error);
-		return json({ error: 'Failed to import selected wallets', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+		console.error('Selective indexing error:', error);
+		return json({ error: 'Failed to index selected wallets', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
 	}
 }; 

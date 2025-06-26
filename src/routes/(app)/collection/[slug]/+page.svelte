@@ -6,6 +6,7 @@
 	import { getContractUrl, getContractName, truncateAddress } from '$lib/utils';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import ArtistAvatar from '$lib/components/ArtistAvatar.svelte';
 
 	export let data: { collection?: any; error?: string };
 
@@ -380,28 +381,13 @@
 											class="artist-card"
 											on:click={() => handleArtistClick(artist.id)}
 										>
-											{#if artist.avatarUrl}
-												<div class="artist-avatar">
-													<OptimizedImage
-														src={artist.avatarUrl}
-														alt="{artist.name} avatar"
-														width={32}
-														height={32}
-														fit="crop"
-														gravity="auto"
-														format="auto"
-														quality={90}
-														className="avatar-image"
-														fallbackSrc="/images/medici-image.png"
-													/>
-												</div>
-											{:else}
-												<div class="artist-avatar-placeholder">
-													<svg viewBox="0 0 24 24" fill="currentColor" class="avatar-icon">
-														<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-													</svg>
-												</div>
-											{/if}
+											<div class="artist-avatar">
+												<ArtistAvatar 
+													artist={artist} 
+													size="md" 
+													className="avatar-image"
+												/>
+											</div>
 											<span class="artist-name">{artist.name}</span>
 										</button>
 									{/each}
@@ -426,9 +412,6 @@
 				<!-- Right Column - Artworks -->
 				<main class="artworks-main">
 					{#if data.collection.artworks && data.collection.artworks.length > 0}
-						<div class="artworks-header">
-							<h2>Artworks ({data.collection.artworks.length})</h2>
-						</div>
 						<div class="artworks-grid">
 							{#each data.collection.artworks as artwork}
 								<button class="artwork-container" on:click={() => {
@@ -645,28 +628,13 @@
 								handleArtistClick(artist.id);
 							}}
 						>
-							{#if artist.avatarUrl}
-								<div class="modal-artist-avatar">
-									<OptimizedImage
-										src={artist.avatarUrl}
-										alt="{artist.name} avatar"
-										width={48}
-										height={48}
-										fit="crop"
-										gravity="auto"
-										format="auto"
-										quality={90}
-										className="avatar-image"
-										fallbackSrc="/images/medici-image.png"
-									/>
-								</div>
-							{:else}
-								<div class="modal-artist-avatar-placeholder">
-									<svg viewBox="0 0 24 24" fill="currentColor" class="modal-avatar-icon">
-										<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-									</svg>
-								</div>
-							{/if}
+							<div class="modal-artist-avatar">
+								<ArtistAvatar 
+									artist={artist} 
+									size="lg" 
+									className="avatar-image"
+								/>
+							</div>
 							<span class="modal-artist-name">{artist.name}</span>
 						</button>
 					{/each}
@@ -771,16 +739,8 @@
 		@apply w-8 h-8 rounded-sm overflow-hidden bg-gray-700 flex-shrink-0;
 	}
 
-	.artist-avatar-placeholder {
-		@apply w-8 h-8 rounded-sm bg-gray-200 flex items-center justify-center flex-shrink-0;
-	}
-
 	.avatar-image {
 		@apply w-full h-full object-cover;
-	}
-
-	.avatar-icon {
-		@apply w-8 h-8 text-gray-400;
 	}
 
 	.artist-card .artist-name {
@@ -853,16 +813,14 @@
 		@apply flex-1 min-h-0 px-0 md:px-8 py-0 lg:py-8;
 	}
 
-	.artworks-header {
-		@apply lg:px-0 mb-6 md:pt-8 lg:pt-0;
-	}
-
-	.artworks-header h2 {
-		@apply text-lg font-bold;
-	}
-
 	.artworks-grid {
-		@apply grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4;
+		@apply grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+	}
+
+	@media (min-width: 1280px) {
+		.artworks-grid {
+			@apply gap-5;
+		}
 	}
 
 	.artwork-container {
@@ -972,13 +930,7 @@
 		@apply w-12 h-12 rounded-sm overflow-hidden bg-gray-700 flex-shrink-0;
 	}
 
-	.modal-artist-avatar-placeholder {
-		@apply w-12 h-12 rounded-sm bg-gray-200 flex items-center justify-center flex-shrink-0;
-	}
 
-	.modal-avatar-icon {
-		@apply w-6 h-6 text-gray-400;
-	}
 
 	.modal-artist-name {
 		@apply text-base font-semibold text-gray-900;
@@ -1041,9 +993,7 @@
 			@apply hover:bg-gray-900;
 		}
 
-		.artist-avatar-placeholder {
-			@apply bg-gray-700;
-		}
+
 
 		.artist-card .artist-name {
 			@apply text-gray-100;
@@ -1069,13 +1019,7 @@
 			@apply hover:bg-gray-900;
 		}
 
-		.modal-artist-avatar-placeholder {
-			@apply bg-gray-700;
-		}
 
-		.modal-avatar-icon {
-			@apply text-gray-400;
-		}
 
 		.modal-artist-name {
 			@apply text-gray-100;

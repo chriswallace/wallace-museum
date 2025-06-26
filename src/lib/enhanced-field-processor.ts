@@ -90,12 +90,14 @@ export interface MediaAnalysisResult {
 export class EnhancedFieldProcessor {
   
   /**
-   * Unified list of reliable IPFS gateways
+   * Unified list of reliable IPFS gateways for indexing 
+   * (excluding wallacemuseum.com and cloudflare-ipfs.com which is permanently offline)
    */
   private static readonly IPFS_GATEWAYS = [
-    'https://ipfs.wallacemuseum.com/ipfs/?pinataGatewayToken=ezmv1YoBrLBuXqWs1CyFxZ2P1SOpOF-X9mgJTP1EmH9d-1F6m6spo1dpD4YoXxw6',
     'https://dweb.link/ipfs/',
-    'https://ipfs.io/ipfs/'
+    'https://ipfs.io/ipfs/',
+    'https://nftstorage.link/ipfs/',
+    'https://gateway.pinata.cloud/ipfs/'
   ];
   
   /**
@@ -430,11 +432,18 @@ export class EnhancedFieldProcessor {
     const dims = this.extractDimensionsFromAnyField(metadata, rawData);
     if (dims) return dims;
     
-    // Strategy 7: Try to get dimensions from the actual image (last resort, skip for Tezos if we have API data)
-    if (imageUrl && !rawData?.fa?.contract) {
-      // Only try IPFS dimension extraction for non-Tezos tokens or when no other data is available
-      const dims = await this.getDimensionsFromUrl(imageUrl);
-      if (dims) return dims;
+    // Strategy 7: Try to get dimensions from the actual image (last resort)
+    if (imageUrl) {
+      try {
+        console.log(`[EnhancedFieldProcessor] Attempting to extract dimensions from image URL: ${imageUrl}`);
+        const dims = await this.getDimensionsFromUrl(imageUrl);
+        if (dims && dims.width > 0 && dims.height > 0) {
+          console.log(`[EnhancedFieldProcessor] Successfully extracted dimensions from image: ${dims.width}x${dims.height}`);
+          return dims;
+        }
+      } catch (error) {
+        console.warn(`[EnhancedFieldProcessor] Failed to extract dimensions from image URL:`, error);
+      }
     }
     
     return null;

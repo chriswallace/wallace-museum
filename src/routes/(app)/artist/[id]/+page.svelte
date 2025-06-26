@@ -7,6 +7,7 @@
 	import { getTwitterUrl, getInstagramUrl, formatSocialHandle } from '$lib/utils/socialMediaUtils';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
+	import ArtistAvatar from '$lib/components/ArtistAvatar.svelte';
 
 	export let data: { artist?: any; error?: string };
 
@@ -289,22 +290,13 @@
 				<!-- Left Column - Artist Details -->
 				<aside class="artist-sidebar">
 					<div class="artist-header">
-						{#if data.artist.avatarUrl}
-							<div class="avatar-container">
-								<OptimizedImage
-									src={data.artist.avatarUrl}
-									alt={data.artist.name}
-									width={120}
-									height={120}
-									fit="crop"
-									gravity="auto"
-									format="auto"
-									quality={90}
-									className="artist-avatar"
-									fallbackSrc="/images/medici-image.png"
-								/>
-							</div>
-						{/if}
+						<div class="avatar-container">
+							<ArtistAvatar 
+								artist={data.artist} 
+								size="xl" 
+								className="artist-avatar"
+							/>
+						</div>
 
 						<div class="artist-title">
 							<h1>
@@ -545,22 +537,13 @@
 			<div class="modal-scroll">
 				<!-- Artist Header -->
 				<div class="modal-artist-header">
-					{#if data.artist.avatarUrl}
-						<div class="modal-avatar-container">
-							<OptimizedImage
-								src={data.artist.avatarUrl}
-								alt={data.artist.name}
-								width={120}
-								height={120}
-								fit="crop"
-								gravity="auto"
-								format="auto"
-								quality={90}
-								className="modal-artist-avatar"
-								fallbackSrc="/images/medici-image.png"
-							/>
-						</div>
-					{/if}
+					<div class="modal-avatar-container">
+						<ArtistAvatar 
+							artist={data.artist} 
+							size="xl" 
+							className="modal-artist-avatar"
+						/>
+					</div>
 					<h2 id="modal-artist-name" class="modal-artist-name">{data.artist.displayName || data.artist.name}</h2>
 				</div>
 
@@ -718,7 +701,7 @@
 	}
 
 	.artworks-grid {
-		@apply grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4;
+		@apply grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
 	}
 
 	.artwork-container {

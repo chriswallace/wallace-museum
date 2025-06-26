@@ -325,174 +325,95 @@
 	{/if}
 </div>
 
-<style>
+<style lang="scss">
 	.video-player {
-		position: relative;
-		width: 100%;
-		max-width: 100%;
-		background: black;
-		border-radius: 4px;
-		overflow: hidden;
-		outline: none;
+		@apply relative w-full max-w-full bg-black rounded-sm overflow-hidden outline-none;
 	}
 
 	.video-player::after {
 		content: '';
-		position: absolute;
-		bottom: 0;
-		left: 0;
-		right: 0;
+		@apply absolute bottom-0 left-0 right-0 opacity-0 transition-opacity duration-300 ease-in-out pointer-events-none z-[1];
 		height: 80px;
 		background: linear-gradient(transparent, rgba(0, 0, 0, 0.1));
-		opacity: 0;
-		transition: opacity 0.3s ease;
-		pointer-events: none;
-		z-index: 1;
 	}
 
 	.video-player:hover::after {
-		opacity: 1;
+		@apply opacity-100;
 	}
 
 	.video-element {
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		object-fit: contain;
-		cursor: pointer;
-		display: block;
-		z-index: 2;
+		@apply absolute top-0 left-0 w-full h-full object-contain cursor-pointer block z-[2];
 	}
 
 	.skeleton-overlay {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1;
+		@apply absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center z-[1];
 	}
 
 	.error-state {
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		@apply absolute top-0 left-0 w-full h-full flex items-center justify-center text-white z-10;
 		background: rgba(0, 0, 0, 0.8);
-		color: white;
-		z-index: 10;
 	}
 
 	.error-content {
-		text-align: center;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 16px;
+		@apply text-center flex flex-col items-center gap-4;
 	}
 
 	.error-content svg {
-		color: #ef4444;
+		@apply text-red-500;
 	}
 
 	.hidden {
-		opacity: 0;
-		pointer-events: none;
+		@apply opacity-0 pointer-events-none;
 	}
 
 	.controls-overlay {
-		position: absolute;
-		bottom: 0;
-		left: 0;
-		right: 0;
+		@apply absolute bottom-0 left-0 right-0 opacity-0 transition-opacity duration-300 ease-in-out pointer-events-none z-[3];
 		background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
 		padding: 20px 16px 16px;
-		opacity: 0;
-		transition: opacity 0.3s ease;
-		pointer-events: none;
-		z-index: 3;
 	}
 
 	.controls-overlay.visible {
-		opacity: 1;
-		pointer-events: auto;
+		@apply opacity-100 pointer-events-auto;
 	}
 
 	.controls-overlay.simplified {
-		padding: 16px 12px 12px;
+		@apply px-3 py-4;
 	}
 
 	.progress-container {
-		margin-bottom: 12px;
+		@apply mb-3;
 	}
 
 	.progress-bar {
-		width: 100%;
-		height: 6px;
+		@apply w-full h-1.5 rounded-sm outline-none cursor-pointer;
 		background: rgba(255, 255, 255, 0.3);
-		border-radius: 3px;
-		outline: none;
-		cursor: pointer;
 		-webkit-appearance: none;
 		appearance: none;
 	}
 
 	.progress-bar::-webkit-slider-thumb {
+		@apply w-4 h-4 rounded-full bg-white cursor-pointer border-none;
 		-webkit-appearance: none;
 		appearance: none;
-		width: 16px;
-		height: 16px;
-		border-radius: 50%;
-		background: white;
-		cursor: pointer;
-		border: none;
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 	}
 
 	.progress-bar::-moz-range-thumb {
-		width: 16px;
-		height: 16px;
-		border-radius: 50%;
-		background: white;
-		cursor: pointer;
-		border: none;
+		@apply w-4 h-4 rounded-full bg-white cursor-pointer border-none;
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 	}
 
 	.controls-bar {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		color: white;
+		@apply flex justify-between items-center text-white;
 	}
 
 	.controls-left,
 	.controls-right {
-		display: flex;
-		align-items: center;
-		gap: 16px;
+		@apply flex items-center gap-4;
 	}
 
 	.control-button {
-		background: none;
-		border: none;
-		color: white;
-		cursor: pointer;
-		padding: 8px;
-		border-radius: 6px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: background-color 0.2s ease;
+		@apply bg-transparent border-none text-white cursor-pointer p-2 rounded-md flex items-center justify-center transition-colors duration-200;
 		min-width: 36px;
 		min-height: 36px;
 	}
@@ -506,69 +427,59 @@
 	}
 
 	.time-display {
-		font-size: 14px;
-		font-family: monospace;
-		color: white;
-		white-space: nowrap;
+		@apply text-sm font-mono text-white whitespace-nowrap px-2 py-1 rounded-sm;
 		background: rgba(0, 0, 0, 0.5);
-		padding: 4px 8px;
-		border-radius: 4px;
 	}
 
-	/* Touch device optimizations */
+	/* Touch device optimizations - keep as media query since it's not a screen size */
 	@media (hover: none) and (pointer: coarse) {
 		.video-player::after {
-			opacity: 1; /* Always show subtle gradient on touch devices */
+			@apply opacity-100; /* Always show subtle gradient on touch devices */
 		}
 
 		.controls-overlay {
-			padding: 20px 16px 20px;
+			@apply py-5 px-4;
 		}
 
 		.progress-bar {
-			height: 8px;
+			@apply h-2;
 		}
 
 		.progress-bar::-webkit-slider-thumb {
-			width: 20px;
-			height: 20px;
+			@apply w-5 h-5;
 		}
 
 		.progress-bar::-moz-range-thumb {
-			width: 20px;
-			height: 20px;
+			@apply w-5 h-5;
 		}
 
 		.control-button {
+			@apply p-3;
 			min-width: 44px;
 			min-height: 44px;
-			padding: 12px;
 		}
 
 		.controls-left,
 		.controls-right {
-			gap: 12px;
+			@apply gap-3;
 		}
 	}
 
 	/* Mobile responsive adjustments */
-	@media (max-width: 768px) {
-		.controls-overlay {
-			padding: 16px 12px 16px;
-		}
+	.controls-overlay {
+		@apply md:py-5 md:px-4;
+	}
 
-		.controls-bar {
-			gap: 8px;
-		}
+	.controls-bar {
+		@apply gap-2 md:gap-4;
+	}
 
-		.controls-left,
-		.controls-right {
-			gap: 12px;
-		}
+	.controls-left,
+	.controls-right {
+		@apply gap-3 md:gap-4;
+	}
 
-		.time-display {
-			font-size: 12px;
-			padding: 2px 6px;
-		}
+	.time-display {
+		@apply text-xs md:text-sm px-1.5 md:px-2 py-0.5 md:py-1;
 	}
 </style> 

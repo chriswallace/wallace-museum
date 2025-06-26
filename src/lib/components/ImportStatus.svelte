@@ -20,15 +20,12 @@
 	{/each}
 </div>
 
-<style>
+<style lang="scss">
 	.progress-list {
-		max-height: 200px;
-		overflow-y: auto;
+		@apply max-h-[200px] overflow-y-auto;
 	}
 	.item {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
+		@apply flex items-center justify-between;
 	}
 	.title {
 		@apply w-3/4 grow text-sm;
@@ -37,11 +34,7 @@
 		@apply truncate max-w-[14em] block;
 	}
 	.loading {
-		width: 24px;
-		height: 24px;
-		background-position: center center;
-		background-size: contain;
-		display: block;
+		@apply w-6 h-6 bg-center bg-contain block;
 	}
 	.pending {
 		background-image: url('/images/loading-small.gif');

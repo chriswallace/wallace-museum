@@ -103,41 +103,20 @@
 	</div>
 {/if}
 
-<style>
+<style lang="scss">
 	.media-chrome-player {
-		display: block;
-		background-color: black;
-		border-radius: 8px;
-		overflow: hidden;
+		@apply block bg-black rounded-lg overflow-hidden;
 	}
 
 	.video-loading-placeholder {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background-color: #000;
-		border-radius: 8px;
-		color: white;
+		@apply flex items-center justify-center bg-black rounded-lg text-white;
 	}
 
 	.loading-content {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 12px;
+		@apply flex flex-col items-center gap-3;
 	}
 
 	.loading-spinner {
-		width: 32px;
-		height: 32px;
-		border: 3px solid rgba(255, 255, 255, 0.3);
-		border-top: 3px solid white;
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-	}
-
-	@keyframes spin {
-		0% { transform: rotate(0deg); }
-		100% { transform: rotate(360deg); }
+		@apply w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin;
 	}
 </style> 

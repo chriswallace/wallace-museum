@@ -150,7 +150,7 @@
 <div class="modal-overlay" transition:fade={{ duration: 200 }}>
 	<div class="modal-container rounded-md shadow-lg bg-white dark:bg-gray-800 max-w-4xl">
 		<div class="modal-header flex justify-between items-center p-4 border-b dark:border-gray-700">
-			<h2 class="text-xl font-bold m-0 dark:text-gray-100">Select Wallets to Import</h2>
+			<h2 class="text-xl font-bold m-0 dark:text-gray-100">Select Wallets to Index</h2>
 			<button class="close-button text-2xl leading-none dark:text-gray-300" on:click={onClose}
 				>&times;</button
 			>
@@ -186,7 +186,7 @@
 						</svg>
 					</div>
 					<p class="text-gray-600 dark:text-gray-400 font-medium">No wallets configured</p>
-					<p class="text-gray-500 dark:text-gray-500 text-sm mt-1">Add wallet addresses in the settings to enable importing.</p>
+					<p class="text-gray-500 dark:text-gray-500 text-sm mt-1">Add wallet addresses in the settings to enable indexing.</p>
 				</div>
 			{:else}
 				<!-- Select All Header -->
@@ -203,7 +203,7 @@
 						</span>
 						{#if hasSelection}
 							<span class="ml-2 text-sm text-gray-600 dark:text-gray-400">
-								• {selectedWallets.size} selected • {totalArtworkCount} artworks
+								• {selectedWallets.size} selected • {totalArtworkCount} NFTs
 							</span>
 						{/if}
 					</label>
@@ -242,13 +242,13 @@
 											</div>
 										</div>
 										
-										<!-- Artwork Count -->
+										<!-- NFT Count -->
 										<div class="artwork-count text-right">
 											<div class="text-lg font-semibold text-blue-600 dark:text-blue-400">
 												{wallet.artworkCount}
 											</div>
 											<div class="text-xs text-gray-500 dark:text-gray-400">
-												artwork{wallet.artworkCount !== 1 ? 's' : ''}
+												NFT{wallet.artworkCount !== 1 ? 's' : ''}
 											</div>
 										</div>
 									</div>
@@ -266,9 +266,9 @@
 				<div class="selection-summary text-sm text-gray-600 dark:text-gray-400">
 					{#if hasSelection}
 						{selectedWallets.size} wallet{selectedWallets.size !== 1 ? 's' : ''} selected
-						• {totalArtworkCount} artwork{totalArtworkCount !== 1 ? 's' : ''} to import
+						• {totalArtworkCount} NFT{totalArtworkCount !== 1 ? 's' : ''} to index
 					{:else}
-						Select wallets to import their artworks
+						Select wallets to index their NFTs
 					{/if}
 				</div>
 				
@@ -281,7 +281,7 @@
 						disabled={!hasSelection}
 						on:click={handleImport}
 					>
-						Import Selected ({totalArtworkCount})
+						Index Selected ({totalArtworkCount})
 					</button>
 				</div>
 			</div>

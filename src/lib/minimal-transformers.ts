@@ -959,12 +959,12 @@ export class MinimalNFTTransformer {
       // Handle different URL types
       let fetchUrl = url;
       
-      // Convert IPFS URLs to HTTP gateway URLs
+      // Convert IPFS URLs to HTTP gateway URLs (using reliable public gateways for indexing)
       if (url.startsWith('ipfs://')) {
         const hash = url.replace('ipfs://', '');
-        fetchUrl = `https://ipfs.io/ipfs/${hash}`;
+        fetchUrl = `https://dweb.link/ipfs/${hash}`; // Use dweb.link as primary for indexing
       } else if (url.includes('/ipfs/') && !url.startsWith('http')) {
-        fetchUrl = `https://ipfs.io/ipfs/${url.split('/ipfs/')[1]}`;
+        fetchUrl = `https://dweb.link/ipfs/${url.split('/ipfs/')[1]}`;
       }
 
       // Skip non-HTTP URLs that we can't fetch

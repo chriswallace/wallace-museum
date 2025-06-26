@@ -12,6 +12,11 @@ export interface CollectionGroup {
 	artBlocksProjectId: number | null;
 	fxhashProjectId: number | null;
 	artworkCount: number;
+	artists: {
+		id: number;
+		name: string;
+		avatarUrl: string | null;
+	}[];
 	artworks: {
 		id: string;
 		title: string;
@@ -69,6 +74,13 @@ export const GET: RequestHandler = async ({ url }) => {
 				isSharedContract: true,
 				artBlocksProjectId: true,
 				fxhashProjectId: true,
+				Artist: {
+					select: {
+						id: true,
+						name: true,
+						avatarUrl: true
+					}
+				},
 				_count: {
 					select: {
 						Artwork: {
@@ -135,6 +147,7 @@ export const GET: RequestHandler = async ({ url }) => {
 				artBlocksProjectId: collection.artBlocksProjectId,
 				fxhashProjectId: collection.fxhashProjectId,
 				artworkCount: collection._count.Artwork, // Use the actual count from _count
+				artists: collection.Artist,
 				artworks: collection.Artwork.map(artwork => ({
 					id: String(artwork.id),
 					title: artwork.title,

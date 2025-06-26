@@ -139,7 +139,7 @@
 	}
 
 	function handleImageError() {
-		console.log(`[ArtworkDisplay] Image failed to load: ${currentImageUrl}`);
+		console.warn(`[ArtworkDisplay] Image failed to load: ${currentImageUrl}`);
 		
 		// If we're currently showing the optimized URL and it failed, try the fallback
 		if (!hasImageError && mediaType === 'image' && optimizedImageUrl !== fallbackImageUrl) {
@@ -148,12 +148,17 @@
 			isMediaLoaded = false;
 		} else {
 			// If fallback also failed, just show as loaded to prevent infinite retry
-			console.log(`[ArtworkDisplay] Fallback URL also failed, giving up`);
+			console.warn(`[ArtworkDisplay] All image URLs failed for artwork: ${artwork.title}`);
 			isMediaLoaded = true;
 		}
 	}
 
 	onMount(() => {
+		// Log missing media for troubleshooting
+		if (!displayUrl) {
+			console.warn(`[ArtworkDisplay] No display URL found for artwork: ${artwork.title}`);
+		}
+		
 		calculateConstraint();
 		window.addEventListener('resize', handleResize);
 		
@@ -196,7 +201,13 @@
 <div class="media-container" class:isMediaLoaded style="transform: scale(1) translateY(0%);" bind:this={mediaContainer}>
 	{#if !displayUrl}
 		<div class="no-media">
-			<p>No media available</p>
+			<div class="no-media-icon">
+				<svg viewBox="0 0 24 24" fill="currentColor" class="icon">
+					<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+				</svg>
+			</div>
+			<p class="no-media-text">Media not available</p>
+			<p class="no-media-subtitle">This artwork's media files could not be loaded</p>
 		</div>
 	{:else if mediaType === 'video'}
 		<MediaChromeVideoPlayer
@@ -230,29 +241,17 @@
 		/>
 	{/if}
 </div>
-<style>
+<style lang="scss">
 	.media-container {
-		position: relative;
-		width: 100%;
-		height: 100%;
-		overflow: hidden;
-		box-sizing: border-box;
+		@apply relative w-full h-full overflow-hidden box-border flex items-center justify-center;
 		contain: layout style size;
-		display: flex;
-		align-items: center;
-		justify-content: center;
 	}
 
 	.media-container img,
 	.media-container video,
 	.media-container iframe {
-		max-width: 100%;
-		max-height: 100%;
-		object-fit: contain;
-		box-sizing: border-box;
+		@apply max-w-full max-h-full object-contain box-border opacity-100 scale-100;
 		transition: opacity 1000ms cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
-		opacity: 1;
-		transform: scale(1);
 	}
 
 	/* Special handling for iframes since they don't support object-fit */
@@ -265,17 +264,10 @@
 	.media-container:not(.isMediaLoaded) img,
 	.media-container:not(.isMediaLoaded) video,
 	.media-container:not(.isMediaLoaded) iframe {
-		opacity: 0;
-		transform: scale(0.8);
+		@apply opacity-0 scale-[0.8];
 	}
 
 	.no-media {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #666;
-		font-size: 14px;
-		width: 100%;
-		height: 100%;
+		@apply flex items-center justify-center text-gray-600 dark:text-gray-400 text-sm w-full h-full;
 	}
 </style>
