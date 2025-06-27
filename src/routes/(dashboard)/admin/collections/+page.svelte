@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { getCloudinaryTransformedUrl } from '$lib/pinataUtils.client';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
@@ -21,8 +21,12 @@
 
 	let collections: Collection[] = [];
 	let page = 1;
-	let totalPages = 0;
+	let hasMore = true;
+	let loading = false;
 	let searchQuery = '';
+	let searchTimeout: NodeJS.Timeout;
+	let intersectionObserver: IntersectionObserver;
+	let loadMoreElement: HTMLElement;
 
 	// Video detection function consistent with media helpers
 	function isVideoUrl(url: string): boolean {
@@ -33,24 +37,81 @@
 		return videoExtensions.test(url);
 	}
 
-	async function fetchCollections(page = 1) {
-		let url = `/api/admin/collections/?page=${page}`;
+	async function fetchCollections(pageNum = 1, append = false) {
+		if (loading) return;
+		
+		loading = true;
+		let url = `/api/admin/collections/?page=${pageNum}`;
 		if (searchQuery) {
 			url += `&search=${encodeURIComponent(searchQuery)}`;
 		}
 
-		const response = await fetch(url);
-		if (response.ok) {
-			const data = await response.json();
-			collections = data.collections;
-			totalPages = data.totalPages;
-			page = data.page;
+		try {
+			const response = await fetch(url);
+			if (response.ok) {
+				const data = await response.json();
+				
+				if (append) {
+					collections = [...collections, ...data.collections];
+				} else {
+					collections = data.collections;
+				}
+				
+				hasMore = data.page < data.totalPages;
+				page = data.page;
+			}
+		} catch (error) {
+			console.error('Error fetching collections:', error);
+		} finally {
+			loading = false;
+		}
+	}
+
+	function loadMore() {
+		if (hasMore && !loading) {
+			fetchCollections(page + 1, true);
+		}
+	}
+
+	function setupIntersectionObserver() {
+		if (intersectionObserver) {
+			intersectionObserver.disconnect();
+		}
+
+		intersectionObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting && hasMore && !loading) {
+						loadMore();
+					}
+				});
+			},
+			{
+				rootMargin: '100px'
+			}
+		);
+
+		if (loadMoreElement) {
+			intersectionObserver.observe(loadMoreElement);
 		}
 	}
 
 	onMount(() => {
-		fetchCollections(page);
+		fetchCollections(1);
 	});
+
+	onDestroy(() => {
+		if (intersectionObserver) {
+			intersectionObserver.disconnect();
+		}
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
+	});
+
+	$: if (loadMoreElement) {
+		setupIntersectionObserver();
+	}
 
 	function editCollection(id: number) {
 		goto(`/admin/collections/${id}`);
@@ -59,15 +120,18 @@
 	function handleSearchInput(event: Event) {
 		const target = event.target as HTMLInputElement;
 		searchQuery = target.value;
-		if (searchQuery.length >= 3 || searchQuery.length === 0) {
-			fetchCollections(page);
+		
+		// Clear existing timeout
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
 		}
-	}
-
-	function changePage(newPage: number) {
-		page = newPage;
-		fetchCollections(page);
-		window.scrollTo(0, 0);
+		
+		// Debounce search
+		searchTimeout = setTimeout(() => {
+			page = 1;
+			hasMore = true;
+			fetchCollections(1, false);
+		}, 300);
 	}
 
 	function addNew() {
@@ -102,185 +166,147 @@
 {:else}
 	<div class="collection-grid">
 		{#each collections as collection}
-			<button class="card" on:click={() => editCollection(collection.id)}>
-				<div class="cover-image-wrap">
-					<div class="cover-image-grid">
-						{#each collection.coverImages as image}
-							{#if isVideoUrl(image)}
-								<video
-									src={image}
-									autoplay
-									loop
-									muted
-									playsinline
-									class="object-cover"
-									width="250"
-									height="250"
-								/>
-							{:else}
-								<OptimizedImage
-									src={image}
-									alt=""
-									width={250}
-									height={250}
-									fit="crop"
-									format="auto"
-									quality={80}
-									aspectRatio="1/1"
-									showSkeleton={true}
-									skeletonBorderRadius="4px"
-									className="aspect-square object-cover"
-								/>
-							{/if}
-						{/each}
+			<button class="collection-card" on:click={() => editCollection(collection.id)}>
+				{#if collection.coverImages.length > 0}
+					<div 
+						class="media"
+						style="background-image: url('{ipfsToHttpUrl(collection.coverImages[0])}');"
+					></div>
+				{:else}
+					<div class="media placeholder">
+						<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+							<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+							<circle cx="9" cy="9" r="2"/>
+							<path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+						</svg>
 					</div>
-				</div>
-				<div class="flex items-center justify-between">
-					<div class="title">{collection.title}</div>
-					{#if collection.artists && collection.artists.length > 0}
-						<div class="artists-container">
-							<ArtistList 
-								artists={collection.artists}
-								layout="badges"
-								size="md"
-								showAvatars={true}
-								maxDisplay={3}
-								className="pr-2"
-							/>
-						</div>
-					{/if}
+				{/if}
+				
+				<!-- Overlay content -->
+				<div class="card-overlay">
+					<div class="card-content">
+						<h3 class="card-title">{collection.title}</h3>
+						{#if collection.artists && collection.artists.length > 0}
+							<div class="card-artists">
+								{#each collection.artists.slice(0, 2) as artist}
+									<span class="artist-badge">{artist.name}</span>
+								{/each}
+								{#if collection.artists.length > 2}
+									<span class="artist-count">+{collection.artists.length - 2} more</span>
+								{/if}
+							</div>
+						{/if}
+					</div>
 				</div>
 			</button>
 		{/each}
 	</div>
+	
+	<!-- Loading indicator and intersection observer target -->
+	{#if hasMore}
+		<div bind:this={loadMoreElement} class="load-more-trigger">
+			{#if loading}
+				<div class="loading-indicator">
+					<div class="loading-spinner"></div>
+					<p>Loading more collections...</p>
+				</div>
+			{/if}
+		</div>
+	{:else if collections.length > 0}
+		<div class="end-message">
+			<p>You've reached the end of the collections.</p>
+		</div>
+	{/if}
 {/if}
 
-{#if totalPages > 1}
-	<nav class="pagination">
-		{#each Array(totalPages) as _, i}
-			<button on:click={() => changePage(i + 1)} class:selected={page === i + 1}>{i + 1}</button>
-		{/each}
-	</nav>
-{/if}
-
-<style>
+<style lang="postcss">
 	.collection-grid {
-		display: grid;
-		width: 100%;
-		gap: 1.5rem;
-		grid-template-columns: 1fr;
+		@apply grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,1fr))] mt-8;
 	}
 	
-	@media (min-width: 640px) {
-		.collection-grid {
-			grid-template-columns: 1fr 1fr;
-			gap: 2rem;
-		}
+	.collection-card {
+		@apply bg-white dark:bg-gray-800 rounded-lg overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] text-left p-0 cursor-pointer shadow-sm relative aspect-[3/4];
 	}
 	
-	@media (min-width: 1024px) {
-		.collection-grid {
-			grid-template-columns: 1fr 1fr 1fr;
-			gap: 2.5rem;
-		}
+	.collection-card:hover {
+		@apply -translate-y-0.5 shadow-xl;
 	}
 	
-	@media (min-width: 1280px) {
-		.collection-grid {
-			gap: 3rem;
-		}
+	.media {
+		@apply absolute inset-0 w-full h-full transition-transform duration-300 ease-in-out rounded-lg;
+		background-size: cover;
+		background-position: center;
+		background-repeat: no-repeat;
+		transform: scale(1.1);
 	}
 	
-	.card {
-		cursor: pointer;
-		border-radius: 0.375rem;
-		box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-		overflow: hidden;
-		padding: 0;
-		background: white;
-		border: 1px solid rgb(229 231 235);
-		transition: all 0.2s ease-in-out;
+	.collection-card:hover .media {
+		@apply scale-[1.02];
 	}
 	
-	.card:hover {
-		box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-		transform: translateY(-0.25rem);
+	.placeholder {
+		@apply absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-900 rounded-lg;
 	}
 	
-	@media (prefers-color-scheme: dark) {
-		.card {
-			background: rgb(31 41 55);
-			border-color: rgb(75 85 99);
-		}
+	.card-overlay {
+		@apply absolute bottom-0 left-0 right-0 top-0 flex items-end p-6 z-10 pointer-events-none;
+		background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.3) 40%, transparent 70%), rgba(0, 0, 0, 0.2);
 	}
 	
-	.cover-image-wrap {
-		overflow: hidden;
+	.card-content {
+		@apply relative z-10 w-full;
 	}
 	
-	.cover-image-grid {
-		display: grid;
-		width: 100%;
-		aspect-ratio: 1;
-		grid-template-columns: 1fr 1fr;
-		transition: transform 0.2s ease-in-out;
+	.card-title {
+		@apply text-lg font-semibold text-white mb-3 leading-snug tracking-tight;
+		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+		word-wrap: break-word;
+		hyphens: auto;
 	}
 	
-	.cover-image-grid:hover {
-		transform: scale(1.05);
+	.card-artists {
+		@apply flex flex-wrap gap-2 items-center;
 	}
 	
-	.title {
-		font-weight: 600;
-		padding: 0.75rem 1rem;
-		font-size: 0.875rem;
+	.artist-badge {
+		@apply text-white px-3 py-1 rounded-full text-xs font-medium tracking-wide border;
+		background: rgba(255, 255, 255, 0.25);
+		backdrop-filter: blur(8px);
+		border-color: rgba(255, 255, 255, 0.2);
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 	}
 	
-	@media (min-width: 640px) {
-		.title {
-			font-size: 1rem;
-		}
+	.artist-count {
+		@apply text-xs font-medium;
+		color: rgba(255, 255, 255, 0.9);
+		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 	}
 	
-	@media (min-width: 768px) {
-		.title {
-			font-size: 1.125rem;
-			padding: 1rem;
-		}
+	.load-more-trigger {
+		@apply mt-12 mb-8;
 	}
 	
-	.pagination {
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		gap: 0.5rem;
-		margin-top: 2rem;
-		margin-bottom: 1rem;
-		flex-wrap: wrap;
+	.loading-indicator {
+		@apply flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400;
 	}
 	
-	.artists-container {
-		padding-bottom: 0.5rem;
-		padding-right: 0.75rem;
+	.loading-indicator p {
+		@apply mt-4 text-sm font-medium;
 	}
 	
-	@media (min-width: 768px) {
-		.artists-container {
-			padding-right: 1rem;
-		}
+	.loading-spinner {
+		@apply w-8 h-8 border-2 border-gray-200 dark:border-gray-700 border-t-gray-600 dark:border-t-gray-300 rounded-full animate-spin;
 	}
 	
-	.artists-count {
-		font-size: 0.75rem;
-		color: rgb(107 114 128);
-		margin-top: 0.25rem;
+	.end-message {
+		@apply flex justify-center py-8 mt-12 text-gray-500 dark:text-gray-400;
 	}
 	
-	@media (prefers-color-scheme: dark) {
-		.artists-count {
-			color: rgb(156 163 175);
-		}
+	.end-message p {
+		@apply text-sm font-medium;
 	}
 </style>
+
+
 
 

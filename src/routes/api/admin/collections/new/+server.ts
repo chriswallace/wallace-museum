@@ -5,14 +5,21 @@ import { cachedCollectionQueries, cachedSearchQueries } from '$lib/cache/db-cach
 // POST: Create a New Collection
 export async function POST({ request }: { request: Request }): Promise<Response> {
 	try {
-		const { title, description, enabled } = await request.json();
+		const { title, description, enabled, artistIds, curatorNotes } = await request.json();
 
 		const newCollection = await prismaWrite.collection.create({
 			data: {
 				title,
 				slug: title.toLowerCase().replace(/\s+/g, '-'),
 				description,
-				enabled
+				curatorNotes,
+				enabled,
+				// Connect artists if provided
+				...(artistIds && artistIds.length > 0 && {
+					Artist: {
+						connect: artistIds.map((id: number) => ({ id }))
+					}
+				})
 			}
 		});
 

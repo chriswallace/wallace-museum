@@ -230,6 +230,35 @@
 		@apply bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100;
 	}
 
+	/* Icon edit button - minimal space-saving design */
+	.icon-edit-button {
+		@apply p-2 rounded-md bg-transparent border-0 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-800 dark:hover:text-gray-100 transition-colors duration-200 cursor-pointer;
+		min-width: auto;
+		min-height: auto;
+	}
+
+	.icon-edit-button:focus {
+		@apply outline-none ring-2 ring-blue-500 ring-opacity-50;
+	}
+
+	/* Clickable title link in tables */
+	.title-link {
+		@apply min-w-[200px] bg-transparent border-0 text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200 cursor-pointer;
+		font-weight: inherit;
+		font-size: inherit;
+		line-height: inherit;
+		text-decoration: none;
+		display: inline-block;
+	}
+
+	.title-link:focus {
+		@apply outline-none ring-2 ring-blue-500 ring-opacity-50;
+	}
+
+	.title-link:hover {
+		text-decoration: underline;
+	}
+
 	button[disabled] {
 		@apply bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500 cursor-not-allowed;
 	}
@@ -636,12 +665,7 @@ button.card:hover {
 	@apply bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 dark:text-gray-200;
 }
 
-/* Toast styling */
-.svelte-toast {
-	--toastBackground: var(--background-without-opacity);
-	--toastColor: var(--text-color);
-	--toastBarBackground: var(--color-primary);
-}
+/* Toast styling - Now handled in the layout component */
 
 /* Mobile-friendly button improvements */
 button {
@@ -691,17 +715,14 @@ legend {
 
 /* Table styling */
 table {
-	@apply relative w-full md:block;
+	@apply relative w-full;
 	border-collapse: collapse;
-	
-	/* Make tables horizontally scrollable on mobile */
-	@apply max-md:block max-md:overflow-x-auto max-md:whitespace-nowrap max-md:text-sm;
+	table-layout: fixed; /* Enable fixed layout for better column control and truncation */
 }
 
 th,
 td {
 	@apply text-left p-2 border-b border-gray-200 dark:border-gray-700 max-md:px-2 max-md:py-3;
-	min-width: 100px;
 }
 
 th:first-child,
@@ -735,11 +756,6 @@ tr:hover td {
 
 td button {
 	@apply block hover:underline text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-yellow-400;
-}
-
-/* Table column sizing classes */
-.actions {
-	@apply min-w-[80px] md:max-w-[10px];
 }
 
 .image {
@@ -807,4 +823,17 @@ select {
 .admin-search + form,
 .admin-header + div form {
 	@apply mt-0;
+}
+
+/* Table cell content control */
+.table-cell-wrap {
+	white-space: normal;
+	overflow: visible;
+	text-overflow: unset;
+}
+
+.table-cell-truncate {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }

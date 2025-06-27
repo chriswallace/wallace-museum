@@ -496,100 +496,114 @@
 		{/if}
 	</div>
 {:else}
-	<table>
-		<thead>
-			<tr>
-				<th class="select">
-					<input
-						type="checkbox"
-						checked={allSelected}
-						indeterminate={someSelected}
-						on:change={toggleSelectAll}
-					/>
-				</th>
-				<th class="artwork"></th>
-				<th class="title sortable" on:click={() => changeSorting('title')}>
-					Title
-					{sortColumn === 'title' && sortOrder === 'asc' ? ' ↑' : ''}
-					{sortColumn === 'title' && sortOrder === 'desc' ? ' ↓' : ''}
-				</th>
-				<th class="artist sortable" on:click={() => changeSorting('artist')}>
-					Artist
-					{sortColumn === 'artist' && sortOrder === 'asc' ? ' ↑' : ''}
-					{sortColumn === 'artist' && sortOrder === 'desc' ? ' ↓' : ''}
-				</th>
-				<th class="collection sortable" on:click={() => changeSorting('collection')}>
-					Collection(s)
-					{sortColumn === 'collection' && sortOrder === 'asc' ? ' ↑' : ''}
-					{sortColumn === 'collection' && sortOrder === 'desc' ? ' ↓' : ''}
-				</th>
-				<th class="actions">Actions</th>
-			</tr>
-			<tr class="help-row">
-				<td colspan="6">
-					<small class="help-text">Tip: Hold Shift and click to select a range of artworks</small>
-				</td>
-			</tr>
-		</thead>
-		<tbody>
-			{#each artworks as artwork, index}
+	<div class="table-container">
+		<table>
+			<thead>
 				<tr>
-					<td>
+					<th class="select">
 						<input
 							type="checkbox"
-							checked={selectedArtworks.has(artwork.id)}
-							on:click={(event) => toggleArtworkSelection(artwork.id, event, index)}
+							checked={allSelected}
+							indeterminate={someSelected}
+							on:change={toggleSelectAll}
 						/>
-					</td>
-					<td>
-						<button class="image" on:click={() => editArtwork(artwork.id)}>
-							<OptimizedImage
-								src={artwork.displayImageUrl}
-								alt={artwork.title}
-								width={80}
-								height={80}
-								fit="cover"
-								format="auto"
-								quality={80}
-								aspectRatio="1/1"
-								showSkeleton={true}
-								skeletonBorderRadius="4px"
-								className="w-full h-full object-cover"
-								mimeType={artwork.mime}
-							/>
-						</button>
-					</td>
-					<td><div style="word-break: break-word; white-space: normal; overflow-wrap: break-word; hyphens: auto;">{artwork.title}</div></td>
-					<td>
-						<ArtistTableCell 
-							artists={artwork.artists}
-							size="xs"
-							showAvatars={true}
-							linkToArtist={false}
-							maxDisplay={3}
-						/>
-					</td>
-					<td
-						><div>
-							{#if artwork.collection}
-								<a
-									href="/admin/collections/{artwork.collection?.id}"
-									on:click|preventDefault={() =>
-										goto(`/admin/collections/${artwork.collection?.id}`)}
-									>{artwork.collection?.title ?? 'Untitled'}</a
-								>
-							{:else}
-								None
-							{/if}
-						</div></td
-					>
-					<td class="text-center"
-						><button class="edit button" on:click={() => editArtwork(artwork.id)}>Edit</button></td
-					>
+					</th>
+					<th class="artwork"></th>
+					<th class="title sortable" on:click={() => changeSorting('title')}>
+						Title
+						{sortColumn === 'title' && sortOrder === 'asc' ? ' ↑' : ''}
+						{sortColumn === 'title' && sortOrder === 'desc' ? ' ↓' : ''}
+					</th>
+					<th class="artist sortable" on:click={() => changeSorting('artist')}>
+						Artist
+						{sortColumn === 'artist' && sortOrder === 'asc' ? ' ↑' : ''}
+						{sortColumn === 'artist' && sortOrder === 'desc' ? ' ↓' : ''}
+					</th>
+					<th class="collection sortable" on:click={() => changeSorting('collection')}>
+						Collection(s)
+						{sortColumn === 'collection' && sortOrder === 'asc' ? ' ↑' : ''}
+						{sortColumn === 'collection' && sortOrder === 'desc' ? ' ↓' : ''}
+					</th>
+					<th class="actions">Actions</th>
 				</tr>
-			{/each}
-		</tbody>
-	</table>
+			</thead>
+			<tbody>
+				{#each artworks as artwork, index}
+					<tr>
+						<td>
+							<input
+								type="checkbox"
+								checked={selectedArtworks.has(artwork.id)}
+								on:click={(event) => toggleArtworkSelection(artwork.id, event, index)}
+							/>
+						</td>
+						<td>
+							<button class="image" on:click={() => editArtwork(artwork.id)}>
+								<OptimizedImage
+									src={artwork.displayImageUrl}
+									alt={artwork.title}
+									width={80}
+									height={80}
+									fit="cover"
+									format="auto"
+									quality={80}
+									aspectRatio="1/1"
+									showSkeleton={true}
+									skeletonBorderRadius="4px"
+									className="w-full h-full object-cover"
+									mimeType={artwork.mime}
+								/>
+							</button>
+						</td>
+						<td>
+							<a 
+								class="title-link" 
+								href="/admin/artworks/edit/{artwork.id}"
+								on:click|preventDefault={() => editArtwork(artwork.id)}
+								title="Click to edit: {artwork.title}"
+							>
+								{artwork.title}
+							</a>
+						</td>
+						<td class="table-cell-wrap">
+							<ArtistTableCell 
+								artists={artwork.artists}
+								size="xs"
+								showAvatars={true}
+								linkToArtist={false}
+								maxDisplay={3}
+							/>
+						</td>
+											<td class="collection">
+						{#if artwork.collection}
+							<a
+								href="/admin/collections/{artwork.collection?.id}"
+								on:click|preventDefault={() =>
+									goto(`/admin/collections/${artwork.collection?.id}`)}
+								title={artwork.collection?.title ?? 'Untitled'}
+								>{artwork.collection?.title ?? 'Untitled'}</a
+							>
+						{:else}
+							<span class="text-gray-500 dark:text-gray-400">None</span>
+						{/if}
+					</td>
+						<td class="text-center">
+							<button 
+								class="icon-edit-button" 
+								on:click={() => editArtwork(artwork.id)}
+								title="Edit artwork"
+								aria-label="Edit artwork"
+							>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+								</svg>
+							</button>
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
 {/if}
 
 {#if totalPages > 1}
@@ -660,28 +674,77 @@
 		}
 	}
 
+	/* Table container to ensure proper width containment */
+	.table-container {
+		@apply w-full overflow-x-auto;
+		max-width: 100%;
+	}
+
+	/* Table styling with proper column sizing */
+	table {
+		@apply w-full table-fixed border-collapse;
+		min-width: 800px; /* Minimum width for proper column display */
+	}
+
+	/* Column width specifications */
 	.select {
-		@apply w-8 md:w-12;
+		@apply w-12; /* Fixed width for checkbox column */
 	}
 
 	.artwork {
-		@apply w-16 md:w-32;
+		@apply w-20; /* Fixed width for image column */
 	}
 
 	.title {
-		@apply min-w-[200px] md:w-[400px];
+		@apply w-auto; /* Flexible width for title */
+		min-width: 200px;
 	}
 
 	.artist {
-		@apply min-w-[150px] md:w-[400px];
+		@apply w-48; /* Fixed width for artist column */
 	}
 
 	.collection {
-		@apply min-w-[150px] md:w-[400px];
+		@apply w-48; /* Fixed width for collection column */
+		
+		a {
+			@apply inline-block w-full text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300 underline decoration-1 underline-offset-2 no-underline hover:underline;
+			text-decoration: underline !important;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
 	}
 
 	.actions {
-		@apply w-16 md:w-12;
+		@apply w-16; /* Fixed width for actions column */
+	}
+
+	/* Table cell content control */
+	th, td {
+		@apply px-3 py-2 text-left border-b border-gray-200 dark:border-gray-700;
+		overflow: hidden;
+	}
+
+	/* Ensure table content doesn't overflow */
+	.table-cell-wrap {
+		@apply w-full overflow-hidden;
+	}
+
+	/* Responsive table handling */
+	@media (max-width: 768px) {
+		table {
+			min-width: 600px; /* Smaller minimum width on mobile */
+		}
+		
+		.title {
+			min-width: 150px;
+		}
+		
+		.artist,
+		.collection {
+			@apply w-32;
+		}
 	}
 
 	.bulk-actions-bar {

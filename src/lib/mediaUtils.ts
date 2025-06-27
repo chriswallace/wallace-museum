@@ -10,7 +10,10 @@ import crypto from 'crypto';
 // 	'https://ipfs.io/ipfs/'
 // ];
 // Note: For frontend media (images/videos), use Wallace Museum Pinata proxy
-// For HTML content and indexing operations, use public IPFS gateways
+// For HTML/interactive content, prioritize the specialized gateway for code-powered artworks:
+// Format: https://{CID}.ipfs.dweb.link/{path}?{queryString}
+// Base: bafybeihygfx2eupqe7p2jvxheb6rhzpmnrdk2oxqqsokf3sztva4p3wl2e.ipfs.dweb.link
+// For indexing operations, use public IPFS gateways
 const DEFAULT_IPFS_GATEWAY = 'https://ipfs.wallacemuseum.com/ipfs/'; // Use Wallace Museum proxy for media
 const ONCHFS_GATEWAY = 'https://onchfs.fxhash2.xyz/';
 const ARWEAVE_GATEWAY = 'https://arweave.net/';
@@ -166,11 +169,12 @@ export function removeQueryString(url: string | null | undefined): string {
 }
 
 /**
- * Converts IPFS URIs to HTTP URLs specifically for HTML content using ipfs.io gateway
- * This ensures HTML content loads properly without authentication issues
+ * Converts IPFS URIs to HTTP URLs specifically for HTML content
+ * Uses dweb.link path format for all HTML/interactive content: https://dweb.link/ipfs/{CID}/{path}?{queryString}
+ * This format preserves case-sensitive CIDs unlike subdomain format which gets lowercased by browsers
  * @param uri - The URI to convert (IPFS URI)
  * @param mimeType - Optional MIME type to determine if this is HTML content
- * @returns A full HTTPS URL using ipfs.io gateway for HTML content
+ * @returns A full HTTPS URL using the dweb.link gateway path format for HTML content
  */
 export function ipfsToHttpUrlForHtml(
 	uri: string | null | undefined,
@@ -191,31 +195,45 @@ export function ipfsToHttpUrlForHtml(
 		return cleanUri;
 	}
 
-	// For HTML content, always use ipfs.io gateway (no authentication needed)
-	const IPFS_IO_GATEWAY = 'https://ipfs.io/ipfs/';
+	/**
+	 * Build dweb.link URL with CID in path
+	 * Format: https://dweb.link/ipfs/{CID}/{path}?{queryString}
+	 * This format preserves case-sensitive CIDs unlike subdomain format
+	 * which gets lowercased by browsers
+	 */
+	function buildDwebUrl(cidAndPath: string, preserveQuery: string = ''): string {
+		// Build dweb.link URL with CID in path to preserve case
+		let url = `https://dweb.link/ipfs/${cidAndPath}`;
+		if (preserveQuery) {
+			url += preserveQuery;
+		}
+		
+		return url;
+	}
 
-	// Handle existing IPFS gateway URLs - extract CID and route through ipfs.io
+	// Handle existing IPFS gateway URLs - extract CID and route through selected gateway
 	if (cleanUri.startsWith('http://') || cleanUri.startsWith('https://')) {
 		const ipfsGatewayPatterns = [
-			/https?:\/\/w3s\.link\/ipfs\/(.+)/,
-			/https?:\/\/dweb\.link\/ipfs\/(.+)/,
-			/https?:\/\/.*\.ipfs\.w3s\.link\/(.+)/,
-			/https?:\/\/.*\.ipfs\.dweb\.link\/(.+)/,
-			/https?:\/\/gateway\.pinata\.cloud\/ipfs\/(.+)/,
-			/https?:\/\/.*\.mypinata\.cloud\/ipfs\/(.+)/,
-			/https?:\/\/nftstorage\.link\/ipfs\/(.+)/,
-			/https?:\/\/ipfs\.io\/ipfs\/(.+)/,
-			/https?:\/\/ipfs\.wallacemuseum\.com\/ipfs\/(.+)/,
-			/https?:\/\/.*\/ipfs\/(.+)/
+			/https?:\/\/w3s\.link\/ipfs\/(.+?)(\?.*)?$/,
+			/https?:\/\/dweb\.link\/ipfs\/(.+?)(\?.*)?$/,
+			/https?:\/\/.*\.ipfs\.w3s\.link\/(.+?)(\?.*)?$/,
+			/https?:\/\/.*\.ipfs\.dweb\.link\/(.+?)(\?.*)?$/,
+			/https?:\/\/gateway\.pinata\.cloud\/ipfs\/(.+?)(\?.*)?$/,
+			/https?:\/\/.*\.mypinata\.cloud\/ipfs\/(.+?)(\?.*)?$/,
+			/https?:\/\/nftstorage\.link\/ipfs\/(.+?)(\?.*)?$/,
+			/https?:\/\/ipfs\.io\/ipfs\/(.+?)(\?.*)?$/,
+			/https?:\/\/ipfs\.wallacemuseum\.com\/ipfs\/(.+?)(\?.*)?$/,
+			/https?:\/\/.*\/ipfs\/(.+?)(\?.*)?$/
 		];
 
 		for (const pattern of ipfsGatewayPatterns) {
 			const match = cleanUri.match(pattern);
 			if (match && match[1]) {
 				const cidAndPath = match[1];
-				// Preserve query parameters for HTML content as they may be needed for functionality
-				// (e.g., generative art parameters, authentication tokens, etc.)
-				return IPFS_IO_GATEWAY + cidAndPath;
+				const queryString = match[2] || '';
+				
+				// Always use dweb.link path format for HTML/interactive content
+				return buildDwebUrl(cidAndPath, queryString);
 			}
 		}
 
@@ -225,18 +243,43 @@ export function ipfsToHttpUrlForHtml(
 
 	// Handle IPFS URIs
 	if (cleanUri.startsWith('ipfs://') || cleanUri.startsWith('ipfs:/')) {
-		// Remove ipfs:// or ipfs:/ prefix
+		// Remove ipfs:// or ipfs:/ prefix and extract query parameters
 		let cleaned = cleanUri.replace(/^ipfs:\/\//, '').replace(/^ipfs:\//, '');
-		return IPFS_IO_GATEWAY + cleaned;
+		const [pathPart, ...queryParts] = cleaned.split('?');
+		const queryString = queryParts.length > 0 ? '?' + queryParts.join('?') : '';
+		
+		// Always use dweb.link path format for HTML/interactive content
+		return buildDwebUrl(pathPart, queryString);
 	}
 
 	// Handle IPFS paths without protocol (raw CIDs or CID/path)
 	if (cleanUri.startsWith('Qm') || cleanUri.startsWith('bafy')) {
-		return IPFS_IO_GATEWAY + cleanUri;
+		// Check if there are query parameters
+		const [pathPart, ...queryParts] = cleanUri.split('?');
+		const queryString = queryParts.length > 0 ? '?' + queryParts.join('?') : '';
+		
+		// Always use dweb.link path format for HTML/interactive content
+		return buildDwebUrl(pathPart, queryString);
 	}
 
 	// If nothing matched, return as is
 	return cleanUri;
+}
+
+/**
+ * Converts IPFS URIs to HTTP URLs for HTML content
+ * Since we now exclusively use dweb.link path format, this returns the same URL for both primary and fallback
+ * @param uri - The URI to convert (IPFS URI)
+ * @param mimeType - Optional MIME type to determine if this is HTML content
+ * @returns Object with primaryUrl (dweb.link path format) and fallbackUrl (same as primary)
+ */
+export function ipfsToHttpUrlForHtmlWithFallback(
+	uri: string | null | undefined,
+	mimeType?: string
+): { primaryUrl: string; fallbackUrl: string } {
+	const url = ipfsToHttpUrlForHtml(uri, mimeType);
+	
+	return { primaryUrl: url, fallbackUrl: url };
 }
 
 /**
@@ -261,7 +304,7 @@ export function ipfsToHttpUrl(
 ): string {
 	if (!uri || typeof uri !== 'string') return '';
 
-	// For HTML content, always use ipfs.io gateway to avoid authentication issues
+	// For HTML/interactive content, use specialized gateway to ensure proper loading
 	if (mimeType === 'text/html' || mimeType === 'text/javascript' || mimeType === 'application/javascript' || mimeType === 'application/x-directory') {
 		return ipfsToHttpUrlForHtml(uri, mimeType);
 	}

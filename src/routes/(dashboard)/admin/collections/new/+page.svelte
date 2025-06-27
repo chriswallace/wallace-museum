@@ -28,7 +28,10 @@
 
 	async function addCollection() {
 		const payload = {
-			...collection,
+			title: collection.title,
+			description: collection.description,
+			curatorNotes: collection.curatorNotes,
+			enabled: collection.enabled,
 			artistIds: selectedArtistIds
 		};
 		const response = await fetch(`/api/admin/collections/new/`, {

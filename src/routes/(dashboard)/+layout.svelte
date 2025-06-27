@@ -12,8 +12,4 @@
 	/>
 </svelte:head>
 
-<div class="admin">
-	<main>
-		<slot />
-	</main>
-</div>
+<slot />

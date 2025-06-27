@@ -346,6 +346,19 @@
 					</div>
 
 					<div class="detail-sections-grid">
+						<!-- Artist Stats -->
+						{#if data.artist.artworks && data.artist.artworks.length > 0}
+							<div class="detail-section">
+								<h3>Stats</h3>
+								<div class="artist-stats">
+									<div class="stat">
+										<span class="stat-label">Artworks</span>
+										<span class="stat-value">{data.artist.artworks.length}</span>
+									</div>
+								</div>
+							</div>
+						{/if}
+
 						<!-- Wallets -->
 						{#if data.artist.profileUrl || walletAddresses.length > 0}
 							<div class="detail-section">
@@ -406,9 +419,6 @@
 				<!-- Right Column - Artworks -->
 				<main class="artworks-main">
 					{#if data.artist.artworks && data.artist.artworks.length > 0}
-						<div class="artworks-header">
-							<h2>Artworks ({data.artist.artworks.length})</h2>
-						</div>
 						<div class="artworks-grid">
 							{#each data.artist.artworks as artwork, artworkIndex}
 								<button class="artwork-container" on:click={() => goto(`/artist/${data.artist.id}/${artwork.id}`)}>
@@ -649,6 +659,22 @@
 		@apply mb-4 text-center sm:text-left;
 	}
 
+	.artist-stats {
+		@apply grid grid-cols-1 gap-2;
+	}
+
+	.stat {
+		@apply space-y-1;
+	}
+
+	.stat-label {
+		@apply block text-xs font-medium text-gray-500 uppercase tracking-wide;
+	}
+
+	.stat-value {
+		@apply block text-lg font-semibold text-gray-900;
+	}
+
 	.detail-section h3 {
 		@apply text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2;
 	}
@@ -695,13 +721,7 @@
 		@apply flex-1 min-h-0 px-0 md:px-8 py-0 lg:py-8;
 	}
 
-	.artworks-header {
-		@apply lg:px-0 mb-6 md:pt-8 lg:pt-0;
-	}
 
-	.artworks-header h2 {
-		@apply text-lg font-bold;
-	}
 
 	.artworks-grid {
 		@apply grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
@@ -851,6 +871,14 @@
 
 		.detail-section h3 {
 			@apply text-gray-400;
+		}
+
+		.stat-label {
+			@apply text-gray-400;
+		}
+
+		.stat-value {
+			@apply text-white;
 		}
 
 		.links-combined a {
