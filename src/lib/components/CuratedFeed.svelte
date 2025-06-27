@@ -48,8 +48,8 @@
 		if (artworkCount === 1) return 'md:grid-cols-1';
 		if (artworkCount === 2) return 'md:grid-cols-2';
 		if (artworkCount === 3) return 'md:grid-cols-3';
-		// For 4 artworks, use 3 columns on larger screens
-		return 'md:grid-cols-2 lg:grid-cols-3';
+		// For 4 artworks, use 4 columns
+		return 'md:grid-cols-4';
 	}
 
 	function handleArtworkClick(artwork: any) {
@@ -381,12 +381,9 @@
 		}
 	}
 
-	.desktop-grid.md\\:grid-cols-2.lg\\:grid-cols-3 {
+	.desktop-grid.md\\:grid-cols-4 {
 		@media (min-width: 768px) {
-			grid-template-columns: repeat(2, 1fr);
-		}
-		@media (min-width: 1024px) {
-			grid-template-columns: repeat(3, 1fr);
+			grid-template-columns: repeat(4, 1fr);
 		}
 	}
 
