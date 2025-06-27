@@ -30,11 +30,18 @@
 		const grouped: Record<string, Artist[]> = {};
 		
 		data.artists.forEach(artist => {
-			const firstLetter = artist.name.charAt(0).toUpperCase();
-			if (!grouped[firstLetter]) {
-				grouped[firstLetter] = [];
+			// Trim whitespace and normalize the name to handle Unicode characters properly
+			const trimmedName = artist.name.trim();
+			const normalizedName = trimmedName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+			const firstLetter = normalizedName.charAt(0).toUpperCase();
+			
+			// Ensure we only use ASCII letters for grouping
+			const groupKey = /^[A-Z]$/.test(firstLetter) ? firstLetter : '#';
+			
+			if (!grouped[groupKey]) {
+				grouped[groupKey] = [];
 			}
-			grouped[firstLetter].push(artist);
+			grouped[groupKey].push(artist);
 		});
 
 		// Sort each group by name
@@ -43,8 +50,13 @@
 		});
 
 		// Return sorted letters with their artists
+		// Sort letters properly, with # (non-alphabetic) coming last
 		return Object.keys(grouped)
-			.sort()
+			.sort((a, b) => {
+				if (a === '#' && b !== '#') return 1;
+				if (b === '#' && a !== '#') return -1;
+				return a.localeCompare(b);
+			})
 			.map(letter => ({
 				letter,
 				artists: grouped[letter]

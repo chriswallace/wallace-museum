@@ -11,3 +11,5 @@ vite.config.ts.timestamp-*
 .output
 .vscode
 /prisma/dev.db
+/reports
+/scripts/dist

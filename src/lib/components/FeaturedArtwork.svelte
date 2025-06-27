@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { navigateWithDebounce } from '$lib/utils/navigationHelpers';
 	import OptimizedImage from './OptimizedImage.svelte';
 	import LoaderWrapper from './LoaderWrapper.svelte';
-	import ArtworkStage from './ArtworkStage.svelte';
+	import LazyArtwork from './LazyArtwork.svelte';
 	import ArtistAvatar from './ArtistAvatar.svelte';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils.js';
 
@@ -82,7 +83,7 @@
 
 	function handleArtworkClick() {
 		if (featuredArtwork && featuredArtwork.artists && featuredArtwork.artists.length > 0) {
-			goto(`/artist/${featuredArtwork.artists[0].id}/${featuredArtwork.id}`);
+			navigateWithDebounce(`/artist/${featuredArtwork.artists[0].id}/${featuredArtwork.id}`);
 		}
 	}
 
@@ -141,21 +142,24 @@
 		<div class="featured-content">
 			<!-- Featured Artwork Display -->
 			<div class="artwork-display">
-				<ArtworkStage
+				<LazyArtwork
 					artwork={{
 						id: featuredArtwork.id,
 						title: featuredArtwork.title,
 						imageUrl: featuredArtwork.imageUrl,
 						animationUrl: featuredArtwork.animationUrl,
+						generatorUrl: featuredArtwork.generatorUrl,
 						mime: featuredArtwork.mime,
 						dimensions: featuredArtwork.dimensions
 					}}
 					aspectRatio="auto"
 					onClick={handleArtworkClick}
 					className="featured-stage"
-					loading="eager"
+					priority={true}
 					quality={90}
-					showShadow={true}
+					fit="contain"
+					sizes="(max-width: 1024px) 100vw, 50vw"
+					responsiveSizes={[400, 600, 800, 1200]}
 				/>
 			</div>
 

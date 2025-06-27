@@ -19,6 +19,9 @@
 	export let quality: number = 85;
 	export let showShadow: boolean = false;
 
+	// Add key to force re-render when artwork changes
+	$: artworkKey = `${artwork.id}-${artwork.imageUrl || artwork.animationUrl || artwork.generatorUrl}`;
+
 	// Media detection functions
 	function isVideoMimeType(mime: string | null | undefined): boolean {
 		if (!mime) return false;
@@ -46,12 +49,13 @@
 	}[aspectRatio];
 </script>
 
-{#if onClick}
-	<button 
-		class="artwork-stage-button {className}" 
-		on:click={onClick}
-		aria-label="View {artwork.title}"
-	>
+{#key artworkKey}
+	{#if onClick}
+		<button 
+			class="artwork-stage-button {className}" 
+			on:click={onClick}
+			aria-label="View {artwork.title}"
+		>
 		<div class="stage {aspectRatioClass}" class:shadow={showShadow}>
 			{#if isVideo && videoUrl}
 				<video
@@ -149,6 +153,7 @@
 		</div>
 	</div>
 {/if}
+{/key}
 
 <style lang="scss">
 	.artwork-stage-button {

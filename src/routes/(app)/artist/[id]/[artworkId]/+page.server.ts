@@ -31,6 +31,9 @@ export const load: PageServerLoad = async ({ params }) => {
 			Artwork: {
 				include: {
 					Artist: true // Include all artists for each artwork
+				},
+				orderBy: {
+					title: 'asc'
 				}
 			}
 		}

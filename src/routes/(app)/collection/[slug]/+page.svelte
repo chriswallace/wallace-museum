@@ -5,6 +5,7 @@
 	import { quintOut } from 'svelte/easing';
 	import { getContractUrl, getContractName, truncateAddress } from '$lib/utils';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
+	import LazyArtwork from '$lib/components/LazyArtwork.svelte';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import ArtistAvatar from '$lib/components/ArtistAvatar.svelte';
 		import { getResponsiveImageProps, shouldUseLazyLoading, getEnhancedResponsiveProps } from '$lib/utils/imageHelpers';
@@ -415,103 +416,30 @@
 					{#if data.collection.artworks && data.collection.artworks.length > 0}
 						<div class="artworks-grid">
 							{#each data.collection.artworks as artwork, artworkIndex}
-								<button class="artwork-container" on:click={() => {
-									if (artwork.artists && artwork.artists.length > 0) {
-										goto(`/artist/${artwork.artists[0].id}/${artwork.id}`);
-									}
-								}}>
-									<div class="artwork-thumbnail">
-										{#if (isVideoMimeType(artwork.mime) || isVideoUrl(artwork.animation_url)) && artwork.animation_url}
-											<!-- Prioritize video content: show animation_url when it's a video -->
-											<video
-												src={ipfsToHttpUrl(artwork.animation_url)}
-												class="thumbnail-video"
-												muted
-												autoplay
-												loop
-												playsinline
-												preload="metadata"
-												on:error={() => {
-													console.log('Video failed to load:', artwork.animation_url);
-												}}
-											>
-												<!-- Fallback for browsers that don't support the video -->
-												<div class="thumbnail-placeholder">
-													<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-														<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-													</svg>
-												</div>
-											</video>
-										{:else if artwork.image_url}
-											{#if isVideoUrl(artwork.image_url)}
-												<!-- Show video when image_url contains video content -->
-												<video
-													src={ipfsToHttpUrl(artwork.image_url)}
-													class="thumbnail-video"
-													muted
-													autoplay
-													loop
-													playsinline
-													preload="metadata"
-													on:error={() => {
-														console.log('Video failed to load:', artwork.image_url);
-													}}
-												>
-													<!-- Fallback for browsers that don't support the video -->
-													<div class="thumbnail-placeholder">
-														<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-															<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-														</svg>
-													</div>
-												</video>
-											{:else}
-												<!-- Show image with responsive optimization -->
-												<OptimizedImage
-													src={artwork.image_url}
-													alt={artwork.title}
-													width={300}
-													sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-													responsive={true}
-													responsiveSizes={[200, 300, 400, 500]}
-													quality={80}
-													fit="cover"
-													format="webp"
-													className="thumbnail-image"
-													fallbackSrc="/images/medici-image.png"
-													loading={shouldUseLazyLoading(artworkIndex, artworkIndex < 4)}
-													mimeType={artwork.mime}
-												/>
-											{/if}
-										{:else if artwork.animation_url}
-											<!-- Fallback: show animation_url as video when no image is available -->
-											<video
-												src={ipfsToHttpUrl(artwork.animation_url)}
-												class="thumbnail-video"
-												muted
-												autoplay
-												loop
-												playsinline
-												preload="metadata"
-												on:error={() => {
-													console.log('Video failed to load:', artwork.animation_url);
-												}}
-											>
-												<!-- Fallback for browsers that don't support the video -->
-												<div class="thumbnail-placeholder">
-													<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-														<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-													</svg>
-												</div>
-											</video>
-										{:else}
-											<div class="thumbnail-placeholder">
-												<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-													<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-												</svg>
-											</div>
-										{/if}
-									</div>
-								</button>
+								<LazyArtwork
+									artwork={{
+										id: artwork.id,
+										title: artwork.title,
+										imageUrl: artwork.image_url,
+										image_url: artwork.image_url,
+										animationUrl: artwork.animation_url,
+										animation_url: artwork.animation_url,
+										mime: artwork.mime,
+										dimensions: artwork.dimensions
+									}}
+									aspectRatio="square"
+									onClick={() => {
+										if (artwork.artists && artwork.artists.length > 0) {
+											goto(`/artist/${artwork.artists[0].id}/${artwork.id}`);
+										}
+									}}
+									quality={80}
+									fit="cover"
+									sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+									responsiveSizes={[200, 300, 400, 500]}
+									priority={artworkIndex < 4}
+									className="artwork-thumbnail"
+								/>
 							{/each}
 						</div>
 					{:else}
@@ -818,7 +746,7 @@
 	}
 
 	.artworks-grid {
-		@apply grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+		@apply grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
 	}
 
 	@media (min-width: 1280px) {

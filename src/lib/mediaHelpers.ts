@@ -308,7 +308,7 @@ export async function fetchWithRetry(url: string, retries = 3, delay = 1000): Pr
 	for (let i = 0; i < retries; i++) {
 		try {
 			const response = await fetch(url, {
-				signal: AbortSignal.timeout(10000) // Timeout of 10 seconds using AbortSignal
+				signal: AbortSignal.timeout(30000) // Increased timeout to 30 seconds for slow IPFS/external APIs
 			});
 			if (response.ok) {
 				return response;

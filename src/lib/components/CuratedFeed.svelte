@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import ArtworkStage from './ArtworkStage.svelte';
+	import { navigateWithDebounce } from '$lib/utils/navigationHelpers';
+	import LazyArtwork from './LazyArtwork.svelte';
 	import type { CollectionGroup } from '../../routes/api/artworks/collections/+server';
 
 	let collections: CollectionGroup[] = [];
@@ -47,13 +48,13 @@
 		if (artworkCount === 1) return 'md:grid-cols-1';
 		if (artworkCount === 2) return 'md:grid-cols-2';
 		if (artworkCount === 3) return 'md:grid-cols-3';
-		// For 4 artworks, use 4 columns on larger screens
-		return 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+		// For 4 artworks, use 3 columns on larger screens
+		return 'md:grid-cols-2 lg:grid-cols-3';
 	}
 
 	function handleArtworkClick(artwork: any) {
 		if (artwork.artists && artwork.artists.length > 0) {
-			goto(`/artist/${artwork.artists[0].id}/${artwork.id}`);
+			navigateWithDebounce(`/artist/${artwork.artists[0].id}/${artwork.id}`);
 		}
 	}
 
@@ -172,6 +173,7 @@
 								{#if isCollectionBySpecificArtist(collection)}
 									<span class="collection-artist">by {collection.artists[0].name}</span>
 								{/if}
+								<span class="collection-count">({collection.artworkCount})</span>
 							</h2>
 							{#if collection.description}
 								<p class="collection-description">{truncateDescription(collection.description)}</p>
@@ -185,7 +187,7 @@
 							<div class="swiper-track">
 								{#each displayArtworks as artwork}
 									<div class="artwork-slide">
-										<ArtworkStage
+										<LazyArtwork
 											artwork={{
 												id: artwork.id,
 												title: artwork.title,
@@ -197,7 +199,9 @@
 											aspectRatio="square"
 											onClick={() => handleArtworkClick(artwork)}
 											className="artwork-thumbnail"
-											loading="lazy"
+											priority={collections.indexOf(collection) < 2}
+											sizes="(max-width: 768px) 50vw, 25vw"
+											responsiveSizes={[150, 200, 300, 400]}
 										/>
 										<div class="artwork-info">
 											<div class="artwork-title">{trimArtworkTitle(artwork.title, collection.title)}</div>
@@ -207,21 +211,6 @@
 										</div>
 									</div>
 								{/each}
-								
-								<!-- Mobile "+ x more" button - hidden on small screens to avoid duplication -->
-								{#if collection.artworkCount > 4}
-									<div class="artwork-slide hidden sm:block">
-										<button 
-											class="more-artworks-card mobile-more-card"
-											on:click={() => goto(`/collection/${collection.slug}`)}
-										>
-											<div class="more-artworks-content">
-												<div class="more-icon">+</div>
-												<div class="more-text">{collection.artworkCount - 4} more</div>
-											</div>
-										</button>
-									</div>
-								{/if}
 							</div>
 						</div>
 
@@ -229,7 +218,7 @@
 						<div class="desktop-grid hidden md:grid {getArtworkGridCols(displayArtworks.length)}">
 							{#each displayArtworks as artwork}
 								<div class="artwork-item">
-									<ArtworkStage
+									<LazyArtwork
 										artwork={{
 											id: artwork.id,
 											title: artwork.title,
@@ -241,7 +230,9 @@
 										aspectRatio="square"
 										onClick={() => handleArtworkClick(artwork)}
 										className="artwork-thumbnail"
-										loading="lazy"
+										priority={collections.indexOf(collection) < 2}
+										sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+										responsiveSizes={[200, 300, 400, 500]}
 									/>
 									<div class="artwork-info">
 										<div class="artwork-title">{trimArtworkTitle(artwork.title, collection.title)}</div>
@@ -252,18 +243,6 @@
 								</div>
 							{/each}
 						</div>
-						
-						<!-- Desktop "more artworks" button - simple rounded button below grid -->
-						{#if collection.artworkCount > 4}
-							<div class="desktop-more-button-container hidden md:block">
-								<button 
-									class="desktop-more-button"
-									on:click={() => goto(`/collection/${collection.slug}`)}
-								>
-									View all {collection.artworkCount} artworks
-								</button>
-							</div>
-						{/if}
 					</div>
 				</div>
 			{/each}
@@ -333,6 +312,10 @@
 		@apply text-2xl font-bold mb-2 text-gray-900 dark:text-gray-50;
 	}
 
+	.collection-count {
+		@apply text-gray-500 dark:text-gray-400 text-lg font-normal ml-2;
+	}
+
 	.collection-artist {
 		@apply text-gray-600 dark:text-gray-400 text-lg font-normal ml-2;
 	}
@@ -398,15 +381,12 @@
 		}
 	}
 
-	.desktop-grid.md\\:grid-cols-2.lg\\:grid-cols-3.xl\\:grid-cols-4 {
+	.desktop-grid.md\\:grid-cols-2.lg\\:grid-cols-3 {
 		@media (min-width: 768px) {
 			grid-template-columns: repeat(2, 1fr);
 		}
 		@media (min-width: 1024px) {
 			grid-template-columns: repeat(3, 1fr);
-		}
-		@media (min-width: 1280px) {
-			grid-template-columns: repeat(4, 1fr);
 		}
 	}
 
@@ -436,7 +416,7 @@
 	}
 
 	.loading-indicator {
-		@apply flex items-center gap-4;
+		@apply flex flex-col items-center justify-center gap-4 py-8;
 	}
 
 	.loading-spinner {
@@ -465,37 +445,10 @@
 	}
 
 	.lazy-load-container {
-		@apply flex justify-center mt-12;
+		@apply flex flex-col items-center justify-center mt-12;
 	}
 
-	/* Mobile more artworks card - keep card-like styling for consistency */
-	.mobile-more-card {
-		@apply w-full aspect-square bg-gray-50 dark:bg-gray-900/50 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-sm cursor-pointer;
-		@apply hover:bg-gray-100 dark:hover:bg-gray-900/70 hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-200;
-		@apply flex items-center justify-center;
-	}
 
-	.more-artworks-content {
-		@apply text-center;
-	}
-
-	.more-icon {
-		@apply text-3xl font-light text-gray-500 dark:text-gray-400 mb-2;
-	}
-
-	.more-text {
-		@apply text-sm font-medium text-gray-600 dark:text-gray-400;
-	}
-
-	/* Desktop more artworks button - simple rounded button */
-	.desktop-more-button-container {
-		@apply mt-8 flex justify-center;
-	}
-
-	.desktop-more-button {
-		@apply px-6 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700;
-		@apply text-gray-700 dark:text-gray-300 text-xs font-medium rounded-full transition-colors duration-200;
-	}
 
 	@media (min-width: 1024px) {
 		.desktop-grid {

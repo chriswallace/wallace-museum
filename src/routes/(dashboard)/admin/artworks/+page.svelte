@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { toast } from '@zerodevx/svelte-toast';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
@@ -29,11 +29,16 @@
 	let artworks: Artwork[] = [];
 	let page: number = 1;
 	let totalPages: number = 0;
+	let totalCount: number = 0;
 	let sortColumn: string = 'id';  // Changed default from 'title' to 'id' to match API
 	let sortOrder: 'asc' | 'desc' = 'desc'; // 'asc' for ascending, 'desc' for descending
 	let searchQuery: string = '';
-	let isLoading: boolean = false;  // Added loading state
+	let loading: boolean = false;  // Renamed from isLoading to match collections
+	let hasMore: boolean = true; // Renamed from hasMoreData to match collections
 	let error: string = '';  // Added error state
+	let searchTimeout: NodeJS.Timeout;
+	let intersectionObserver: IntersectionObserver;
+	let loadMoreElement: HTMLElement;
 	
 	// Bulk actions state
 	let selectedArtworks = new Set<number | string>();
@@ -77,25 +82,30 @@
 	$: allSelected = artworks.length > 0 && selectedArtworks.size === artworks.length;
 	$: someSelected = selectedArtworks.size > 0 && selectedArtworks.size < artworks.length;
 
-	async function fetchArtworks(pageNum: number = 1) {
-		isLoading = true;
+	async function fetchArtworks(pageNum: number = 1, append: boolean = false) {
+		if (loading) return;
+		
+		loading = true;
+		if (!append) {
+			artworks = []; // Clear existing artworks for new search/sort
+		}
 		error = '';
 		
 		try {
 			// Fixed parameter names to match API expectations
 			let url = `/api/admin/artworks/?page=${pageNum}&limit=50`;
-		if (sortColumn && sortOrder) {
+			if (sortColumn && sortOrder) {
 				url += `&sortBy=${sortColumn}&sortOrder=${sortOrder}`;
-		}
-		if (searchQuery) {
-			url += `&search=${encodeURIComponent(searchQuery)}`;
-		}
+			}
+			if (searchQuery) {
+				url += `&search=${encodeURIComponent(searchQuery)}`;
+			}
 
-		const response = await fetch(url);
-		if (response.ok) {
-			const data = await response.json();
+			const response = await fetch(url);
+			if (response.ok) {
+				const data = await response.json();
 				// Normalize image URLs to handle both imageUrl and image_url, and prioritize thumbnail
-				artworks = data.artworks.map((artwork: any) => ({
+				const normalizedArtworks = data.artworks.map((artwork: any) => ({
 					...artwork,
 					displayImageUrl:
 						artwork.thumbnailUrl ||
@@ -104,17 +114,32 @@
 						artwork.image_url ||
 						'',
 				}));
-			totalPages = data.totalPages;
-			page = data.page;
+
+				if (append) {
+					// Append new artworks to existing ones
+					artworks = [...artworks, ...normalizedArtworks];
+				} else {
+					// Replace artworks with new data
+					artworks = normalizedArtworks;
+				}
+
+				totalPages = data.totalPages;
+				totalCount = data.totalCount;
+				page = data.page;
+				hasMore = page < totalPages;
 			} else {
 				error = 'Failed to fetch artworks';
-				artworks = [];
+				if (!append) {
+					artworks = [];
+				}
 			}
 		} catch (e) {
 			error = (e as Error).message || 'An error occurred while fetching artworks';
-			artworks = [];
+			if (!append) {
+				artworks = [];
+			}
 		} finally {
-			isLoading = false;
+			loading = false;
 		}
 	}
 
@@ -380,16 +405,40 @@
 		fetchArtistsAndCollections();
 	});
 
+	onDestroy(() => {
+		if (intersectionObserver) {
+			intersectionObserver.disconnect();
+		}
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
+	});
+
+	$: if (loadMoreElement) {
+		setupIntersectionObserver();
+	}
+
 	function editArtwork(id: number | string) {
 		goto(`/admin/artworks/edit/${id}`);
 	}
 
 	function handleSearchInput(event: Event) {
-		searchQuery = (event.target as HTMLInputElement).value;
-		if (searchQuery.length >= 3 || searchQuery.length === 0) {
-			page = 1; // Reset to first page when searching
-			fetchArtworks(1);
+		const target = event.target as HTMLInputElement;
+		searchQuery = target.value;
+		
+		// Clear existing timeout
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
 		}
+		
+		// Debounce search
+		searchTimeout = setTimeout(() => {
+			page = 1;
+			hasMore = true;
+			selectedArtworks.clear(); // Clear selections when searching
+			selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
+			fetchArtworks(1, false);
+		}, 300);
 	}
 
 	function changeSorting(column: string) {
@@ -400,7 +449,10 @@
 			sortOrder = 'asc';
 		}
 		page = 1; // Reset to first page when sorting
-		fetchArtworks(1);
+		hasMore = true;
+		selectedArtworks.clear(); // Clear selections when sorting
+		selectedArtworks = new Set(selectedArtworks); // Trigger reactivity
+		fetchArtworks(1, false);
 	}
 
 	function changePage(newPage: number) {
@@ -409,6 +461,35 @@
 
 		// This will scroll the window to the top of the page
 		window.scrollTo(0, 0);
+	}
+
+	function loadMore() {
+		if (hasMore && !loading) {
+			fetchArtworks(page + 1, true);
+		}
+	}
+
+	function setupIntersectionObserver() {
+		if (intersectionObserver) {
+			intersectionObserver.disconnect();
+		}
+
+		intersectionObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting && hasMore && !loading) {
+						loadMore();
+					}
+				});
+			},
+			{
+				rootMargin: '100px'
+			}
+		);
+
+		if (loadMoreElement) {
+			intersectionObserver.observe(loadMoreElement);
+		}
 	}
 
 	function addNew() {
@@ -421,7 +502,18 @@
 </svelte:head>
 
 <div class="admin-header !mb-2">
-	<h1>Artworks</h1>
+	<h1>
+		Artworks
+		{#if totalCount > 0}
+			<span class="count-badge">
+				{#if artworks.length < totalCount}
+					{artworks.length} of {totalCount}
+				{:else}
+					{totalCount}
+				{/if}
+			</span>
+		{/if}
+	</h1>
 	<div class="header-actions">
 		<button class="ghost" on:click={() => addNew()}>+ Add new</button>
 	</div>
@@ -479,7 +571,7 @@
 	{/if}
 </div>
 
-{#if isLoading}
+{#if loading && artworks.length === 0}
 	<div class="loading">
 		<p>Loading artworks...</p>
 	</div>
@@ -604,17 +696,25 @@
 			</tbody>
 		</table>
 	</div>
+
+	<!-- Loading indicator and intersection observer target -->
+	{#if hasMore}
+		<div bind:this={loadMoreElement} class="load-more-trigger">
+			{#if loading}
+				<div class="loading-indicator">
+					<div class="loading-spinner"></div>
+					<p>Loading more artworks...</p>
+				</div>
+			{/if}
+		</div>
+	{:else if artworks.length > 0}
+		<div class="end-message">
+			<p>You've reached the end! Showing all {totalCount} artworks.</p>
+		</div>
+	{/if}
 {/if}
 
-{#if totalPages > 1}
-	<nav class="pagination">
-		{#each Array(totalPages) as _, i}
-			<button on:click={() => changePage(i + 1)} class:selected={page === i + 1}>
-				{i + 1}
-			</button>
-		{/each}
-	</nav>
-{/if}
+<!-- Traditional pagination removed in favor of infinite scroll -->
 
 <!-- Bulk Edit Modal -->
 {#if showBulkActions}
@@ -665,6 +765,10 @@
 {/if}
 
 <style lang="scss">
+	.count-badge {
+		@apply inline-block ml-3 px-3 py-1 text-sm bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full font-normal;
+	}
+
 	.sticky-controls {
 		@apply sticky top-0 z-40 bg-white dark:bg-gray-900 pt-4 pb-4 mb-4;
 		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -745,6 +849,31 @@
 		.collection {
 			@apply w-32;
 		}
+	}
+
+	/* Infinite scroll components - matching collections style */
+	.load-more-trigger {
+		@apply mt-12 mb-8;
+	}
+	
+	.loading-indicator {
+		@apply flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400;
+	}
+	
+	.loading-indicator p {
+		@apply mt-4 text-sm font-medium;
+	}
+	
+	.loading-spinner {
+		@apply w-8 h-8 border-2 border-gray-200 dark:border-gray-700 border-t-gray-600 dark:border-t-gray-300 rounded-full animate-spin;
+	}
+	
+	.end-message {
+		@apply flex justify-center py-8 mt-12 text-gray-500 dark:text-gray-400;
+	}
+	
+	.end-message p {
+		@apply text-sm font-medium;
 	}
 
 	.bulk-actions-bar {

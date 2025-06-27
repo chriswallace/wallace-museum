@@ -1187,7 +1187,7 @@
 	/* Desktop dark mode hover styles */
 	@media (min-width: 768px) and (prefers-color-scheme: dark) {
 		.nav-button:hover {
-			@apply bg-primary-dark text-white;
+			@apply bg-primary-dark text-black;
 		}
 	}
 

@@ -47,6 +47,7 @@
 	let hasTriedDirectIpfs = false;
 	let hasTriedAlternativeGateways = false;
 	let currentGatewayIndex = 0;
+	let previousSrc = src;
 
 	/**
 	 * Extract CID from IPFS URL for fallback gateway usage
@@ -242,6 +243,14 @@
 
 	// Show skeleton when loading or when src is empty but showSkeleton is true
 	$: shouldShowSkeleton = showSkeleton && (isLoading || !shouldShowImage);
+	
+	// Debug logging for skeleton state
+	$: if (src && shouldShowSkeleton !== previousSkeletonState) {
+		console.log(`[OptimizedImage] Skeleton state changed for ${src?.substring(0, 50)}... - shouldShowSkeleton: ${shouldShowSkeleton}, isLoading: ${isLoading}, shouldShowImage: ${shouldShowImage}`);
+		previousSkeletonState = shouldShowSkeleton;
+	}
+	
+	let previousSkeletonState = shouldShowSkeleton;
 
 	// Generate responsive srcset if enabled - only for IPFS URLs that can be optimized
 	$: srcset = responsive && src && canOptimize && !hasError ? createResponsiveSrcSet(src, responsiveSizes, {
@@ -341,6 +350,50 @@
 		hasTriedDirectIpfs = false;
 		hasTriedAlternativeGateways = false;
 		currentGatewayIndex = 0;
+	}
+
+	// Add cleanup timeout to prevent stuck loading states
+	let loadingTimeout: ReturnType<typeof setTimeout> | null = null;
+	
+	// Set a timeout to force loading completion if image doesn't load
+	$: if (isLoading && shouldShowImage) {
+		if (loadingTimeout) {
+			clearTimeout(loadingTimeout);
+		}
+		
+		loadingTimeout = setTimeout(() => {
+			if (isLoading) {
+				console.warn(`[OptimizedImage] Loading timeout for: ${currentSrc}`);
+				isLoading = false;
+				isLoaded = true;
+			}
+		}, 10000); // 10 second timeout
+	}
+
+	// Clear timeout when loading completes
+	$: if (!isLoading && loadingTimeout) {
+		clearTimeout(loadingTimeout);
+		loadingTimeout = null;
+	}
+
+	// Reset all states when src changes to prevent stuck states
+	$: if (src !== previousSrc) {
+		// Clear any existing timeout
+		if (loadingTimeout) {
+			clearTimeout(loadingTimeout);
+			loadingTimeout = null;
+		}
+		
+		// Reset all loading states
+		isLoading = shouldShowImage ? true : false;
+		isLoaded = false;
+		hasError = false;
+		hasTriedDirectIpfs = false;
+		hasTriedAlternativeGateways = false;
+		currentGatewayIndex = 0;
+		
+		// Track the previous src to detect changes
+		previousSrc = src;
 	}
 </script>
 

@@ -6,7 +6,11 @@ export const load: PageServerLoad = async ({ params }) => {
 	const artist = await prisma.artist.findUnique({
 		where: { id: artistId },
 		include: {
-			Artwork: true
+			Artwork: {
+				orderBy: {
+					title: 'asc'
+				}
+			}
 		}
 	});
 

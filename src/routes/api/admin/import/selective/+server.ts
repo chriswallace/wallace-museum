@@ -23,7 +23,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		console.log(`[Selective Indexing] Triggering indexing for ${selectedWallets.length} selected wallets...`);
 		
 		try {
-			// Call the indexer API for each selected wallet
+			// Call the indexer API for each selected wallet with retry logic
 			const indexingPromises = selectedWallets.map(async (wallet: any) => {
 				console.log(`[Selective Indexing] Starting indexing for wallet: ${wallet.address} (${wallet.blockchain})`);
 				
@@ -33,30 +33,72 @@ export const POST: RequestHandler = async ({ request }) => {
 				
 				console.log(`[Selective Indexing] Calling indexer URL: ${indexerUrl}`);
 				
-				const indexerResponse = await fetch(indexerUrl, {
-					method: 'GET',
-					headers: {
-						'Content-Type': 'application/json'
+				// Retry logic for network issues
+				let lastError: any = null;
+				for (let attempt = 1; attempt <= 3; attempt++) {
+					try {
+						const indexerResponse = await fetch(indexerUrl, {
+							method: 'GET',
+							headers: {
+								'Content-Type': 'application/json'
+							},
+							signal: AbortSignal.timeout(300000) // 5 minute timeout for indexing
+						});
+						
+						if (!indexerResponse.ok) {
+							const errorText = await indexerResponse.text();
+							console.error(`[Selective Indexing] Failed to index wallet ${wallet.address} (attempt ${attempt}):`, errorText);
+							lastError = errorText;
+							
+							// Don't retry on client errors (4xx)
+							if (indexerResponse.status >= 400 && indexerResponse.status < 500) {
+								break;
+							}
+							
+							// Wait before retrying (exponential backoff)
+							if (attempt < 3) {
+								const waitTime = Math.pow(2, attempt) * 1000;
+								console.log(`[Selective Indexing] Waiting ${waitTime}ms before retry...`);
+								await new Promise(resolve => setTimeout(resolve, waitTime));
+								continue;
+							}
+						} else {
+							const indexerResult = await indexerResponse.json();
+							console.log(`[Selective Indexing] Successfully indexed wallet ${wallet.address}:`, {
+								indexed: indexerResult.result?.indexed || 0,
+								errors: indexerResult.result?.errors?.length || 0
+							});
+							
+							return { 
+								success: true, 
+								wallet: wallet.address, 
+								indexed: indexerResult.result?.indexed || 0,
+								result: indexerResult 
+							};
+						}
+					} catch (error) {
+						console.error(`[Selective Indexing] Network error indexing wallet ${wallet.address} (attempt ${attempt}):`, error);
+						lastError = error;
+						
+						// Don't retry on timeout errors - they usually indicate the operation is still running
+						if (error instanceof Error && (error.name === 'TimeoutError' || error.message.includes('timeout'))) {
+							console.log(`[Selective Indexing] Timeout detected for ${wallet.address} - this is normal for large wallets`);
+							break;
+						}
+						
+						// Wait before retrying
+						if (attempt < 3) {
+							const waitTime = Math.pow(2, attempt) * 1000;
+							console.log(`[Selective Indexing] Waiting ${waitTime}ms before retry...`);
+							await new Promise(resolve => setTimeout(resolve, waitTime));
+						}
 					}
-				});
-				
-				if (!indexerResponse.ok) {
-					const errorText = await indexerResponse.text();
-					console.error(`[Selective Indexing] Failed to index wallet ${wallet.address}:`, errorText);
-					return { success: false, wallet: wallet.address, error: errorText };
 				}
 				
-				const indexerResult = await indexerResponse.json();
-				console.log(`[Selective Indexing] Successfully indexed wallet ${wallet.address}:`, {
-					indexed: indexerResult.result?.indexed || 0,
-					errors: indexerResult.result?.errors?.length || 0
-				});
-				
 				return { 
-					success: true, 
+					success: false, 
 					wallet: wallet.address, 
-					indexed: indexerResult.result?.indexed || 0,
-					result: indexerResult 
+					error: lastError instanceof Error ? lastError.message : (typeof lastError === 'string' ? lastError : 'Unknown error')
 				};
 			});
 

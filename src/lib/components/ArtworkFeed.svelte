@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, afterUpdate } from 'svelte';
-	import { goto } from '$app/navigation';
-	import OptimizedImage from './OptimizedImage.svelte';
+	import { navigateWithDebounce } from '$lib/utils/navigationHelpers';
+	import LazyArtwork from './LazyArtwork.svelte';
 	import LoaderWrapper from './LoaderWrapper.svelte';
 	import ArtistAvatar from './ArtistAvatar.svelte';
 	import type { FeedArtwork } from '../../routes/api/artworks/random/+server';
@@ -64,7 +64,7 @@
 
 	function handleArtworkClick(artwork: FeedArtwork) {
 		if (artwork.artists && artwork.artists.length > 0) {
-			goto(`/artist/${artwork.artists[0].id}/${artwork.id}`);
+			navigateWithDebounce(`/artist/${artwork.artists[0].id}/${artwork.id}`);
 		}
 	}
 
@@ -117,27 +117,23 @@
 					aria-label="View {artwork.title} by {artwork.artists.map(a => a.name).join(', ')}"
 				>
 					<div class="artwork-thumbnail">
-						<div class="stage">
-							{#if artwork.imageUrl}
-								<OptimizedImage
-									src={artwork.imageUrl}
-									alt={artwork.title}
-									fit="contain"
-									format="auto"
-									quality={70}
-									className="thumbnail-image"
-									fallbackSrc="/images/medici-image.png"
-									mimeType={artwork.mime}
-									loading="lazy"
-								/>
-							{:else}
-								<div class="thumbnail-placeholder">
-									<svg viewBox="0 0 24 24" fill="currentColor" class="placeholder-icon">
-										<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-									</svg>
-								</div>
-							{/if}
-						</div>
+						<LazyArtwork
+							artwork={{
+								id: artwork.id,
+								title: artwork.title,
+								imageUrl: artwork.imageUrl,
+								animationUrl: artwork.animationUrl,
+								mime: artwork.mime,
+								dimensions: artwork.dimensions
+							}}
+							aspectRatio="auto"
+							quality={70}
+							fit="contain"
+							sizes="(max-width: 640px) 100vw, 560px"
+							responsiveSizes={[300, 400, 560, 800]}
+							priority={artworks.indexOf(artwork) < 2}
+							className="feed-artwork"
+						/>
 					</div>
 					
 					<div class="artwork-info-container">
@@ -217,20 +213,8 @@
 		@apply flex items-center justify-center mx-auto my-0;
 	}
 
-	.stage {
-		@apply bg-gray-100 dark:bg-gray-950/70 w-full h-full overflow-hidden flex items-center justify-center;
-	}
-
-	:global(.thumbnail-image) {
-		@apply w-full h-full object-contain;
-	}
-
-	.thumbnail-placeholder {
-		@apply w-full h-full flex items-center justify-center text-gray-500;
-	}
-
-	.placeholder-icon {
-		@apply w-16 h-16;
+	:global(.feed-artwork) {
+		@apply w-full h-full;
 	}
 
 	.artwork-info-container {

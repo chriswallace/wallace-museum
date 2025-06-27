@@ -33,7 +33,7 @@ export const GET: RequestHandler = async ({ params }) => {
 		const artist = await prisma.artist.findUnique({
 			where: { id: parseInt(artistId, 10) },
 			include: {
-				artworks: {
+				Artwork: {
 					select: {
 						id: true,
 						title: true,
@@ -60,7 +60,7 @@ export const GET: RequestHandler = async ({ params }) => {
 		}
 
 		// Transform the data to match the expected interface
-		const artworks: Artwork[] = artist.artworks.map((artwork) => {
+		const artworks: Artwork[] = artist.Artwork.map((artwork) => {
 			// Parse dimensions if they exist
 			let dimensions: { width: number; height: number } | undefined;
 			if (artwork.dimensions && typeof artwork.dimensions === 'object') {
