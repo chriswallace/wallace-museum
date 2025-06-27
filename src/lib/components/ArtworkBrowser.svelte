@@ -341,5 +341,9 @@
 		font-size: 1.1rem; // Slightly larger description
 		line-height: 1.7;
 		color: #ccc;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 </style>

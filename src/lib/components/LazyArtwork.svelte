@@ -284,6 +284,12 @@
 	.lazy-artwork-button {
 		@apply w-full bg-transparent border-none p-0 cursor-pointer block;
 		@apply transition-transform duration-300 hover:scale-[1.01] focus:outline-none focus:scale-[1.01];
+		/* Ensure button respects container constraints */
+		height: 100%;
+		max-height: 100%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 	}
 
 	.lazy-artwork-display {
@@ -297,6 +303,11 @@
 		&.aspect-auto {
 			@apply h-full;
 			max-height: 100%;
+			/* Ensure proper centering and constraint behavior */
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			position: relative;
 		}
 	}
 

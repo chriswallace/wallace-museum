@@ -14,9 +14,9 @@
 	let page = 1;
 	const limit = 12;
 
-	// Get display artworks for each collection (limit to 4 for grid display)
+	// Get display artworks for each collection (show all artworks)
 	function getDisplayArtworks(collection: CollectionGroup) {
-		return collection.artworks.slice(0, 4);
+		return collection.artworks; // Show all artworks instead of limiting to 4
 	}
 
 	// Truncate description at 255 characters with ellipsis
@@ -142,8 +142,8 @@
 </script>
 
 <div class="curated-feed">
-	<div class="feed-header">
-		<h2>Collections</h2>
+	<div class="feed-header mx-4 mb-16 border-b border-gray-200 dark:border-gray-800">
+		<h2>Browse Collections</h2>
 	</div>
 
 	<!-- Collections Section -->
@@ -164,26 +164,28 @@
 				{@const displayArtworks = getDisplayArtworks(collection)}
 				<div class="collection-group">
 					<div class="collection-header">
-						<button 
-							class="collection-header-button"
-							on:click={() => goto(`/collection/${collection.slug}`)}
-						>
-							<h2 class="collection-title">
-								{collection.title}
-								{#if isCollectionBySpecificArtist(collection)}
-									<span class="collection-artist">by {collection.artists[0].name}</span>
-								{/if}
-								<span class="collection-count">({collection.artworkCount})</span>
-							</h2>
-							{#if collection.description}
-								<p class="collection-description">{truncateDescription(collection.description)}</p>
+						<div class="collection-card">
+							<button 
+								class="collection-title-button"
+								on:click={() => goto(`/collection/${collection.slug}`)}
+							>
+								<h2 class="collection-title">{collection.title}</h2>
+							</button>
+							{#if isCollectionBySpecificArtist(collection)}
+								<div class="collection-artist">by {collection.artists[0].name}</div>
 							{/if}
-						</button>
+							<div class="collection-count">{collection.artworkCount} artwork{collection.artworkCount !== 1 ? 's' : ''}</div>
+							<button 
+								class="view-all-button"
+								on:click={() => goto(`/collection/${collection.slug}`)}
+							>
+								View All
+							</button>
+						</div>
 					</div>
 
 					<div class="collection-artworks">
-						<!-- Mobile Swiper -->
-						<div class="mobile-swiper md:hidden">
+						<div class="artworks-swiper">
 							<div class="swiper-track">
 								{#each displayArtworks as artwork}
 									<div class="artwork-slide">
@@ -200,8 +202,9 @@
 											onClick={() => handleArtworkClick(artwork)}
 											className="artwork-thumbnail"
 											priority={collections.indexOf(collection) < 2}
-											sizes="(max-width: 768px) 50vw, 25vw"
-											responsiveSizes={[150, 200, 300, 400]}
+											sizes="(max-width: 768px) 80vw, (max-width: 1024px) 400px, 500px"
+											responsiveSizes={[300, 400, 500, 600]}
+											quality={85}
 										/>
 										<div class="artwork-info">
 											<div class="artwork-title">{trimArtworkTitle(artwork.title, collection.title)}</div>
@@ -212,36 +215,6 @@
 									</div>
 								{/each}
 							</div>
-						</div>
-
-						<!-- Desktop Grid -->
-						<div class="desktop-grid hidden md:grid {getArtworkGridCols(displayArtworks.length)}">
-							{#each displayArtworks as artwork}
-								<div class="artwork-item">
-									<LazyArtwork
-										artwork={{
-											id: artwork.id,
-											title: artwork.title,
-											imageUrl: artwork.imageUrl,
-											animationUrl: artwork.animationUrl,
-											mime: artwork.mime,
-											dimensions: artwork.dimensions
-										}}
-										aspectRatio="square"
-										onClick={() => handleArtworkClick(artwork)}
-										className="artwork-thumbnail"
-										priority={collections.indexOf(collection) < 2}
-										sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-										responsiveSizes={[200, 300, 400, 500]}
-									/>
-									<div class="artwork-info">
-										<div class="artwork-title">{trimArtworkTitle(artwork.title, collection.title)}</div>
-										{#if artwork.artists && artwork.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
-											<div class="artist-name">{artwork.artists[0].name}</div>
-										{/if}
-									</div>
-								</div>
-							{/each}
 						</div>
 					</div>
 				</div>
@@ -268,7 +241,7 @@
 
 <style lang="scss">
 	.curated-feed {
-		@apply w-full mx-auto px-4 pb-16;
+		@apply w-full mx-auto px-0 pb-16;
 	}
 
 	.feed-header {
@@ -284,60 +257,101 @@
 	}
 
 	.collections-section {
-		@apply flex flex-col gap-20;
+		@apply flex flex-col gap-32;
 	}
 
 	@media (min-width: 768px) {
 		.collections-section {
-			@apply gap-24;
+			@apply gap-40;
 		}
 	}
 
 	@media (min-width: 1024px) {
 		.collections-section {
-			@apply gap-28;
+			@apply gap-48;
 		}
 	}
 
 	.collection-header {
-		@apply mb-6 max-w-prose;
+		@apply max-w-prose;
 	}
 
-	.collection-header-button {
-		@apply w-full text-left bg-transparent border-none p-0 cursor-pointer;
-		@apply hover:opacity-80 transition-opacity duration-200;
+	@media (min-width: 768px) {
+		.collection-group {
+			@apply flex items-stretch gap-8;
+		}
+		
+		.collection-header {
+			@apply flex-shrink-0 flex;
+			width: 33.333333%; /* 1/3 */
+			max-width: none;
+		}
+		
+		.collection-artworks {
+			@apply flex-1 overflow-hidden;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.collection-group {
+			@apply gap-12;
+		}
+	}
+
+	.collection-card {
+		@apply flex flex-col items-center justify-center text-center flex-1;
+		@apply transition-colors duration-200;
+	}
+
+	.collection-title-button {
+		@apply bg-transparent border-none p-0 cursor-pointer;
+		@apply transition-colors duration-200;
+	}
+
+	.collection-title-button:hover .collection-title {
+		@apply text-gray-600 dark:text-gray-300;
 	}
 
 	.collection-title {
-		@apply text-2xl font-bold mb-2 text-gray-900 dark:text-gray-50;
+		@apply text-2xl font-bold mb-3 text-gray-900 dark:text-gray-50;
+		@apply leading-tight transition-colors duration-200;
 	}
 
-	.collection-count {
-		@apply text-gray-500 dark:text-gray-400 text-lg font-normal ml-2;
+	.view-all-button {
+		@apply mt-4 px-4 py-2 bg-transparent border border-gray-300 dark:border-gray-600;
+		@apply text-gray-600 dark:text-gray-400 text-sm font-medium rounded-md;
+		@apply hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200;
+		@apply transition-all duration-200 cursor-pointer;
 	}
 
 	.collection-artist {
-		@apply text-gray-600 dark:text-gray-400 text-lg font-normal ml-2;
+		@apply text-gray-600 dark:text-gray-400 text-lg font-medium mb-2;
+		@apply block;
+	}
+
+	.collection-count {
+		@apply text-gray-500 dark:text-gray-400 text-sm font-normal;
 	}
 
 	.collection-description {
 		@apply text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-4;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.collection-artworks {
 	}
 
-	/* Mobile Swiper */
-	.mobile-swiper {
+	/* Artworks Swiper */
+	.artworks-swiper {
 		@apply overflow-hidden;
 	}
 
-	.mobile-swiper {
-		@apply md:hidden;
-	}
-
 	.swiper-track {
-		@apply flex gap-2 overflow-x-auto pb-4;
+		@apply flex overflow-x-auto pb-4;
+		gap: 8px;
 		scroll-snap-type: x mandatory;
 		scrollbar-width: none;
 		-ms-overflow-style: none;
@@ -345,7 +359,27 @@
 
 	@media (min-width: 640px) {
 		.swiper-track {
-			@apply gap-3;
+			gap: 8px;
+		}
+	}
+
+	@media (min-width: 768px) {
+		.swiper-track {
+			gap: 8px;
+			/* Allow content to flow off-canvas to the right on desktop */
+			padding-right: 50vw;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.swiper-track {
+			gap: 8px;
+		}
+	}
+
+	@media (min-width: 1280px) {
+		.swiper-track {
+			gap: 8px;
 		}
 	}
 
@@ -354,41 +388,27 @@
 	}
 
 	.artwork-slide {
-		@apply flex-shrink-0 w-64;
+		@apply flex-shrink-0;
+		width: 320px; /* Larger mobile size */
 		scroll-snap-align: start;
 	}
 
-	/* Desktop Grid */
-	.desktop-grid {
-		@apply hidden md:grid gap-2;
-	}
-
-	.desktop-grid.md\\:grid-cols-1 {
-		@media (min-width: 768px) {
-			grid-template-columns: 1fr;
+	@media (min-width: 768px) {
+		.artwork-slide {
+			width: 400px; /* Larger desktop size */
 		}
 	}
 
-	.desktop-grid.md\\:grid-cols-2 {
-		@media (min-width: 768px) {
-			grid-template-columns: repeat(2, 1fr);
+	@media (min-width: 1024px) {
+		.artwork-slide {
+			width: 480px; /* Even larger on big screens */
 		}
 	}
 
-	.desktop-grid.md\\:grid-cols-3 {
-		@media (min-width: 768px) {
-			grid-template-columns: repeat(3, 1fr);
+	@media (min-width: 1280px) {
+		.artwork-slide {
+			width: 520px; /* Maximum size for very large screens */
 		}
-	}
-
-	.desktop-grid.md\\:grid-cols-4 {
-		@media (min-width: 768px) {
-			grid-template-columns: repeat(4, 1fr);
-		}
-	}
-
-	.artwork-item {
-		@apply w-full bg-transparent border-none cursor-pointer text-left;
 	}
 
 	.artwork-thumbnail {
@@ -443,19 +463,5 @@
 
 	.lazy-load-container {
 		@apply flex flex-col items-center justify-center mt-12;
-	}
-
-
-
-	@media (min-width: 1024px) {
-		.desktop-grid {
-			@apply gap-3;
-		}
-	}
-
-	@media (min-width: 1280px) {
-		.desktop-grid {
-			@apply gap-4;
-		}
 	}
 </style> 

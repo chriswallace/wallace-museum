@@ -152,11 +152,11 @@
 						mime: featuredArtwork.mime,
 						dimensions: featuredArtwork.dimensions
 					}}
-					aspectRatio="auto"
+					aspectRatio="square"
 					onClick={handleArtworkClick}
 					className="featured-stage"
 					priority={true}
-					quality={90}
+					quality={75}
 					fit="contain"
 					sizes="(max-width: 1024px) 100vw, 50vw"
 					responsiveSizes={[400, 600, 800, 1200]}
@@ -302,14 +302,85 @@
 
 	.artwork-display {
 		@apply w-full flex items-center justify-center order-1 lg:order-none;
-		@apply h-[50vh] lg:h-[70vh] overflow-hidden;
-		max-height: calc(100vh - var(--navbar-height, 80px) - 8rem);
+		@apply overflow-hidden;
+		/* Make it square */
+		aspect-ratio: 1 / 1;
+		max-width: min(70vh, 100%);
+		max-height: min(70vh, 100%);
+		/* Ensure proper centering and constraints */
+		position: relative;
+		/* Ensure minimum size to prevent collapse */
+		min-width: 300px;
+		min-height: 300px;
+		/* Center the square container */
+		margin: 0 auto;
 	}
 
 	:global(.featured-stage) {
 		@apply w-full h-full;
 		max-width: 100%;
 		max-height: 100%;
+		/* Ensure the stage respects container bounds */
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		/* Prevent overflow and ensure containment */
+		overflow: hidden !important;
+		box-sizing: border-box !important;
+	}
+
+	/* Ensure the artwork stage within featured-stage is properly constrained */
+	:global(.featured-stage .artwork-stage) {
+		max-width: 100% !important;
+		max-height: 100% !important;
+		width: 100% !important;
+		height: 100% !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+	}
+
+	/* Ensure images and videos within the featured stage are properly constrained */
+	:global(.featured-stage .stage-image),
+	:global(.featured-stage .stage-video) {
+		max-width: 100% !important;
+		max-height: 100% !important;
+		width: auto !important;
+		height: auto !important;
+		object-fit: contain !important;
+		/* Ensure the image/video scales to fit the container */
+		display: block !important;
+		/* Perfect centering */
+		margin: auto !important;
+		position: absolute !important;
+		top: 50% !important;
+		left: 50% !important;
+		transform: translate(-50%, -50%) !important;
+	}
+
+	/* Ensure the OptimizedImage container within featured stage behaves correctly */
+	:global(.featured-stage .image-container) {
+		max-width: 100% !important;
+		max-height: 100% !important;
+		width: 100% !important;
+		height: 100% !important;
+		display: flex !important;
+		align-items: center !important;
+		justify-content: center !important;
+		/* Relative positioning for absolute child */
+		position: relative !important;
+	}
+
+	/* Ensure the lazy-artwork-container within featured stage has proper flex layout */
+	:global(.featured-stage) {
+		display: flex !important;
+		height: 100% !important;
+	}
+
+	:global(.featured-stage .lazy-artwork-container) {
+		display: flex !important;
+		height: 100% !important;
+		width: 100% !important;
 	}
 
 	.image-placeholder {
@@ -347,6 +418,10 @@
 
 	.artwork-description {
 		@apply text-gray-700 dark:text-gray-300 leading-relaxed;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.section-label {

@@ -1203,10 +1203,18 @@
 	/* Content styles */
 	.artwork-description {
 		@apply leading-relaxed text-sm;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.artwork-description p {
 		@apply m-0 mb-2;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.read-more-button {

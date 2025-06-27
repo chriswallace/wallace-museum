@@ -447,6 +447,11 @@
 
 	img {
 		@apply mx-auto block object-contain transition-opacity duration-200 ease-in-out relative z-10;
+		/* Ensure proper scaling for contain behavior */
+		max-width: 100%;
+		max-height: 100%;
+		width: auto;
+		height: auto;
 	}
 
 	img.hidden {

@@ -255,6 +255,10 @@
 
 	.artwork-description {
 		@apply text-sm leading-relaxed max-w-full overflow-x-hidden;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.tags {

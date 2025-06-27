@@ -839,10 +839,18 @@
 
 	.modal-description {
 		@apply text-gray-700 leading-relaxed;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	.modal-description p {
 		@apply text-base leading-relaxed m-0 text-left;
+		word-break: break-word;
+		white-space: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
 	}
 
 	/* Artists Modal Styles */
