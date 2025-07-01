@@ -770,8 +770,7 @@
 	}
 
 	.sticky-controls {
-		@apply sticky top-0 z-40 bg-white dark:bg-gray-900 pt-4 pb-4 mb-4;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+		@apply sticky top-0 z-40 bg-gray-50 dark:bg-gray-900 pt-4 pb-4 mb-4;
 		
 		.search {
 			@apply mb-0;

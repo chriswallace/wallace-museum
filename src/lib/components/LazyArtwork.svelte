@@ -26,8 +26,8 @@
 	export let threshold: number = 0.1;
 	export let priority: boolean = false; // For above-the-fold content
 	export let fit: 'contain' | 'cover' | 'crop' | 'scale-down' | 'pad' = 'contain';
-	export let sizes: string = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw';
-	export let responsiveSizes: number[] = [200, 300, 400, 500];
+	export let sizes: string = '(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw';
+	export let responsiveSizes: number[] = [300, 400, 500];
 
 	let containerElement: HTMLElement;
 	let observer: IntersectionObserver | null = null;

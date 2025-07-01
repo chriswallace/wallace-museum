@@ -489,7 +489,7 @@
 		}
 
 		.nav-tab {
-			@apply text-gray-300 hover:text-white;
+			@apply text-gray-500 hover:text-white;
 		}
 
 		.nav-tab.active {
@@ -501,7 +501,7 @@
 		}
 
 		.nav-tab:hover:not(.active) {
-			@apply text-gray-100;
+			@apply text-gray-300;
 		}
 
 		.mobile-menu-panel {

@@ -3,6 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { navigateWithDebounce } from '$lib/utils/navigationHelpers';
 	import LazyArtwork from './LazyArtwork.svelte';
+	import SkeletonLoader from './SkeletonLoader.svelte';
+	import { processArtworksForEntangled, isEntangledPair, getEntangledPageUrl, isEntangledArtwork, getEntangledPageUrlFromArtwork } from '$lib/utils/entangledHelpers';
 	import type { CollectionGroup } from '../../routes/api/artworks/collections/+server';
 
 	let collections: CollectionGroup[] = [];
@@ -16,7 +18,7 @@
 
 	// Get display artworks for each collection (show all artworks)
 	function getDisplayArtworks(collection: CollectionGroup) {
-		return collection.artworks; // Show all artworks instead of limiting to 4
+		return processArtworksForEntangled(collection.artworks); // Process for Entangled pairing
 	}
 
 	// Truncate description at 255 characters with ellipsis
@@ -142,19 +144,53 @@
 </script>
 
 <div class="curated-feed">
-	<div class="feed-header mx-4 mb-16 border-b border-gray-200 dark:border-gray-800">
+	<div class="feed-header mb-16 border-b border-gray-200 dark:border-gray-800">
 		<h2>Browse Collections</h2>
 	</div>
 
 	<!-- Collections Section -->
 	<div class="collections-section">
 		{#if loading && collections.length === 0}
-			<div class="loading-container">
-				<div class="loading-indicator">
-					<div class="loading-spinner"></div>
-					<span class="loading-text">Loading collections...</span>
+			<!-- Collection Skeleton Loaders -->
+			{#each Array(3) as _, i}
+				<div class="collection-group">
+					<div class="collection-header">
+						<div class="collection-card">
+							<div class="collection-main-info">
+								<SkeletonLoader width="200px" height="32px" borderRadius="4px" />
+								<div class="mt-2">
+									<SkeletonLoader width="120px" height="16px" borderRadius="4px" />
+								</div>
+								<div class="mt-1">
+									<SkeletonLoader width="80px" height="14px" borderRadius="4px" />
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="collection-artworks">
+						<div class="artworks-swiper">
+							<div class="swiper-track">
+								{#each Array(4) as _, j}
+									<div class="artwork-slide">
+										<SkeletonLoader width="100%" height="280px" borderRadius="8px" />
+										<div class="artwork-info">
+											<div class="artwork-title">
+												<SkeletonLoader width="80%" height="16px" borderRadius="4px" />
+											</div>
+											<div class="artist-name mt-1">
+												<SkeletonLoader width="60%" height="14px" borderRadius="4px" />
+											</div>
+										</div>
+									</div>
+								{/each}
+								<div class="artwork-slide view-collection-slide">
+									<SkeletonLoader width="100%" height="280px" borderRadius="8px" />
+								</div>
+							</div>
+						</div>
+					</div>
 				</div>
-			</div>
+			{/each}
 		{:else if collections.length === 0}
 			<div class="end-message">
 				<p>No collections available</p>
@@ -165,55 +201,159 @@
 				<div class="collection-group">
 					<div class="collection-header">
 						<div class="collection-card">
-							<button 
-								class="collection-title-button"
-								on:click={() => goto(`/collection/${collection.slug}`)}
-							>
-								<h2 class="collection-title">{collection.title}</h2>
-							</button>
-							{#if isCollectionBySpecificArtist(collection)}
-								<div class="collection-artist">by {collection.artists[0].name}</div>
-							{/if}
-							<div class="collection-count">{collection.artworkCount} artwork{collection.artworkCount !== 1 ? 's' : ''}</div>
-							<button 
-								class="view-all-button"
-								on:click={() => goto(`/collection/${collection.slug}`)}
-							>
-								View All
-							</button>
+							<div class="collection-main-info">
+								<button 
+									class="collection-title-button"
+									on:click={() => goto(`/collection/${collection.slug}`)}
+								>
+									<h2 class="collection-title">{collection.title}</h2>
+								</button>
+								{#if isCollectionBySpecificArtist(collection)}
+									<div class="collection-artist">by {collection.artists[0].name}</div>
+								{/if}
+								<div class="collection-count">{collection.artworkCount} artwork{collection.artworkCount !== 1 ? 's' : ''}</div>
+							</div>
 						</div>
 					</div>
 
 					<div class="collection-artworks">
 						<div class="artworks-swiper">
 							<div class="swiper-track">
-								{#each displayArtworks as artwork}
-									<div class="artwork-slide">
-										<LazyArtwork
-											artwork={{
-												id: artwork.id,
-												title: artwork.title,
-												imageUrl: artwork.imageUrl,
-												animationUrl: artwork.animationUrl,
-												mime: artwork.mime,
-												dimensions: artwork.dimensions
-											}}
-											aspectRatio="square"
-											onClick={() => handleArtworkClick(artwork)}
-											className="artwork-thumbnail"
-											priority={collections.indexOf(collection) < 2}
-											sizes="(max-width: 768px) 80vw, (max-width: 1024px) 400px, 500px"
-											responsiveSizes={[300, 400, 500, 600]}
-											quality={85}
-										/>
-										<div class="artwork-info">
-											<div class="artwork-title">{trimArtworkTitle(artwork.title, collection.title)}</div>
-											{#if artwork.artists && artwork.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
-												<div class="artist-name">{artwork.artists[0].name}</div>
-											{/if}
+								{#each displayArtworks as item}
+									{#if isEntangledPair(item)}
+										<!-- Entangled pair link -->
+										<div class="artwork-slide entangled-slide">
+											<a 
+												href={getEntangledPageUrl(item.ethereum.tokenId, item.tezos.tokenId)}
+												class="entangled-link"
+											>
+												<div class="entangled-preview-mini">
+													<div class="entangled-preview-images-mini">
+														<div class="chain-preview-mini ethereum">
+															<LazyArtwork
+																artwork={{
+																	id: item.ethereum.id,
+																	title: item.ethereum.title,
+																	imageUrl: item.ethereum.imageUrl,
+																	animationUrl: item.ethereum.animationUrl,
+																	mime: item.ethereum.mime,
+																	dimensions: item.ethereum.dimensions
+																}}
+																aspectRatio="square"
+																className="chain-artwork-mini"
+																priority={collections.indexOf(collection) < 2}
+																sizes="200px"
+																responsiveSizes={[200]}
+																quality={85}
+															/>
+														</div>
+														<div class="chain-preview-mini tezos">
+															<LazyArtwork
+																artwork={{
+																	id: item.tezos.id,
+																	title: item.tezos.title,
+																	imageUrl: item.tezos.imageUrl,
+																	animationUrl: item.tezos.animationUrl,
+																	mime: item.tezos.mime,
+																	dimensions: item.tezos.dimensions
+																}}
+																aspectRatio="square"
+																className="chain-artwork-mini"
+																priority={collections.indexOf(collection) < 2}
+																sizes="200px"
+																responsiveSizes={[200]}
+																quality={85}
+															/>
+														</div>
+													</div>
+													<div class="entangled-overlay-mini">
+														<div class="entangled-title-mini">ENTANGLED</div>
+													</div>
+												</div>
+											</a>
+											<div class="artwork-info">
+												<div class="artwork-title">Entangled #{item.ethereum.tokenId || item.ethereum.tokenID || '1'}</div>
+												{#if item.ethereum.artists && item.ethereum.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
+													<div class="artist-name">{item.ethereum.artists[0].name}</div>
+												{/if}
+											</div>
 										</div>
-									</div>
+									{:else if isEntangledArtwork(item)}
+										<!-- Individual Entangled artwork link -->
+										<div class="artwork-slide">
+											<a 
+												href={getEntangledPageUrlFromArtwork(item)}
+												class="entangled-single-link"
+											>
+												<LazyArtwork
+													artwork={{
+														id: item.id,
+														title: item.title,
+														imageUrl: item.imageUrl,
+														animationUrl: item.animationUrl,
+														mime: item.mime,
+														dimensions: item.dimensions
+													}}
+													aspectRatio="square"
+													className="artwork-thumbnail"
+													priority={collections.indexOf(collection) < 2}
+													sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, (max-width: 1024px) 400px, (max-width: 1280px) 480px, 520px"
+													responsiveSizes={[280, 320, 400, 480, 520]}
+													quality={85}
+												/>
+												<div class="entangled-badge-mini">ENTANGLED</div>
+											</a>
+											<div class="artwork-info">
+												<div class="artwork-title">{trimArtworkTitle(item.title, collection.title)}</div>
+												{#if item.artists && item.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
+													<div class="artist-name">{item.artists[0].name}</div>
+												{/if}
+											</div>
+										</div>
+									{:else}
+										<!-- Regular artwork display -->
+										<div class="artwork-slide">
+											<LazyArtwork
+												artwork={{
+													id: item.id,
+													title: item.title,
+													imageUrl: item.imageUrl,
+													animationUrl: item.animationUrl,
+													mime: item.mime,
+													dimensions: item.dimensions
+												}}
+												aspectRatio="square"
+												onClick={() => handleArtworkClick(item)}
+												className="artwork-thumbnail"
+												priority={collections.indexOf(collection) < 2}
+												sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, (max-width: 1024px) 400px, (max-width: 1280px) 480px, 520px"
+												responsiveSizes={[280, 320, 400, 480, 520]}
+												quality={85}
+											/>
+											<div class="artwork-info">
+												<div class="artwork-title">{trimArtworkTitle(item.title, collection.title)}</div>
+												{#if item.artists && item.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
+													<div class="artist-name">{item.artists[0].name}</div>
+												{/if}
+											</div>
+										</div>
+									{/if}
 								{/each}
+								
+								<!-- View Collection Card -->
+								<div class="artwork-slide view-collection-slide">
+									<button 
+										class="view-collection-card"
+										on:click={() => goto(`/collection/${collection.slug}`)}
+									>
+										<div class="view-collection-content">
+											<div class="view-collection-text">
+												<div class="view-collection-label">View Collection</div>
+												<div class="view-collection-count">{collection.artworkCount} artwork{collection.artworkCount !== 1 ? 's' : ''}</div>
+											</div>
+										</div>
+									</button>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -223,9 +363,43 @@
 			{#if hasMore}
 				<div class="lazy-load-container">
 					{#if loading}
-						<div class="loading-indicator">
-							<div class="loading-spinner"></div>
-							<span class="loading-text">Loading more collections...</span>
+						<!-- Subtle skeleton loader for additional collections -->
+						<div class="collection-group">
+							<div class="collection-header">
+								<div class="collection-card">
+									<div class="collection-main-info">
+										<SkeletonLoader width="200px" height="32px" borderRadius="4px" />
+										<div class="mt-2">
+											<SkeletonLoader width="120px" height="16px" borderRadius="4px" />
+										</div>
+										<div class="mt-1">
+											<SkeletonLoader width="80px" height="14px" borderRadius="4px" />
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="collection-artworks">
+								<div class="artworks-swiper">
+									<div class="swiper-track">
+										{#each Array(4) as _, j}
+											<div class="artwork-slide">
+												<SkeletonLoader width="100%" height="280px" borderRadius="8px" />
+												<div class="artwork-info">
+													<div class="artwork-title">
+														<SkeletonLoader width="80%" height="16px" borderRadius="4px" />
+													</div>
+													<div class="artist-name mt-1">
+														<SkeletonLoader width="60%" height="14px" borderRadius="4px" />
+													</div>
+												</div>
+											</div>
+										{/each}
+										<div class="artwork-slide view-collection-slide">
+											<SkeletonLoader width="100%" height="280px" borderRadius="8px" />
+										</div>
+									</div>
+								</div>
+							</div>
 						</div>
 					{/if}
 					<div class="load-trigger" bind:this={loadMoreTrigger}></div>
@@ -241,11 +415,17 @@
 
 <style lang="scss">
 	.curated-feed {
-		@apply w-full mx-auto px-0 pb-16;
+		@apply w-full mx-auto px-4 pb-16;
+	}
+
+	@media (min-width: 768px) {
+		.curated-feed {
+			@apply px-0;
+		}
 	}
 
 	.feed-header {
-		@apply mb-16;
+		@apply mb-8 sm:mb-12 lg:mb-16 lg:mx-4;
 	}
 
 	.feed-header h2 {
@@ -257,18 +437,24 @@
 	}
 
 	.collections-section {
-		@apply flex flex-col gap-32;
+		@apply flex flex-col gap-16;
+	}
+
+	@media (min-width: 640px) {
+		.collections-section {
+			@apply gap-24;
+		}
 	}
 
 	@media (min-width: 768px) {
 		.collections-section {
-			@apply gap-40;
+			@apply gap-32;
 		}
 	}
 
 	@media (min-width: 1024px) {
 		.collections-section {
-			@apply gap-48;
+			@apply gap-40;
 		}
 	}
 
@@ -283,7 +469,7 @@
 		
 		.collection-header {
 			@apply flex-shrink-0 flex;
-			width: 33.333333%; /* 1/3 */
+			width: 25%; /* Reduced from 33.333% to make it less wide */
 			max-width: none;
 		}
 		
@@ -294,13 +480,35 @@
 
 	@media (min-width: 1024px) {
 		.collection-group {
-			@apply gap-12;
+			@apply gap-6;
 		}
 	}
 
 	.collection-card {
-		@apply flex flex-col items-center justify-center text-center flex-1;
+		@apply flex flex-col items-start justify-start text-left flex-1;
 		@apply transition-colors duration-200;
+	}
+
+	@media (max-width: 767px) {
+		.collection-card {
+			@apply gap-4 mb-4;
+		}
+	}
+
+	@media (min-width: 768px) {
+		.collection-card {
+			@apply flex-col items-center justify-center text-center;
+		}
+	}
+
+	.collection-main-info {
+		@apply flex flex-col gap-1;
+	}
+
+	@media (min-width: 768px) {
+		.collection-main-info {
+			@apply items-center text-center gap-2;
+		}
 	}
 
 	.collection-title-button {
@@ -313,24 +521,55 @@
 	}
 
 	.collection-title {
-		@apply text-2xl font-bold mb-3 text-gray-900 dark:text-gray-50;
+		@apply text-lg font-bold mb-1 text-gray-900 dark:text-gray-50;
 		@apply leading-tight transition-colors duration-200;
 	}
 
+	@media (min-width: 640px) {
+		.collection-title {
+			@apply text-xl;
+		}
+	}
+
+	@media (min-width: 768px) {
+		.collection-title {
+			@apply text-2xl mb-3;
+		}
+	}
+
 	.view-all-button {
-		@apply mt-4 px-4 py-2 bg-transparent border border-gray-300 dark:border-gray-600;
+		@apply mt-2 px-4 py-2 bg-transparent border border-gray-300 dark:border-gray-600;
 		@apply text-gray-600 dark:text-gray-400 text-sm font-medium rounded-md;
 		@apply hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200;
-		@apply transition-all duration-200 cursor-pointer;
+		@apply transition-all duration-200 cursor-pointer flex-shrink-0;
+		@apply h-fit self-start;
+	}
+
+	@media (min-width: 768px) {
+		.view-all-button {
+			@apply mt-4 px-4 py-2 text-sm self-center;
+		}
 	}
 
 	.collection-artist {
-		@apply text-gray-600 dark:text-gray-400 text-lg font-medium mb-2;
+		@apply text-gray-600 dark:text-gray-400 text-sm font-medium mb-1;
 		@apply block;
 	}
 
+	@media (min-width: 768px) {
+		.collection-artist {
+			@apply text-lg mb-2;
+		}
+	}
+
 	.collection-count {
-		@apply text-gray-500 dark:text-gray-400 text-sm font-normal;
+		@apply text-gray-500 dark:text-gray-400 text-xs font-normal mb-0;
+	}
+
+	@media (min-width: 768px) {
+		.collection-count {
+			@apply text-sm;
+		}
 	}
 
 	.collection-description {
@@ -342,6 +581,19 @@
 	}
 
 	.collection-artworks {
+		@apply mt-4 -mx-4;
+	}
+
+	@media (min-width: 640px) {
+		.collection-artworks {
+			@apply mt-6;
+		}
+	}
+
+	@media (min-width: 768px) {
+		.collection-artworks {
+			@apply mt-0 mx-0;
+		}
 	}
 
 	/* Artworks Swiper */
@@ -351,36 +603,12 @@
 
 	.swiper-track {
 		@apply flex overflow-x-auto pb-4;
-		gap: 8px;
+		gap: 12px;
 		scroll-snap-type: x mandatory;
 		scrollbar-width: none;
 		-ms-overflow-style: none;
-	}
-
-	@media (min-width: 640px) {
-		.swiper-track {
-			gap: 8px;
-		}
-	}
-
-	@media (min-width: 768px) {
-		.swiper-track {
-			gap: 8px;
-			/* Allow content to flow off-canvas to the right on desktop */
-			padding-right: 50vw;
-		}
-	}
-
-	@media (min-width: 1024px) {
-		.swiper-track {
-			gap: 8px;
-		}
-	}
-
-	@media (min-width: 1280px) {
-		.swiper-track {
-			gap: 8px;
-		}
+		padding-left: 1rem;
+		padding-right: 1rem;
 	}
 
 	.swiper-track::-webkit-scrollbar {
@@ -388,14 +616,32 @@
 	}
 
 	.artwork-slide {
-		@apply flex-shrink-0;
-		width: 320px; /* Larger mobile size */
-		scroll-snap-align: start;
+		@apply flex-shrink-0 px-0;
+		width: 280px; /* Optimized mobile size */
+		scroll-snap-align: 16px;
+	}
+
+	.entangled-slide {
+		width: 560px; /* Double width for Entangled pairs */
+	}
+
+	@media (min-width: 640px) {
+		.artwork-slide {
+			width: 320px;
+		}
+		
+		.entangled-slide {
+			width: 640px;
+		}
 	}
 
 	@media (min-width: 768px) {
 		.artwork-slide {
 			width: 400px; /* Larger desktop size */
+		}
+		
+		.entangled-slide {
+			width: 800px; /* Double width for Entangled pairs */
 		}
 	}
 
@@ -403,11 +649,19 @@
 		.artwork-slide {
 			width: 480px; /* Even larger on big screens */
 		}
+		
+		.entangled-slide {
+			width: 960px; /* Double width for Entangled pairs */
+		}
 	}
 
 	@media (min-width: 1280px) {
 		.artwork-slide {
 			width: 520px; /* Maximum size for very large screens */
+		}
+		
+		.entangled-slide {
+			width: 1040px; /* Double width for Entangled pairs */
 		}
 	}
 
@@ -463,5 +717,86 @@
 
 	.lazy-load-container {
 		@apply flex flex-col items-center justify-center mt-12;
+	}
+
+	/* Entangled Mini Styles */
+	.entangled-link {
+		@apply block no-underline;
+	}
+
+	.entangled-preview-mini {
+		@apply relative bg-gradient-to-br from-gray-900 to-black rounded-lg overflow-hidden aspect-video mb-2;
+		transition: all 0.3s ease;
+	}
+
+	.entangled-preview-mini:hover {
+		transform: scale(1.02);
+		box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+	}
+
+	.entangled-preview-images-mini {
+		@apply absolute inset-0 flex;
+	}
+
+	.chain-preview-mini {
+		@apply flex-1 relative overflow-hidden;
+	}
+
+	.chain-preview-mini.ethereum {
+		@apply border-r border-blue-500/30;
+	}
+
+	.chain-preview-mini.tezos {
+		@apply border-l border-blue-400/30;
+	}
+
+	.entangled-overlay-mini {
+		@apply absolute inset-0 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center text-white text-center;
+		background: linear-gradient(45deg, rgba(98, 126, 234, 0.8), rgba(45, 156, 219, 0.8));
+	}
+
+	.entangled-title-mini {
+		@apply text-lg md:text-xl font-bold tracking-wide;
+		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+	}
+
+	.entangled-single-link {
+		@apply relative block no-underline;
+	}
+
+	.entangled-badge-mini {
+		@apply absolute top-2 right-2 px-2 py-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold rounded-full tracking-wide;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+	}
+
+	.view-collection-slide {
+		@apply flex-shrink-0 px-0 aspect-square;
+	}
+
+	.view-collection-card {
+		@apply bg-transparent border-none p-0 cursor-pointer w-full;
+		@apply transition-all duration-200 hover:scale-[1.01];
+	}
+
+	.view-collection-content {
+		@apply w-full aspect-square bg-gray-100 dark:bg-gray-900 flex flex-col items-center justify-center gap-3 ;
+		@apply hover:border-gray-400 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800;
+		@apply transition-all duration-200;
+	}
+
+	.view-collection-text {
+		@apply flex flex-col items-center justify-center text-center gap-1;
+	}
+
+	.view-collection-label {
+		@apply text-xl font-semibold text-gray-800 dark:text-gray-200;
+	}
+
+	.view-collection-count {
+		@apply text-xs text-gray-500 dark:text-gray-400;
+	}
+
+	.collection-icon {
+		@apply w-full h-full;
 	}
 </style> 

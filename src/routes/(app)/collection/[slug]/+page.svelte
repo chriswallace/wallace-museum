@@ -8,7 +8,8 @@
 	import LazyArtwork from '$lib/components/LazyArtwork.svelte';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import ArtistAvatar from '$lib/components/ArtistAvatar.svelte';
-		import { getResponsiveImageProps, shouldUseLazyLoading, getEnhancedResponsiveProps } from '$lib/utils/imageHelpers';
+	import { getResponsiveImageProps, shouldUseLazyLoading, getEnhancedResponsiveProps } from '$lib/utils/imageHelpers';
+	import { processArtworksForEntangled, isEntangledPair, getEntangledPageUrl, isEntangledArtwork, getEntangledPageUrlFromArtwork } from '$lib/utils/entangledHelpers';
 
 	export let data: { collection?: any; error?: string };
 
@@ -149,6 +150,9 @@
 		? `${data.collection.title} - ${primaryDescription || 'A curated collection at the Wallace Museum showcasing innovative digital art.'}`
 		: 'Collection at the Wallace Museum';
 	$: artworkCount = data.collection?.artworks?.length || 0;
+	
+	// Process artworks to handle Entangled pairing
+	$: processedArtworks = data.collection?.artworks ? processArtworksForEntangled(data.collection.artworks) : [];
 </script>
 
 <svelte:head>
@@ -413,33 +417,124 @@
 
 				<!-- Right Column - Artworks -->
 				<main class="artworks-main">
-					{#if data.collection.artworks && data.collection.artworks.length > 0}
+					{#if processedArtworks && processedArtworks.length > 0}
 						<div class="artworks-grid">
-							{#each data.collection.artworks as artwork, artworkIndex}
-								<LazyArtwork
-									artwork={{
-										id: artwork.id,
-										title: artwork.title,
-										imageUrl: artwork.image_url,
-										image_url: artwork.image_url,
-										animationUrl: artwork.animation_url,
-										animation_url: artwork.animation_url,
-										mime: artwork.mime,
-										dimensions: artwork.dimensions
-									}}
-									aspectRatio="square"
-									onClick={() => {
-										if (artwork.artists && artwork.artists.length > 0) {
-											goto(`/artist/${artwork.artists[0].id}/${artwork.id}`);
-										}
-									}}
-									quality={80}
-									fit="cover"
-									sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-									responsiveSizes={[200, 300, 400, 500]}
-									priority={artworkIndex < 4}
-									className="artwork-thumbnail"
-								/>
+							{#each processedArtworks as item, itemIndex}
+								{#if isEntangledPair(item)}
+									<!-- Entangled pair link -->
+									<a 
+										href={getEntangledPageUrl(item.ethereum.tokenId, item.tezos.tokenId)}
+										class="entangled-pair-container"
+									>
+										<div class="entangled-preview">
+											<div class="entangled-preview-images">
+												<div class="chain-preview ethereum">
+													<LazyArtwork
+														artwork={{
+															id: item.ethereum.id,
+															title: item.ethereum.title,
+															imageUrl: item.ethereum.image_url,
+															image_url: item.ethereum.image_url,
+															animationUrl: item.ethereum.animation_url,
+															animation_url: item.ethereum.animation_url,
+															mime: item.ethereum.mime,
+															dimensions: item.ethereum.dimensions
+														}}
+														aspectRatio="square"
+														quality={80}
+														fit="cover"
+														sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+														responsiveSizes={[300, 400, 500]}
+														priority={itemIndex < 4}
+														className="chain-artwork-thumbnail"
+													/>
+													<div class="chain-label">⟠ ETH #{item.ethereum.tokenId}</div>
+												</div>
+												<div class="chain-preview tezos">
+													<LazyArtwork
+														artwork={{
+															id: item.tezos.id,
+															title: item.tezos.title,
+															imageUrl: item.tezos.image_url,
+															image_url: item.tezos.image_url,
+															animationUrl: item.tezos.animation_url,
+															animation_url: item.tezos.animation_url,
+															mime: item.tezos.mime,
+															dimensions: item.tezos.dimensions
+														}}
+														aspectRatio="square"
+														quality={80}
+														fit="cover"
+														sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+														responsiveSizes={[300, 400, 500]}
+														priority={itemIndex < 4}
+														className="chain-artwork-thumbnail"
+													/>
+													<div class="chain-label">◊ XTZ #{item.tezos.tokenId}</div>
+												</div>
+											</div>
+											<div class="entangled-overlay">
+												<div class="entangled-title">ENTANGLED</div>
+												<div class="entangled-subtitle">Cross-Chain Interactive Art</div>
+											</div>
+										</div>
+									</a>
+								{:else if isEntangledArtwork(item)}
+									<!-- Individual Entangled artwork link -->
+									<a 
+										href={getEntangledPageUrlFromArtwork(item)}
+										class="entangled-single-container"
+									>
+										<LazyArtwork
+											artwork={{
+												id: item.id,
+												title: item.title,
+												imageUrl: item.image_url,
+												image_url: item.image_url,
+												animationUrl: item.animation_url,
+												animation_url: item.animation_url,
+												mime: item.mime,
+												dimensions: item.dimensions
+											}}
+											aspectRatio="square"
+											quality={80}
+											fit="cover"
+											sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+											responsiveSizes={[300, 400, 500]}
+											priority={itemIndex < 4}
+											className="artwork-thumbnail"
+										/>
+										<div class="entangled-single-overlay">
+											<div class="entangled-badge">ENTANGLED</div>
+										</div>
+									</a>
+								{:else}
+									<!-- Regular artwork display -->
+									<LazyArtwork
+										artwork={{
+											id: item.id,
+											title: item.title,
+											imageUrl: item.image_url,
+											image_url: item.image_url,
+											animationUrl: item.animation_url,
+											animation_url: item.animation_url,
+											mime: item.mime,
+											dimensions: item.dimensions
+										}}
+										aspectRatio="square"
+										onClick={() => {
+											if (item.artists && item.artists.length > 0) {
+												goto(`/artist/${item.artists[0].id}/${item.id}`);
+											}
+										}}
+										quality={80}
+										fit="cover"
+										sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+										responsiveSizes={[300, 400, 500]}
+										priority={itemIndex < 4}
+										className="artwork-thumbnail"
+									/>
+								{/if}
 							{/each}
 						</div>
 					{:else}
@@ -749,10 +844,81 @@
 		@apply grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
 	}
 
+	/* Entangled Styles */
+	.entangled-pair-container {
+		@apply col-span-full block no-underline;
+		grid-column: 1 / -1;
+	}
+
+	.entangled-preview {
+		@apply relative bg-gradient-to-br from-gray-900 to-black rounded-lg overflow-hidden aspect-video;
+		min-height: 300px;
+		transition: all 0.3s ease;
+	}
+
+	.entangled-preview:hover {
+		transform: scale(1.02);
+		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+	}
+
+	.entangled-preview-images {
+		@apply absolute inset-0 flex;
+	}
+
+	.chain-preview {
+		@apply flex-1 relative overflow-hidden;
+	}
+
+	.chain-preview.ethereum {
+		@apply border-r border-blue-500/30;
+	}
+
+	.chain-preview.tezos {
+		@apply border-l border-blue-400/30;
+	}
+
+	.chain-label {
+		@apply absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-xs font-mono backdrop-blur-sm;
+	}
+
+	.entangled-overlay {
+		@apply absolute inset-0 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center text-white text-center;
+		background: linear-gradient(45deg, rgba(98, 126, 234, 0.8), rgba(45, 156, 219, 0.8));
+	}
+
+	.entangled-title {
+		@apply text-2xl md:text-3xl font-bold mb-2 tracking-wide;
+		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+	}
+
+	.entangled-subtitle {
+		@apply text-sm md:text-base opacity-90;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+	}
+
+	.entangled-single-container {
+		@apply relative block no-underline;
+	}
+
+	.entangled-single-overlay {
+		@apply absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity duration-300;
+	}
+
+	.entangled-badge {
+		@apply px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold rounded-full tracking-wide;
+		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+	}
+
 	@media (min-width: 1280px) {
 		.artworks-grid {
 			@apply gap-5;
 		}
+	}
+
+	.entangled-pair-container {
+		@apply col-span-full;
+		/* Make entangled pairs span the full width of the grid */
+		grid-column: 1 / -1;
 	}
 
 	.artwork-container {

@@ -171,9 +171,8 @@ export function getResponsiveSizes(context: 'artwork' | 'thumbnail' | 'grid' | '
 		case 'artwork':
 			return '(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 70vw';
 		case 'thumbnail':
-			return '(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw';
 		case 'grid':
-			return '(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw';
+			return '(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw';
 		case 'avatar':
 			return '64px';
 		default:
@@ -218,9 +217,9 @@ export const ImageConfigs = {
 export const ResponsiveImageConfigs = {
 	// Artwork thumbnails in grids
 	artworkThumbnail: {
-		sizes: '(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw',
-		responsiveSizes: [200, 300, 400, 500],
-		defaultWidth: 300,
+		sizes: '(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw',
+		responsiveSizes: [300, 400, 500],
+		defaultWidth: 400,
 		quality: 80,
 		fit: 'cover' as const,
 		format: 'webp' as const
@@ -396,9 +395,9 @@ export function getEnhancedResponsiveProps(
 
 	const configs = {
 		grid: {
-			sizes: options.customSizes || '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw',
-			widths: options.customWidths || [200, 300, 400, 500],
-			defaultWidth: 300,
+			sizes: options.customSizes || '(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw',
+			widths: options.customWidths || [300, 400, 500],
+			defaultWidth: 400,
 			quality: 80
 		},
 		hero: {

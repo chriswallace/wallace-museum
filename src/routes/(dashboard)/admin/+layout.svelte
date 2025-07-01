@@ -2,10 +2,7 @@
 	import { page } from '$app/stores';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
 	import { onMount } from 'svelte';
-	import SquareLibrary from 'lucide-svelte/icons/square-library';
-	import Image from 'lucide-svelte/icons/image';
-	import UsersRound from 'lucide-svelte/icons/users-round';
-	import Import from 'lucide-svelte/icons/import';
+	import { SquareLibrary, Image, UsersRound, Import } from 'lucide-svelte';
 
 	let currentPage: string = '';
 	let sidebarOpen = false;

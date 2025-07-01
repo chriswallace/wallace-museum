@@ -253,7 +253,7 @@
 <style lang="scss">
 	.featured-section {
 		@apply w-full max-w-7xl mx-auto px-4 md:px-4 relative;
-		@apply mb-16 md:mb-40 lg:mb-48;
+		@apply mb-16 mt-4 md:mt-0 md:mb-40 lg:mb-48;
 		
 		/* Fade-in animation */
 		opacity: 0;
@@ -264,13 +264,6 @@
 		&.visible {
 			opacity: 1;
 			transform: translateY(0);
-		}
-		
-		&::before {
-			content: '';
-			@apply absolute -inset-x-4 -inset-y-8 bg-gradient-to-b from-transparent via-gray-50/20 to-transparent dark:via-gray-900/20;
-			@apply pointer-events-none hidden md:block;
-			border-radius: 2rem;
 		}
 		
 		> * {

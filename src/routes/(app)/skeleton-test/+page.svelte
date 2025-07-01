@@ -87,7 +87,7 @@
 		<div class="flex gap-4">
 			{#each artworks as artwork}
 				<button
-					class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+					class="px-4 py-2 bg-blue-500 text-white hover:bg-blue-600 transition-colors"
 					class:bg-blue-700={currentArtwork.id === artwork.id}
 					on:click={() => switchArtwork(artwork)}
 				>
