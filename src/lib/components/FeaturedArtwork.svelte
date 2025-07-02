@@ -4,9 +4,11 @@
 	import { navigateWithDebounce } from '$lib/utils/navigationHelpers';
 	import OptimizedImage from './OptimizedImage.svelte';
 	import LoaderWrapper from './LoaderWrapper.svelte';
-	import LazyArtwork from './LazyArtwork.svelte';
+	import ArtworkDisplay from './ArtworkDisplay.svelte';
 	import ArtistAvatar from './ArtistAvatar.svelte';
 	import { ipfsToHttpUrl } from '$lib/mediaUtils.js';
+	import { getBestMediaUrl, getMediaDisplayType } from '$lib/utils/mediaHelpers';
+	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
 
 	interface FeaturedArtworkData {
 		id: string;
@@ -38,10 +40,77 @@
 	}
 
 	let featuredArtwork: FeaturedArtworkData | null = null;
+	let displayedArtwork: FeaturedArtworkData | null = null; // The artwork currently being displayed
 	let loading = true;
 	let error = false;
 	let sectionElement: HTMLElement;
 	let isVisible = false;
+	let isRefreshing = false;
+	let artworkTransitioning = false;
+	let artworkContainer: HTMLElement;
+	let containerWidth = 0;
+	let containerHeight = 0;
+
+	// Calculate responsive image size based on container dimensions
+	function calculateResponsiveImageSize(): number {
+		if (!containerWidth || !containerHeight) {
+			// Fallback sizes based on viewport
+			if (typeof window !== 'undefined') {
+				const vw = window.innerWidth;
+				const vh = window.innerHeight;
+				
+				// Mobile: use viewport width
+				if (vw <= 768) return Math.min(vw * 0.9, 600);
+				
+				// Desktop: use 70vh as max size (matching CSS)
+				const maxSize = Math.min(vh * 0.7, vw * 0.5);
+				return Math.min(maxSize, 800);
+			}
+			return 600; // SSR fallback
+		}
+		
+		// Use actual container dimensions with device pixel ratio for crisp images
+		const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+		const targetSize = Math.max(containerWidth, containerHeight);
+		
+		// Scale up for high-DPI displays but cap at reasonable size
+		return Math.min(targetSize * dpr, 1200);
+	}
+
+	// Get optimized image URL for the featured artwork
+	function getOptimizedFeaturedImageUrl(imageUrl: string): string {
+		const size = calculateResponsiveImageSize();
+		
+		return buildOptimizedImageUrl(imageUrl, {
+			width: size,
+			height: size,
+			fit: 'contain',
+			quality: 90,
+			format: 'webp'
+		});
+	}
+
+	// Update container dimensions
+	function updateContainerDimensions() {
+		if (artworkContainer) {
+			const rect = artworkContainer.getBoundingClientRect();
+			containerWidth = rect.width;
+			containerHeight = rect.height;
+		}
+	}
+
+	// Handle window resize
+	function handleResize() {
+		updateContainerDimensions();
+	}
+
+	// Update container dimensions when artwork changes
+	$: if (displayedArtwork && artworkContainer) {
+		// Use requestAnimationFrame to ensure DOM is updated
+		requestAnimationFrame(() => {
+			updateContainerDimensions();
+		});
+	}
 
 	// Format mint date for display
 	function formatMintDate(mintDate: Date | null): string | null {
@@ -69,6 +138,7 @@
 
 			if (response.ok) {
 				featuredArtwork = data.artwork;
+				displayedArtwork = data.artwork; // Set both for initial load
 			} else {
 				console.error('Failed to load featured artwork:', data.error);
 				error = true;
@@ -78,6 +148,41 @@
 			error = true;
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function refreshFeaturedArtwork() {
+		if (isRefreshing) return; // Prevent multiple simultaneous requests
+		
+		isRefreshing = true;
+		artworkTransitioning = true;
+		error = false;
+
+		try {
+			const response = await fetch('/api/artworks/featured', {
+				cache: 'no-cache'
+			});
+			const data = await response.json();
+
+			if (response.ok) {
+				featuredArtwork = data.artwork;
+				
+				// Wait for the fade-out animation, then update the displayed artwork
+				setTimeout(() => {
+					displayedArtwork = data.artwork;
+					artworkTransitioning = false;
+				}, 300);
+			} else {
+				console.error('Failed to refresh featured artwork:', data.error);
+				error = true;
+				artworkTransitioning = false;
+			}
+		} catch (err) {
+			console.error('Error refreshing featured artwork:', err);
+			error = true;
+			artworkTransitioning = false;
+		} finally {
+			isRefreshing = false;
 		}
 	}
 
@@ -124,7 +229,14 @@
 		loadFeaturedArtwork();
 		const cleanup = setupIntersectionObserver();
 		
-		return cleanup;
+		// Set up resize observer for responsive sizing
+		updateContainerDimensions();
+		window.addEventListener('resize', handleResize);
+		
+		return () => {
+			cleanup?.();
+			window.removeEventListener('resize', handleResize);
+		};
 	});
 </script>
 
@@ -141,32 +253,85 @@
 	{:else}
 		<div class="featured-content">
 			<!-- Featured Artwork Display -->
-			<div class="artwork-display">
-				<LazyArtwork
-					artwork={{
-						id: featuredArtwork.id,
-						title: featuredArtwork.title,
-						imageUrl: featuredArtwork.imageUrl,
-						animationUrl: featuredArtwork.animationUrl,
-						generatorUrl: featuredArtwork.generatorUrl,
-						mime: featuredArtwork.mime,
-						dimensions: featuredArtwork.dimensions
-					}}
-					aspectRatio="square"
-					onClick={handleArtworkClick}
-					className="featured-stage"
-					priority={true}
-					quality={75}
-					fit="contain"
-					sizes="(max-width: 1024px) 100vw, 50vw"
-					responsiveSizes={[400, 600, 800, 1200]}
-				/>
+			<div class="artwork-display" class:refreshing={isRefreshing} class:transitioning={artworkTransitioning} bind:this={artworkContainer}>
+				<div class="artwork-display-wrapper">
+					{#if displayedArtwork}
+						{#key displayedArtwork.id}
+							{#if displayedArtwork}
+								{@const mediaUrls = {
+									generatorUrl: displayedArtwork.generatorUrl,
+									animationUrl: displayedArtwork.animationUrl,
+									imageUrl: displayedArtwork.imageUrl
+								}}
+								{@const bestMedia = getBestMediaUrl(mediaUrls, 'fullscreen', displayedArtwork.mime)}
+								{@const mediaType = getMediaDisplayType(bestMedia, displayedArtwork.mime)}
+								{@const displayUrl = bestMedia?.url || ''}
+								
+								{#if displayUrl}
+									{#if mediaType === 'image'}
+										<OptimizedImage
+											src={getOptimizedFeaturedImageUrl(displayUrl)}
+											alt={displayedArtwork.title}
+											className="w-full h-full object-contain"
+											quality={90}
+											loading="eager"
+											sizes="(max-width: 768px) 90vw, (max-width: 1024px) 50vw, 70vh"
+										/>
+									{:else}
+										<!-- For videos and iframes, use the regular ArtworkDisplay -->
+										<ArtworkDisplay
+											artwork={{
+												title: displayedArtwork.title,
+												imageUrl: displayedArtwork.imageUrl,
+												animationUrl: displayedArtwork.animationUrl,
+												generatorUrl: displayedArtwork.generatorUrl,
+												mime: displayedArtwork.mime,
+												dimensions: displayedArtwork.dimensions
+											}}
+											isInFullscreenMode={false}
+										/>
+									{/if}
+								{:else}
+									<div class="image-placeholder">
+										<div class="placeholder-icon">
+											<svg viewBox="0 0 24 24" fill="currentColor">
+												<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+											</svg>
+										</div>
+										<p>Image not available</p>
+									</div>
+								{/if}
+							{/if}
+						{/key}
+					{/if}
+					
+					<!-- Invisible click overlay to prevent video interaction and handle clicks -->
+					<div 
+						class="click-overlay"
+						on:click={handleArtworkClick} 
+						on:keydown={(e) => e.key === 'Enter' && handleArtworkClick()} 
+						role="button" 
+						tabindex="0" 
+						aria-label="View {displayedArtwork?.title || featuredArtwork?.title || 'artwork'}"
+					></div>
+				</div>
 			</div>
 
 			<!-- Artwork Information -->
 			<div class="artwork-details">
 				<div class="featured-label">
 					<span>Featured</span>
+					<button 
+						on:click={refreshFeaturedArtwork}
+						class="refresh-button"
+						class:refreshing={isRefreshing}
+						aria-label="Refresh featured artwork"
+						disabled={isRefreshing}
+					>
+						<svg viewBox="0 0 24 24" fill="currentColor" class="refresh-icon">
+							<path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-8 3.58-8 8s3.58 8 8 8c1.1 0 2.12-.2 3.07-.57l-1.42-1.42c-.51.16-1.06.26-1.65.26-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+						</svg>
+					</button>
 				</div>
 
 				<button 
@@ -307,74 +472,68 @@
 		min-height: 300px;
 		/* Center the square container */
 		margin: 0 auto;
+		/* Add transition for refreshing state */
+		transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+		
+		&.refreshing {
+			opacity: 0.7;
+			transform: scale(0.98);
+		}
+		
+		&.transitioning {
+			opacity: 0.5;
+			transform: scale(0.95);
+		}
 	}
 
-	:global(.featured-stage) {
-		@apply w-full h-full;
+	.artwork-display-wrapper {
+		@apply w-full h-full relative;
 		max-width: 100%;
 		max-height: 100%;
-		/* Ensure the stage respects container bounds */
-		display: flex !important;
-		align-items: center !important;
-		justify-content: center !important;
+		/* Ensure the wrapper respects container bounds */
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		/* Prevent overflow and ensure containment */
-		overflow: hidden !important;
-		box-sizing: border-box !important;
+		overflow: hidden;
+		box-sizing: border-box;
+		/* Add smooth zoom transition */
+		transition: transform 0.3s ease-out;
+		
+		&:hover {
+			transform: scale(1.05);
+		}
+		
+		/* Fade-in animation for new artwork */
+		:global(.artwork-container) {
+			animation: fadeIn 0.4s ease-out;
+		}
+	}
+	
+	.click-overlay {
+		@apply absolute inset-0 z-10;
+		@apply cursor-pointer;
+		@apply bg-transparent;
+		
+		/* Focus styles for accessibility */
+		&:focus {
+			outline: 2px solid rgba(59, 130, 246, 0.5);
+			outline-offset: 2px;
+		}
 	}
 
-	/* Ensure the artwork stage within featured-stage is properly constrained */
-	:global(.featured-stage .artwork-stage) {
-		max-width: 100% !important;
-		max-height: 100% !important;
-		width: 100% !important;
-		height: 100% !important;
-		display: flex !important;
-		align-items: center !important;
-		justify-content: center !important;
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
 	}
 
-	/* Ensure images and videos within the featured stage are properly constrained */
-	:global(.featured-stage .stage-image),
-	:global(.featured-stage .stage-video) {
-		max-width: 100% !important;
-		max-height: 100% !important;
-		width: auto !important;
-		height: auto !important;
-		object-fit: contain !important;
-		/* Ensure the image/video scales to fit the container */
-		display: block !important;
-		/* Perfect centering */
-		margin: auto !important;
-		position: absolute !important;
-		top: 50% !important;
-		left: 50% !important;
-		transform: translate(-50%, -50%) !important;
-	}
 
-	/* Ensure the OptimizedImage container within featured stage behaves correctly */
-	:global(.featured-stage .image-container) {
-		max-width: 100% !important;
-		max-height: 100% !important;
-		width: 100% !important;
-		height: 100% !important;
-		display: flex !important;
-		align-items: center !important;
-		justify-content: center !important;
-		/* Relative positioning for absolute child */
-		position: relative !important;
-	}
-
-	/* Ensure the lazy-artwork-container within featured stage has proper flex layout */
-	:global(.featured-stage) {
-		display: flex !important;
-		height: 100% !important;
-	}
-
-	:global(.featured-stage .lazy-artwork-container) {
-		display: flex !important;
-		height: 100% !important;
-		width: 100% !important;
-	}
 
 	.image-placeholder {
 		@apply w-full h-full flex items-center justify-center text-gray-500;
@@ -392,6 +551,7 @@
 
 	.featured-label {
 		@apply text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider;
+		@apply flex items-center gap-2;
 	}
 
 	.mint-date {
@@ -485,5 +645,34 @@
 		@apply text-sm text-gray-600 dark:text-gray-400;
 	}
 
+	.refresh-button {
+		@apply bg-transparent border-none p-1 cursor-pointer rounded-md;
+		@apply transition-all duration-200;
+		@apply hover:bg-gray-100 dark:hover:bg-gray-800;
+		@apply focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600;
+		@apply text-gray-500 dark:text-gray-400;
+		@apply hover:text-gray-700 dark:hover:text-gray-300;
+		
+		&:disabled {
+			@apply cursor-not-allowed opacity-75;
+		}
+		
+		&.refreshing .refresh-icon {
+			animation: spin 1s linear infinite;
+		}
+	}
 
+	.refresh-icon {
+		@apply w-4 h-4;
+		@apply transition-transform duration-200;
+	}
+
+	@keyframes spin {
+		from {
+			transform: rotate(0deg);
+		}
+		to {
+			transform: rotate(360deg);
+		}
+	}
 </style> 

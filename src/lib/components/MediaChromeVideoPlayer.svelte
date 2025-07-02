@@ -105,11 +105,11 @@
 
 <style lang="scss">
 	.media-chrome-player {
-		@apply block bg-black rounded-lg overflow-hidden;
+		@apply block bg-black overflow-hidden;
 	}
 
 	.video-loading-placeholder {
-		@apply flex items-center justify-center bg-black rounded-lg text-white;
+		@apply flex items-center justify-center bg-black text-white;
 	}
 
 	.loading-content {

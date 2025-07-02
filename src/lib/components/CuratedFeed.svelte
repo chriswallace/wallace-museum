@@ -149,7 +149,10 @@
 	});
 
 	// Swiper navigation functions
-	function scrollSwiper(swiperTrack: HTMLElement, direction: 'left' | 'right') {
+	function scrollSwiper(swiperTrack: Element, direction: 'left' | 'right') {
+		// Type guard to ensure we have an HTMLElement
+		if (!(swiperTrack instanceof HTMLElement)) return;
+		
 		// Calculate scroll amount based on viewport width to match artwork slide widths
 		let scrollAmount = 320; // Default for small screens
 
@@ -727,16 +730,19 @@
 	}
 
 	.swiper-nav-button {
-		@apply absolute top-1/2 transform -translate-y-1/2 z-10;
+		@apply absolute top-1/2 z-10;
 		@apply w-12 h-12 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm;
 		@apply flex items-center justify-center cursor-pointer border-0;
 		@apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white;
-		@apply shadow-lg hover:shadow-xl transition-all duration-200;
+		@apply shadow-lg hover:shadow-xl transition-all duration-300;
 		@apply opacity-0 pointer-events-none;
 		@apply hover:bg-white dark:hover:bg-gray-700;
+		/* Use transform instead of Tailwind classes for better control */
+		transform: translateY(-50%);
 	}
 
-	.artworks-swiper.hoverable:hover .swiper-nav-button {
+	.artworks-swiper.hoverable:hover .swiper-nav-button,
+	.swiper-nav-button:hover {
 		@apply opacity-100 pointer-events-auto;
 	}
 
@@ -750,10 +756,15 @@
 
 	.swiper-nav-button svg {
 		@apply w-5 h-5;
+		@apply transition-transform duration-200;
 	}
 
 	.swiper-nav-button:hover {
 		transform: translateY(-50%) scale(1.05);
+	}
+
+	.swiper-nav-button:hover svg {
+		transform: scale(1.1);
 	}
 
 	/* Hide navigation on mobile */
