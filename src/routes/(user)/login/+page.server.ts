@@ -5,7 +5,7 @@ import { db } from '$lib/prisma';
 import crypto from 'crypto';
 
 export const actions: Actions = {
-	default: async ({ request, cookies }) => {
+	login: async ({ request, cookies }) => {
 		const data = await request.formData();
 		const username = data.get('username') as string;
 		const password = data.get('password') as string;
@@ -50,14 +50,12 @@ export const actions: Actions = {
 				sameSite: 'strict',
 				expires: expiresAt
 			});
-
-			throw redirect(302, '/admin');
 		} catch (error) {
-			if (error instanceof Response) {
-				throw error; // Re-throw redirect
-			}
 			console.error('Login error:', error);
 			return { error: 'Login failed' };
 		}
+
+		// Redirect after successful login (outside try/catch)
+		throw redirect(302, '/admin');
 	}
 };

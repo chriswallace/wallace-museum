@@ -5,7 +5,7 @@ import { db } from '$lib/prisma';
 import crypto from 'crypto';
 
 export const actions: Actions = {
-	default: async ({ request, cookies }) => {
+	register: async ({ request, cookies }) => {
 		const data = await request.formData();
 		const username = data.get('username') as string;
 		const email = data.get('email') as string;
@@ -19,10 +19,7 @@ export const actions: Actions = {
 			// Check if user already exists
 			const existingUser = await db.read.user.findFirst({
 				where: {
-					OR: [
-						{ username },
-						{ email }
-					]
+					OR: [{ username }, { email }]
 				}
 			});
 
@@ -67,14 +64,12 @@ export const actions: Actions = {
 				sameSite: 'strict',
 				expires: expiresAt
 			});
-
-			throw redirect(302, '/admin');
 		} catch (error) {
-			if (error instanceof Response) {
-				throw error; // Re-throw redirect
-			}
 			console.error('Setup error:', error);
 			return { error: 'Failed to create user account' };
 		}
+
+		// Redirect after successful user creation (outside try/catch)
+		throw redirect(302, '/admin');
 	}
 };

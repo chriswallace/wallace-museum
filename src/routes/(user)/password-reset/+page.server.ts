@@ -1,55 +1,52 @@
-import { fail, redirect } from '@sveltejs/kit';
-import bcrypt from 'bcryptjs';
+import { fail } from '@sveltejs/kit';
 import type { Action, Actions, PageServerLoad } from './$types';
-import prisma from '$lib/prisma';
+import { db } from '$lib/prisma';
 
 export const load: PageServerLoad = async () => {
 	// todo
 };
 
-const login: Action = async ({ cookies, request }) => {
+const reset: Action = async ({ request }) => {
 	const data = await request.formData();
-	const username = data.get('username');
-	const password = data.get('password');
+	const email = data.get('username'); // Using username field but expecting email
 
-	if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
+	if (typeof email !== 'string' || !email) {
 		return fail(400, { invalid: true });
 	}
 
-	const user = await prisma.user.findUnique({ where: { username } });
-
-	if (!user) {
-		return fail(400, { credentials: true });
+	// Basic email validation
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	if (!emailRegex.test(email)) {
+		return fail(400, { invalid: true });
 	}
 
-	const userPassword = await bcrypt.compare(password, user.passwordHash);
+	try {
+		// Check if user exists with this email
+		const user = await db.read.user.findUnique({ where: { email } });
 
-	if (!userPassword) {
-		return fail(400, { credentials: true });
+		// For security, always return success even if user doesn't exist
+		// This prevents email enumeration attacks
+
+		if (user) {
+			// TODO: Generate reset token and send email
+			// For now, just log that a reset was requested
+			console.log(`Password reset requested for: ${email}`);
+
+			// In a real implementation, you would:
+			// 1. Generate a secure reset token
+			// 2. Store it in the database with expiration
+			// 3. Send reset email with token link
+		}
+
+		// Always return success to prevent user enumeration
+		return {
+			success: true,
+			message: 'If an account with that email exists, a password reset link has been sent.'
+		};
+	} catch (error) {
+		console.error('Password reset error:', error);
+		return fail(500, { error: 'Password reset failed' });
 	}
-
-	// generate new auth token just in case
-	const authenticatedUser = await prisma.user.update({
-		where: { username: user.username },
-		data: { userAuthToken: crypto.randomUUID() }
-	});
-
-	cookies.set('session', authenticatedUser.userAuthToken, {
-		// send cookie for admin pages
-		path: '/',
-		// server side only cookie so you can't use `document.cookie`
-		httpOnly: true,
-		// only requests from same site can send cookies
-		// https://developer.mozilla.org/en-US/docs/Glossary/CSRF
-		sameSite: 'strict',
-		// only sent over HTTPS in production
-		secure: process.env.NODE_ENV === 'production',
-		// set cookie to expire after a month
-		maxAge: 60 * 60 * 24 * 30
-	});
-
-	// redirect the user
-	throw redirect(302, '/admin');
 };
 
-export const actions: Actions = { login };
+export const actions: Actions = { reset };

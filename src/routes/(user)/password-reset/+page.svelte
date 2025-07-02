@@ -10,7 +10,7 @@
 
 <h1>Reset password</h1>
 
-<form action="?/login" method="POST">
+<form action="?/reset" method="POST">
 	<div>
 		<label for="username">Email address</label>
 		<input id="username" name="username" type="text" required />

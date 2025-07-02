@@ -1,34 +1,53 @@
 <svelte:head>
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<link rel="stylesheet" href="https://use.typekit.net/dpg0jya.css" />
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+		html,
+		body {
+			margin: 0 !important;
+			padding: 0 !important;
+			font-family:
+				system-ui,
+				-apple-system,
+				BlinkMacSystemFont,
+				'Segoe UI',
+				Roboto,
+				Oxygen,
+				Ubuntu,
+				Cantarell,
+				'Open Sans',
+				'Helvetica Neue',
+				sans-serif;
+		}
+	</style>
 </svelte:head>
 
-<div class="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-	<div class="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md dark:bg-gray-800">
-		<div class="text-center">
-			<img class="logo" src="/images/app-icon.png" alt="Wallace Museum" width="200" height="60">
+<div class="app-frame">
+	<main>
+		<div class="surface">
+			<div class="text-center">
+				<img class="logo" src="/images/app-icon.png" alt="Wallace Museum" width="60" height="60" />
+			</div>
+			<slot />
 		</div>
-		<slot />
-	</div>
+	</main>
 </div>
 
 <style lang="scss" global>
-	html,
-	body{
-		margin: 0;
-		padding: 0;
-		font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-	}
-
-	.app-frame {
+	:global(.app-frame) {
 		@apply bg-gray-200 dark:bg-[#21401F] text-gray-700 dark:text-gray-400 min-h-screen flex items-start justify-start;
 	}
 
-	main {
+	:global(main) {
 		@apply flex-grow w-full min-h-[100svh] max-w-xl;
 	}
 
-	.surface {
+	:global(.surface) {
 		@apply min-h-[100svh] bg-white dark:bg-gray-900/40 rounded-lg px-12;
 	}
 
