@@ -4,7 +4,13 @@
 	import { navigateWithDebounce } from '$lib/utils/navigationHelpers';
 	import LazyArtwork from './LazyArtwork.svelte';
 	import SkeletonLoader from './SkeletonLoader.svelte';
-	import { processArtworksForEntangled, isEntangledPair, getEntangledPageUrl, isEntangledArtwork, getEntangledPageUrlFromArtwork } from '$lib/utils/entangledHelpers';
+	import {
+		processArtworksForEntangled,
+		isEntangledPair,
+		getEntangledPageUrl,
+		isEntangledArtwork,
+		getEntangledPageUrlFromArtwork
+	} from '$lib/utils/entangledHelpers';
 	import type { CollectionGroup } from '../../routes/api/artworks/collections/+server';
 
 	let collections: CollectionGroup[] = [];
@@ -108,7 +114,7 @@
 		loading = true;
 
 		try {
-			const excludeIds = collections.map(c => c.id);
+			const excludeIds = collections.map((c) => c.id);
 			const params = new URLSearchParams();
 			params.set('limit', '6');
 			if (excludeIds.length > 0) {
@@ -133,7 +139,7 @@
 
 	onMount(() => {
 		loadCollections();
-		
+
 		// Cleanup on component destroy
 		return () => {
 			if (observerCleanup) {
@@ -141,6 +147,41 @@
 			}
 		};
 	});
+
+	// Swiper navigation functions
+	function scrollSwiper(swiperTrack: HTMLElement, direction: 'left' | 'right') {
+		// Calculate scroll amount based on viewport width to match artwork slide widths
+		let scrollAmount = 320; // Default for small screens
+
+		if (window.innerWidth >= 1280) {
+			scrollAmount = 520;
+		} else if (window.innerWidth >= 1024) {
+			scrollAmount = 480;
+		} else if (window.innerWidth >= 768) {
+			scrollAmount = 400;
+		} else if (window.innerWidth >= 640) {
+			scrollAmount = 320;
+		} else {
+			scrollAmount = 280;
+		}
+
+		const currentScroll = swiperTrack.scrollLeft;
+		const targetScroll =
+			direction === 'left' ? currentScroll - scrollAmount : currentScroll + scrollAmount;
+
+		swiperTrack.scrollTo({
+			left: targetScroll,
+			behavior: 'smooth'
+		});
+	}
+
+	function canScrollLeft(swiperTrack: HTMLElement): boolean {
+		return swiperTrack.scrollLeft > 0;
+	}
+
+	function canScrollRight(swiperTrack: HTMLElement): boolean {
+		return swiperTrack.scrollLeft < swiperTrack.scrollWidth - swiperTrack.clientWidth;
+	}
 </script>
 
 <div class="curated-feed">
@@ -169,6 +210,27 @@
 					</div>
 					<div class="collection-artworks">
 						<div class="artworks-swiper">
+							<!-- Navigation Buttons (hidden during loading) -->
+							<button
+								class="swiper-nav-button swiper-nav-left"
+								style="display: none;"
+								aria-label="Previous artworks"
+							>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M15 18l-6-6 6-6" />
+								</svg>
+							</button>
+
+							<button
+								class="swiper-nav-button swiper-nav-right"
+								style="display: none;"
+								aria-label="Next artworks"
+							>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M9 18l6-6-6-6" />
+								</svg>
+							</button>
+
 							<div class="swiper-track">
 								{#each Array(4) as _, j}
 									<div class="artwork-slide">
@@ -202,7 +264,7 @@
 					<div class="collection-header">
 						<div class="collection-card">
 							<div class="collection-main-info">
-								<button 
+								<button
 									class="collection-title-button"
 									on:click={() => goto(`/collection/${collection.slug}`)}
 								>
@@ -211,19 +273,50 @@
 								{#if isCollectionBySpecificArtist(collection)}
 									<div class="collection-artist">by {collection.artists[0].name}</div>
 								{/if}
-								<div class="collection-count">{collection.artworkCount} artwork{collection.artworkCount !== 1 ? 's' : ''}</div>
+								<div class="collection-count">
+									{collection.artworkCount} artwork{collection.artworkCount !== 1 ? 's' : ''}
+								</div>
 							</div>
 						</div>
 					</div>
 
 					<div class="collection-artworks">
-						<div class="artworks-swiper">
+						<div class="artworks-swiper" class:hoverable={displayArtworks.length > 3}>
+							<!-- Navigation Buttons -->
+							<button
+								class="swiper-nav-button swiper-nav-left"
+								on:click={(e) => {
+									e.preventDefault();
+									const swiperTrack = e.currentTarget.parentElement?.querySelector('.swiper-track');
+									if (swiperTrack) scrollSwiper(swiperTrack, 'left');
+								}}
+								aria-label="Previous artworks"
+							>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M15 18l-6-6 6-6" />
+								</svg>
+							</button>
+
+							<button
+								class="swiper-nav-button swiper-nav-right"
+								on:click={(e) => {
+									e.preventDefault();
+									const swiperTrack = e.currentTarget.parentElement?.querySelector('.swiper-track');
+									if (swiperTrack) scrollSwiper(swiperTrack, 'right');
+								}}
+								aria-label="Next artworks"
+							>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M9 18l6-6-6-6" />
+								</svg>
+							</button>
+
 							<div class="swiper-track">
 								{#each displayArtworks as item}
 									{#if isEntangledPair(item)}
 										<!-- Entangled pair link -->
 										<div class="artwork-slide entangled-slide">
-											<a 
+											<a
 												href={getEntangledPageUrl(item.ethereum.tokenId, item.tezos.tokenId)}
 												class="entangled-link"
 											>
@@ -272,7 +365,9 @@
 												</div>
 											</a>
 											<div class="artwork-info">
-												<div class="artwork-title">Entangled #{item.ethereum.tokenId || item.ethereum.tokenID || '1'}</div>
+												<div class="artwork-title">
+													Entangled #{item.ethereum.tokenId || item.ethereum.tokenID || '1'}
+												</div>
 												{#if item.ethereum.artists && item.ethereum.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
 													<div class="artist-name">{item.ethereum.artists[0].name}</div>
 												{/if}
@@ -281,10 +376,7 @@
 									{:else if isEntangledArtwork(item)}
 										<!-- Individual Entangled artwork link -->
 										<div class="artwork-slide">
-											<a 
-												href={getEntangledPageUrlFromArtwork(item)}
-												class="entangled-single-link"
-											>
+											<a href={getEntangledPageUrlFromArtwork(item)} class="entangled-single-link">
 												<LazyArtwork
 													artwork={{
 														id: item.id,
@@ -304,7 +396,9 @@
 												<div class="entangled-badge-mini">ENTANGLED</div>
 											</a>
 											<div class="artwork-info">
-												<div class="artwork-title">{trimArtworkTitle(item.title, collection.title)}</div>
+												<div class="artwork-title">
+													{trimArtworkTitle(item.title, collection.title)}
+												</div>
 												{#if item.artists && item.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
 													<div class="artist-name">{item.artists[0].name}</div>
 												{/if}
@@ -331,7 +425,9 @@
 												quality={85}
 											/>
 											<div class="artwork-info">
-												<div class="artwork-title">{trimArtworkTitle(item.title, collection.title)}</div>
+												<div class="artwork-title">
+													{trimArtworkTitle(item.title, collection.title)}
+												</div>
 												{#if item.artists && item.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
 													<div class="artist-name">{item.artists[0].name}</div>
 												{/if}
@@ -339,17 +435,21 @@
 										</div>
 									{/if}
 								{/each}
-								
+
 								<!-- View Collection Card -->
 								<div class="artwork-slide view-collection-slide">
-									<button 
+									<button
 										class="view-collection-card"
 										on:click={() => goto(`/collection/${collection.slug}`)}
 									>
 										<div class="view-collection-content">
 											<div class="view-collection-text">
 												<div class="view-collection-label">View Collection</div>
-												<div class="view-collection-count">{collection.artworkCount} artwork{collection.artworkCount !== 1 ? 's' : ''}</div>
+												<div class="view-collection-count">
+													{collection.artworkCount} artwork{collection.artworkCount !== 1
+														? 's'
+														: ''}
+												</div>
 											</div>
 										</div>
 									</button>
@@ -380,6 +480,27 @@
 							</div>
 							<div class="collection-artworks">
 								<div class="artworks-swiper">
+									<!-- Navigation Buttons (hidden during loading) -->
+									<button
+										class="swiper-nav-button swiper-nav-left"
+										style="display: none;"
+										aria-label="Previous artworks"
+									>
+										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+											<path d="M15 18l-6-6 6-6" />
+										</svg>
+									</button>
+
+									<button
+										class="swiper-nav-button swiper-nav-right"
+										style="display: none;"
+										aria-label="Next artworks"
+									>
+										<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+											<path d="M9 18l6-6-6-6" />
+										</svg>
+									</button>
+
 									<div class="swiper-track">
 										{#each Array(4) as _, j}
 											<div class="artwork-slide">
@@ -466,13 +587,13 @@
 		.collection-group {
 			@apply flex items-stretch gap-8;
 		}
-		
+
 		.collection-header {
 			@apply flex-shrink-0 flex;
 			width: 25%; /* Reduced from 33.333% to make it less wide */
 			max-width: none;
 		}
-		
+
 		.collection-artworks {
 			@apply flex-1 overflow-hidden;
 		}
@@ -601,6 +722,47 @@
 		@apply overflow-hidden;
 	}
 
+	.artworks-swiper.hoverable {
+		@apply relative;
+	}
+
+	.swiper-nav-button {
+		@apply absolute top-1/2 transform -translate-y-1/2 z-10;
+		@apply w-12 h-12 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm;
+		@apply flex items-center justify-center cursor-pointer border-0;
+		@apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white;
+		@apply shadow-lg hover:shadow-xl transition-all duration-200;
+		@apply opacity-0 pointer-events-none;
+		@apply hover:bg-white dark:hover:bg-gray-700;
+	}
+
+	.artworks-swiper.hoverable:hover .swiper-nav-button {
+		@apply opacity-100 pointer-events-auto;
+	}
+
+	.swiper-nav-left {
+		@apply left-2;
+	}
+
+	.swiper-nav-right {
+		@apply right-2;
+	}
+
+	.swiper-nav-button svg {
+		@apply w-5 h-5;
+	}
+
+	.swiper-nav-button:hover {
+		transform: translateY(-50%) scale(1.05);
+	}
+
+	/* Hide navigation on mobile */
+	@media (max-width: 767px) {
+		.swiper-nav-button {
+			@apply hidden;
+		}
+	}
+
 	.swiper-track {
 		@apply flex overflow-x-auto pb-4;
 		gap: 12px;
@@ -629,7 +791,7 @@
 		.artwork-slide {
 			width: 320px;
 		}
-		
+
 		.entangled-slide {
 			width: 640px;
 		}
@@ -639,7 +801,7 @@
 		.artwork-slide {
 			width: 400px; /* Larger desktop size */
 		}
-		
+
 		.entangled-slide {
 			width: 800px; /* Double width for Entangled pairs */
 		}
@@ -649,7 +811,7 @@
 		.artwork-slide {
 			width: 480px; /* Even larger on big screens */
 		}
-		
+
 		.entangled-slide {
 			width: 960px; /* Double width for Entangled pairs */
 		}
@@ -659,7 +821,7 @@
 		.artwork-slide {
 			width: 520px; /* Maximum size for very large screens */
 		}
-		
+
 		.entangled-slide {
 			width: 1040px; /* Double width for Entangled pairs */
 		}
@@ -779,7 +941,7 @@
 	}
 
 	.view-collection-content {
-		@apply w-full aspect-square bg-gray-100 dark:bg-gray-900 flex flex-col items-center justify-center gap-3 ;
+		@apply w-full aspect-square bg-gray-100 dark:bg-gray-900 flex flex-col items-center justify-center gap-3;
 		@apply hover:border-gray-400 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800;
 		@apply transition-all duration-200;
 	}
@@ -799,4 +961,4 @@
 	.collection-icon {
 		@apply w-full h-full;
 	}
-</style> 
+</style>
