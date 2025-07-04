@@ -12,17 +12,36 @@
 	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
 	import { VideoPresets } from '$lib/utils/mediaHelpers';
 
+	/**
+	 * Enhanced artist preview with Pinata image optimizations:
+	 * - WebP format for better compression (preserves GIFs)
+	 * - Responsive sizing based on screen size
+	 * - High-DPI display support
+	 * - Metadata stripping for smaller file sizes
+	 * - Sharpening for better preview quality
+	 * - Hover delay to prevent flickering
+	 */
+
 	let hoveredArtist: Artist | null = null;
 	let mouseX = 0;
 	let mouseY = 0;
 	let preloadedImages: Record<string, HTMLImageElement> = {};
 	let loadingStates: Record<string, boolean> = {};
 	let isLargeScreen = false;
+	let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
+	let shouldShowPreview = false;
 
 	// Helper function to detect if content is a video based on MIME type
 	function isVideoMime(mime: string | null): boolean {
 		if (!mime) return false;
 		return mime.startsWith('video/');
+	}
+
+	// Helper function to get safe DPR value for Pinata transformations
+	function getSafeDpr(): 1 | 2 | 3 {
+		if (typeof window === 'undefined') return 1;
+		const dpr = window.devicePixelRatio || 1;
+		return Math.min(Math.max(Math.round(dpr), 1), 3) as 1 | 2 | 3;
 	}
 
 	// Group artists by first letter
@@ -123,12 +142,15 @@
 			artist.artworks.forEach((artwork) => {
 				if (artwork.image_url && !preloadedImages[artwork.image_url]) {
 					const img = new window.Image();
-					// Use optimized image URL for preloading - same as what will be displayed
+					// Use optimized image URL for preloading with enhanced Pinata transformations
 					img.src = buildOptimizedImageUrl(artwork.image_url, {
-						width: 340, // Use max size for preloading
+						width: isLargeScreen ? 350 : 280, // Responsive sizing for different screen sizes
 						fit: 'contain',
-						format: 'auto', // Let the optimizer decide format (preserves GIFs)
-						quality: 80,
+						format: artwork.mime === 'image/gif' ? 'auto' : 'webp', // Preserve GIFs, optimize others
+						quality: 75, // Slightly lower quality for faster loading
+						dpr: getSafeDpr(), // Account for high-DPI displays
+						sharpen: 1, // Slight sharpening for better preview quality
+						metadata: 'none', // Strip metadata for smaller file sizes
 						mimeType: artwork.mime // Pass MIME type for proper GIF detection
 					});
 					preloadedImages[artwork.image_url] = img;
@@ -142,10 +164,29 @@
 	}
 
 	function handleArtistHover(artist: Artist) {
+		// Clear any existing timeout
+		if (hoverTimeout) {
+			clearTimeout(hoverTimeout);
+		}
+		
+		// Set the hovered artist immediately for positioning
 		hoveredArtist = artist;
+		
+		// Add a small delay before showing the preview to prevent flickering
+		hoverTimeout = setTimeout(() => {
+			shouldShowPreview = true;
+		}, 150);
 	}
 
 	function clearArtistHover() {
+		// Clear any existing timeout
+		if (hoverTimeout) {
+			clearTimeout(hoverTimeout);
+			hoverTimeout = null;
+		}
+		
+		// Clear the preview state
+		shouldShowPreview = false;
 		hoveredArtist = null;
 	}
 
@@ -337,7 +378,7 @@
 		</div>
 	</div>
 
-	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && previewMedia}
+	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && previewMedia && shouldShowPreview}
 		<div
 			class="floating-artwork-preview"
 			style="left: {safeLeft}px; top: {safeTop}px; width: {previewDimensions.width}px; height: {previewDimensions.height}px;"
@@ -354,8 +395,13 @@
 					width={previewDimensions?.width || 320}
 					height={previewDimensions?.height || 240}
 					fit="contain"
-					format="auto"
-					quality={80}
+					format={hoveredArtist.artworks[0].mime === 'image/gif' ? 'auto' : 'webp'}
+					quality={75}
+					dpr={getSafeDpr()}
+					sharpen={1}
+					gravity="center"
+					animation={true}
+					metadata="none"
 					mimeType={hoveredArtist.artworks[0].mime}
 					className={loadingStates[previewMedia.url] ? 'hidden preview-image' : 'preview-image'}
 					on:load={() => {
