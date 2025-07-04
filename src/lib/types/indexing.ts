@@ -4,12 +4,10 @@
 export type DataSource = 'opensea' | 'teztok' | 'alchemy' | 'moralis' | 'manual' | 'objkt';
 export type Blockchain =
 	| 'ethereum'
-	| 'tezos'
+	| 'base'
+	| 'shape'
 	| 'polygon'
-	| 'solana'
-	| 'flow'
-	| 'arbitrum'
-	| 'optimism'
+	| 'tezos'
 	| 'unknown';
 export type ImportStatus =
 	| 'pending'

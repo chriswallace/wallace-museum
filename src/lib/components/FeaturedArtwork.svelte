@@ -53,20 +53,24 @@
 
 	// Calculate responsive image size based on container dimensions
 	function calculateResponsiveImageSize(): number {
+		// Always ensure we have a reasonable minimum size
+		const minSize = 280;
+		const maxSize = 800;
+		
 		if (!containerWidth || !containerHeight) {
 			// Fallback sizes based on viewport
 			if (typeof window !== 'undefined') {
 				const vw = window.innerWidth;
 				const vh = window.innerHeight;
 				
-				// Mobile: use viewport width
-				if (vw <= 768) return Math.min(vw * 0.9, 600);
+				// Mobile: use viewport width but cap at 500px
+				if (vw <= 768) return Math.max(Math.min(vw * 0.9, 500), minSize);
 				
-				// Desktop: use 70vh as max size (matching CSS)
+				// Desktop: use 70vh as max size but cap at 600px
 				const maxSize = Math.min(vh * 0.7, vw * 0.5);
-				return Math.min(maxSize, 800);
+				return Math.max(Math.min(maxSize, 600), minSize);
 			}
-			return 600; // SSR fallback
+			return 500; // SSR fallback
 		}
 		
 		// Use actual container dimensions with device pixel ratio for crisp images
@@ -74,18 +78,42 @@
 		const targetSize = Math.max(containerWidth, containerHeight);
 		
 		// Scale up for high-DPI displays but cap at reasonable size
-		return Math.min(targetSize * dpr, 1200);
+		const calculatedSize = Math.min(targetSize * dpr, maxSize);
+		return Math.max(calculatedSize, minSize);
 	}
 
 	// Get optimized image URL for the featured artwork
 	function getOptimizedFeaturedImageUrl(imageUrl: string): string {
 		const size = calculateResponsiveImageSize();
 		
+		// Ensure we always have a reasonable size (should never be needed due to calculateResponsiveImageSize, but safety check)
+		const safeSize = Math.max(size, 280);
+		
+		// If artwork has dimensions, calculate appropriate height to maintain aspect ratio
+		let optimizedWidth = safeSize;
+		let optimizedHeight = safeSize;
+		
+		if (displayedArtwork?.dimensions) {
+			const { width: artworkWidth, height: artworkHeight } = displayedArtwork.dimensions;
+			const aspectRatio = artworkWidth / artworkHeight;
+			
+			// Use the calculated size as the constraining dimension
+			if (aspectRatio > 1) {
+				// Landscape: constrain by width
+				optimizedWidth = safeSize;
+				optimizedHeight = Math.round(safeSize / aspectRatio);
+			} else {
+				// Portrait or square: constrain by height
+				optimizedHeight = safeSize;
+				optimizedWidth = Math.round(safeSize * aspectRatio);
+			}
+		}
+		
 		return buildOptimizedImageUrl(imageUrl, {
-			width: size,
-			height: size,
+			width: optimizedWidth,
+			height: optimizedHeight,
 			fit: 'contain',
-			quality: 90,
+			quality: 75, // Reduced from 90 to 75 for lower quality
 			format: 'webp'
 		});
 	}
@@ -269,13 +297,20 @@
 								
 								{#if displayUrl}
 									{#if mediaType === 'image'}
+										{@const imageSize = calculateResponsiveImageSize()}
+										{@const artworkAspectRatio = displayedArtwork.dimensions ? `${displayedArtwork.dimensions.width}/${displayedArtwork.dimensions.height}` : '1/1'}
 										<OptimizedImage
 											src={getOptimizedFeaturedImageUrl(displayUrl)}
 											alt={displayedArtwork.title}
+											width={imageSize}
+											height={displayedArtwork.dimensions ? Math.round(imageSize * (displayedArtwork.dimensions.height / displayedArtwork.dimensions.width)) : imageSize}
 											className="w-full h-full object-contain"
-											quality={90}
+											quality={75}
 											loading="eager"
-											sizes="(max-width: 768px) 90vw, (max-width: 1024px) 50vw, 70vh"
+											sizes="(max-width: 768px) 500px, (max-width: 1024px) 600px, 800px"
+											aspectRatio={artworkAspectRatio}
+											fallbackSrc="/images/medici-image.png"
+											showSkeleton={false}
 										/>
 									{:else}
 										<!-- For videos and iframes, use the regular ArtworkDisplay -->
@@ -461,16 +496,15 @@
 	.artwork-display {
 		@apply w-full flex items-center justify-center order-1 lg:order-none;
 		@apply overflow-hidden;
-		/* Make it square */
-		aspect-ratio: 1 / 1;
-		max-width: min(70vh, 100%);
-		max-height: min(70vh, 100%);
+		/* Allow flexible aspect ratio based on artwork dimensions */
+		max-width: min(60vh, 100%);
+		max-height: min(60vh, 100%);
 		/* Ensure proper centering and constraints */
 		position: relative;
 		/* Ensure minimum size to prevent collapse */
-		min-width: 300px;
-		min-height: 300px;
-		/* Center the square container */
+		min-width: 280px;
+		min-height: 280px;
+		/* Center the container */
 		margin: 0 auto;
 		/* Add transition for refreshing state */
 		transition: opacity 0.3s ease-out, transform 0.3s ease-out;
@@ -497,6 +531,9 @@
 		/* Prevent overflow and ensure containment */
 		overflow: hidden;
 		box-sizing: border-box;
+		/* Ensure minimum dimensions for artworks without stored dimensions */
+		min-width: 280px;
+		min-height: 280px;
 		/* Add smooth zoom transition */
 		transition: transform 0.3s ease-out;
 		
@@ -507,6 +544,14 @@
 		/* Fade-in animation for new artwork */
 		:global(.artwork-container) {
 			animation: fadeIn 0.4s ease-out;
+		}
+		
+		/* Ensure OptimizedImage container fills the wrapper */
+		:global(.image-container) {
+			width: 100% !important;
+			height: 100% !important;
+			min-width: 280px;
+			min-height: 280px;
 		}
 	}
 	
@@ -532,8 +577,6 @@
 			transform: scale(1);
 		}
 	}
-
-
 
 	.image-placeholder {
 		@apply w-full h-full flex items-center justify-center text-gray-500;

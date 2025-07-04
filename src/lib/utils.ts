@@ -180,6 +180,16 @@ export function getContractUrl(
 					return `https://polygonscan.com/token/${address}?a=${tokenId}`;
 				}
 				return `https://polygonscan.com/address/${address}`;
+			case 'base':
+				if (tokenId) {
+					return `https://basescan.org/token/${address}?a=${tokenId}`;
+				}
+				return `https://basescan.org/address/${address}`;
+			case 'shape':
+				if (tokenId) {
+					return `https://shapescan.xyz/token/${address}?a=${tokenId}`;
+				}
+				return `https://shapescan.xyz/address/${address}`;
 			case 'ethereum':
 			default:
 				if (tokenId) {

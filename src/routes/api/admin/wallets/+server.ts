@@ -6,24 +6,31 @@ import { env } from '$env/dynamic/private';
 import { AlchemyNFTIndexer } from '$lib/alchemy-nft-indexer';
 
 // Function to get NFT count from Alchemy API (more reliable than OpenSea)
-async function getAlchemyNFTCount(walletAddress: string): Promise<number> {
+async function getAlchemyNFTCount(walletAddress: string, blockchain: string = 'ethereum'): Promise<number> {
 	try {
 		const apiKey = env.ALCHEMY_API_KEY;
 		if (!apiKey) {
 			console.warn('Alchemy API key not configured, falling back to OpenSea');
-			return getOpenSeaNFTCount(walletAddress);
+			// Only fallback to OpenSea for Ethereum
+			if (blockchain === 'ethereum') {
+				return getOpenSeaNFTCount(walletAddress);
+			}
+			return 0;
 		}
 
-		const alchemyIndexer = new AlchemyNFTIndexer(apiKey);
+		const alchemyIndexer = new AlchemyNFTIndexer(apiKey, blockchain as any);
 		const count = await alchemyIndexer.getWalletNFTCount(walletAddress);
 		
-		console.log(`[Alchemy Count] ${walletAddress}: ${count} NFTs`);
+		console.log(`[Alchemy Count] ${blockchain} wallet ${walletAddress}: ${count} NFTs`);
 		return count;
 
 	} catch (error) {
-		console.error(`Error fetching Alchemy NFT count for ${walletAddress}:`, error);
-		// Fallback to OpenSea if Alchemy fails
-		return getOpenSeaNFTCount(walletAddress);
+		console.error(`Error fetching Alchemy NFT count for ${walletAddress} on ${blockchain}:`, error);
+		// Fallback to OpenSea only for Ethereum
+		if (blockchain === 'ethereum') {
+			return getOpenSeaNFTCount(walletAddress);
+		}
+		return 0;
 	}
 }
 
@@ -266,9 +273,9 @@ export const GET: RequestHandler = async ({ request, url }) => {
 				try {
 					let artworkCount = 0;
 					
-					if (wallet.blockchain === 'ethereum') {
-						// Get real count from Alchemy API (more reliable than OpenSea)
-						artworkCount = await getAlchemyNFTCount(wallet.address);
+					if (wallet.blockchain === 'ethereum' || wallet.blockchain === 'base' || wallet.blockchain === 'shape' || wallet.blockchain === 'polygon') {
+						// Get real count from Alchemy API (supports all EVM chains)
+						artworkCount = await getAlchemyNFTCount(wallet.address, wallet.blockchain);
 						
 						// If Alchemy fails, fall back to indexed count
 						if (artworkCount === 0) {

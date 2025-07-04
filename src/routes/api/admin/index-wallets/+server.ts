@@ -34,23 +34,23 @@ async function processWallet(
 
 	try {
 		// Process based on blockchain
-		if (blockchain === 'ethereum') {
+		if (blockchain === 'ethereum' || blockchain === 'base' || blockchain === 'shape' || blockchain === 'polygon') {
 			// Fetch owned NFTs with comprehensive data and enhanced pagination
 			const ownedNFTs = await indexingWorkflow.indexWalletNFTs(
 				walletAddress, 
-				'ethereum', 
+				blockchain as 'ethereum' | 'base' | 'shape' | 'polygon', 
 				'owned',
 				{ 
 					maxPages: 500, // Increased for enhanced pagination
 					pageSize: 50,
 					enrichmentLevel: 'comprehensive', // Keep comprehensive data fetching
-					useEnhancedPagination: true, // Enable enhanced pagination to work around OpenSea limits
+					useEnhancedPagination: blockchain === 'ethereum', // Only use enhanced pagination for Ethereum (OpenSea)
 					expectedNFTCount: undefined, // We don't know the expected count, but enhanced pagination will adapt
 					provider: provider // Use the requested provider
 				}
 			);
 			
-			console.log(`[ProcessWallet] Fetched ${ownedNFTs.length} owned NFTs for ${walletAddress}`);
+			console.log(`[ProcessWallet] Fetched ${ownedNFTs.length} owned NFTs for ${walletAddress} on ${blockchain}`);
 			
 			// Store NFTs in database with type and wallet address
 			const storeResult = await dbOps.batchStoreNFTs(ownedNFTs, 'owned', walletAddress);

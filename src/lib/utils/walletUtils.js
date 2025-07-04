@@ -124,6 +124,9 @@ export function getBlockchainDisplayName(blockchain) {
 	/** @type {Record<string, string>} */
 	const names = {
 		ethereum: 'Ethereum',
+		base: 'Base',
+		shape: 'Shape',
+		polygon: 'Polygon',
 		tezos: 'Tezos',
 		unknown: 'Unknown'
 	};

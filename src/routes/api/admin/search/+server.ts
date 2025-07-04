@@ -90,6 +90,7 @@ export async function GET({ url, request }: RequestEvent) {
 		const offset = parseInt(searchParams.get('offset') || '0', 10);
 		const filter = searchParams.get('filter') || 'all';
 		const type = searchParams.get('type') || 'all'; // New type filter parameter
+		const blockchain = searchParams.get('blockchain') || 'all'; // New blockchain filter parameter
 
 		// Get user's wallet addresses for filtering
 		const walletAddresses = await getWalletAddresses();
@@ -127,6 +128,29 @@ export async function GET({ url, request }: RequestEvent) {
 			searchConditions.type = 'created';
 		}
 		// For type === 'all', we don't add any type filtering
+
+		// Add blockchain filtering
+		if (blockchain !== 'all') {
+			// Add blockchain filter to the search conditions
+			const blockchainCondition = {
+				normalizedData: {
+					path: ['blockchain'],
+					equals: blockchain
+				}
+			} as any;
+
+			if (searchConditions.AND && Array.isArray(searchConditions.AND)) {
+				searchConditions.AND.push(blockchainCondition);
+			} else if (searchConditions.OR) {
+				searchConditions.AND = [
+					{ OR: searchConditions.OR },
+					blockchainCondition
+				];
+				delete searchConditions.OR;
+			} else {
+				searchConditions.AND = [blockchainCondition];
+			}
+		}
 
 		// Legacy filter support (can be removed once frontend is updated)
 		if (filter === 'created') {

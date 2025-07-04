@@ -97,6 +97,8 @@
 	let selectAll = false;
 	// Add tab state for filtering
 	let activeTab: 'owned' | 'created' = 'owned'; // Changed from 'all' to default to 'owned'
+	// Add blockchain filter
+	let selectedBlockchain: string = 'all'; // 'all', 'ethereum', 'base', 'shape', etc.
 
 	// Debounced search functionality
 	let searchTimeout: NodeJS.Timeout;
@@ -127,6 +129,20 @@
 		// Trigger immediate search when tab changes
 		searchArtworks(true);
 	}
+
+	// Reactive statement for blockchain filter changes
+	let previousSelectedBlockchain: string = selectedBlockchain;
+	$: if (isMounted && selectedBlockchain !== previousSelectedBlockchain) {
+		previousSelectedBlockchain = selectedBlockchain;
+		// Clear any pending search timeout since blockchain change should be immediate
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
+		// Trigger immediate search when blockchain filter changes
+		searchArtworks(true);
+	}
+
+
 
 	// Use reactive stores for selection
 	const selectedIdsStore = writable<number[]>([]);
@@ -201,7 +217,8 @@
 				q: searchTerm,
 				limit: '48',
 				offset: reset ? '0' : currentOffset.toString(),
-				type: activeTab // Use the new type parameter
+				type: activeTab, // Use the new type parameter
+				blockchain: selectedBlockchain // Add blockchain filter
 			});
 
 			const response = await fetch(`/api/admin/search?${params}`);
@@ -957,6 +974,19 @@
 			</div>
 		</div>
 		<div class="flex-shrink-0">
+			<select
+				bind:value={selectedBlockchain}
+				class="h-11 mb-0 px-3 border dark:border-gray-700 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-400 dark:focus:ring-yellow-400"
+			>
+				<option value="all">All Chains</option>
+				<option value="ethereum">Ethereum</option>
+				<option value="base">Base</option>
+				<option value="shape">Shape</option>
+				<option value="polygon">Polygon</option>
+				<option value="tezos">Tezos</option>
+			</select>
+		</div>
+		<div class="flex-shrink-0">
 			<button
 				class="primary py-2 px-6 h-11"
 				on:click={() => searchArtworks(true)}
@@ -964,6 +994,8 @@
 			>
 		</div>
 	</div>
+
+
 
 	<!-- Filter Tabs -->
 	<div class="mb-8">

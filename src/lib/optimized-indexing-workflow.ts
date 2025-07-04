@@ -52,22 +52,22 @@ export class OptimizedIndexingWorkflow {
    */
   async indexWalletNFTs(
     walletAddress: string,
-    blockchain: 'ethereum' | 'tezos',
+    blockchain: 'ethereum' | 'tezos' | 'base' | 'shape' | 'polygon',
     type: 'owned' | 'created' = 'owned',
     options: IndexingOptions & { expectedNFTCount?: number; useEnhancedPagination?: boolean } = {}
   ): Promise<MinimalNFTData[]> {
     console.log(`[OptimizedIndexingWorkflow] Starting comprehensive indexing for ${walletAddress} on ${blockchain}`);
 
-    if (blockchain === 'ethereum') {
+    if (blockchain === 'ethereum' || blockchain === 'base' || blockchain === 'shape' || blockchain === 'polygon') {
       // Default to hybrid approach for maximum reliability and data richness
       const provider = options.provider || 'hybrid';
       
       if (provider === 'hybrid' && this.alchemyIndexer) {
         console.log(`[OptimizedIndexingWorkflow] Using hybrid approach: Alchemy for discovery + OpenSea for enrichment`);
-        return this.indexEthereumWalletHybrid(walletAddress, options);
+        return this.indexEthereumWalletHybrid(walletAddress, blockchain, options);
       } else if (provider === 'alchemy' && this.alchemyIndexer) {
         console.log(`[OptimizedIndexingWorkflow] Using Alchemy indexer for reliable data coverage`);
-        return this.indexEthereumWalletWithAlchemy(walletAddress, options);
+        return this.indexEthereumWalletWithAlchemy(walletAddress, blockchain, options);
       } else if (provider === 'hybrid' && !this.alchemyIndexer) {
         console.warn(`[OptimizedIndexingWorkflow] Hybrid provider requested but no Alchemy API key provided, falling back to enhanced OpenSea`);
         options.provider = 'opensea';
@@ -75,15 +75,24 @@ export class OptimizedIndexingWorkflow {
         console.warn(`[OptimizedIndexingWorkflow] Alchemy provider requested but no API key provided, falling back to OpenSea`);
       }
       
-      // OpenSea indexing (legacy and enhanced)
-      const useEnhanced = options.useEnhancedPagination !== false; // Default to true
-      
-      if (useEnhanced) {
-        console.log(`[OptimizedIndexingWorkflow] Using enhanced OpenSea pagination for better NFT coverage`);
-        return this.indexEthereumWalletEnhanced(walletAddress, type, options);
+      // OpenSea indexing (legacy and enhanced) - only for Ethereum for now
+      if (blockchain === 'ethereum') {
+        const useEnhanced = options.useEnhancedPagination !== false;
+        
+        if (useEnhanced) {
+          console.log(`[OptimizedIndexingWorkflow] Using enhanced OpenSea pagination for better NFT coverage`);
+          return this.indexEthereumWalletEnhanced(walletAddress, type, options);
+        } else {
+          console.log(`[OptimizedIndexingWorkflow] Using legacy OpenSea pagination (may miss NFTs due to API limits)`);
+          return this.indexEthereumWallet(walletAddress, type, options);
+        }
       } else {
-        console.log(`[OptimizedIndexingWorkflow] Using legacy OpenSea pagination (may miss NFTs due to API limits)`);
-        return this.indexEthereumWallet(walletAddress, type, options);
+        console.warn(`[OptimizedIndexingWorkflow] OpenSea fallback not available for ${blockchain}, using Alchemy only`);
+        if (this.alchemyIndexer) {
+          return this.indexEthereumWalletWithAlchemy(walletAddress, blockchain, options);
+        } else {
+          throw new Error(`No indexer available for ${blockchain} - Alchemy API key required`);
+        }
       }
     } else {
       return this.indexTezosWallet(walletAddress, type, options);
@@ -305,25 +314,32 @@ export class OptimizedIndexingWorkflow {
    */
   async indexEthereumWalletWithAlchemy(
     walletAddress: string,
+    blockchain: 'ethereum' | 'tezos' | 'base' | 'shape' | 'polygon',
     options: IndexingOptions = {}
   ): Promise<MinimalNFTData[]> {
     if (!this.alchemyIndexer) {
       throw new Error('Alchemy indexer not initialized - API key required');
     }
 
+    // Create a blockchain-specific Alchemy indexer
+    const blockchainIndexer = blockchain !== 'ethereum' 
+      ? new AlchemyNFTIndexer(this.alchemyIndexer.apiKey, blockchain as any)
+      : this.alchemyIndexer;
+
     const alchemyOptions: AlchemyIndexingOptions = {
       includeMetadata: true,
       includeSpam: false,
       pageSize: options.pageSize || 100, // Alchemy supports up to 100 per page
       maxPages: options.maxPages || 1000,
-      enrichmentLevel: options.enrichmentLevel || 'standard'
+      enrichmentLevel: options.enrichmentLevel || 'standard',
+      blockchain: blockchain as any
     };
 
-    console.log(`[OptimizedIndexingWorkflow] Starting Alchemy indexing for ${walletAddress}`);
+    console.log(`[OptimizedIndexingWorkflow] Starting Alchemy indexing for ${walletAddress} on ${blockchain}`);
     console.log(`[OptimizedIndexingWorkflow] Options:`, alchemyOptions);
 
     try {
-      const nfts = await this.alchemyIndexer.getWalletNFTs(walletAddress, alchemyOptions);
+      const nfts = await blockchainIndexer.getWalletNFTs(walletAddress, alchemyOptions);
       
       // Set the owner address for each NFT since Alchemy doesn't include it
       const nftsWithOwner = nfts.map(nft => ({
@@ -334,7 +350,7 @@ export class OptimizedIndexingWorkflow {
       console.log(`[OptimizedIndexingWorkflow] Alchemy indexing completed: ${nftsWithOwner.length} NFTs`);
       
       // Get indexer stats for logging
-      const stats = this.alchemyIndexer.getStats();
+      const stats = blockchainIndexer.getStats();
       console.log(`[OptimizedIndexingWorkflow] Alchemy indexer stats:`, stats);
 
       return nftsWithOwner;
@@ -351,14 +367,20 @@ export class OptimizedIndexingWorkflow {
    */
   async indexEthereumWalletHybrid(
     walletAddress: string,
+    blockchain: 'ethereum' | 'tezos' | 'base' | 'shape' | 'polygon',
     options: IndexingOptions = {}
   ): Promise<MinimalNFTData[]> {
     if (!this.alchemyIndexer) {
       throw new Error('Alchemy indexer not initialized - API key required for hybrid approach');
     }
 
-    console.log(`[OptimizedIndexingWorkflow] Starting hybrid indexing for ${walletAddress}`);
+    console.log(`[OptimizedIndexingWorkflow] Starting hybrid indexing for ${walletAddress} on ${blockchain}`);
     console.log(`[OptimizedIndexingWorkflow] Phase 1: Alchemy discovery`);
+
+    // Create a blockchain-specific Alchemy indexer
+    const blockchainIndexer = blockchain !== 'ethereum' 
+      ? new AlchemyNFTIndexer(this.alchemyIndexer.apiKey, blockchain as any)
+      : this.alchemyIndexer;
 
     // Phase 1: Use Alchemy to discover all NFTs (100% reliable)
     const alchemyOptions: AlchemyIndexingOptions = {
@@ -366,10 +388,11 @@ export class OptimizedIndexingWorkflow {
       includeSpam: false,
       pageSize: options.pageSize || 100,
       maxPages: options.maxPages || 1000,
-      enrichmentLevel: 'minimal' // Get basic data from Alchemy
+      enrichmentLevel: 'minimal', // Get basic data from Alchemy
+      blockchain: blockchain as any
     };
 
-    const alchemyNFTs = await this.alchemyIndexer.getWalletNFTs(walletAddress, alchemyOptions);
+    const alchemyNFTs = await blockchainIndexer.getWalletNFTs(walletAddress, alchemyOptions);
     console.log(`[OptimizedIndexingWorkflow] Phase 1 complete: Discovered ${alchemyNFTs.length} NFTs via Alchemy`);
 
     if (alchemyNFTs.length === 0) {
@@ -377,60 +400,64 @@ export class OptimizedIndexingWorkflow {
       return [];
     }
 
-    // Phase 2: Use OpenSea to enrich the discovered NFTs
-    console.log(`[OptimizedIndexingWorkflow] Phase 2: OpenSea enrichment for ${alchemyNFTs.length} NFTs`);
-    
-    const enrichmentLevel = options.enrichmentLevel || 'comprehensive';
-    const enrichedNFTs: MinimalNFTData[] = [];
-    
-    // Process NFTs in batches to avoid overwhelming OpenSea API
-    const batchSize = 5; // Conservative batch size for enrichment
-    
-    for (let i = 0; i < alchemyNFTs.length; i += batchSize) {
-      const batch = alchemyNFTs.slice(i, i + batchSize);
-      console.log(`[OptimizedIndexingWorkflow] Enriching batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(alchemyNFTs.length / batchSize)} (${batch.length} NFTs)`);
+    // Phase 2: Use OpenSea to enrich the discovered NFTs (only for Ethereum)
+    if (blockchain === 'ethereum') {
+      console.log(`[OptimizedIndexingWorkflow] Phase 2: OpenSea enrichment for ${alchemyNFTs.length} NFTs`);
       
-      const batchPromises = batch.map(async (nft) => {
-                          try {
-           // For now, just use Alchemy data with enhanced dimensions
-           // TODO: Implement proper OpenSea enrichment integration
-           const mergedNFT: MinimalNFTData = {
-             ...nft, // Start with Alchemy data as base
-             // Enhanced dimension handling
-             dimensions: await this.extractBestDimensions(nft)
-           };
-           
-           console.log(`[OptimizedIndexingWorkflow] Successfully processed ${nft.contractAddress}:${nft.tokenId}`);
-           return mergedNFT;
-         } catch (error) {
-           console.warn(`[OptimizedIndexingWorkflow] Error processing ${nft.contractAddress}:${nft.tokenId}:`, error);
-           // Fallback to original Alchemy data
-           return nft;
-         }
-      });
+      const enrichmentLevel = options.enrichmentLevel || 'comprehensive';
+      const enrichedNFTs: MinimalNFTData[] = [];
       
-      const enrichedBatch = await Promise.all(batchPromises);
-      enrichedNFTs.push(...enrichedBatch);
+      // Process NFTs in batches to avoid overwhelming OpenSea API
+      const batchSize = 5;
       
-      // Add delay between batches to respect rate limits
-      if (i + batchSize < alchemyNFTs.length) {
-        const delay = 2000; // 2 second delay between enrichment batches
-        console.log(`[OptimizedIndexingWorkflow] Waiting ${delay}ms before next enrichment batch...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+      for (let i = 0; i < alchemyNFTs.length; i += batchSize) {
+        const batch = alchemyNFTs.slice(i, i + batchSize);
+        console.log(`[OptimizedIndexingWorkflow] Enriching batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(alchemyNFTs.length / batchSize)} (${batch.length} NFTs)`);
+        
+        const batchPromises = batch.map(async (nft) => {
+          try {
+            // For now, just use Alchemy data with enhanced dimensions
+            // TODO: Implement proper OpenSea enrichment integration
+            const mergedNFT: MinimalNFTData = {
+              ...nft, // Start with Alchemy data as base
+              // Enhanced dimension handling
+              dimensions: await this.extractBestDimensions(nft)
+            };
+            
+            console.log(`[OptimizedIndexingWorkflow] Successfully processed ${nft.contractAddress}:${nft.tokenId}`);
+            return mergedNFT;
+          } catch (error) {
+            console.warn(`[OptimizedIndexingWorkflow] Error processing ${nft.contractAddress}:${nft.tokenId}:`, error);
+            // Fallback to original Alchemy data
+            return nft;
+          }
+        });
+        
+        const enrichedBatch = await Promise.all(batchPromises);
+        enrichedNFTs.push(...enrichedBatch);
+        
+        // Add delay between batches to respect rate limits
+        if (i + batchSize < alchemyNFTs.length) {
+          const delay = 2000; // 2 second delay between enrichment batches
+          console.log(`[OptimizedIndexingWorkflow] Waiting ${delay}ms before next enrichment batch...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
+
+      console.log(`[OptimizedIndexingWorkflow] Hybrid indexing completed:`);
+      console.log(`- Discovery: ${alchemyNFTs.length} NFTs found via Alchemy`);
+      console.log(`- Enrichment: ${enrichedNFTs.length} NFTs processed via OpenSea`);
+      
+      // Get final stats
+      const alchemyStats = blockchainIndexer.getStats();
+      const openSeaStats = this.openSeaAPI.getStats();
+      console.log(`[OptimizedIndexingWorkflow] Alchemy stats:`, alchemyStats);
+      console.log(`[OptimizedIndexingWorkflow] OpenSea stats:`, openSeaStats);
+
+      return enrichedNFTs;
+    } else {
+      throw new Error('Hybrid approach not supported for non-Ethereum blockchains');
     }
-
-    console.log(`[OptimizedIndexingWorkflow] Hybrid indexing completed:`);
-    console.log(`- Discovery: ${alchemyNFTs.length} NFTs found via Alchemy`);
-    console.log(`- Enrichment: ${enrichedNFTs.length} NFTs processed via OpenSea`);
-    
-    // Get final stats
-    const alchemyStats = this.alchemyIndexer.getStats();
-    const openSeaStats = this.openSeaAPI.getStats();
-    console.log(`[OptimizedIndexingWorkflow] Alchemy stats:`, alchemyStats);
-    console.log(`[OptimizedIndexingWorkflow] OpenSea stats:`, openSeaStats);
-
-    return enrichedNFTs;
   }
 
   /**

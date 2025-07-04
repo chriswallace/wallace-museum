@@ -19,9 +19,10 @@
 	function getBlockchainLabel(blockchain: string): string {
 		const labels: Record<string, string> = {
 			ethereum: 'ETH',
-			tezos: 'XTZ',
+			base: 'BASE',
+			shape: 'SHAPE',
 			polygon: 'MATIC',
-			solana: 'SOL'
+			tezos: 'XTZ'
 		};
 		return labels[blockchain] || blockchain;
 	}
@@ -114,10 +115,11 @@
 							required
 							disabled={isSubmitting}
 						>
-							<option value="ethereum">Ethereum</option>
-							<option value="tezos">Tezos</option>
-							<option value="polygon">Polygon</option>
-							<option value="solana">Solana</option>
+												<option value="ethereum">Ethereum</option>
+					<option value="base">Base</option>
+					<option value="shape">Shape</option>
+					<option value="polygon">Polygon</option>
+					<option value="tezos">Tezos</option>
 						</select>
 					</div>
 

@@ -4,6 +4,13 @@ import { IntelligentRateLimiter } from './intelligent-rate-limiter';
 interface AlchemyNFT {
   contract: {
     address: string;
+    name?: string;
+    symbol?: string;
+    totalSupply?: string;
+    tokenType?: string;
+    contractDeployer?: string;
+    deployedBlockNumber?: number;
+    spamClassifications?: string[];
   };
   tokenId: string;
   tokenType: string;
@@ -87,15 +94,21 @@ export interface AlchemyIndexingOptions {
   pageSize?: number;
   maxPages?: number;
   enrichmentLevel?: 'minimal' | 'standard' | 'comprehensive';
+  blockchain?: 'ethereum' | 'base' | 'shape' | 'polygon';
 }
 
 export class AlchemyNFTIndexer {
-  private apiKey: string;
+  public apiKey: string;
   private rateLimiter: IntelligentRateLimiter;
-  private baseUrl: string = 'https://eth-mainnet.g.alchemy.com/nft/v3';
+  private baseUrl: string;
+  private blockchain: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, blockchain: 'ethereum' | 'base' | 'shape' | 'polygon' = 'ethereum') {
     this.apiKey = apiKey;
+    this.blockchain = blockchain;
+    
+    // Set the appropriate base URL for the blockchain
+    this.baseUrl = this.getAlchemyBaseUrl(blockchain);
     
     // Configure rate limiter for Alchemy (more generous than OpenSea)
     this.rateLimiter = new IntelligentRateLimiter({
@@ -106,6 +119,20 @@ export class AlchemyNFTIndexer {
       batchSize: 10,         // Larger batches allowed
       adaptiveThreshold: 2
     });
+  }
+
+  /**
+   * Get the appropriate Alchemy base URL for the blockchain
+   */
+  private getAlchemyBaseUrl(blockchain: string): string {
+    const baseUrls: Record<string, string> = {
+      ethereum: 'https://eth-mainnet.g.alchemy.com/nft/v3',
+      base: 'https://base-mainnet.g.alchemy.com/nft/v3',
+      shape: 'https://shape-mainnet.g.alchemy.com/nft/v3',
+      polygon: 'https://polygon-mainnet.g.alchemy.com/nft/v3'
+    };
+    
+    return baseUrls[blockchain] || baseUrls.ethereum;
   }
 
   /**
@@ -165,11 +192,25 @@ export class AlchemyNFTIndexer {
           break;
         }
 
+        // Filter out spam NFTs if includeSpam is false
+        let filteredNFTs = response.ownedNfts;
+        if (!includeSpam) {
+          const beforeCount = filteredNFTs.length;
+          filteredNFTs = response.ownedNfts.filter(nft => {
+            const isSpam = nft.contract.spamClassifications && nft.contract.spamClassifications.length > 0;
+            return !isSpam;
+          });
+          const spamCount = beforeCount - filteredNFTs.length;
+          if (spamCount > 0) {
+            console.log(`[AlchemyNFTIndexer] Filtered out ${spamCount} spam NFTs from page ${pageCount}`);
+          }
+        }
+
         // Transform Alchemy NFTs to MinimalNFTData
-        const transformedNFTs = response.ownedNfts.map(nft => this.transformAlchemyNFT(nft, enrichmentLevel));
+        const transformedNFTs = filteredNFTs.map(nft => this.transformAlchemyNFT(nft, enrichmentLevel));
         allNFTs.push(...transformedNFTs);
 
-        console.log(`[AlchemyNFTIndexer] Page ${pageCount}: +${response.ownedNfts.length} NFTs (total: ${allNFTs.length}/${totalExpected})`);
+        console.log(`[AlchemyNFTIndexer] Page ${pageCount}: +${filteredNFTs.length} NFTs (${response.ownedNfts.length} total, ${response.ownedNfts.length - filteredNFTs.length} spam filtered) (running total: ${allNFTs.length})`);
 
         // Check if we have more pages
         pageKey = response.pageKey;
@@ -202,16 +243,33 @@ export class AlchemyNFTIndexer {
 
   /**
    * Get NFT count for a wallet (much more reliable than OpenSea)
+   * By default returns total count including spam for performance.
+   * Set filterSpam=true for accurate non-spam count (slower).
    */
-  async getWalletNFTCount(walletAddress: string): Promise<number> {
+  async getWalletNFTCount(walletAddress: string, filterSpam: boolean = false): Promise<number> {
     try {
-      console.log(`[AlchemyNFTIndexer] Getting NFT count for ${walletAddress}`);
+      console.log(`[AlchemyNFTIndexer] Getting NFT count for ${walletAddress} (filterSpam: ${filterSpam})`);
 
+      if (filterSpam) {
+        // For non-spam count, we need to fetch and filter the NFTs
+        // This is less efficient but more accurate
+        const nfts = await this.getWalletNFTs(walletAddress, {
+          includeMetadata: false,
+          includeSpam: false,
+          pageSize: 100,
+          maxPages: 1000
+        });
+        
+        console.log(`[AlchemyNFTIndexer] Wallet ${walletAddress} has ${nfts.length} non-spam NFTs`);
+        return nfts.length;
+      }
+
+      // For total count including spam (faster), we can use the API directly
       const result = await this.rateLimiter.executeCall(
         () => this.fetchNFTsPage(walletAddress, {
           pageSize: 1, // Just get first page to get total count
           includeMetadata: false,
-          includeSpam: false
+          includeSpam: true
         }),
         `NFT count for ${walletAddress}`
       );
@@ -224,7 +282,7 @@ export class AlchemyNFTIndexer {
       const response = result.data as AlchemyResponse;
       const count = response.totalCount || 0;
       
-      console.log(`[AlchemyNFTIndexer] Wallet ${walletAddress} has ${count} NFTs`);
+      console.log(`[AlchemyNFTIndexer] Wallet ${walletAddress} has ${count} total NFTs (including spam)`);
       return count;
 
     } catch (error) {
@@ -280,9 +338,11 @@ export class AlchemyNFTIndexer {
     url.searchParams.set('pageSize', pageSize.toString());
     url.searchParams.set('withMetadata', includeMetadata.toString());
     
-    if (!includeSpam) {
-      url.searchParams.set('excludeFilters[]', 'SPAM');
-    }
+    // Note: excludeFilters requires Growth+ plan, so we skip it for compatibility
+    // The spam filtering will need to be done post-processing if needed
+    // if (!includeSpam) {
+    //   url.searchParams.set('excludeFilters[]', 'SPAM');
+    // }
     
     if (pageKey) {
       url.searchParams.set('pageKey', pageKey);
@@ -413,11 +473,103 @@ export class AlchemyNFTIndexer {
     // Extract mint information
     const mintDate = nft.mint?.timestamp || nft.timeLastUpdated;
 
+    // Extract creator/artist information
+    let creator = undefined;
+    
+    // Debug logging to understand the response structure
+    console.log(`[AlchemyNFTIndexer] DEBUG - NFT structure for ${contractAddress}:${tokenId}:`);
+    console.log(`  mint:`, JSON.stringify(nft.mint, null, 2));
+    console.log(`  contract:`, JSON.stringify(nft.contract, null, 2));
+    console.log(`  metadata keys:`, Object.keys(metadata));
+    
+    // Write debug info to file for inspection
+    try {
+      const fs = require('fs');
+      const debugInfo = {
+        contractAddress,
+        tokenId,
+        mint: nft.mint,
+        contract: nft.contract,
+        metadataKeys: Object.keys(metadata),
+        metadata: metadata
+      };
+      fs.writeFileSync(`debug-alchemy-${contractAddress.slice(-6)}-${tokenId}.json`, JSON.stringify(debugInfo, null, 2));
+    } catch (e) {
+      // Ignore file write errors
+    }
+    
+    // Try to get creator from mint address (most reliable for Base/other chains)
+    if (nft.mint?.mintAddress && nft.mint.mintAddress !== '0x0000000000000000000000000000000000000000') {
+      creator = {
+        address: nft.mint.mintAddress,
+        username: undefined,
+        bio: undefined,
+        description: undefined,
+        profileUrl: undefined,
+        avatarUrl: undefined,
+        websiteUrl: undefined,
+        displayName: undefined,
+        ensName: undefined,
+        isVerified: undefined,
+        twitterHandle: undefined,
+        instagramHandle: undefined,
+        profileData: undefined,
+        resolutionSource: 'alchemy_mint',
+        socialLinks: undefined
+      };
+      console.log(`[AlchemyNFTIndexer] Found creator from mint address for ${contractAddress}:${tokenId}: ${nft.mint.mintAddress}`);
+    }
+    // Fallback to contract deployer if no mint address
+    else if (nft.contract?.contractDeployer && nft.contract.contractDeployer !== '0x0000000000000000000000000000000000000000') {
+      creator = {
+        address: nft.contract.contractDeployer,
+        username: undefined,
+        bio: undefined,
+        description: undefined,
+        profileUrl: undefined,
+        avatarUrl: undefined,
+        websiteUrl: undefined,
+        displayName: undefined,
+        ensName: undefined,
+        isVerified: undefined,
+        twitterHandle: undefined,
+        instagramHandle: undefined,
+        profileData: undefined,
+        resolutionSource: 'alchemy_deployer',
+        socialLinks: undefined
+      };
+      console.log(`[AlchemyNFTIndexer] Found creator from contract deployer for ${contractAddress}:${tokenId}: ${nft.contract.contractDeployer}`);
+    }
+    // Also check metadata for creator information
+    else if (metadata.creator) {
+      creator = {
+        address: metadata.creator,
+        username: metadata.creator_name || undefined,
+        bio: undefined,
+        description: undefined,
+        profileUrl: undefined,
+        avatarUrl: undefined,
+        websiteUrl: undefined,
+        displayName: metadata.creator_name || undefined,
+        ensName: undefined,
+        isVerified: undefined,
+        twitterHandle: undefined,
+        instagramHandle: undefined,
+        profileData: undefined,
+        resolutionSource: 'alchemy_metadata',
+        socialLinks: undefined
+      };
+      console.log(`[AlchemyNFTIndexer] Found creator from metadata for ${contractAddress}:${tokenId}: ${metadata.creator}`);
+    }
+    else {
+      console.log(`[AlchemyNFTIndexer] No creator information found for ${contractAddress}:${tokenId}`);
+    }
+
     const minimalNFT: MinimalNFTData = {
       // Core identification
       contractAddress,
       tokenId,
-      blockchain: 'ethereum',
+      blockchain: this.blockchain as 'ethereum' | 'tezos' | 'polygon' | 'base' | 'shape',
       tokenStandard: nft.tokenType || 'ERC721',
 
       // Basic info
@@ -439,7 +591,10 @@ export class AlchemyNFTIndexer {
       attributes,
 
       // Collection
-      collection
+      collection,
+
+      // Creator/Artist
+      creator
     };
 
     return minimalNFT;

@@ -14,11 +14,13 @@
 
 	// State
 	let wallets: WalletWithCount[] = [];
+	let filteredWallets: WalletWithCount[] = [];
 	let selectedWallets: Set<string> = new Set();
 	let isLoading = true;
 	let error = '';
 	let selectAll = false;
 	let totalArtworkCount = 0;
+	let selectedBlockchain = 'all'; // Filter by blockchain
 
 	// Load wallets with artwork counts
 	async function loadWallets() {
@@ -61,15 +63,43 @@
 	// Initialize on mount
 	loadWallets();
 
+	// Reactive statement for blockchain filtering
+	$: if (wallets.length > 0) {
+		filterWalletsByBlockchain();
+	}
+
 	// Get blockchain label for display
 	function getBlockchainLabel(blockchain: string): string {
 		const labels: Record<string, string> = {
 			ethereum: 'ETH',
-			tezos: 'XTZ',
+			base: 'BASE',
+			shape: 'SHAPE',
 			polygon: 'MATIC',
-			solana: 'SOL'
+			tezos: 'XTZ'
 		};
 		return labels[blockchain] || blockchain.toUpperCase();
+	}
+
+	// Filter wallets by blockchain
+	function filterWalletsByBlockchain() {
+		if (selectedBlockchain === 'all') {
+			filteredWallets = wallets;
+		} else {
+			filteredWallets = wallets.filter(wallet => wallet.blockchain === selectedBlockchain);
+		}
+		
+		// Update selection to only include filtered wallets
+		const filteredKeys = new Set(filteredWallets.map(getWalletKey));
+		const updatedSelection = new Set<string>();
+		
+		for (const key of selectedWallets) {
+			if (filteredKeys.has(key)) {
+				updatedSelection.add(key);
+			}
+		}
+		
+		selectedWallets = updatedSelection;
+		selectAll = filteredWallets.length > 0 && selectedWallets.size === filteredWallets.length;
 	}
 
 	// Format wallet address for display
@@ -93,8 +123,10 @@
 		}
 		selectedWallets = selectedWallets; // Trigger reactivity
 		
-		// Update select all state
-		selectAll = selectedWallets.size === wallets.length;
+		// Update select all state based on filtered wallets
+		const filteredKeys = new Set(filteredWallets.map(getWalletKey));
+		const selectedFilteredCount = Array.from(selectedWallets).filter(key => filteredKeys.has(key)).length;
+		selectAll = filteredWallets.length > 0 && selectedFilteredCount === filteredWallets.length;
 	}
 
 	// Toggle select all
@@ -102,14 +134,15 @@
 		// The selectAll variable is already updated by the bind:checked
 		// So we use the current value to determine what to do
 		if (selectAll) {
-			// Select all wallets
-			selectedWallets.clear();
-			wallets.forEach(wallet => {
+			// Select all filtered wallets
+			filteredWallets.forEach(wallet => {
 				selectedWallets.add(getWalletKey(wallet));
 			});
 		} else {
-			// Deselect all wallets
-			selectedWallets.clear();
+			// Deselect all filtered wallets
+			filteredWallets.forEach(wallet => {
+				selectedWallets.delete(getWalletKey(wallet));
+			});
 		}
 		selectedWallets = selectedWallets; // Trigger reactivity
 	}
@@ -135,8 +168,8 @@
 	// Calculate total artwork count for selected wallets
 	$: {
 		totalArtworkCount = 0;
-		if (wallets.length > 0 && selectedWallets.size > 0) {
-			for (const wallet of wallets) {
+		if (filteredWallets.length > 0 && selectedWallets.size > 0) {
+			for (const wallet of filteredWallets) {
 				if (selectedWallets.has(getWalletKey(wallet))) {
 					totalArtworkCount += (wallet.artworkCount || 0);
 				}
@@ -189,6 +222,26 @@
 					<p class="text-gray-500 dark:text-gray-500 text-sm mt-1">Add wallet addresses in the settings to enable indexing.</p>
 				</div>
 			{:else}
+				<!-- Blockchain Filter -->
+				<div class="blockchain-filter mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
+					<div class="flex items-center gap-4">
+						<label for="blockchain-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+							Filter by Chain:
+						</label>
+						<select
+							id="blockchain-filter"
+							bind:value={selectedBlockchain}
+							class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+						>
+							<option value="all">All Chains ({wallets.length} wallets)</option>
+							{#each [...new Set(wallets.map(w => w.blockchain))] as blockchain}
+								{@const count = wallets.filter(w => w.blockchain === blockchain).length}
+								<option value={blockchain}>{getBlockchainLabel(blockchain)} ({count})</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+
 				<!-- Select All Header -->
 				<div class="select-all-header mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
 					<label class="flex items-center cursor-pointer">
@@ -199,7 +252,7 @@
 							class="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-sm"
 						/>
 						<span class="font-medium dark:text-gray-100">
-							Select All ({wallets.length} wallets)
+							Select All ({filteredWallets.length} {selectedBlockchain === 'all' ? 'wallets' : getBlockchainLabel(selectedBlockchain) + ' wallets'})
 						</span>
 						{#if hasSelection}
 							<span class="ml-2 text-sm text-gray-600 dark:text-gray-400">
@@ -211,7 +264,7 @@
 
 				<!-- Wallet List -->
 				<div class="wallet-list space-y-2">
-					{#each wallets as wallet (getWalletKey(wallet))}
+					{#each filteredWallets as wallet (getWalletKey(wallet))}
 						<div class="wallet-item p-3 border dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
 							<label class="flex items-center cursor-pointer">
 								<input

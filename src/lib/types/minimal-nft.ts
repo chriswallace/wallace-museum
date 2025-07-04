@@ -4,7 +4,7 @@ export interface MinimalNFTData {
   // Core identification
   contractAddress: string;
   tokenId: string;
-  blockchain: 'ethereum' | 'tezos' | 'polygon';
+  blockchain: 'ethereum' | 'base' | 'shape' | 'polygon' | 'tezos';
   
   // Basic metadata (for Artwork table)
   title: string;

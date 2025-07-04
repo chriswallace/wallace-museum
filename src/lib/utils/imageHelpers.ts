@@ -257,10 +257,10 @@ export const ResponsiveImageConfigs = {
 
 	// Featured artwork on homepage
 	featuredArtwork: {
-		sizes: '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px',
-		responsiveSizes: [400, 600, 800, 1200],
+		sizes: '(max-width: 640px) 500px, (max-width: 1024px) 600px, 800px',
+		responsiveSizes: [400, 500, 600, 800],
 		defaultWidth: 600,
-		quality: 85,
+		quality: 75,
 		fit: 'contain' as const,
 		format: 'webp' as const
 	}
@@ -320,7 +320,7 @@ export function getViewportOptimizedUrl(
 		display: { width: 1200, quality: 90, fit: 'contain' as const },
 		avatar: { width: 64, quality: 85, fit: 'cover' as const },
 		banner: { width: 1200, quality: 85, fit: 'cover' as const },
-		featured: { width: 600, quality: 85, fit: 'contain' as const }
+		featured: { width: 600, quality: 75, fit: 'contain' as const }
 	};
 
 	const config = configs[context];

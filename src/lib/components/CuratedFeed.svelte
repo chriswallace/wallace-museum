@@ -340,7 +340,7 @@
 																priority={collections.indexOf(collection) < 2}
 																sizes="200px"
 																responsiveSizes={[200]}
-																quality={85}
+																quality={70}
 															/>
 														</div>
 														<div class="chain-preview-mini tezos">
@@ -358,7 +358,7 @@
 																priority={collections.indexOf(collection) < 2}
 																sizes="200px"
 																responsiveSizes={[200]}
-																quality={85}
+																quality={70}
 															/>
 														</div>
 													</div>
@@ -394,7 +394,7 @@
 													priority={collections.indexOf(collection) < 2}
 													sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, (max-width: 1024px) 400px, (max-width: 1280px) 480px, 520px"
 													responsiveSizes={[280, 320, 400, 480, 520]}
-													quality={85}
+													quality={70}
 												/>
 												<div class="entangled-badge-mini">ENTANGLED</div>
 											</a>
@@ -425,7 +425,7 @@
 												priority={collections.indexOf(collection) < 2}
 												sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, (max-width: 1024px) 400px, (max-width: 1280px) 480px, 520px"
 												responsiveSizes={[280, 320, 400, 480, 520]}
-												quality={85}
+												quality={70}
 											/>
 											<div class="artwork-info">
 												<div class="artwork-title">
@@ -734,16 +734,28 @@
 		@apply w-12 h-12 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm;
 		@apply flex items-center justify-center cursor-pointer border-0;
 		@apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white;
-		@apply shadow-lg hover:shadow-xl transition-all duration-300;
+		@apply shadow-lg hover:shadow-xl;
 		@apply opacity-0 pointer-events-none;
 		@apply hover:bg-white dark:hover:bg-gray-700;
 		/* Use transform instead of Tailwind classes for better control */
 		transform: translateY(-50%);
+		/* Smooth transition with delay to prevent flickering */
+		transition: opacity 0.2s ease-in-out 0.1s, 
+		           background-color 0.2s ease-in-out,
+		           box-shadow 0.2s ease-in-out,
+		           transform 0.2s ease-in-out;
 	}
 
-	.artworks-swiper.hoverable:hover .swiper-nav-button,
+	.artworks-swiper.hoverable:hover .swiper-nav-button {
+		@apply opacity-100 pointer-events-auto;
+		/* Remove delay when showing */
+		transition-delay: 0s;
+	}
+
+	/* Keep buttons visible when hovering over them directly */
 	.swiper-nav-button:hover {
 		@apply opacity-100 pointer-events-auto;
+		transition-delay: 0s;
 	}
 
 	.swiper-nav-left {
