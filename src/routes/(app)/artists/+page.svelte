@@ -6,7 +6,6 @@
 	import { ipfsToHttpUrl } from '$lib/mediaUtils';
 	import { fade, fly } from 'svelte/transition';
 	import { goto } from '$app/navigation';
-	import LoaderWrapper from '$lib/components/LoaderWrapper.svelte';
 	import OptimizedImage from '$lib/components/OptimizedImage.svelte';
 	import { onMount } from 'svelte';
 	import { buildOptimizedImageUrl } from '$lib/imageOptimization';
@@ -20,13 +19,14 @@
 	 * - Metadata stripping for smaller file sizes
 	 * - Sharpening for better preview quality
 	 * - Hover delay to prevent flickering
+	 * - On-demand loading (no preloading)
+	 * - Preview only shows after image fully loads (no loader)
 	 */
 
 	let hoveredArtist: Artist | null = null;
 	let mouseX = 0;
 	let mouseY = 0;
-	let preloadedImages: Record<string, HTMLImageElement> = {};
-	let loadingStates: Record<string, boolean> = {};
+	let imageLoadedStates: Record<string, boolean> = {};
 	let isLargeScreen = false;
 	let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
 	let shouldShowPreview = false;
@@ -136,32 +136,7 @@
 		isLargeScreen = window.innerWidth >= 1024;
 	}
 
-	// Preload all artwork images for all artists
-	function preloadAllArtworkImages() {
-		data.artists.forEach((artist) => {
-			artist.artworks.forEach((artwork) => {
-				if (artwork.image_url && !preloadedImages[artwork.image_url]) {
-					const img = new window.Image();
-					// Use optimized image URL for preloading with enhanced Pinata transformations
-					img.src = buildOptimizedImageUrl(artwork.image_url, {
-						width: isLargeScreen ? 350 : 280, // Responsive sizing for different screen sizes
-						fit: 'contain',
-						format: artwork.mime === 'image/gif' ? 'auto' : 'webp', // Preserve GIFs, optimize others
-						quality: 75, // Slightly lower quality for faster loading
-						dpr: getSafeDpr(), // Account for high-DPI displays
-						sharpen: 1, // Slight sharpening for better preview quality
-						metadata: 'none', // Strip metadata for smaller file sizes
-						mimeType: artwork.mime // Pass MIME type for proper GIF detection
-					});
-					preloadedImages[artwork.image_url] = img;
-				}
-			});
-		});
-	}
 
-	if (typeof window !== 'undefined') {
-		preloadAllArtworkImages();
-	}
 
 	function handleArtistHover(artist: Artist) {
 		// Clear any existing timeout
@@ -188,6 +163,9 @@
 		// Clear the preview state
 		shouldShowPreview = false;
 		hoveredArtist = null;
+		
+		// Optional: Clear loaded states to force reload on next hover
+		// imageLoadedStates = {};
 	}
 
 	function handleMouseMove(event: MouseEvent) {
@@ -379,19 +357,35 @@
 	</div>
 
 	{#if hoveredArtist && hoveredArtist.artworks.length > 0 && previewMedia && shouldShowPreview}
-		<div
-			class="floating-artwork-preview"
-			style="left: {safeLeft}px; top: {safeTop}px; width: {previewDimensions.width}px; height: {previewDimensions.height}px;"
-		>
-			{#if previewMedia.type === 'image'}
-				{#if loadingStates[previewMedia.url]}
-					<div class="preview-loader">
-						<LoaderWrapper width="100%" height="200px" />
-					</div>
-				{/if}
+		{#if previewMedia.type === 'image'}
+			{#if imageLoadedStates[previewMedia.url]}
+				<div
+					class="floating-artwork-preview"
+					style="left: {safeLeft}px; top: {safeTop}px; width: {previewDimensions.width}px; height: {previewDimensions.height}px;"
+				>
+					<OptimizedImage
+						src={previewMedia.url}
+						alt={hoveredArtist.artworks[0].title || ''}
+						width={previewDimensions?.width || 320}
+						height={previewDimensions?.height || 240}
+						fit="contain"
+						format={hoveredArtist.artworks[0].mime === 'image/gif' ? 'auto' : 'webp'}
+						quality={75}
+						dpr={getSafeDpr()}
+						sharpen={1}
+						gravity="center"
+						animation={true}
+						metadata="none"
+						mimeType={hoveredArtist.artworks[0].mime}
+						className="preview-image"
+						showSkeleton={false}
+					/>
+				</div>
+			{:else}
+				<!-- Hidden image for loading detection -->
 				<OptimizedImage
 					src={previewMedia.url}
-					alt={hoveredArtist.artworks[0].title || ''}
+					alt=""
 					width={previewDimensions?.width || 320}
 					height={previewDimensions?.height || 240}
 					fit="contain"
@@ -403,16 +397,22 @@
 					animation={true}
 					metadata="none"
 					mimeType={hoveredArtist.artworks[0].mime}
-					className={loadingStates[previewMedia.url] ? 'hidden preview-image' : 'preview-image'}
+					className="hidden"
+					showSkeleton={false}
 					on:load={() => {
 						if (previewMedia?.url) {
-							loadingStates[previewMedia.url] = false;
-							loadingStates = loadingStates;
+							imageLoadedStates[previewMedia.url] = true;
+							imageLoadedStates = imageLoadedStates;
 						}
 					}}
 				/>
-			{:else if previewMedia.type === 'video'}
-				{@const videoAttrs = VideoPresets.preview(previewMedia.url)}
+			{/if}
+		{:else if previewMedia.type === 'video'}
+			{@const videoAttrs = VideoPresets.preview(previewMedia.url)}
+			<div
+				class="floating-artwork-preview"
+				style="left: {safeLeft}px; top: {safeTop}px; width: {previewDimensions.width}px; height: {previewDimensions.height}px;"
+			>
 				<video
 					src={videoAttrs.src}
 					autoplay={videoAttrs.autoplay}
@@ -428,8 +428,8 @@
 					<track kind="captions" />
 					Your browser does not support the video tag.
 				</video>
-			{/if}
-		</div>
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -505,9 +505,7 @@
 		opacity: 0.75;
 	}
 
-	.preview-loader {
-		@apply w-full h-full overflow-hidden flex items-center justify-center;
-	}
+
 
 	.preview-image {
 		@apply w-full h-full rounded-lg bg-white object-contain shadow-lg m-0;

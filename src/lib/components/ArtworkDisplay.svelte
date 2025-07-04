@@ -244,7 +244,6 @@
 <style lang="scss">
 	.media-container {
 		@apply relative w-full h-full overflow-hidden box-border flex items-center justify-center;
-		contain: layout style size;
 	}
 
 	.media-container img,
