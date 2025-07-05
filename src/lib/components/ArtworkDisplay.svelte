@@ -106,29 +106,39 @@
 	}
 
 	function calculateConstraint() {
-		if (!mediaContainer || !artwork.dimensions) return;
-
-		const containerRect = mediaContainer.getBoundingClientRect();
-		const containerWidth = containerRect.width;
-		const containerHeight = containerRect.height;
-		
-		if (containerWidth === 0 || containerHeight === 0) return;
+		if (!artwork.dimensions) {
+			// Default to constraining width when no dimensions available
+			constrainWidth = true;
+			return;
+		}
 
 		const artworkWidth = artwork.dimensions.width;
 		const artworkHeight = artwork.dimensions.height;
 		
-		// Calculate container and artwork aspect ratios
-		const containerAspectRatio = containerWidth / containerHeight;
-		const artworkAspectRatio = artworkWidth / artworkHeight;
-		
-		// If artwork is wider than container proportionally, constrain width
-		// If artwork is taller than container proportionally, constrain height
-		constrainWidth = artworkAspectRatio > containerAspectRatio;
+		// For square artworks, we need to check which container dimension is smaller
+		// and constrain based on that to prevent overflow
+		if (artworkWidth === artworkHeight) {
+			// Square artwork - constrain based on container aspect ratio
+			if (mediaContainer) {
+				const containerRect = mediaContainer.getBoundingClientRect();
+				const containerAspectRatio = containerRect.width / containerRect.height;
+				
+				// If container is wider than tall, constrain height (set height to 100%, width to auto)
+				// If container is taller than wide, constrain width (set width to 100%, height to auto)
+				constrainWidth = containerAspectRatio <= 1;
+			} else {
+				// Fallback: default to constraining width for squares
+				constrainWidth = true;
+			}
+		} else {
+			// Non-square artwork - constrain the longest dimension of the artwork
+			// If artwork is wider than it is tall, constrain width (set width to 100%, height to auto)
+			// If artwork is taller than it is wide, constrain height (set height to 100%, width to auto)
+			constrainWidth = artworkWidth >= artworkHeight;
+		}
 	}
 
-	function handleResize() {
-		calculateConstraint();
-	}
+
 
 	function handleMediaLoad() {
 		isMediaLoaded = true;
@@ -160,20 +170,31 @@
 		}
 		
 		calculateConstraint();
-		window.addEventListener('resize', handleResize);
+		
+		// Set up resize observer to recalculate constraints when container size changes
+		let resizeObserver: ResizeObserver | null = null;
+		if (mediaContainer && typeof ResizeObserver !== 'undefined') {
+			resizeObserver = new ResizeObserver(() => {
+				calculateConstraint();
+			});
+			resizeObserver.observe(mediaContainer);
+		}
 		
 		return () => {
-			window.removeEventListener('resize', handleResize);
 			// Clear timeout on component cleanup
 			if (loadTimeout) {
 				clearTimeout(loadTimeout);
 				loadTimeout = null;
 			}
+			// Clean up resize observer
+			if (resizeObserver) {
+				resizeObserver.disconnect();
+			}
 		};
 	});
 
 	// Recalculate when artwork changes
-	$: if (artwork.dimensions && mediaContainer) {
+	$: if (artwork.dimensions) {
 		calculateConstraint();
 	}
 
@@ -181,20 +202,20 @@
 	$: mediaStyle = (isInFullscreenMode && artwork.fullscreen)
 		? 'width: 100%; height: 100%; object-fit: cover;'
 		: constrainWidth 
-		? 'width: 100%; height: auto;' 
-		: 'width: auto; height: 100%;';
+		? 'width: 100%; height: auto; max-height: 100%;' 
+		: 'width: auto; height: 100%; max-width: 100%;';
 
 	// Special handling for iframe aspect ratio - ensure proper sizing within container
 	$: iframeStyle = (isInFullscreenMode && artwork.fullscreen)
 		? 'width: 100%; height: 100%; border: none;'
 		: mediaType === 'iframe' && artwork.dimensions
 		? (constrainWidth 
-			? `width: 100%; height: auto; aspect-ratio: ${artwork.dimensions.width} / ${artwork.dimensions.height};`
-			: `width: auto; height: 100%; aspect-ratio: ${artwork.dimensions.width} / ${artwork.dimensions.height};`)
+			? `width: 100%; height: auto; max-height: 100%; aspect-ratio: ${artwork.dimensions.width} / ${artwork.dimensions.height};`
+			: `width: auto; height: 100%; max-width: 100%; aspect-ratio: ${artwork.dimensions.width} / ${artwork.dimensions.height};`)
 		: mediaType === 'iframe' 
 		? (constrainWidth 
-			? 'width: 100%; height: auto; aspect-ratio: 1 / 1;'
-			: 'width: auto; height: 100%; aspect-ratio: 1 / 1;')
+			? 'width: 100%; height: auto; max-height: 100%; aspect-ratio: 1 / 1;'
+			: 'width: auto; height: 100%; max-width: 100%; aspect-ratio: 1 / 1;')
 		: mediaStyle;
 </script>
 
@@ -244,7 +265,14 @@
 <style lang="scss">
 	.media-container {
 		@apply relative w-full h-full overflow-hidden box-border flex items-center justify-center;
-		contain: none;
+		/* Ensure the container has proper dimensions and can shrink */
+		min-width: 0;
+		min-height: 0;
+		/* Prevent overflow by ensuring flex behavior */
+		flex-shrink: 1;
+		/* Ensure container maintains its bounds */
+		max-width: 100%;
+		max-height: 100%;
 	}
 
 	.media-container img,
@@ -252,6 +280,13 @@
 	.media-container iframe {
 		@apply max-w-full max-h-full object-contain box-border opacity-100 scale-100;
 		transition: opacity 1000ms cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+		/* Ensure media elements respect container bounds */
+		flex-shrink: 1;
+		/* Force elements to fit within container - defensive sizing */
+		max-width: 100% !important;
+		max-height: 100% !important;
+		width: auto;
+		height: auto;
 	}
 
 	/* Special handling for iframes since they don't support object-fit */

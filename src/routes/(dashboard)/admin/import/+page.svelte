@@ -75,7 +75,7 @@
 	// Function to handle image loading errors
 	function handleImageError(event: Event) {
 		const img = event.currentTarget as HTMLImageElement;
-		img.src = '/images/medici-image.png';
+		img.src = '/images/placeholder.webp';
 	}
 
 	// Get saved wallet addresses from the page data
@@ -589,7 +589,7 @@
 		}
 
 		// Return fallback image if no valid thumbnail URL found
-		return '/images/medici-image.png';
+		return '/images/placeholder.webp';
 	}
 
 	// Reactive variable for select all button text

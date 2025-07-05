@@ -281,7 +281,7 @@
 							quality={90}
 							aspectRatio="1/1"
 							className="w-full h-full object-cover rounded-full"
-							fallbackSrc="/images/medici-image.png"
+							fallbackSrc="/images/placeholder.webp"
 							showFallbackOnError={true}
 						/>
 

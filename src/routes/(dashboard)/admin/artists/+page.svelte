@@ -138,7 +138,7 @@
 							quality={85}
 							aspectRatio="1/1"
 							className="w-full h-full object-cover"
-							fallbackSrc="/images/medici-image.png"
+							fallbackSrc="/images/placeholder.webp"
 						/>
 					{:else}
 						<img

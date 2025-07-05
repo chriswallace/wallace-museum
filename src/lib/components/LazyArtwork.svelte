@@ -65,6 +65,16 @@
 		'tall': 'aspect-[9/16]'
 	}[aspectRatio];
 
+	// Check if this is a GIF that should preserve original size
+	$: isGif = artwork.mime === 'image/gif';
+
+	// Grid-optimized image settings for better Pinata performance
+	$: gridOptimizedWidth = isGif ? undefined : responsiveSizes[responsiveSizes.length - 1];
+	$: gridOptimizedHeight = isGif ? undefined : (aspectRatio === 'square' ? responsiveSizes[responsiveSizes.length - 1] : undefined);
+	$: gridOptimizedFit = 'contain' as const; // Always use contain to show full artwork
+	$: gridOptimizedQuality = isGif ? undefined : (quality || 50); // Lower quality for grid thumbnails
+	$: gridOptimizedFormat = isGif ? 'auto' as const : 'webp' as const; // Preserve GIF format, optimize others
+
 	function setupIntersectionObserver() {
 		if (!containerElement || typeof window === 'undefined' || !('IntersectionObserver' in window)) {
 			// Fallback: load immediately if no intersection observer support
@@ -155,7 +165,7 @@
 						<!-- Video fallback -->
 						{#if primaryUrl}
 							<OptimizedImage
-								src={ipfsToHttpUrl(primaryUrl)}
+								src={primaryUrl}
 								alt={artwork.title}
 								width={responsiveSizes[responsiveSizes.length - 1]}
 								{sizes}
@@ -165,7 +175,7 @@
 								{fit}
 								format="webp"
 								className="stage-image"
-								fallbackSrc="/images/medici-image.png"
+								fallbackSrc="/images/placeholder.webp"
 								loading="lazy"
 								mimeType={artwork.mime || 'image/png'}
 								on:load={handleImageLoad}
@@ -176,17 +186,18 @@
 				{:else if primaryUrl}
 					<!-- Image content -->
 					<OptimizedImage
-						src={ipfsToHttpUrl(primaryUrl)}
+						src={primaryUrl}
 						alt={artwork.title}
-						width={responsiveSizes[responsiveSizes.length - 1]}
+						width={gridOptimizedWidth}
+						height={gridOptimizedHeight}
 						{sizes}
 						responsive={true}
 						{responsiveSizes}
-						{quality}
-						{fit}
-						format="webp"
+						quality={gridOptimizedQuality}
+						fit={gridOptimizedFit}
+						format={gridOptimizedFormat}
 						className="stage-image"
-						fallbackSrc="/images/medici-image.png"
+						fallbackSrc="/images/placeholder.webp"
 						loading="lazy"
 						mimeType={artwork.mime || 'image/png'}
 						showSkeleton={showSkeleton && !isLoaded}
@@ -225,7 +236,7 @@
 						<!-- Video fallback -->
 						{#if primaryUrl}
 							<OptimizedImage
-								src={ipfsToHttpUrl(primaryUrl)}
+								src={primaryUrl}
 								alt={artwork.title}
 								width={responsiveSizes[responsiveSizes.length - 1]}
 								{sizes}
@@ -235,7 +246,7 @@
 								{fit}
 								format="webp"
 								className="stage-image"
-								fallbackSrc="/images/medici-image.png"
+								fallbackSrc="/images/placeholder.webp"
 								loading="lazy"
 								mimeType={artwork.mime || 'image/png'}
 								on:load={handleImageLoad}
@@ -246,17 +257,18 @@
 				{:else if primaryUrl}
 					<!-- Image content -->
 					<OptimizedImage
-						src={ipfsToHttpUrl(primaryUrl)}
+						src={primaryUrl}
 						alt={artwork.title}
-						width={responsiveSizes[responsiveSizes.length - 1]}
+						width={gridOptimizedWidth}
+						height={gridOptimizedHeight}
 						{sizes}
 						responsive={true}
 						{responsiveSizes}
-						{quality}
-						{fit}
-						format="webp"
+						quality={gridOptimizedQuality}
+						fit={gridOptimizedFit}
+						format={gridOptimizedFormat}
 						className="stage-image"
-						fallbackSrc="/images/medici-image.png"
+						fallbackSrc="/images/placeholder.webp"
 						loading="lazy"
 						mimeType={artwork.mime || 'image/png'}
 						showSkeleton={showSkeleton && !isLoaded}

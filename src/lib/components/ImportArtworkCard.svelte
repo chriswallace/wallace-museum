@@ -49,9 +49,20 @@
 	export let debugSkeletonMode = false;
 	export let viewMode: 'grid' | 'list' = 'grid';
 
-	// Simplified media URL resolution - prioritize thumbnails for grid display
+	// Display URLs
 	$: displayImageUrl = getDisplayImageUrl();
 	$: displayAnimationUrl = getDisplayAnimationUrl();
+
+	// Check if this is a GIF that should preserve original size
+	$: isGif = artwork.mime === 'image/gif';
+
+	// Grid optimization settings
+	$: gridWidth = isGif ? undefined : 300;
+	$: gridHeight = isGif ? undefined : 300;
+	$: gridQuality = isGif ? undefined : 50;
+	$: gridFormat = isGif ? 'auto' as const : 'webp' as const;
+
+	// Simplified media URL resolution - prioritize thumbnails for grid display
 	$: shouldShowVideo = shouldDisplayAsVideo();
 
 	// Helper functions
@@ -115,7 +126,7 @@
 	function handleImageError(event: Event) {
 		const target = event.currentTarget as HTMLImageElement | HTMLVideoElement;
 		if (target instanceof HTMLImageElement) {
-			target.src = '/images/medici-image.png';
+			target.src = '/images/placeholder.webp';
 		}
 	}
 
@@ -180,7 +191,7 @@
 					showSkeleton={true}
 					skeletonBorderRadius="0px"
 					className="w-full h-full object-cover"
-					fallbackSrc="/images/medici-image.png"
+					fallbackSrc="/images/placeholder.webp"
 					loading="lazy"
 					on:error={handleImageError}
 				/>
@@ -206,15 +217,16 @@
 				<OptimizedImage
 					src={displayImageUrl}
 					alt={getArtworkTitle(artwork)}
-					width={300}
-					height={300}
+					width={gridWidth}
+					height={gridHeight}
 					aspectRatio="1/1"
 					fit="contain"
-					format="auto"
-					quality={85}
+					format={gridFormat}
+					quality={gridQuality}
 					className="w-full h-full object-contain"
-					fallbackSrc="/images/medici-image.png"
+					fallbackSrc="/images/placeholder.webp"
 					loading="lazy"
+					mimeType={artwork.mime}
 					on:error={handleImageError}
 				/>
 			{:else}
@@ -400,7 +412,7 @@
 						showSkeleton={true}
 						skeletonBorderRadius="6px"
 						className="w-full h-full object-cover"
-						fallbackSrc="/images/medici-image.png"
+						fallbackSrc="/images/placeholder.webp"
 						loading="lazy"
 						on:error={handleImageError}
 					/>
@@ -426,15 +438,16 @@
 					<OptimizedImage
 						src={displayImageUrl}
 						alt={getArtworkTitle(artwork)}
-						width={48}
-						height={48}
+						width={isGif ? undefined : 48}
+						height={isGif ? undefined : 48}
 						aspectRatio="1/1"
 						fit="contain"
-						format="auto"
-						quality={85}
+						format={gridFormat}
+						quality={gridQuality}
 						className="w-full h-full object-contain"
-						fallbackSrc="/images/medici-image.png"
+						fallbackSrc="/images/placeholder.webp"
 						loading="lazy"
+						mimeType={artwork.mime}
 						on:error={handleImageError}
 					/>
 				{:else}

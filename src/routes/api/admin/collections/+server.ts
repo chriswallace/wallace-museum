@@ -49,7 +49,7 @@ export async function GET({ url }: { url: URL }): Promise<Response> {
 					}
 				});
 
-				const defaultImage = '/images/medici-image.png';
+				const defaultImage = '/images/placeholder.webp';
 				const modifiedCollections = collections.map((collection) => ({
 					...collection,
 					coverImages: getCoverImages(

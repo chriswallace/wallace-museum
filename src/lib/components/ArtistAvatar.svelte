@@ -37,15 +37,15 @@
 			alt={artist.name}
 			width={sizeConfig.width}
 			height={sizeConfig.height}
-			fit="crop"
+			fit="cover"
 			gravity="center"
-			format="auto"
-			quality={85}
+			format="webp"
+			quality={80}
 			aspectRatio="1/1"
 			showSkeleton={showSkeleton}
 			skeletonBorderRadius={isSquare ? "4px" : "50%"}
 			className={imageClasses}
-			fallbackSrc="/images/medici-image.png"
+			fallbackSrc="/images/placeholder.webp"
 		/>
 	{:else}
 		<img

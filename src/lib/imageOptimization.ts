@@ -416,27 +416,9 @@ export function createRetinaUrls(
 export const ImagePresets = {
 	// Avatar images
 	avatar: {
-		small: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
-			width: 32,
-			height: 32,
-			fit: 'cover',
-			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
-			quality: 85
-		}),
-		medium: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
-			width: 64,
-			height: 64,
-			fit: 'cover',
-			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
-			quality: 85
-		}),
-		large: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
-			width: 128,
-			height: 128,
-			fit: 'cover',
-			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
-			quality: 85
-		})
+		small: (imageUrl: string) => buildAvatarOptimizedImageUrl(imageUrl, 'sm'),
+		medium: (imageUrl: string) => buildAvatarOptimizedImageUrl(imageUrl, 'md'),
+		large: (imageUrl: string) => buildAvatarOptimizedImageUrl(imageUrl, 'lg')
 	},
 
 	// Artwork thumbnails
@@ -494,20 +476,8 @@ export const ImagePresets = {
 
 	// Grid/collection views
 	grid: {
-		small: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
-			width: 250,
-			height: 250,
-			fit: 'cover',
-			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
-			quality: 80
-		}),
-		medium: (imageUrl: string) => buildOptimizedImageUrl(imageUrl, {
-			width: 350,
-			height: 350,
-			fit: 'cover',
-			format: (isSvgUrl(imageUrl) || isGifUrl(imageUrl)) ? 'auto' : 'webp',
-			quality: 85
-		})
+		small: (imageUrl: string) => buildGridOptimizedImageUrl(imageUrl, { size: 'small', aspectRatio: 'square' }),
+		medium: (imageUrl: string) => buildGridOptimizedImageUrl(imageUrl, { size: 'medium', aspectRatio: 'square' })
 	},
 
 	// Preview/hover images
@@ -586,7 +556,7 @@ export function buildImageUrlWithFallback(
 	isIpfs: boolean;
 	canOptimize: boolean;
 } {
-	const { enableOptimizations = true, fallbackImage = '/images/medici-image.png', ...optimizationOptions } = options;
+	const { enableOptimizations = true, fallbackImage = '/images/placeholder.webp', ...optimizationOptions } = options;
 	
 	if (!imageUrl) {
 		return {
@@ -637,4 +607,78 @@ export function buildImageUrlWithFallback(
 		isIpfs: isIpfsContent,
 		canOptimize: canOptimizeContent
 	};
+}
+
+/**
+ * Optimized settings specifically for grid images to maximize Pinata performance
+ */
+export function buildGridOptimizedImageUrl(
+	imageUrl: string | null | undefined,
+	options: {
+		size?: 'small' | 'medium' | 'large';
+		aspectRatio?: 'square' | 'auto';
+		quality?: number;
+		mimeType?: string | null;
+	} = {}
+): string {
+	if (!imageUrl) return '';
+
+	const { size = 'medium', aspectRatio = 'square', quality, mimeType } = options;
+
+	// Check if this is a GIF - preserve original size and format
+	const isGif = mimeType === 'image/gif';
+	if (isGif) {
+		return buildOptimizedImageUrl(imageUrl, {
+			format: 'auto', // Preserve GIF format
+			fit: 'contain'
+		});
+	}
+
+	// Grid-specific size mappings optimized for Pinata
+	const gridSizes = {
+		small: { width: 250, height: 250 },
+		medium: { width: 300, height: 300 },
+		large: { width: 400, height: 400 }
+	};
+
+	const sizeConfig = gridSizes[size];
+	const gridQuality = quality || 50; // Optimized for grid thumbnails
+	const gridFit = 'contain'; // Always show full artwork
+
+	return buildOptimizedImageUrl(imageUrl, {
+		width: sizeConfig.width,
+		height: aspectRatio === 'square' ? sizeConfig.height : undefined,
+		quality: gridQuality,
+		fit: gridFit,
+		format: 'webp'
+	});
+}
+
+/**
+ * Optimized settings specifically for avatar images in grids
+ */
+export function buildAvatarOptimizedImageUrl(
+	imageUrl: string | null | undefined,
+	size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' = 'md'
+): string {
+	if (!imageUrl) return '';
+
+	const avatarSizes = {
+		xs: 16,
+		sm: 20,
+		md: 32,
+		lg: 48,
+		xl: 64
+	};
+
+	const avatarSize = avatarSizes[size];
+
+	return buildOptimizedImageUrl(imageUrl, {
+		width: avatarSize,
+		height: avatarSize,
+		fit: 'cover',
+		gravity: 'center',
+		format: isSvgUrl(imageUrl) ? 'auto' : 'webp',
+		quality: 80
+	});
 } 

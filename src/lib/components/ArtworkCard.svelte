@@ -33,9 +33,18 @@
 	};
 
 	$: bestMedia = getBestMediaUrl(mediaUrls, 'thumbnail', artwork.mime);
-	$: cardImageUrl = bestMedia?.url || '';
+	$: cardImageUrl = artwork.thumbnailUrl || artwork.imageUrl || artwork.animationUrl || artwork.generatorUrl || '';
 	$: mediaType = getMediaDisplayType(bestMedia, artwork.mime);
 	$: displayAsVideo = mediaType === 'video';
+
+	// Check if this is a GIF that should preserve original size
+	$: isGif = artwork.mime === 'image/gif';
+
+	// Grid optimization settings
+	$: gridWidth = isGif ? undefined : 300;
+	$: gridHeight = isGif ? undefined : 300;
+	$: gridQuality = isGif ? undefined : 50;
+	$: gridFormat = isGif ? 'auto' as const : 'webp' as const;
 </script>
 
 <div class="artwork-card" class:selectable class:selected={isSelected}>
@@ -66,14 +75,14 @@
 					<OptimizedImage
 						src={cardImageUrl}
 						alt={artwork.title || 'Artwork thumbnail'}
-						width={artwork.dimensions?.width || 300}
-						height={artwork.dimensions?.height || 300}
-						aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
+						width={gridWidth}
+						height={gridHeight}
+						aspectRatio="1/1"
 						fit="contain"
-						format="auto"
-						quality={85}
+						format={gridFormat}
+						quality={gridQuality}
 						className="w-full aspect-square object-contain rounded-md mb-3"
-						fallbackSrc="/images/medici-image.png"
+						fallbackSrc="/images/placeholder.webp"
 						mimeType={artwork.mime}
 					/>
 				{/if}
@@ -105,14 +114,14 @@
 				<OptimizedImage
 					src={cardImageUrl}
 					alt={artwork.title || 'Artwork thumbnail'}
-					width={artwork.dimensions?.width || 300}
-					height={artwork.dimensions?.height || 300}
-					aspectRatio={artwork.dimensions ? `${artwork.dimensions.width}/${artwork.dimensions.height}` : '1/1'}
+					width={gridWidth}
+					height={gridHeight}
+					aspectRatio="1/1"
 					fit="contain"
-					format="auto"
-					quality={85}
+					format={gridFormat}
+					quality={gridQuality}
 					className="w-full aspect-square object-contain rounded-md mb-3"
-					fallbackSrc="/images/medici-image.png"
+					fallbackSrc="/images/placeholder.webp"
 					mimeType={artwork.mime}
 				/>
 			{/if}

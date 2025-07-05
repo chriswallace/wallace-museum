@@ -30,7 +30,7 @@
 	export let retina: boolean = false;
 	
 	// Fallback options
-	export let fallbackSrc: string = '/images/medici-image.png';
+	export let fallbackSrc: string = '/images/placeholder.webp';
 	export let showFallbackOnError: boolean = true;
 
 	export let aspectRatio: string | undefined = undefined;

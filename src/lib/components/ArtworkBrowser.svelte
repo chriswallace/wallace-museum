@@ -168,7 +168,7 @@
 					format="auto"
 					quality={85}
 					className="w-full h-auto"
-					fallbackSrc="/images/medici-image.png"
+					fallbackSrc="/images/placeholder.webp"
 					mimeType={currentArtwork.mime}
 				/>
 			</div>

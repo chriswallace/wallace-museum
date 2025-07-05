@@ -76,7 +76,7 @@
 							format="auto"
 							quality={quality}
 							className="stage-image"
-							fallbackSrc="/images/medici-image.png"
+							fallbackSrc="/images/placeholder.webp"
 							loading={loading}
 							mimeType="image/png"
 						/>
@@ -90,7 +90,7 @@
 					format="auto"
 					quality={quality}
 					className="stage-image"
-					fallbackSrc="/images/medici-image.png"
+					fallbackSrc="/images/placeholder.webp"
 					loading={loading}
 					mimeType={artwork.mime || 'image/png'}
 				/>
@@ -125,7 +125,7 @@
 							format="auto"
 							quality={quality}
 							className="stage-image"
-							fallbackSrc="/images/medici-image.png"
+							fallbackSrc="/images/placeholder.webp"
 							loading={loading}
 							mimeType="image/png"
 						/>
@@ -139,7 +139,7 @@
 					format="auto"
 					quality={quality}
 					className="stage-image"
-					fallbackSrc="/images/medici-image.png"
+					fallbackSrc="/images/placeholder.webp"
 					loading={loading}
 					mimeType={artwork.mime || 'image/png'}
 				/>

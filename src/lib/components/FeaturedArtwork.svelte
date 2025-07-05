@@ -41,12 +41,14 @@
 
 	let featuredArtwork: FeaturedArtworkData | null = null;
 	let displayedArtwork: FeaturedArtworkData | null = null; // The artwork currently being displayed
+	let nextArtwork: FeaturedArtworkData | null = null; // The artwork being loaded next
 	let loading = true;
 	let error = false;
 	let sectionElement: HTMLElement;
 	let isVisible = false;
 	let isRefreshing = false;
 	let artworkTransitioning = false;
+	let nextArtworkLoaded = false;
 	let artworkContainer: HTMLElement;
 	let containerWidth = 0;
 	let containerHeight = 0;
@@ -183,8 +185,8 @@
 		if (isRefreshing) return; // Prevent multiple simultaneous requests
 		
 		isRefreshing = true;
-		artworkTransitioning = true;
 		error = false;
+		nextArtworkLoaded = false;
 
 		try {
 			const response = await fetch('/api/artworks/featured', {
@@ -193,25 +195,30 @@
 			const data = await response.json();
 
 			if (response.ok) {
-				featuredArtwork = data.artwork;
-				
-				// Wait for the fade-out animation, then update the displayed artwork
-				setTimeout(() => {
-					displayedArtwork = data.artwork;
-					artworkTransitioning = false;
-				}, 300);
+				// Don't update featuredArtwork yet - wait for image to load
+				nextArtwork = data.artwork;
+				// Don't set artworkTransitioning = true here
+				// We'll wait for the new artwork to load first
 			} else {
 				console.error('Failed to refresh featured artwork:', data.error);
 				error = true;
-				artworkTransitioning = false;
 			}
 		} catch (err) {
 			console.error('Error refreshing featured artwork:', err);
 			error = true;
-			artworkTransitioning = false;
 		} finally {
 			isRefreshing = false;
 		}
+	}
+
+	function handleNextArtworkLoad() {
+		nextArtworkLoaded = true;
+		// Update both the displayed artwork and content immediately - no fade out needed
+		featuredArtwork = nextArtwork;
+		displayedArtwork = nextArtwork;
+		nextArtwork = null;
+		nextArtworkLoaded = false;
+		// No transition state needed since we're doing a direct swap
 	}
 
 	function handleArtworkClick() {
@@ -284,8 +291,6 @@
 			<div class="artwork-display" class:refreshing={isRefreshing} class:transitioning={artworkTransitioning} bind:this={artworkContainer}>
 				<div class="artwork-display-wrapper">
 					{#if displayedArtwork}
-						{#key displayedArtwork.id}
-							{#if displayedArtwork}
 								{@const mediaUrls = {
 									generatorUrl: displayedArtwork.generatorUrl,
 									animationUrl: displayedArtwork.animationUrl,
@@ -309,7 +314,7 @@
 											loading="eager"
 											sizes="(max-width: 768px) 500px, (max-width: 1024px) 600px, 800px"
 											aspectRatio={artworkAspectRatio}
-											fallbackSrc="/images/medici-image.png"
+											fallbackSrc="/images/placeholder.webp"
 											showSkeleton={false}
 										/>
 									{:else}
@@ -336,9 +341,9 @@
 										<p>Image not available</p>
 									</div>
 								{/if}
-							{/if}
-						{/key}
 					{/if}
+					
+
 					
 					<!-- Invisible click overlay to prevent video interaction and handle clicks -->
 					<div 
@@ -425,7 +430,7 @@
 										format="auto"
 										quality={85}
 										className="collection-thumbnail"
-										fallbackSrc="/images/medici-image.png"
+										fallbackSrc="/images/placeholder.webp"
 										loading="eager"
 									/>
 								</div>
@@ -446,6 +451,33 @@
 					</div>
 				{/if}
 			</div>
+		</div>
+	{/if}
+
+	<!-- Hidden preload container -->
+	{#if nextArtwork && !nextArtworkLoaded}
+		{@const nextMediaUrls = {
+			generatorUrl: nextArtwork.generatorUrl,
+			animationUrl: nextArtwork.animationUrl,
+			imageUrl: nextArtwork.imageUrl
+		}}
+		{@const nextBestMedia = getBestMediaUrl(nextMediaUrls, 'fullscreen', nextArtwork.mime)}
+		{@const nextMediaType = getMediaDisplayType(nextBestMedia, nextArtwork.mime)}
+		{@const nextDisplayUrl = nextBestMedia?.url || ''}
+		
+		<div class="preload-container">
+			{#if nextDisplayUrl && nextMediaType === 'image'}
+				{@const imageSize = calculateResponsiveImageSize()}
+				<img
+					src={getOptimizedFeaturedImageUrl(nextDisplayUrl)}
+					alt=""
+					on:load={handleNextArtworkLoad}
+					on:error={handleNextArtworkLoad}
+				/>
+			{:else if nextDisplayUrl}
+				<!-- For videos and iframes, trigger load immediately since they handle their own loading -->
+				{handleNextArtworkLoad()}
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -487,18 +519,17 @@
 		@apply grid grid-cols-1 gap-2 md:gap-6 lg:gap-8 xl:gap-16 items-center;
 		@apply lg:grid-cols-2;
 		
-		/* Responsive min-height */
-		@media (min-width: 769px) {
-			min-height: calc(100vh - var(--navbar-height));
+		/* Responsive height */
+		@media (min-width: 1024px) {
+			height: calc(100svh - var(--navbar-height));
 		}
 	}
 
 	.artwork-display {
 		@apply w-full flex items-center justify-center order-1 lg:order-none;
-		@apply overflow-hidden;
-		/* Allow flexible aspect ratio based on artwork dimensions */
-		max-width: min(60vh, 100%);
-		max-height: min(60vh, 100%);
+		/* Mobile: constrain height to 50% of viewport height */
+		max-width: min(50vh, 100%);
+		max-height: min(50vh, 100%);
 		/* Ensure proper centering and constraints */
 		position: relative;
 		/* Ensure minimum size to prevent collapse */
@@ -508,6 +539,18 @@
 		margin: 0 auto;
 		/* Add transition for refreshing state */
 		transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+		/* Ensure container can shrink to fit content */
+		flex-shrink: 1;
+		/* Prevent overflow by not constraining too tightly */
+		overflow: visible;
+		
+		/* Desktop: take full container height with padding */
+		@media (min-width: 1024px) {
+			max-width: 100%;
+			max-height: calc(100% - 4rem);
+			height: calc(100% - 4rem);
+			padding: 2rem 0;
+		}
 		
 		&.refreshing {
 			opacity: 0.7;
@@ -528,30 +571,26 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		/* Prevent overflow and ensure containment */
-		overflow: hidden;
+		/* Allow content to be visible while maintaining bounds */
+		overflow: visible;
 		box-sizing: border-box;
 		/* Ensure minimum dimensions for artworks without stored dimensions */
 		min-width: 280px;
 		min-height: 280px;
-		/* Add smooth zoom transition */
-		transition: transform 0.3s ease-out;
+		/* Ensure wrapper can shrink to fit content */
+		flex-shrink: 1;
 		
-		&:hover {
-			transform: scale(1.05);
-		}
+		/* Removed fade-in animation to prevent transitions during refresh */
 		
-		/* Fade-in animation for new artwork */
-		:global(.artwork-container) {
-			animation: fadeIn 0.4s ease-out;
-		}
-		
-		/* Ensure OptimizedImage container fills the wrapper */
+		/* Ensure OptimizedImage container fills the wrapper properly */
 		:global(.image-container) {
 			width: 100% !important;
 			height: 100% !important;
 			min-width: 280px;
 			min-height: 280px;
+			/* Ensure image container doesn't overflow */
+			max-width: 100% !important;
+			max-height: 100% !important;
 		}
 	}
 	
@@ -567,16 +606,7 @@
 		}
 	}
 
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-			transform: scale(0.98);
-		}
-		to {
-			opacity: 1;
-			transform: scale(1);
-		}
-	}
+
 
 	.image-placeholder {
 		@apply w-full h-full flex items-center justify-center text-gray-500;
@@ -717,5 +747,18 @@
 		to {
 			transform: rotate(360deg);
 		}
+	}
+
+	/* Hide preload container */
+	.preload-container {
+		position: absolute;
+		top: -9999px;
+		left: -9999px;
+		width: 1px;
+		height: 1px;
+		opacity: 0;
+		overflow: hidden;
+		pointer-events: none;
+		visibility: hidden;
 	}
 </style> 

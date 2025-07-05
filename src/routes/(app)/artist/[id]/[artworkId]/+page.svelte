@@ -82,8 +82,7 @@
 			}
 		}, 100);
 
-		// Initialize aspect ratio calculation
-		calculateAspectRatio();
+		// Initialize media load detection
 		setupMediaLoadDetection();
 		
 		return () => {
@@ -477,41 +476,10 @@
 		: 'Artwork gallery at the Wallace Museum';
 	$: artistNames = data.currentArtworkArtists?.map(a => a.name).join(', ') || 'Unknown Artist';
 
-	// Template layout functions
-	function calculateAspectRatio() {
-		const artworkCanvas = document.querySelector('.artwork-canvas');
-		const nftMediaDiv = document.querySelector('.nft-media');
-
-		if (!artworkCanvas || !nftMediaDiv) {
-			return null;
-		}
-
-		const canvasRect = artworkCanvas.getBoundingClientRect();
-		const canvasWidth = canvasRect.width;
-		const canvasHeight = canvasRect.height;
-
-		if (canvasWidth === 0 || canvasHeight === 0) {
-			return null;
-		}
-
-		const aspectRatio = canvasWidth / canvasHeight;
-		(nftMediaDiv as HTMLElement).style.aspectRatio = `${aspectRatio} / 1`;
-
-		return aspectRatio;
-	}
-
+	// Template layout functions - removed aspect ratio calculation to allow natural artwork proportions
 	function handleLayoutRecalculation() {
-		const nftMediaDiv = document.querySelector('.nft-media');
-		
-		if (nftMediaDiv) {
-			(nftMediaDiv as HTMLElement).style.aspectRatio = '';
-		}
-
-		requestAnimationFrame(() => {
-			setTimeout(() => {
-				calculateAspectRatio();
-			}, 50);
-		});
+		// No longer forcing aspect ratio - let ArtworkDisplay handle it naturally
+		return;
 	}
 
 	function debounce(func: Function, wait: number) {
@@ -590,7 +558,6 @@
 	if (typeof window !== 'undefined') {
 		window.addEventListener('resize', debouncedHandleLayoutRecalculation);
 		window.addEventListener('load', () => {
-			calculateAspectRatio();
 			setupMediaLoadDetection();
 		});
 	}
@@ -773,7 +740,6 @@
 											linkToWebsite={false}
 											linkToArtist={true}
 											showPopover={false}
-											separator=", "
 											className="artist-name"
 										/>
 									{:else}
@@ -1043,7 +1009,7 @@
 	}
 
 	.artwork-content-container {
-		@apply max-w-[2000px] mx-auto flex-1 px-4 sm:px-6 lg:px-12;
+		@apply mx-auto flex-1 px-4 sm:px-6 lg:px-12;
 	}
 
 	/* Fullscreen content container - remove constraints and padding */

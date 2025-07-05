@@ -72,7 +72,7 @@
 					format="auto"
 					quality={85}
 					className="w-full h-full object-contain"
-					fallbackSrc="/images/medici-image.png"
+					fallbackSrc="/images/placeholder.webp"
 					loading="eager"
 					mimeType={currentArtwork.mime}
 					showSkeleton={true}

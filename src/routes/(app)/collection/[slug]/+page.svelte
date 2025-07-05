@@ -246,7 +246,7 @@
 									format="auto"
 									quality={70}
 									className="collection-image"
-									fallbackSrc="/images/medici-image.png"
+									fallbackSrc="/images/placeholder.webp"
 								/>
 						{/if}
 
@@ -583,7 +583,7 @@
 								format="auto"
 								quality={90}
 								className="modal-collection-image"
-								fallbackSrc="/images/medici-image.png"
+								fallbackSrc="/images/placeholder.webp"
 							/>
 						</div>
 					{/if}
@@ -635,7 +635,7 @@
 								format="auto"
 								quality={90}
 								className="modal-collection-image"
-								fallbackSrc="/images/medici-image.png"
+								fallbackSrc="/images/placeholder.webp"
 							/>
 						</div>
 					{/if}
