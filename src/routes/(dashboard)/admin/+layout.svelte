@@ -152,7 +152,7 @@
 					href={item.href}
 					on:click={closeSidebar}
 					class="flex items-center no-underline {sidebarCollapsed ? 'px-4 justify-center' : 'px-6'} py-2 text-sm font-medium transition-colors duration-200 {currentPage === item.href 
-						? 'bg-primary-400 text-gray-900 hover:text-black' 
+						? 'bg-yellow-400 text-black hover:text-black' 
 						: 'text-gray-900 dark:text-gray-100 hover:text-gray-950 dark:hover:text-white'}"
 					title={sidebarCollapsed ? item.label : ''}
 				>
