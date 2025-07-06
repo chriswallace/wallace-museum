@@ -47,10 +47,10 @@
 
 	function parseContractAddresses(addresses: any): string[] {
 		if (!addresses) return [];
-		if (Array.isArray(addresses)) return addresses;
+		if (Array.isArray(addresses)) return addresses.filter(addr => addr && typeof addr === 'string');
 		try {
 			const parsed = JSON.parse(addresses);
-			return Array.isArray(parsed) ? parsed : [];
+			return Array.isArray(parsed) ? parsed.filter(addr => addr && typeof addr === 'string') : [];
 		} catch {
 			return [];
 		}
@@ -361,17 +361,19 @@
 								<h3>Contract{contractAddresses.length > 1 ? 's' : ''}</h3>
 								<div class="contracts-list">
 									{#each contractAddresses as contractAddress}
-										<div class="contract-item">
-											<a 
-												href={getContractUrl(contractAddress, data.collection.chainIdentifier || 'ethereum')}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="contract-link"
-											>
-												<span class="contract-name">{getContractName(contractAddress) || 'Smart Contract'}</span>
-												<code class="contract-address">{truncateAddress(contractAddress)}</code>
-											</a>
-										</div>
+										{#if contractAddress}
+											<div class="contract-item">
+												<a 
+													href={getContractUrl(contractAddress, data.collection.chainIdentifier || 'ethereum')}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="contract-link"
+												>
+													<span class="contract-name">{getContractName(contractAddress) || 'Smart Contract'}</span>
+													<code class="contract-address">{truncateAddress(contractAddress)}</code>
+												</a>
+											</div>
+										{/if}
 									{/each}
 								</div>
 							</div>

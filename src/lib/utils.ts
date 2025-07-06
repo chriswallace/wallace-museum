@@ -121,9 +121,9 @@ const CONTRACT_NAMES: Record<string, string> = {
 /**
  * Truncate an address to show first 6 and last 4 characters
  */
-export function truncateAddress(address: string): string {
+export function truncateAddress(address: string | null | undefined): string {
 	if (!address || address.length <= 10) {
-		return address;
+		return address || '';
 	}
 	return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 }
@@ -131,7 +131,7 @@ export function truncateAddress(address: string): string {
 /**
  * Get a human-readable name for a contract address
  */
-export function getContractName(address: string, contractAlias?: string): string {
+export function getContractName(address: string | null | undefined, contractAlias?: string | null): string {
 	if (!address) return contractAlias || 'Unknown Contract';
 
 	// Check if we have a known contract name
@@ -156,7 +156,7 @@ export function getContractName(address: string, contractAlias?: string): string
 }
 
 export function getContractUrl(
-	address: string,
+	address: string | null | undefined,
 	blockchain?: string,
 	tokenId?: string
 ): string | undefined {

@@ -162,16 +162,19 @@
 							<dd>{artworkDetails.tokenStandard?.toUpperCase()}</dd>
 						{/if}
 						{#if (artworkDetails.contractAddress || artworkDetails.contractAddr) && (artworkDetails.tokenId || artworkDetails.tokenID)}
+							{@const contractAddress = artworkDetails.contractAddress || artworkDetails.contractAddr}
+							{@const contractUrl = getContractUrl(contractAddress, artworkDetails.blockchain, artworkDetails.tokenId || artworkDetails.tokenID)}
 							<dt>Contract</dt>
 							<dd>
-								<a
-									target="_blank"
-									href={getContractUrl(
-										artworkDetails.contractAddress || artworkDetails.contractAddr,
-										artworkDetails.blockchain,
-										artworkDetails.tokenId || artworkDetails.tokenID
-									)}>{getContractName(artworkDetails.contractAddress || artworkDetails.contractAddr, artworkDetails.contractAlias)}</a
-								>
+								{#if contractUrl}
+									<a
+										target="_blank"
+										href={contractUrl}
+									>{getContractName(contractAddress, artworkDetails.contractAlias)}</a
+									>
+								{:else}
+									{getContractName(contractAddress, artworkDetails.contractAlias)}
+								{/if}
 							</dd>
 						{/if}
 						{#if artworkDetails.dimensions && artworkDetails.dimensions.width && artworkDetails.dimensions.height}
