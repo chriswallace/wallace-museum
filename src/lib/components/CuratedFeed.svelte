@@ -4,13 +4,7 @@
 	import { navigateWithDebounce } from '$lib/utils/navigationHelpers';
 	import LazyArtwork from './LazyArtwork.svelte';
 	import SkeletonLoader from './SkeletonLoader.svelte';
-	import {
-		processArtworksForEntangled,
-		isEntangledPair,
-		getEntangledPageUrl,
-		isEntangledArtwork,
-		getEntangledPageUrlFromArtwork
-	} from '$lib/utils/entangledHelpers';
+
 	import type { CollectionGroup } from '../../routes/api/artworks/collections/+server';
 
 	let collections: CollectionGroup[] = [];
@@ -24,7 +18,7 @@
 
 	// Get display artworks for each collection (show all artworks)
 	function getDisplayArtworks(collection: CollectionGroup) {
-		return processArtworksForEntangled(collection.artworks); // Process for Entangled pairing
+		return collection.artworks;
 	}
 
 	// Truncate description at 255 characters with ellipsis
@@ -140,6 +134,16 @@
 	onMount(() => {
 		loadCollections();
 
+		// Initialize button states for all swipers after collections load
+		setTimeout(() => {
+			const swiperTracks = document.querySelectorAll('.swiper-track');
+			swiperTracks.forEach(track => {
+				if (track instanceof HTMLElement) {
+					updateButtonStates(track);
+				}
+			});
+		}, 500);
+
 		// Cleanup on component destroy
 		return () => {
 			if (observerCleanup) {
@@ -176,6 +180,9 @@
 			left: targetScroll,
 			behavior: 'smooth'
 		});
+
+		// Update button states after scrolling
+		setTimeout(() => updateButtonStates(swiperTrack), 300);
 	}
 
 	function canScrollLeft(swiperTrack: HTMLElement): boolean {
@@ -185,6 +192,23 @@
 	function canScrollRight(swiperTrack: HTMLElement): boolean {
 		return swiperTrack.scrollLeft < swiperTrack.scrollWidth - swiperTrack.clientWidth;
 	}
+
+	function updateButtonStates(swiperTrack: HTMLElement) {
+		const container = swiperTrack.closest('.collection-artworks');
+		if (!container) return;
+
+		const leftButton = container.querySelector('.swiper-nav-left') as HTMLButtonElement;
+		const rightButton = container.querySelector('.swiper-nav-right') as HTMLButtonElement;
+
+		if (leftButton) {
+			leftButton.disabled = !canScrollLeft(swiperTrack);
+		}
+		if (rightButton) {
+			rightButton.disabled = !canScrollRight(swiperTrack);
+		}
+	}
+
+
 </script>
 
 <div class="curated-feed">
@@ -284,159 +308,67 @@
 					</div>
 
 					<div class="collection-artworks">
-						<div class="artworks-swiper" class:hoverable={displayArtworks.length > 3}>
-							<!-- Navigation Buttons -->
-							<button
-								class="swiper-nav-button swiper-nav-left"
-								on:click={(e) => {
-									e.preventDefault();
-									const swiperTrack = e.currentTarget.parentElement?.querySelector('.swiper-track');
-									if (swiperTrack) scrollSwiper(swiperTrack, 'left');
-								}}
-								aria-label="Previous artworks"
-							>
-								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<path d="M15 18l-6-6 6-6" />
-								</svg>
-							</button>
+						<div class="artworks-swiper has-nav">
+							<!-- Navigation Buttons - positioned over artworks on the top right -->
+							<div class="nav-buttons-container">
+								<button
+									class="swiper-nav-button swiper-nav-left"
+									on:click={(e) => {
+										e.preventDefault();
+										const swiperTrack = e.currentTarget.parentElement?.parentElement?.querySelector('.swiper-track');
+										if (swiperTrack) scrollSwiper(swiperTrack, 'left');
+									}}
+									aria-label="Previous artworks"
+								>
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<path d="M15 18l-6-6 6-6" />
+									</svg>
+								</button>
 
-							<button
-								class="swiper-nav-button swiper-nav-right"
-								on:click={(e) => {
-									e.preventDefault();
-									const swiperTrack = e.currentTarget.parentElement?.querySelector('.swiper-track');
-									if (swiperTrack) scrollSwiper(swiperTrack, 'right');
-								}}
-								aria-label="Next artworks"
-							>
-								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<path d="M9 18l6-6-6-6" />
-								</svg>
-							</button>
-
+								<button
+									class="swiper-nav-button swiper-nav-right"
+									on:click={(e) => {
+										e.preventDefault();
+										const swiperTrack = e.currentTarget.parentElement?.parentElement?.querySelector('.swiper-track');
+										if (swiperTrack) scrollSwiper(swiperTrack, 'right');
+									}}
+									aria-label="Next artworks"
+								>
+									<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+										<path d="M9 18l6-6-6-6" />
+									</svg>
+								</button>
+							</div>
 							<div class="swiper-track">
 								{#each displayArtworks as item}
-									{#if isEntangledPair(item)}
-										<!-- Entangled pair link -->
-										<div class="artwork-slide entangled-slide">
-											<a
-												href={getEntangledPageUrl(item.ethereum.tokenId, item.tezos.tokenId)}
-												class="entangled-link"
-											>
-												<div class="entangled-preview-mini">
-													<div class="entangled-preview-images-mini">
-														<div class="chain-preview-mini ethereum">
-															<LazyArtwork
-																artwork={{
-																	id: item.ethereum.id,
-																	title: item.ethereum.title,
-																	imageUrl: item.ethereum.imageUrl,
-																	animationUrl: item.ethereum.animationUrl,
-																	mime: item.ethereum.mime,
-																	dimensions: item.ethereum.dimensions
-																}}
-																aspectRatio="square"
-																className="chain-artwork-mini"
-																priority={collections.indexOf(collection) < 2}
-																sizes="200px"
-																responsiveSizes={[200]}
-																quality={70}
-															/>
-														</div>
-														<div class="chain-preview-mini tezos">
-															<LazyArtwork
-																artwork={{
-																	id: item.tezos.id,
-																	title: item.tezos.title,
-																	imageUrl: item.tezos.imageUrl,
-																	animationUrl: item.tezos.animationUrl,
-																	mime: item.tezos.mime,
-																	dimensions: item.tezos.dimensions
-																}}
-																aspectRatio="square"
-																className="chain-artwork-mini"
-																priority={collections.indexOf(collection) < 2}
-																sizes="200px"
-																responsiveSizes={[200]}
-																quality={70}
-															/>
-														</div>
-													</div>
-													<div class="entangled-overlay-mini">
-														<div class="entangled-title-mini">ENTANGLED</div>
-													</div>
-												</div>
-											</a>
-											<div class="artwork-info">
-												<div class="artwork-title">
-													Entangled #{item.ethereum.tokenId || item.ethereum.tokenID || '1'}
-												</div>
-												{#if item.ethereum.artists && item.ethereum.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
-													<div class="artist-name">{item.ethereum.artists[0].name}</div>
-												{/if}
+									<!-- Regular artwork display -->
+									<div class="artwork-slide">
+										<LazyArtwork
+											artwork={{
+												id: item.id,
+												title: item.title,
+												imageUrl: item.imageUrl,
+												animationUrl: item.animationUrl,
+												mime: item.mime,
+												dimensions: item.dimensions
+											}}
+											aspectRatio="square"
+											onClick={() => handleArtworkClick(item)}
+											className="artwork-thumbnail"
+											priority={collections.indexOf(collection) < 2}
+											sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, (max-width: 1024px) 400px, (max-width: 1280px) 480px, 520px"
+											responsiveSizes={[280, 320, 400, 480, 520]}
+											quality={70}
+										/>
+										<div class="artwork-info">
+											<div class="artwork-title">
+												{trimArtworkTitle(item.title, collection.title)}
 											</div>
+											{#if item.artists && item.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
+												<div class="artist-name">{item.artists[0].name}</div>
+											{/if}
 										</div>
-									{:else if isEntangledArtwork(item)}
-										<!-- Individual Entangled artwork link -->
-										<div class="artwork-slide">
-											<a href={getEntangledPageUrlFromArtwork(item)} class="entangled-single-link">
-												<LazyArtwork
-													artwork={{
-														id: item.id,
-														title: item.title,
-														imageUrl: item.imageUrl,
-														animationUrl: item.animationUrl,
-														mime: item.mime,
-														dimensions: item.dimensions
-													}}
-													aspectRatio="square"
-													className="artwork-thumbnail"
-													priority={collections.indexOf(collection) < 2}
-													sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, (max-width: 1024px) 400px, (max-width: 1280px) 480px, 520px"
-													responsiveSizes={[280, 320, 400, 480, 520]}
-													quality={70}
-												/>
-												<div class="entangled-badge-mini">ENTANGLED</div>
-											</a>
-											<div class="artwork-info">
-												<div class="artwork-title">
-													{trimArtworkTitle(item.title, collection.title)}
-												</div>
-												{#if item.artists && item.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
-													<div class="artist-name">{item.artists[0].name}</div>
-												{/if}
-											</div>
-										</div>
-									{:else}
-										<!-- Regular artwork display -->
-										<div class="artwork-slide">
-											<LazyArtwork
-												artwork={{
-													id: item.id,
-													title: item.title,
-													imageUrl: item.imageUrl,
-													animationUrl: item.animationUrl,
-													mime: item.mime,
-													dimensions: item.dimensions
-												}}
-												aspectRatio="square"
-												onClick={() => handleArtworkClick(item)}
-												className="artwork-thumbnail"
-												priority={collections.indexOf(collection) < 2}
-												sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, (max-width: 1024px) 400px, (max-width: 1280px) 480px, 520px"
-												responsiveSizes={[280, 320, 400, 480, 520]}
-												quality={70}
-											/>
-											<div class="artwork-info">
-												<div class="artwork-title">
-													{trimArtworkTitle(item.title, collection.title)}
-												</div>
-												{#if item.artists && item.artists.length > 0 && !isCollectionBySpecificArtist(collection)}
-													<div class="artist-name">{item.artists[0].name}</div>
-												{/if}
-											</div>
-										</div>
-									{/if}
+									</div>
 								{/each}
 
 								<!-- View Collection Card -->
@@ -722,68 +654,54 @@
 
 	/* Artworks Swiper */
 	.artworks-swiper {
-		@apply overflow-hidden;
+		@apply overflow-hidden relative;
 	}
 
-	.artworks-swiper.hoverable {
-		@apply relative;
-	}
-
-	.swiper-nav-button {
-		@apply absolute top-1/2 z-10;
-		@apply w-12 h-12 rounded-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm;
-		@apply flex items-center justify-center cursor-pointer border-0;
-		@apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white;
-		@apply shadow-lg hover:shadow-xl;
-		@apply opacity-0 pointer-events-none;
-		@apply hover:bg-white dark:hover:bg-gray-700;
-		/* Use transform instead of Tailwind classes for better control */
-		transform: translateY(-50%);
-		/* Smooth transition with delay to prevent flickering */
-		transition: opacity 0.2s ease-in-out 0.1s, 
-		           background-color 0.2s ease-in-out,
-		           box-shadow 0.2s ease-in-out,
-		           transform 0.2s ease-in-out;
-	}
-
-	.artworks-swiper.hoverable:hover .swiper-nav-button {
-		@apply opacity-100 pointer-events-auto;
-		/* Remove delay when showing */
-		transition-delay: 0s;
-	}
-
-	/* Keep buttons visible when hovering over them directly */
-	.swiper-nav-button:hover {
-		@apply opacity-100 pointer-events-auto;
-		transition-delay: 0s;
-	}
-
-	.swiper-nav-left {
-		@apply left-2;
-	}
-
-	.swiper-nav-right {
-		@apply right-2;
-	}
-
-	.swiper-nav-button svg {
-		@apply w-5 h-5;
-		@apply transition-transform duration-200;
-	}
-
-	.swiper-nav-button:hover {
-		transform: translateY(-50%) scale(1.05);
-	}
-
-	.swiper-nav-button:hover svg {
-		transform: scale(1.1);
+	/* Navigation Buttons Container - positioned as overlay */
+	.nav-buttons-container {
+		@apply absolute top-0 right-0 flex gap-0;
+		z-index: 20;
 	}
 
 	/* Hide navigation on mobile */
 	@media (max-width: 767px) {
-		.swiper-nav-button {
+		.nav-buttons-container {
 			@apply hidden;
 		}
+	}
+
+	.swiper-nav-button {
+		@apply w-12 h-12 bg-white dark:bg-gray-950;
+		@apply flex items-center justify-center cursor-pointer;
+		@apply text-gray-600 dark:text-gray-400;
+		@apply shadow-sm hover:shadow-md;
+		@apply transition-all duration-200;
+		@apply hover:bg-gray-50 dark:hover:bg-gray-700;
+		@apply hover:text-gray-900 dark:hover:text-white;
+		/* Add borders to match page background */
+	}
+
+	@media (prefers-color-scheme: dark) {
+		.swiper-nav-button {
+			border-left-color: black;
+			border-bottom-color: black;
+		}
+	}
+
+	.swiper-nav-button:disabled {
+		@apply cursor-not-allowed;
+		@apply hover:bg-white dark:hover:bg-gray-950;
+		@apply hover:text-gray-600 dark:hover:text-gray-400;
+		@apply hover:shadow-sm;
+	}
+
+	.swiper-nav-button svg {
+		@apply w-4 h-4;
+		@apply transition-transform duration-200;
+	}
+
+	.swiper-nav-button:hover:not(:disabled) svg {
+		@apply scale-110;
 	}
 
 	.swiper-track {
@@ -806,17 +724,9 @@
 		scroll-snap-align: 16px;
 	}
 
-	.entangled-slide {
-		width: 560px; /* Double width for Entangled pairs */
-	}
-
 	@media (min-width: 640px) {
 		.artwork-slide {
 			width: 320px;
-		}
-
-		.entangled-slide {
-			width: 640px;
 		}
 	}
 
@@ -824,29 +734,17 @@
 		.artwork-slide {
 			width: 400px; /* Larger desktop size */
 		}
-
-		.entangled-slide {
-			width: 800px; /* Double width for Entangled pairs */
-		}
 	}
 
 	@media (min-width: 1024px) {
 		.artwork-slide {
 			width: 480px; /* Even larger on big screens */
 		}
-
-		.entangled-slide {
-			width: 960px; /* Double width for Entangled pairs */
-		}
 	}
 
 	@media (min-width: 1280px) {
 		.artwork-slide {
 			width: 520px; /* Maximum size for very large screens */
-		}
-
-		.entangled-slide {
-			width: 1040px; /* Double width for Entangled pairs */
 		}
 	}
 
@@ -904,55 +802,7 @@
 		@apply flex flex-col items-center justify-center mt-12;
 	}
 
-	/* Entangled Mini Styles */
-	.entangled-link {
-		@apply block no-underline;
-	}
 
-	.entangled-preview-mini {
-		@apply relative bg-gradient-to-br from-gray-900 to-black rounded-lg overflow-hidden aspect-video mb-2;
-		transition: all 0.3s ease;
-	}
-
-	.entangled-preview-mini:hover {
-		transform: scale(1.02);
-		box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-	}
-
-	.entangled-preview-images-mini {
-		@apply absolute inset-0 flex;
-	}
-
-	.chain-preview-mini {
-		@apply flex-1 relative overflow-hidden;
-	}
-
-	.chain-preview-mini.ethereum {
-		@apply border-r border-blue-500/30;
-	}
-
-	.chain-preview-mini.tezos {
-		@apply border-l border-blue-400/30;
-	}
-
-	.entangled-overlay-mini {
-		@apply absolute inset-0 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center text-white text-center;
-		background: linear-gradient(45deg, rgba(98, 126, 234, 0.8), rgba(45, 156, 219, 0.8));
-	}
-
-	.entangled-title-mini {
-		@apply text-lg md:text-xl font-bold tracking-wide;
-		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-	}
-
-	.entangled-single-link {
-		@apply relative block no-underline;
-	}
-
-	.entangled-badge-mini {
-		@apply absolute top-2 right-2 px-2 py-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-bold rounded-full tracking-wide;
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-	}
 
 	.view-collection-slide {
 		@apply flex-shrink-0 px-0 aspect-square;
