@@ -71,7 +71,18 @@
 	// Grid-optimized image settings for better Pinata performance
 	$: gridOptimizedWidth = isGif ? undefined : responsiveSizes[responsiveSizes.length - 1];
 	$: gridOptimizedHeight = isGif ? undefined : (aspectRatio === 'square' ? responsiveSizes[responsiveSizes.length - 1] : undefined);
-	$: gridOptimizedFit = 'contain' as const; // Always use contain to show full artwork
+	
+	// Use proper object-fit based on context and artwork dimensions
+	$: gridOptimizedFit = (() => {
+		// For artwork grids and collections, always use 'contain' to show full artwork without cropping
+		// This follows the established pattern for displaying complete artworks
+		if (aspectRatio === 'square' || aspectRatio === 'auto') {
+			return 'contain' as const;
+		}
+		// For avatar images or other contexts, use cover to properly fill containers
+		return fit;
+	})();
+	
 	$: gridOptimizedQuality = isGif ? undefined : (quality || 50); // Lower quality for grid thumbnails
 	$: gridOptimizedFormat = isGif ? 'auto' as const : 'webp' as const; // Preserve GIF format, optimize others
 
@@ -311,15 +322,24 @@
 	.artwork-stage {
 		@apply bg-gray-100 dark:bg-gray-950/70 w-full overflow-hidden flex items-center justify-center;
 		
+		/* Ensure stage has proper minimum dimensions for images */
+		min-height: 0;
+		
 		/* Ensure auto aspect ratio doesn't break container constraints */
 		&.aspect-auto {
 			@apply h-full;
 			max-height: 100%;
+			min-height: 100%;
 			/* Ensure proper centering and constraint behavior */
 			display: flex;
 			align-items: center;
 			justify-content: center;
 			position: relative;
+		}
+		
+		/* For square aspect ratio, ensure full container coverage */
+		&.aspect-square {
+			min-height: 100%;
 		}
 	}
 
@@ -345,9 +365,14 @@
 	}
 
 	:global(.stage-image) {
-		@apply w-full h-full object-contain;
+		@apply w-full h-full;
 		max-width: 100% !important;
 		max-height: 100% !important;
+		
+		/* Ensure images fill at least one dimension of their container */
+		min-width: 100%;
+		min-height: 100%;
+		object-fit: contain; /* Default fallback, will be overridden by component props */
 	}
 
 	.stage-placeholder {

@@ -291,12 +291,12 @@
 					<div class="collection-header">
 						<div class="collection-card">
 							<div class="collection-main-info">
-								<button
+								<a
 									class="collection-title-button"
-									on:click={() => goto(`/collection/${collection.slug}`)}
+									href="/collection/{collection.slug}"
 								>
 									<h2 class="collection-title">{collection.title}</h2>
-								</button>
+								</a>
 								{#if isCollectionBySpecificArtist(collection)}
 									<div class="collection-artist">by {collection.artists[0].name}</div>
 								{/if}
@@ -355,7 +355,7 @@
 											aspectRatio="square"
 											onClick={() => handleArtworkClick(item)}
 											className="artwork-thumbnail"
-											priority={collections.indexOf(collection) < 2}
+											priority={true}
 											sizes="(max-width: 640px) 280px, (max-width: 768px) 320px, (max-width: 1024px) 400px, (max-width: 1280px) 480px, 520px"
 											responsiveSizes={[280, 320, 400, 480, 520]}
 											quality={70}
@@ -569,7 +569,7 @@
 
 	.collection-title-button {
 		@apply bg-transparent border-none p-0 cursor-pointer;
-		@apply transition-colors duration-200;
+		@apply transition-colors duration-200 no-underline;
 	}
 
 	.collection-title-button:hover .collection-title {
@@ -751,6 +751,33 @@
 	.artwork-thumbnail {
 		@apply overflow-hidden w-full mb-2;
 		@apply flex items-center justify-center mx-auto my-0;
+		/* Ensure minimum height to match container width for proper grid display */
+		aspect-ratio: 1 / 1;
+		min-height: 280px;
+	}
+	
+	@media (min-width: 640px) {
+		.artwork-thumbnail {
+			min-height: 320px;
+		}
+	}
+
+	@media (min-width: 768px) {
+		.artwork-thumbnail {
+			min-height: 400px;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.artwork-thumbnail {
+			min-height: 480px;
+		}
+	}
+
+	@media (min-width: 1280px) {
+		.artwork-thumbnail {
+			min-height: 520px;
+		}
 	}
 
 	.artwork-info {

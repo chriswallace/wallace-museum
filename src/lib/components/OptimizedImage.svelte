@@ -428,6 +428,7 @@
 			height={height || ''}
 			class={className}
 			class:hidden={shouldShowSkeleton}
+			style:--object-fit={fit}
 			on:loadstart={handleLoadStart}
 			on:load={handleLoad}
 			on:error={handleError}
@@ -446,12 +447,14 @@
 	}
 
 	img {
-		@apply mx-auto block object-contain transition-opacity duration-200 ease-in-out relative z-10;
-		/* Ensure proper scaling for contain behavior */
+		@apply mx-auto block transition-opacity duration-200 ease-in-out relative z-10;
+		/* Apply object-fit based on the fit prop */
+		object-fit: var(--object-fit, contain);
+		/* Ensure proper scaling */
 		max-width: 100%;
 		max-height: 100%;
-		width: auto;
-		height: auto;
+		width: 100%;
+		height: 100%;
 	}
 
 	img.hidden {

@@ -65,6 +65,7 @@
 	"dependencies": {
 		"@ffprobe-installer/ffprobe": "^2.1.2",
 		"@img/sharp-libvips-win32-x64": "^1.0.2",
+		"@panzoom/panzoom": "^4.6.0",
 		"@pinata/sdk": "^2.1.0",
 		"@sveltejs/adapter-vercel": "^1.0.6",
 		"@sveltejs/kit": "^1.11.0",
