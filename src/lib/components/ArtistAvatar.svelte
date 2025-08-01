@@ -44,8 +44,9 @@
 			aspectRatio="1/1"
 			showSkeleton={showSkeleton}
 			skeletonBorderRadius={isSquare ? "4px" : "50%"}
-			className={imageClasses}
-			fallbackSrc="/images/placeholder.webp"
+					className={imageClasses}
+		fallbackSrc="/images/placeholder.webp"
+		showFallbackOnError={true}
 		/>
 	{:else}
 		<img

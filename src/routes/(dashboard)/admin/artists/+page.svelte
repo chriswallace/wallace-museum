@@ -139,6 +139,7 @@
 							aspectRatio="1/1"
 							className="w-full h-full object-cover"
 							fallbackSrc="/images/placeholder.webp"
+							showFallbackOnError={true}
 						/>
 					{:else}
 						<img

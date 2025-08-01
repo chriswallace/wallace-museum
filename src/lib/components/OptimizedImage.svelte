@@ -31,7 +31,7 @@
 	
 	// Fallback options
 	export let fallbackSrc: string = '/images/placeholder.webp';
-	export let showFallbackOnError: boolean = true;
+	export let showFallbackOnError: boolean = false;
 
 	export let aspectRatio: string | undefined = undefined;
 

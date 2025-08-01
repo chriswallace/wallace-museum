@@ -188,11 +188,12 @@
 					format="auto"
 					quality={80}
 					aspectRatio="1/1"
-					showSkeleton={true}
-					skeletonBorderRadius="0px"
-					className="w-full h-full object-cover"
-					fallbackSrc="/images/placeholder.webp"
-					loading="lazy"
+									showSkeleton={true}
+				skeletonBorderRadius="0px"
+				className="w-full h-full object-cover"
+				fallbackSrc="/images/placeholder.webp"
+				showFallbackOnError={true}
+				loading="lazy"
 					on:error={handleImageError}
 				/>
 			{:else if shouldShowVideo && displayAnimationUrl}
@@ -225,6 +226,7 @@
 					quality={gridQuality}
 					className="w-full h-full object-contain"
 					fallbackSrc="/images/placeholder.webp"
+				showFallbackOnError={true}
 					loading="lazy"
 					mimeType={artwork.mime}
 					on:error={handleImageError}
@@ -413,6 +415,7 @@
 						skeletonBorderRadius="6px"
 						className="w-full h-full object-cover"
 						fallbackSrc="/images/placeholder.webp"
+				showFallbackOnError={true}
 						loading="lazy"
 						on:error={handleImageError}
 					/>
@@ -446,6 +449,7 @@
 						quality={gridQuality}
 						className="w-full h-full object-contain"
 						fallbackSrc="/images/placeholder.webp"
+				showFallbackOnError={true}
 						loading="lazy"
 						mimeType={artwork.mime}
 						on:error={handleImageError}
